@@ -654,6 +654,8 @@ const char* xd3_strerror (int ret)
     case XD3_GOTHEADER: return "XD3_GOTHEADER";
     case XD3_WINSTART: return "XD3_WINSTART";
     case XD3_WINFINISH: return "XD3_WINFINISH";
+    case XD3_TOOFARBACK: return "XD3_TOOFARBACK";
+    case XD3_INTERNAL: return "XD3_INTERNAL";
     }
   return strerror (ret);
 }
@@ -692,7 +694,7 @@ static const xd3_sec_type fgk_sec_type =
 #define IF_FGK(x)
 #define FGK_CASE(s) \
   s->msg = "unavailable secondary compressor: FGK Adaptive Huffman"; \
-  return EINVAL;
+  return XD3_INTERNAL;
 #endif
 
 #if SECONDARY_DJW
@@ -718,7 +720,7 @@ static const xd3_sec_type djw_sec_type =
 #define IF_DJW(x)
 #define DJW_CASE(s) \
   s->msg = "unavailable secondary compressor: DJW Static Huffman"; \
-  return EINVAL;
+  return XD3_INTERNAL;
 #endif
 
 /******************************************************************************************/
@@ -1337,7 +1339,7 @@ xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
 	      if (*code_string > XD3_CPY)
 		{
 		  stream->msg = "invalid code-table opcode";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      code_table[i].type1 = *code_string++;
 	      break;
@@ -1345,7 +1347,7 @@ xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
 	      if (*code_string > XD3_CPY)
 		{
 		  stream->msg = "invalid code-table opcode";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      code_table[i].type2 = *code_string++;
 	      break;
@@ -1353,7 +1355,7 @@ xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
 	      if (*code_string != 0 && code_table[i].type1 == XD3_NOOP)
 		{
 		  stream->msg = "invalid code-table size";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      code_table[i].size1 = *code_string++;
 	      break;
@@ -1361,7 +1363,7 @@ xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
 	      if (*code_string != 0 && code_table[i].type2 == XD3_NOOP)
 		{
 		  stream->msg = "invalid code-table size";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      code_table[i].size2 = *code_string++;
 	      break;
@@ -1369,12 +1371,12 @@ xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
 	      if (*code_string >= modes)
 		{
 		  stream->msg = "invalid code-table mode";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      if (*code_string != 0 && code_table[i].type1 != XD3_CPY)
 		{
 		  stream->msg = "invalid code-table mode";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      code_table[i].type1 += *code_string++;
 	      break;
@@ -1382,12 +1384,12 @@ xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
 	      if (*code_string >= modes)
 		{
 		  stream->msg = "invalid code-table mode";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      if (*code_string != 0 && code_table[i].type2 != XD3_CPY)
 		{
 		  stream->msg = "invalid code-table mode";
-		  return EINVAL;
+		  return XD3_INTERNAL;
 		}
 	      code_table[i].type2 += *code_string++;
 	      break;
@@ -1432,7 +1434,7 @@ xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t si
   if (code_size != sizeof (code_string))
     {
       stream.msg = "corrupt code-table encoding";
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       goto fail;
     }
 
@@ -1566,7 +1568,7 @@ xd3_check_pow2 (usize_t value, usize_t *logof)
 	}
     }
 
-  return EINVAL;
+  return XD3_INTERNAL;
 }
 
 static usize_t
@@ -1862,7 +1864,7 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (PART & OFLOW)                                                \
 	{                                                              \
 	  stream->msg = "overflow in decode_integer";                  \
-	  return EINVAL;                                               \
+	  return XD3_INTERNAL;                                               \
 	}                                                              \
                                                                        \
       PART = (PART << 7) | (next & 127);                               \
@@ -1888,13 +1890,13 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (inp == max)                                                  \
 	{                                                              \
 	  stream->msg = "end-of-input in read_integer";                \
-	  return EINVAL;                                               \
+	  return XD3_INTERNAL;                                               \
 	}                                                              \
                                                                        \
       if (val & OFLOW)                                                 \
 	{                                                              \
 	  stream->msg = "overflow in read_intger";                     \
-	  return EINVAL;                                               \
+	  return XD3_INTERNAL;                                               \
 	}                                                              \
                                                                        \
       next = (*inp++);                                                 \
@@ -2171,7 +2173,7 @@ xd3_decode_address (xd3_stream *stream, usize_t here, uint mode, const uint8_t *
       if (*inpp == max)
 	{
 	  stream->msg = "address underflow";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       mode -= same_start;
@@ -2484,7 +2486,7 @@ xd3_config_stream(xd3_stream *stream,
       (ret = xd3_check_pow2(XD3_ALLOCSIZE, NULL)))
     {
       stream->msg = "incorrect compilation: wrong integer sizes";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   /* Check/set secondary compressor. */
@@ -2494,7 +2496,7 @@ xd3_config_stream(xd3_stream *stream,
       if (stream->flags & XD3_SEC_OTHER)
 	{
 	  stream->msg = "XD3_SEC flags require a secondary compressor type";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
       break;
     case XD3_SEC_FGK:
@@ -2503,7 +2505,7 @@ xd3_config_stream(xd3_stream *stream,
       DJW_CASE (stream);
     default:
       stream->msg = "too many secondary compressor types set";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   /* Check/set encoder code table. */
@@ -2521,7 +2523,7 @@ xd3_config_stream(xd3_stream *stream,
 #endif
   default:
     stream->msg = "alternate code table support was not compiled";
-    return EINVAL;
+    return XD3_INTERNAL;
   }
 
   /* Check sprevsz */
@@ -2534,7 +2536,7 @@ xd3_config_stream(xd3_stream *stream,
       if ((ret = xd3_check_pow2 (stream->sprevsz, NULL)))
 	{
 	  stream->msg = "sprevsz is required to be a power of two";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       stream->sprevmask = stream->sprevsz - 1;
@@ -2557,7 +2559,7 @@ xd3_config_stream(xd3_stream *stream,
 	  config->srcwin_maxsz < stream->srcwin_size)
 	{
 	  stream->msg = "invalid soft string-match config";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
       break;)
 
@@ -2566,7 +2568,7 @@ xd3_config_stream(xd3_stream *stream,
       IF_BUILD_FAST(case XD3_SMATCH_FAST: smatcher = & __smatcher_fast; break;)
     default:
       stream->msg = "invalid string match config type";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   stream->string_match  = smatcher->string_match;
@@ -2600,7 +2602,7 @@ xd3_getblk (xd3_stream *stream/*, xd3_source *source*/, xoff_t blkno)
   if (blkno >= source->blocks)
     {
       stream->msg = "source file too short";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if (blkno != source->curblkno || source->curblk == NULL)
@@ -2626,7 +2628,7 @@ xd3_getblk (xd3_stream *stream/*, xd3_source *source*/, xoff_t blkno)
   if (source->onblk != xd3_bytes_on_srcblk (source, blkno))
     {
       stream->msg = "getblk returned short block";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   return 0;
@@ -2673,7 +2675,7 @@ xd3_close_stream (xd3_stream *stream)
       if (stream->enc_state != ENC_INPUT || stream->avail_in != 0)
 	{
 	  stream->msg = "encoding is incomplete";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
   else
@@ -2690,7 +2692,7 @@ xd3_close_stream (xd3_stream *stream)
 	default:
 	  /* If decoding, should be ready for the next window. */
 	  stream->msg = "EOF in decode";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
 
@@ -2709,7 +2711,7 @@ xd3_get_appheader (xd3_stream  *stream,
   if (stream->dec_state < DEC_WININD)
     {
       stream->msg = "application header not available";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   (*data) = stream->dec_appheader;
@@ -3640,7 +3642,7 @@ xd3_encode_input (xd3_stream *stream)
   if (stream->dec_state != 0)
     {
       stream->msg = "encoder/decoder transition";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   switch (stream->enc_state)
@@ -3781,7 +3783,7 @@ xd3_encode_input (xd3_stream *stream)
       if (stream->avail_out != 0)
 	{
 	  stream->msg = "missed call to consume output";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Continue outputting one buffer at a time, until the next is NULL. */
@@ -3813,7 +3815,7 @@ xd3_encode_input (xd3_stream *stream)
 
     default:
       stream->msg = "invalid state";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 }
 #endif /* XD3_ENCODER */
@@ -3853,7 +3855,7 @@ xd3_process_completely (xd3_stream    *stream,
 	case XD3_GETSRCBLK:
 	  {
 	    stream->msg = "stream requires source input";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 	case 0: /* there is no plain "success" return for xd3_encode/decode */
 	  XD3_ASSERT (ret != 0);
@@ -3947,7 +3949,7 @@ xd3_decode_setup_buffers (xd3_stream *stream)
       if (stream->dec_cpyoff < stream->dec_laststart)
 	{
 	  stream->msg = "unsupported VCD_TARGET offset";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* See if the two windows are the same.  This indicates the first time VCD_TARGET is
@@ -4113,7 +4115,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 
 			    & inst->size)))
     {
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   /* For copy instructions, read address. */
@@ -4143,7 +4145,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
       if (inst->addr >= stream->dec_position)
 	{
 	  stream->msg = "address too large";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Check: a VCD_TARGET or VCD_SOURCE copy cannot exceed the remaining buffer space
@@ -4151,7 +4153,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
       if (inst->addr < stream->dec_cpylen && inst->addr + inst->size > stream->dec_cpylen)
 	{
 	  stream->msg = "size too large";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
   else
@@ -4183,7 +4185,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
   if (stream->dec_position + inst->size > stream->dec_maxpos)
     {
       stream->msg = "size too large";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   stream->dec_position += inst->size;
@@ -4200,7 +4202,7 @@ xd3_decode_instruction (xd3_stream *stream)
   if (stream->inst_sect.buf == stream->inst_sect.buf_max)
     {
       stream->msg = "instruction underflow";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   inst = &stream->code_table[*stream->inst_sect.buf++];
@@ -4241,7 +4243,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (stream->data_sect.buf == stream->data_sect.buf_max)
 	  {
 	    stream->msg = "data underflow";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	/* TUNE: Probably want to eliminate memset/memcpy here */
@@ -4260,7 +4262,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (stream->data_sect.buf + take > stream->data_sect.buf_max)
 	  {
 	    stream->msg = "data underflow";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	memcpy (stream->next_out + stream->avail_out,
@@ -4318,6 +4320,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((ret = xd3_getblk (stream, block)))
 		  {
 		    /* could be a XD3_GETSRCBLK failure. */
+		    XD3_ASSERT(ret != XD3_TOOFARBACK);
 		    return ret;
 		  }
 
@@ -4328,7 +4331,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) && (blkoff + take > source->onblk))
 		  {
 		    stream->msg = "source file too short";
-		    return EINVAL;
+		    return XD3_INTERNAL;
 
 		  }
 
@@ -4451,7 +4454,7 @@ xd3_decode_sections (xd3_stream *stream)
     {
     default:
       stream->msg = "internal error";
-      return EINVAL;
+      return XD3_INTERNAL;
 
     case DEC_DATA:
       if ((ret = xd3_decode_section (stream, & stream->data_sect, DEC_INST, copy))) { return ret; }
@@ -4527,19 +4530,19 @@ xd3_decode_emit (xd3_stream *stream)
     {
       IF_DEBUG1 (P(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n", stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if (stream->data_sect.buf != stream->data_sect.buf_max)
     {
       stream->msg = "extra data section";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if (stream->addr_sect.buf != stream->addr_sect.buf_max)
     {
       stream->msg = "extra address section";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   /* OPT: Should cksum computation be combined with the above loop? */
@@ -4551,7 +4554,7 @@ xd3_decode_emit (xd3_stream *stream)
       if (a32 != stream->dec_adler32)
 	{
 	  stream->msg = "target window checksum mismatch";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
 
@@ -4567,7 +4570,7 @@ xd3_decode_input (xd3_stream *stream)
   if (stream->enc_state != 0)
     {
       stream->msg = "encoder/decoder transition";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
 #define BYTE_CASE(expr,x,nstate)                                               \
@@ -4605,13 +4608,13 @@ xd3_decode_input (xd3_stream *stream)
 	    stream->dec_magic[2] != VCDIFF_MAGIC3)
 	  {
 	    stream->msg = "not a VCDIFF input";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	if (stream->dec_magic[3] != 0)
 	  {
 	    stream->msg = "VCDIFF input version > 0 is not supported";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	stream->dec_state = DEC_HDRIND;
@@ -4623,7 +4626,7 @@ xd3_decode_input (xd3_stream *stream)
 	if ((stream->dec_hdr_ind & VCD_INVHDR) != 0)
 	  {
 	    stream->msg = "unrecognized header indicator bits set";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	stream->dec_state = DEC_SECONDID;
@@ -4643,7 +4646,7 @@ xd3_decode_input (xd3_stream *stream)
 	      DJW_CASE (stream);
 	    default:
 	      stream->msg = "unknown secondary compressor ID";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 	}
 
@@ -4730,7 +4733,7 @@ xd3_decode_input (xd3_stream *stream)
 	if (XOFF_T_OVERFLOW (stream->dec_winstart, stream->dec_tgtlen))
 	  {
 	    stream->msg = "decoder file offset overflow";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	stream->dec_winstart += stream->dec_tgtlen;
@@ -4738,7 +4741,7 @@ xd3_decode_input (xd3_stream *stream)
 	if ((stream->dec_win_ind & VCD_INVWIN) != 0)
 	  {
 	    stream->msg = "unrecognized window indicator bits set";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	if ((ret = xd3_decode_init_window (stream))) { return ret; }
@@ -4765,7 +4768,7 @@ xd3_decode_input (xd3_stream *stream)
       if (XOFF_T_OVERFLOW (stream->dec_cpyoff, stream->dec_cpylen))
 	{
 	  stream->msg = "decoder copy window overflows a file offset";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Check copy window bounds: VCD_TARGET window may not exceed current position. */
@@ -4773,7 +4776,7 @@ xd3_decode_input (xd3_stream *stream)
 	  (stream->dec_cpyoff + (xoff_t) stream->dec_cpylen > stream->dec_winstart))
 	{
 	  stream->msg = "VCD_TARGET window out of bounds";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
     case DEC_ENCLEN:
@@ -4789,14 +4792,14 @@ xd3_decode_input (xd3_stream *stream)
       if (USIZE_T_OVERFLOW (stream->dec_cpylen, stream->dec_tgtlen))
 	{
 	  stream->msg = "decoder target window overflows a usize_t";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Check for malicious files. */
       if (stream->dec_tgtlen > XD3_HARDMAXWINSIZE)
 	{
 	  stream->msg = "hard window size exceeded";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       stream->dec_maxpos = stream->dec_cpylen + stream->dec_tgtlen;
@@ -4808,14 +4811,14 @@ xd3_decode_input (xd3_stream *stream)
       if ((stream->dec_del_ind & VCD_INVDEL) != 0)
 	{
 	  stream->msg = "unrecognized delta indicator bits set";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Delta indicator is only used with secondary compression. */
       if ((stream->dec_del_ind != 0) && (stream->sec_type == NULL))
 	{
 	  stream->msg = "invalid delta indicator bits set";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Section lengths */
@@ -4856,7 +4859,7 @@ xd3_decode_input (xd3_stream *stream)
 	if (stream->dec_enclen != enclen_check)
 	  {
 	    stream->msg = "incorrect encoding length (redundent)";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
       }
 
@@ -4882,7 +4885,7 @@ xd3_decode_input (xd3_stream *stream)
 	  if (src == NULL)
 	    {
 	      stream->msg = "source input required";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 
 	  src->cpyoff_blocks = stream->dec_cpyoff / src->blksize;
@@ -4925,7 +4928,7 @@ xd3_decode_input (xd3_stream *stream)
 
     default:
       stream->msg = "invalid state";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 }
 
@@ -4998,8 +5001,7 @@ xd3_string_match_init (xd3_stream *stream)
 static int
 xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 {
-  // The input offset at which the source should ideally be scanned
-  xoff_t logical_input_cksum_pos = stream->total_in + pos_in + stream->srcwin_size;
+  xoff_t logical_input_cksum_pos;
 
   if (stream->srcwin_cksum_pos >= stream->src->size)
     {
@@ -5007,27 +5009,32 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       return 0;
     }
 
+  /* Begin by advancing at twice the input rate, up to half the maximum window size. */
+  logical_input_cksum_pos = min((stream->total_in + pos_in) * 2,
+				(stream->total_in + pos_in) + (stream->srcwin_maxsz / 2));
+
+  /* If srcwin_cksum_pos is already greater, wait until the difference is met. */
   if (stream->srcwin_cksum_pos > logical_input_cksum_pos)
     {
-      *next_move_point = stream->srcwin_cksum_pos - logical_input_cksum_pos;
+      *next_move_point = pos_in +
+	(usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
       return 0;
     }
 
-  IF_DEBUG1 (P(RINT "[move_p1] size=%d T=%"Q"d S=%"Q"d\n", stream->srcwin_size,
-	       stream->total_in + pos_in, stream->srcwin_cksum_pos));
+  /* If the stream has matched beyond the srcwin_cksum_pos (good), we shouldn't
+   * begin reading so far back. */
+  int diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
 
-  *next_move_point = pos_in + stream->srcwin_size;
-
-  if (stream->srcwin_cksum_pos == 0)
+  if (diff > stream->srcwin_size)
     {
-      // Two windows to start with
-      logical_input_cksum_pos += stream->srcwin_size;
+      stream->srcwin_cksum_pos = stream->total_in + pos_in - stream->srcwin_size;
+      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
     }
-  else
+
+  if (diff < stream->srcwin_size)
     {
-      // Otherwise double and add
-      stream->srcwin_size = min(stream->srcwin_maxsz, stream->srcwin_size * 2);
-      logical_input_cksum_pos += stream->srcwin_size;
+      /* Advance a minimum of srcwin_size bytes */
+      logical_input_cksum_pos = stream->srcwin_cksum_pos + stream->srcwin_size;
     }
 
   while (stream->srcwin_cksum_pos < logical_input_cksum_pos &&
@@ -5038,6 +5045,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       usize_t onblk = xd3_bytes_on_srcblk (stream->src, blkno);
       int ret;
 
+      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
+      onblk = min(onblk, blkoff + diff);
+
       if (blkoff + stream->large_look >= onblk)
 	{
 	  /* Next block */
@@ -5045,16 +5055,20 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  continue;
 	}
 
+      IF_DEBUG1 (P(RINT "[move_p1] T=%"Q"u S=%"Q"u\n", 
+		   stream->total_in + pos_in,
+		   stream->srcwin_cksum_pos));
+
       if ((ret = xd3_getblk (stream, blkno)))
 	{
+	  if (ret == XD3_TOOFARBACK)
+	    {
+	      ret = XD3_INTERNAL;
+	    }
 	  return ret;
 	}
 
-      usize_t diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
-
-      onblk = min(onblk, diff + blkoff + stream->large_look);
-
-      while (blkoff + stream->large_look <= onblk)
+      while (blkoff + stream->large_look < onblk)
 	{
 	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkoff, stream->large_look);
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
@@ -5065,10 +5079,14 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  stream->srcwin_cksum_pos += stream->large_step;
 	  IF_DEBUG (stream->large_ckcnt += 1);
 	}
-    }
 
-  IF_DEBUG1 (P(RINT "[move_p2] size=%d T=%"Q"d S=%"Q"d next_move=%d\n", stream->srcwin_size,
-	       stream->total_in + pos_in, stream->srcwin_cksum_pos, *next_move_point));
+      IF_DEBUG1 (P(RINT "[move_p2] T=%"Q"u S=%"Q"u\n", 
+		   stream->total_in + pos_in,
+		   stream->srcwin_cksum_pos));
+
+    }
+  *next_move_point = pos_in +
+    (usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
 
   return 0;
 }
@@ -5081,10 +5099,6 @@ xd3_srcwin_setup (xd3_stream *stream)
 {
   xd3_source *src = stream->src;
   xoff_t length;
-
-  IF_DEBUG1 (P(RINT "[srcwin setup:%"Q"u] iopt buffer %s\n",
-		stream->current_window,
-		stream->enc_state < ENC_FLUSH ? "overflow" : "fit"));
 
   /* Check the undecided state. */
   XD3_ASSERT (src->srclen == 0 && src->srcbase == 0);
@@ -5108,7 +5122,7 @@ xd3_srcwin_setup (xd3_stream *stream)
   if (length > (xoff_t) USIZE_T_MAX)
     {
       stream->msg = "source window length overflow (not 64bit)";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   /* If ENC_FLUSH, then we know the exact source window to use because no more copies can
@@ -5133,10 +5147,6 @@ xd3_srcwin_setup (xd3_stream *stream)
 
   XD3_ASSERT (src->srclen);
  done:
-  IF_DEBUG1 (P(RINT "[srcwin setup:%"Q"u] base %"Q"u size %u\n",
-		      stream->current_window,
-		      src->srcbase,
-		      src->srclen));
   /* Set the taroff.  This convenience variable is used even when stream->src == NULL. */
   stream->taroff = src->srclen;
   return 0;
@@ -5152,27 +5162,11 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 {
   xd3_source *src = stream->src;
   usize_t greedy_or_not;
-  xoff_t farthest_src;
 
   stream->match_maxback = 0;
   stream->match_maxfwd  = 0;
   stream->match_back    = 0;
   stream->match_fwd     = 0;
-
-  farthest_src = max(stream->srcwin_cksum_pos, srcpos);
-
-  XD3_ASSERT (stream->srcwin_maxsz > src->blksize);
-
-  /* This prevents the encoder from seeking back more than srcwin_maxsz.  Using
-   * srcwin_maxsz is incorrect.  TODO: Possibly an new option here, how far back to
-   * seek? */
-  if (max_in == 0 ||
-      farthest_src - srcpos > stream->srcwin_maxsz - src->blksize)
-    {
-      goto bad;  // TODO! Note: this prevents catching the TODO/bug below
-    }
-
-  /* TODO: check for boundary crossing */
 
   /* Going backwards, the 1.5-pass algorithm allows some already-matched input may be
    * covered by a longer source match.  The greedy algorithm does not allow this. */
@@ -5299,6 +5293,12 @@ xd3_source_extend_match (xd3_stream *stream)
 
 	  if ((ret = xd3_getblk (stream, tryblk)))
 	    {
+	      /* if search went too far back, continue forward. */
+	      if (ret == XD3_TOOFARBACK)
+		{
+		  break;
+		}
+		
 	      /* could be a XD3_GETSRCBLK failure. */
 	      return ret;
 	    }
@@ -5334,6 +5334,13 @@ xd3_source_extend_match (xd3_stream *stream)
     {
       if ((ret = xd3_getblk (stream, tryblk)))
 	{
+	  /* if search went too far back, continue forward. */
+	  if (ret == XD3_TOOFARBACK)
+	    {
+	      break;
+	    }
+
+	  /* could be a XD3_GETSRCBLK failure. */
 	  return ret;
 	}
 
@@ -5752,12 +5759,6 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 
   /* If there is not enough input remaining for any kind of match, skip it. */
   if (pos_in + SLOOK > max_in) { goto loopnomore; }
-
-  IF_DEBUG1 ({
-    static int x = 0;
-    P(RINT "[string match:%d] pos_in %d; \n",
-       x++, pos_in);
-  });
 
   /* Now reset the incremental loop state: */
 

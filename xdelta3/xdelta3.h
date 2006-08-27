@@ -47,7 +47,7 @@
 /* The source window starts with only a few checksums, then doubles up to
  * XD3_DEFAULT_MAX_CKSUM_ADVANCE. */
 #ifndef XD3_DEFAULT_START_CKSUM_ADVANCE
-#define XD3_DEFAULT_START_CKSUM_ADVANCE 1024
+#define XD3_DEFAULT_START_CKSUM_ADVANCE (1U << 14)
 #endif
 
 /* TODO: There is no command-line flag to set this value. */
@@ -295,6 +295,8 @@ typedef enum {
   XD3_WINSTART  = -17707, /* notification: returned before a window is processed, giving a
 			   * chance to XD3_SKIP_WINDOW or not XD3_SKIP_EMIT that window. */
   XD3_WINFINISH = -17708, /* notification: returned after encode/decode & output for a window */
+  XD3_TOOFARBACK = -17709, /* (encoder only) may be returned by getblk() if the block is too old */
+  XD3_INTERNAL = -17710, /* internal error */
 
 } xd3_rvalues;
 

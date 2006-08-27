@@ -1804,7 +1804,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   if (option_verbose > 1) { XPR(NT "source window size: %u\n", option_srcwinsz); }
   if (option_verbose > 1) { XPR(NT "source block size: %u\n", source->blksize); }
   
-  lru_size = (option_srcwinsz / source->blksize) + 1;
+  lru_size = (option_srcwinsz / source->blksize);
 
   XD3_ASSERT(lru_size <= 128);  /* TODO: fix performance here */
 
@@ -1862,7 +1862,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 	      source->curblkno = 0;
 	      source->onblk    = nread;
 
-	      if (option_verbose > 1)
+	      if (option_verbose > 2)
 		{
 		  XPR(NT "source block 0 read (not compressed)\n");
 		}
@@ -1957,8 +1957,12 @@ main_getblk_func (xd3_stream *stream,
 	  lru_hits += 1;
 	  return 0;
 	}
-      XD3_ASSERT (lru[idx].blkno == -1LL ||
-		  lru[idx].blkno == blkno - lru_size);
+
+      if (lru[idx].blkno != -1LL &&
+	  lru[idx].blkno != blkno - lru_size)
+	{
+	  return XD3_TOOFARBACK;
+	}
     }
   else
     {
@@ -2015,7 +2019,7 @@ main_getblk_func (xd3_stream *stream,
 
   main_blklru_list_push_back (& lru_list, blru);
 
-  if (option_verbose > 1)
+  if (option_verbose > 2)
     {
       if (blru->blkno != -1LL)
 	{
@@ -2182,14 +2186,12 @@ main_input (xd3_cmd     cmd,
       {
 	config.winsize = min (input_size, (xoff_t) option_winsize);
       }
-    config.winsize = xd3_round_blksize (config.winsize, MIN_BUFSIZE);
     config.winsize = max (config.winsize, MIN_BUFSIZE);
   }
   {
     /* Source blocksize is not user-settable, only option_srcwinsz is,
      * which determines the number of blocks. */
     source.blksize = XD3_DEFAULT_SRCBLKSZ;
-    option_srcwinsz = xd3_round_blksize(option_srcwinsz, MIN_BUFSIZE);
     option_srcwinsz = max(option_srcwinsz, MIN_BUFSIZE);
     config.srcwin_maxsz = option_srcwinsz;
   }
@@ -2391,34 +2393,34 @@ main_input (xd3_cmd     cmd,
 		if (option_verbose)
 		  {
 		    char rrateavg[32], wrateavg[32], tm[32];
-		    char rdb[32],  wdb[32],  sb[32];
-		    char trdb[32], twdb[32], tsb[32];
-		    char srcbuf[48], tsrcbuf[48];
+		    char rdb[32], wdb[32];
+		    char trdb[32], twdb[32];
 		    long millis = get_millisecs_since ();
 		    usize_t this_read = stream.total_in - last_total_in;
 		    usize_t this_write = stream.total_out - last_total_out;
 		    last_total_in = stream.total_in;
 		    last_total_out = stream.total_out;
 
-		    tsrcbuf[0] = srcbuf[0] = 0;
-		    if (used_source)
+		    if (option_verbose > 1)
 		      {
-			sprintf (srcbuf, ": src %s", main_format_bcnt (xd3_encoder_srclen (& stream), sb));
-			sprintf (tsrcbuf, ": src %s", main_format_bcnt (stream.srcwin_cksum_pos, tsb));
-		      }
-		    /*if (stream.current_window >= option_first_window &&
-  		          stream.current_window <= option_last_window)*/
-		      {
-			XPR(NT "%"Q"u: in %s (%s): out %s (%s)%s: total in %s: out %s%s: %s\n",
+			XPR(NT "%"Q"u: in %s (%s): out %s (%s): total in %s: out %s: %s\n",
 			    stream.current_window,
 			    main_format_bcnt (this_read, rdb),
 			    main_format_rate (this_read, millis, rrateavg),
 			    main_format_bcnt (this_write, wdb),
 			    main_format_rate (this_write, millis, wrateavg),
-			    srcbuf,
 			    main_format_bcnt (stream.total_in, trdb),
 			    main_format_bcnt (stream.total_out, twdb),
-			    tsrcbuf,
+			    main_format_millis (millis, tm));
+		      }
+		    else
+		      {
+			XPR(NT "%"Q"u: in %s: out %s: total in %s: out %s: %s\n",
+ 			    stream.current_window,
+			    main_format_bcnt (this_read, rdb),
+			    main_format_bcnt (this_write, wdb),
+			    main_format_bcnt (stream.total_in, trdb),
+			    main_format_bcnt (stream.total_out, twdb),
 			    main_format_millis (millis, tm));
 		      }
 		  }
