@@ -1,0 +1,166 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>Xdelta3 command-line guide (BETA)</title>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+  <link rel="stylesheet" type="text/css" href="xdelta3.css"/>
+</head>
+<body>
+
+<!-- $Format: "$WWWLeftNavBar$" $ --!>
+<table cellpadding="20px" width=700> <tr> <td class="leftbdr" valign=top height=600 width=100> <div class="leftbody"> <h1>Xdelta</h1> <a href="xdelta3.html">overview</a><br> <a href="xdelta3-cmdline.html">command&nbsp;line</a><br> <a href="xdelta3-api-guide.html">api&nbsp;guide</a><br> <br><a href="http://xdelta.org">xdelta.org</a></h2> </div> </td> <td valign=top width=500>
+
+
+<!-- Copyright (C) 2003 and onward. Joshua P. MacDonald --!>
+
+<h1>command-line guide</h1>
+
+<code>xdelta3</code> can be run with syntax familiar but not similar to gzip;
+it requires you to specify the output file in most cases, rather than applying
+any default filename extensions.  These are cases that resemble gzip:<p>
+
+<div class="example">
+<pre>
+xdelta3 -c file_to_compress > delta_file
+xdelta3 -dc delta_file > file_uncompressed
+</pre>
+</div>
+<p>
+
+The <code>-c</code> option says to write to the standard output.  The
+<code>-d</code> option says to decode.  The default action is to encode (also
+specified by <code>-e</code>).  <code>xdelta3</code> also supports long
+command names, these two commands are equivalent to the ones abvove:<p>
+
+<div class="example">
+<pre>
+xdelta3 encode file_to_compress > delta_file
+xdelta3 decode delta_file > file_uncompressed
+</pre>
+</div>
+<p>
+
+<code>xdelta3</code> has the notion of a default filename for decoding.  If
+you specified a file name during the encode step, it is used as the default
+for decoding.  The <code>-s</code> option specifies a <em>source file</em> for
+delta-compression.<p>
+
+<div class="example">
+<pre>
+xdelta3 -s source_file target_file delta_file
+xdelta3 -d delta_file
+</pre>
+</div>
+<p>
+
+The second line above fills in "source_file" and "target_file" as the input
+and output filenames.  Without the <code>-f</code> option,
+<code>xdelta3</code> will not overwrite an existing file.  When there are no
+default filenames (e.g., in decode), standard input and standard output are
+used.  In the example below, the default source filename is applied in
+decoding.
+<p>
+
+<div class="example">
+<pre>
+cat target_file | xdelta3 -s source_file > delta_file
+xdelta3 -d < delta_file > target_file.1
+</pre>
+</div>
+<p>
+
+<code>xdelta3</code> recognizes externally compressed inputs, so the following
+command produces the expected results:<p>
+
+<div class="example">
+<pre>
+xdelta3 -s beta2.tar.gz beta3.tar.gz beta3.tar.gz.xd
+xdelta3 -ds beta2.tar.gz beta3.tar.gz.xd beta3.tar.gz.1
+</pre>
+</div>
+<p>
+
+You can avoid the intermediate file and use <code>xdelta3</code> together
+with a <code>tar</code>-pipeline.
+
+<div class="example">
+<pre>
+tar -cf - beta3 | xdelta3 -s beta2.tar > beta3.tar.xd
+xdelta3 -d beta3.tar.xd | tar -xf -
+</pre>
+</div>
+<p>
+
+<code>xdelta</code> can print various information about a compressed file with
+the "printhdr" command.  The "printhdrs" command prints information about each
+<em>window</em> of the encoding.  The "printdelta" command prints the actual
+encoding for each window, in human-readable format.<p>
+
+<div class="example">
+<pre>
+# xdelta3 printdelta delta_file
+VCDIFF version:               0
+VCDIFF header size:           5
+VCDIFF header indicator:      none
+VCDIFF secondary compressor:  none
+VCDIFF window number:         0
+VCDIFF window indicator:      VCD_SOURCE VCD_ADLER32 
+VCDIFF adler32 checksum:      48BFADB6
+VCDIFF copy window length:    2813
+VCDIFF copy window offset:    0
+VCDIFF delta encoding length: 93
+VCDIFF target window length:  2903
+VCDIFF data section length:   72
+VCDIFF inst section length:   8
+VCDIFF addr section length:   3
+  Offset Code Type1 Size1 @Addr1 + Type2 Size2 @Addr2
+  000000 019  CPY_0 1535 @0     
+  001535 001  ADD     72        
+  001607 019  CPY_0 1296 @1517  
+</pre>
+</div>
+<br>
+<p>
+
+
+<h1>xdelta3 -h</h1>
+
+<pre>
+usage: xdelta3 [command/options] [input [output]]
+commands are:
+    encode      encodes the input
+    decode      decodes the input
+    config      prints xdelta3 configuration
+    test        run the builtin tests
+special commands for VCDIFF inputs:
+    printhdr    print information about the first window
+    printhdrs   print information about all windows
+    printdelta  print information about the entire delta
+options are:
+   -c           use stdout instead of default
+   -d           same as decode command
+   -e           same as encode command
+   -f           force overwrite
+   -n           disable checksum (encode/decode)
+   -D           disable external decompression (encode/decode)
+   -R           disable external recompression (decode)
+   -N           disable small string-matching compression
+   -S [djw|fgk] disable/enable secondary compression
+   -A [apphead] disable/provide application header
+   -s source    source file to copy from (if any)
+   -B blksize   source file block size
+   -W winsize   input window buffer size
+   -v           be verbose (max 2)
+   -q           be quiet
+   -h           show help
+   -V           show version
+   -P           repeat count (for profiling)
+</pre>
+<p>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

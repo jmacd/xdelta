@@ -1,0 +1,47 @@
+#include "xdelta3.h"
+
+extern int VVV;
+
+int VVV;
+
+void use(int r)
+{
+  VVV = r;
+}
+
+int main() {
+  xd3_config config;
+  xd3_stream stream;
+  xd3_source source;
+
+  xd3_init_config (& config, 0);
+  use (xd3_config_stream (&stream, &config));
+  use (xd3_close_stream (&stream));
+  xd3_abort_stream (&stream);
+  xd3_free_stream (&stream);
+  
+  xd3_avail_input (& stream, NULL, 0);
+  xd3_consume_output (& stream);
+  
+  use (xd3_bytes_on_srcblk (& source, 0));
+  use (xd3_set_source (& stream, & source));
+  xd3_set_flags (& stream, 0);
+  
+  use (xd3_decode_completely (& stream, NULL, 0, NULL, NULL, 0));
+  use (xd3_decode_input (&stream));
+  use (xd3_decoder_needs_source (& stream));
+  use (xd3_get_appheader (& stream, NULL, NULL));
+  
+  use ((int) xd3_errstring (& stream));
+  use ((int) xd3_strerror (0));
+			     
+#if XD3_ENCODER
+  use (xd3_encode_input (&stream));
+  use (xd3_encode_completely (& stream, NULL, 0, NULL, NULL, 0));
+  use (xd3_set_appheader (& stream));
+  use (xd3_encoder_used_source (& stream));
+  use (xd3_encoder_srcbase (& stream));
+  use (xd3_encoder_srclen (& stream));
+#endif
+  return 0;
+}

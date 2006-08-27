@@ -1,0 +1,133 @@
+;; -*- Prcs -*-
+(Created-By-Prcs-Version 1 3 3)
+(Project-Description "")
+(Project-Version xdelta3 0 5)
+(Parent-Version xdelta3 0 4)
+(Version-Log "write a bit of documentation, work to fix/clean the regression test, fixed one actual bug in xd3_stream_close()")
+(New-Version-Log "")
+(Checkin-Time "Sun, 30 May 2004 14:42:47 -0700")
+(Checkin-Login jmacd)
+(Populate-Ignore ())
+(Project-Keywords
+ (WWWLeftNavBar "<table cellpadding=\"20px\" width=700> <tr> <td class=\"leftbdr\" valign=top height=600 width=100> <div class=\"leftbody\"> <h1>Xdelta</h1> <a href=\"xdelta3.html\">overview</a><br> <a href=\"xdelta3-cmdline.html\">command&nbsp;line</a><br> <a href=\"xdelta3-api-guide.html\">api&nbsp;guide</a><br> <br><a href=\"http://xdelta.org\">xdelta.org</a></h2> </div> </td> <td valign=top width=500>")
+ )
+(Files
+
+;; Files added by populate at Sun, 20 Jul 2003 04:22:04 +0400,
+;; to version 0.0(w), by jmacd:
+
+  (Makefile (xdelta3/0_Makefile 1.3 644))
+  (xdelta3.h (xdelta3/1_xdelta3.h 1.2 644))
+  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.2 644))
+  (xdelta3-second.h (xdelta3/3_xdelta3-se 1.1 644))
+  (xdelta3-python.h (xdelta3/4_xdelta3-py 1.1 644))
+  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.3 644))
+  (xdelta3-list.h (xdelta3/6_xdelta3-li 1.1 644))
+  (xdelta3-fgk.h (xdelta3/7_xdelta3-fg 1.1 644))
+  (xdelta3-djw.h (xdelta3/8_xdelta3-dj 1.1 644))
+  (xdelta3-cfgs.h (xdelta3/9_xdelta3-cf 1.1 644))
+  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.3 755))
+  (setup.py (xdelta3/11_setup.py 1.1 644))
+  (analyze_pfx.py (xdelta3/12_analyze_pf 1.1 644))
+  (analyze_gp.py (xdelta3/13_analyze_gp 1.1 644))
+  (analyze_clen.py (xdelta3/14_analyze_cl 1.1 644))
+  (rcs_junk.cc (xdelta3/15_rcs_junk.c 1.1 644))
+  (xdelta3.c (xdelta3/16_xdelta3.c 1.3 644))
+  (testh.c (xdelta3/17_testh.c 1.1 644))
+  (show.c (xdelta3/18_show.c 1.1 644))
+  (linkxd3lib.c (xdelta3/19_linkxd3lib 1.1 644))
+  (badcopy.c (xdelta3/20_badcopy.c 1.1 644))
+
+;; Files added by populate at Sun, 20 Jul 2003 04:22:08 +0400,
+;; to version 0.0(w), by jmacd:
+
+  (save.regtest.bug9/foo,v (xdelta3/21_foo,vx 1.1 444) :no-keywords)
+  (save.regtest.bug9/foo2,v (xdelta3/22_foo2,vx 1.1 444) :no-keywords)
+  (save.regtest.bug8/core (xdelta3/23_core 1.1 600) :no-keywords)
+  (save.regtest.bug8/output.x.right (xdelta3/24_output.x.r 1.1 644) :no-keywords)
+  (save.regtest.bug8/output.x (xdelta3/25_output.x 1.1 644) :no-keywords)
+  (save.regtest.bug8/input.1.xz (xdelta3/26_input.1.xz 1.1 644) :no-keywords)
+  (save.regtest.bug8/input.0.xz (xdelta3/27_input.0.xz 1.1 644) :no-keywords)
+  (save.regtest.bug8/input.0 (xdelta3/28_input.0 1.1 644))
+  (save.regtest.bug8/input.1 (xdelta3/29_input.1 1.1 644))
+  (save.regtest.bug7/core (xdelta3/30_core 1.1 600) :no-keywords)
+  (save.regtest.bug7/recon.x (xdelta3/31_recon.x 1.1 644) :no-keywords)
+  (save.regtest.bug7/output.x (xdelta3/32_output.x 1.1 644) :no-keywords)
+  (save.regtest.bug7/input.1 (xdelta3/33_input.1 1.1 644) :no-keywords)
+  (save.regtest.bug7/input.0 (xdelta3/34_input.0 1.1 644) :no-keywords)
+  (save.regtest.bug7/output (xdelta3/35_output 1.1 644) :no-keywords)
+  (save.regtest.bug7/recon (xdelta3/36_recon 1.1 644) :no-keywords)
+  (save.regtest.bug6/recon (xdelta3/37_recon 1.1 644))
+  (save.regtest.bug6/input.21 (xdelta3/38_input.21 1.1 644))
+  (save.regtest.bug6/input.20 (xdelta3/39_input.20 1.1 644))
+  (save.regtest.bug6/input.0 (xdelta3/40_input.0 1.1 644))
+  (save.regtest.bug6/output (xdelta3/41_output 1.1 644) :no-keywords)
+  (save.regtest.bug5/input.1 (xdelta3/42_input.1 1.1 644) :no-keywords)
+  (save.regtest.bug5/input.0 (xdelta3/43_input.0 1.1 644) :no-keywords)
+  (save.regtest.bug4/input.1 (xdelta3/44_input.1 1.1 644) :no-keywords)
+  (save.regtest.bug4/input.0 (xdelta3/45_input.0 1.1 644) :no-keywords)
+  (save.regtest.bug3/input.1 (xdelta3/46_input.1 1.1 644))
+  (save.regtest.bug3/input.0 (xdelta3/47_input.0 1.1 644))
+  (save.regtest.bug2/input.1 (xdelta3/48_input.1 1.1 644) :no-keywords)
+  (save.regtest.bug2/input.0 (xdelta3/49_input.0 1.1 644) :no-keywords)
+  (save.regtest.bug12/xd3regtest.27181/input.1 (xdelta3/50_input.1 1.1 644) :no-keywords)
+  (save.regtest.bug12/xd3regtest.27181/input.0 (xdelta3/51_input.0 1.1 644) :no-keywords)
+  (save.regtest.bug12/xd3regtest.27181/output (xdelta3/b/0_output 1.1 644) :no-keywords)
+  (save.regtest.bug12/output.x (xdelta3/b/1_output.x 1.1 644) :no-keywords)
+  (save.regtest.bug12/input.1 (xdelta3/b/2_input.1 1.1 644))
+  (save.regtest.bug12/input.0 (xdelta3/b/3_input.0 1.1 644))
+  (save.regtest.bug12/output (xdelta3/b/4_output 1.1 644) :no-keywords)
+  (save.regtest.bug11/recon.x (xdelta3/b/5_recon.x 1.1 644))
+  (save.regtest.bug11/output.x (xdelta3/b/6_output.x 1.1 644) :no-keywords)
+  (save.regtest.bug11/input.1 (xdelta3/b/7_input.1 1.1 644))
+  (save.regtest.bug11/input.0 (xdelta3/b/8_input.0 1.1 644))
+  (save.regtest.bug11/output (xdelta3/b/9_output 1.1 644) :no-keywords)
+  (save.regtest.bug11/recon (xdelta3/b/10_recon 1.1 644))
+  (save.regtest.bug10/recon.x (xdelta3/b/11_recon.x 1.1 644) :no-keywords)
+  (save.regtest.bug10/output.x (xdelta3/b/12_output.x 1.1 644) :no-keywords)
+  (save.regtest.bug10/input.1 (xdelta3/b/13_input.1 1.1 644) :no-keywords)
+  (save.regtest.bug10/input.0 (xdelta3/b/14_input.0 1.1 644) :no-keywords)
+  (save.regtest.bug10/output (xdelta3/b/15_output 1.1 644) :no-keywords)
+  (save.regtest.bug1/input.4 (xdelta3/b/16_input.4 1.1 644))
+  (save.regtest.bug1/input.5 (xdelta3/b/17_input.5 1.1 644))
+
+;; Files added by populate at Sun, 20 Jul 2003 04:22:28 +0400,
+;; to version 0.0(w), by jmacd:
+
+  (priorities.txt (xdelta3/b/18_priorities 1.1 644))
+
+;; Files added by populate at Sun, 20 Jul 2003 04:22:40 +0400,
+;; to version 0.0(w), by jmacd:
+
+  (vcdiff.ps (xdelta3/b/19_vcdiff.ps 1.1 644))
+  (draft-vcdiff-huffman.txt (xdelta3/b/20_draft-vcdi 1.1 600))
+
+;; Files added by populate at Sun, 20 Jul 2003 04:22:59 +0400,
+;; to version 0.0(w), by jmacd:
+
+  (dead.code (xdelta3/b/21_dead.code 1.2 644))
+
+;; Files added by populate at Sun, 20 Jul 2003 04:23:05 +0400,
+;; to version 0.0(w), by jmacd:
+
+  (draft-korn-vcdiff.txt (xdelta3/b/22_draft-korn 1.1 600))
+
+;; Files added by populate at Sun, 20 Jul 2003 08:16:41 +0400,
+;; to version 0.1(w), by jmacd:
+
+  (www/xdelta3-api-guide.html (xdelta3/b/23_Xdelta3-ap 1.4 644))
+  (www/xdelta3.html (xdelta3/b/24_Xdelta3.ht 1.4 644))
+
+;; Files added by populate at Sun, 20 Jul 2003 22:35:48 +0400,
+;; to version 0.2(w), by jmacd:
+
+  (www/xdelta3-cmdline.html (xdelta3/b/25_xdelta3-cm 1.2 644))
+  (www/xdelta3.css (xdelta3/b/26_xdelta3.cs 1.3 644))
+
+;; Files added by populate at Wed, 21 Jul 2004 15:39:04 -0700,
+;; to version 0.5(w), by jmacd:
+
+  (gpl.txt ())
+)
+(Merge-Parents)
+(New-Merge-Parents)

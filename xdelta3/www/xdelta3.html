@@ -1,0 +1,89 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>Xdelta3 delta compression library (BETA)</title>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+  <link rel="stylesheet" type="text/css" href="xdelta3.css"/>
+</head>
+<body>
+
+<!-- $Format: "$WWWLeftNavBar$" $ --!>
+<table cellpadding="20px" width=700> <tr> <td class="leftbdr" valign=top height=600 width=100> <div class="leftbody"> <h1>Xdelta</h1> <a href="xdelta3.html">overview</a><br> <a href="xdelta3-cmdline.html">command&nbsp;line</a><br> <a href="xdelta3-api-guide.html">api&nbsp;guide</a><br> <br><a href="http://xdelta.org">xdelta.org</a></h2> </div> </td> <td valign=top width=500>
+
+<!-- Copyright (C) 2003 and onward. Joshua P. MacDonald --!>
+
+<h1>version three?</h1>
+
+Xdelta3 is the third and latest release of Xdelta, which is a set of tools and
+APIs for reading and writing compressed <em>deltas</em>.  Deltas encode the
+differences between two versions of a document.  This release features a
+completely new compression engine, several algorithmic improvements, a fully
+programmable interface modelled after zlib, in addition to a command-line
+utility, use of the RFC3284 (VCDIFF) encoding, a python extension, and now
+64-bit support.<p>
+
+Xdelta3 is <em>tiny</em>.  A minimal, fully functional VCDIFF decoder library
+pipes in at 16KB.  The command-line utility complete with encoder/decoder
+tools, external compression support, and the <code>djw</code> secondary
+compression routines, is just under 60KB, slightly larger than a
+<code>gzip</code> executable.<p>
+
+Xdelta3 has few dependencies because it's capable of stand-alone file
+compression (i.e., what zlib and gzip do).  The stand-alone compression of
+Xdelta3/VCDIFF is 10-20% worse than <code>gzip</code>, you may view this as
+paying for the convenience-cost of having a single encoding, tool, and api
+designed to do both <em>data-compression</em> and <em>differencing</em> at
+once.<p>
+
+The Xdelta3 command-line tool, <code>xdelta3</code>, supports several
+convenience routines.  Delta compression works when the two inputs are
+similar, but often we would like to compute the difference between two
+compressed documents.  <code>xdelta3</code> has (optional) support to
+recognize externally compressed inputs and process them correctly.  This
+support is facilitated, in part, using the VCDIFF <em>application header</em>
+field to store <code>xdelta3</code> meta-data, which includes the original
+file names (if any) and codes to incidate whether the inputs were externally
+compressed.  Applications may provide their own application header.<p>
+
+<h1>what are version one and version two?</h1>
+
+Many shortcomings in the Xdelta1.x release are fixed in its replacement,
+Xdelta3.  Xdelta1 used both a simplistic compression algorithm and a
+simplistic encoding.  For example, Xdelta1 compresses the entire document at
+once and thus uses memory proportional to the input size.<p>
+
+The Xdelta1 compression engine made no attempt to find matching strings
+smaller than say 16 or 32 bytes, and the encoding does not attempt to
+efficiently encode the <code>COPY</code> and <code>ADD</code> instructions
+which constitute a delta.  For documents with highly similar data, however,
+these techniques degrade performance by a relatively insignificant amount.
+(Xdelta1.x compresses the delta with Zlib to improve matters, but this
+dependency stinks.)<p>
+
+Despite leaving much to be desired, Xdelta1 showed that you can do well
+without great complexity; as it turns out, the particulars of the compression
+aengine are a relatively insignificant compared to the difficulty of
+programming an application that uses delta-compression.  Better solve that
+first.<p>
+
+What we want are <em>systems</em> that manage compressed storage and network
+communication.  The second major release, Xdelta2, addresses these issues.
+Xdelta2 features a storage interface -- part database and part file system --
+which allows indexing and labeling compressed documents.  The feature set is
+similar to RCS.  The Xdelta2 interface supports efficient algorithms for
+<em>extracting</em> deltas between any pair of versions in storage.  The
+extraction technique also does not rely on hierarchy or centralizing the
+namespace, making the techniques ideal for peer-to-peer communication and
+proxy architectures.  I am grateful to Mihut Ionescu for implementing the
+Xproxy HTTP delta-compressing proxy system based on this interface and
+studying the benefits of delta-compression in that context.  Xdelta2 stressed
+the Xdelta1 compression engine beyond its limits; so Xdelta3 is designed as
+the ideal replacement.  The Xdelta2 techniques are yet to be ported to the new
+implementation.<p>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

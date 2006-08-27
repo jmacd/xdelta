@@ -1,0 +1,212 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>Xdelta3 API guide (BETA)</title>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+  <link rel="stylesheet" type="text/css" href="xdelta3.css"/>
+</head>
+<body>
+
+<!-- $Format: "$WWWLeftNavBar$" $ --!>
+<table cellpadding="20px" width=700> <tr> <td class="leftbdr" valign=top height=600 width=100> <div class="leftbody"> <h1>Xdelta</h1> <a href="xdelta3.html">overview</a><br> <a href="xdelta3-cmdline.html">command&nbsp;line</a><br> <a href="xdelta3-api-guide.html">api&nbsp;guide</a><br> <br><a href="http://xdelta.org">xdelta.org</a></h2> </div> </td> <td valign=top width=500>
+
+
+<!-- Copyright (C) 2003 and onward. Joshua P. MacDonald --!>
+
+<h1>api guide</h1>
+
+<p>This guide intends to give you a quick start to the Xdelta3 programming
+interface.  This is not a complete reference, the comments inside source file
+<code>xdelta3.h</code> and the command-line application,
+<code>xdelta3-main.h</code> offer more complete information.</p>
+
+<p>Have you read the <a href="xdelta3-cmdline.html">command-line interface</a>?</p>
+
+<h1>stream interface</h1>
+
+<p>
+To begin with, there are three external structures, only two of which are
+discussed here.  The <code>xd3_stream</code> struct plays the main role, one
+of these contains the state necessary to encode or decode one stream of data.
+An <code>xd3_source</code> struct maintains state about the (optional) source
+file, against which differences are computed.  The third structure,
+<code>xd3_config</code> deals with configuring various encoder parameters.</p>
+
+<p>
+At a glance, the interface resembles Zlib.  The program puts data in, which
+the xd3_stream consumes.  After computing over the data, the xd3_stream in
+turn generates output for the application to consume, or it requests more
+input.  The xd3_stream also issues requests to the application to read a block
+of source data.  The request to read a source block may be handled in one of
+two ways, according to application preference.  If a <code>xd3_getblk</code>
+callback function is provided, the application handler will be called from
+within the library, suspending computation until the request completes.  If no
+callback function is provided the library returns a special code
+(XD3_GETSRCBLK), allowing the application to issue the request and resume
+computation whenever it likes.  In both cases, the xd3_source struct contains
+the requested block number and a place to store the result.</p>
+
+<h1>setup</h1>
+<p>The code to declare and initialize the xd3_stream:</p>
+<div class="example">
+<pre>
+int ret;
+xd3_stream stream;
+xd3_config config;
+
+xd3_init_config (&config, 0 /* flags */);
+config.winsize = 32768;
+ret = xd3_config_stream (&stream, &config);
+
+if (ret != 0) { /* error */ }
+</pre>
+</div>
+
+<p>
+<code>xd3_init_config()</code> initializes the <code>xd3_config</code> struct
+with default values.  Many settings remain undocumented in the beta release.
+The most relevant setting, <code>xd3_config.winsize</code>, sets the encoder
+window size.  The encoder allocates a buffer of this size if the program
+supplies input in smaller units (unless the <code>XD3_FLUSH</code> flag is
+set). <code>xd3_config_stream()</code> initializes the <code>xd3_stream</code>
+object with the supplied configuration.
+</p>
+
+<h1>setting the source</h1>
+<p>
+The stream is ready for input at this point, though for encoding the source
+data must be supplied now.  To declare an initialize the xd3_source:</p>
+
+<div class="example">
+<pre>
+xd3_source source;
+void *IO_handle = ...;
+
+source.name = "...";
+source.size = file_size;
+source.ioh= IO_handle;
+source.blksize= 32768;
+source.curblkno = (xoff_t) -1;
+source.curblk = NULL;
+
+ret = xd3_set_source (&stream, &source);
+
+if (ret != 0) { /* error */ }
+</pre>
+</div>
+
+<p>
+The decoder sets source data in the same manner, but it may delay this step
+until the application header has been received (<code>XD3_GOTHEADER</code>).
+The application can also check whether source data is required for decoding
+with the <code>xd3_decoder_needs_source()</code>.</p>
+
+<p>
+<code>xd3_source.blksize</code> determines the block size used for requesting
+source blocks.  If the first source block (or the entire source) is already in
+memory, set <code>curblkno</code> to 0 and <code>curblk</code> to that block
+of data.</p>
+
+<h1>input/output loop</h1>
+
+<p>The stream is now ready for input, which the application provides by
+calling <code>xd3_avail_input()</code>.  The application initiates
+encoding or decoding at this point by calling one of two functions:</p>
+
+<div class="example">
+<pre>
+int xd3_encode_input (xd3_stream *stream)
+int xd3_decode_input (xd3_stream *stream)
+</pre>
+</div>
+
+<p>Unless there is an error, these routines return one of six result
+codes which the application must handle.  In many cases, all or most
+of the handler code is shared between encoding and decoding.  The
+codes are:</p>
+
+<ul>
+<li> <code>XD3_INPUT</code>: The stream is ready for (or requires) more input.  The
+application should call xd3_avail_input when (if) more data is
+available.
+
+<li> <code>XD3_OUTPUT</code>: The stream has pending output.  The application
+should write or otherwise consume the block of data found in the
+xd3_stream fields <code>next_out</code> and <code>avail_out</code>,
+then call <code>xd3_consume_output</code>.
+
+<li> <code>XD3_GETSRCBLK</code>: The stream is requesting a source block be read,
+as described above.  This is only ever returned if the xd3_getblk
+callback was not provided.
+
+<li> <code>XD3_GOTHEADER</code>: This decoder-specific code indicates that the
+first VCDIFF window header has been received.  This gives the
+application a chance to inspect the application header before
+encoding the first window.
+
+<li> <code>XD3_WINSTART</code>: This is returned by both encoder and decoder prior to
+processing a window.  For encoding, this code is returned once there is enough
+available input.  For decoding, this is returned following each window header
+(except the first, when XD3_GOTHEADER is returned instead).
+
+<li> <code>XD3_WINFINISH</code>: This is called when the output from a single
+window has been fully consumed.
+</ul>
+
+<p>An application could be structured something like this:</p>
+
+<div class="example">
+<pre>
+do {
+  read (&indata, &insize);
+  if (reached_EOF) {
+    xd3_set_flags (&stream, XD3_FLUSH);
+  }
+  xd3_avail_input (&stream, indata, insize);
+process:
+  ret = xd3_xxcode_input (&stream);
+  switch (ret) {
+  case XD3_INPUT:
+    continue;
+  case XD3_OUTPUT:
+    /* write data */
+    goto process;
+  case XD3_GETSRCBLK:
+    /* set source block */
+    goto process;
+  case XD3_GOTHEADER:
+  case XD3_WINSTART:
+  case XD3_WINFINISH:
+    /* no action necessary */
+    goto process;
+  default:
+    /* error */
+  }
+} while (! reached_EOF);
+</pre>
+</div>
+
+<p>
+All that remains is to close the stream and free its resources.  The
+<code>xd3_close_stream()</code> checks several error conditions but otherwise
+involves no input or output.  The <code>xd3_free_stream()</code> routine frees
+all memory allocated by the stream.</p>
+
+<h1>misc</h1>
+
+<p>
+There are two convenience functions for encoding to and decoding from
+in-memory buffers.  See the <code>xd3_encode_completely</code> and
+<code>xd3_decode_completely</code> interfaces.</p>
+
+<p>
+There are two routines to get and set the application header.  When
+encoding, sthe application header must be set before the first
+<code>XD3_WINSTART</code>.  When decoding, the application header is available
+after after the first <code>XD3_GOTHEADER</code>.</p>
+
+</td>
+</tr>
+</table>
+</body>
+</html>
