@@ -3703,14 +3703,17 @@ xd3_encode_input (xd3_stream *stream)
 	       * source match that extends to the end of the previous window.  The
 	       * match_srcpos field is initially zero and later set during
 	       * xd3_source_extend_match. */
-	      if (stream->avail_in > 0) {
-		/* This call can't fail because the source window is unrestricted. */
-		ret = xd3_source_match_setup (stream, stream->match_srcpos);
-		XD3_ASSERT (ret == 0);
-		stream->match_state = MATCH_FORWARD;
-	      } else {
-		stream->match_state = MATCH_SEARCHING;
-	      }
+	      if (stream->avail_in > 0)
+		{
+		  /* This call can't fail because the source window is unrestricted. */
+		  ret = xd3_source_match_setup (stream, stream->match_srcpos);
+		  XD3_ASSERT (ret == 0);
+		  stream->match_state = MATCH_FORWARD;
+		}
+	      else
+		{
+		  stream->match_state = MATCH_SEARCHING;
+		}
 	      XD3_ASSERT (stream->match_fwd == 0);
 
 	    case MATCH_FORWARD:
@@ -5091,6 +5094,35 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   return 0;
 }
 
+static xoff_t 
+xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
+{
+  /* This function handles the 32/64bit boundary crossing. */
+  if (stream->srcwin_cksum_pos <= (xoff_t)USIZE_T_MAX)
+    {
+      return (xoff_t)low;
+    }
+
+  /* total_in + pos_in would be more correct. */
+
+  xoff_t ti = stream->total_in;
+  xoff_t s0 = ti >> 32;
+  xoff_t l1 = ((s0+0) << 32) | low;
+  xoff_t l2 = ((s0+1) << 32) | low;
+
+  if (l1 > ti)
+    {
+      return l1;
+    }
+
+  if (l2 - ti < ti - l1)
+    {
+      return l2;
+    }
+
+  return l1;
+}
+
 /* This function sets up the stream->src fields srcbase, srclen.  The call is delayed
  * until these values are needed to encode a copy address.  At this point the decision has
  * to be made. */
@@ -5183,6 +5215,8 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
        * instructions when a covering source match is found. */
       greedy_or_not = stream->unencoded_offset;
     }
+
+  
 
   /* Backward target match limit. */
   XD3_ASSERT (pos_in >= greedy_or_not);
@@ -5436,9 +5470,6 @@ xd3_source_extend_match (xd3_stream *stream)
 	{
 	  return ret;
 	}
-
-      // TODO: ideally, we would update srcwin_cksum_pos to avoid computing checksums in
-      // the middle of an already-discovered long match.
 
       /* If the match ends with the available input: */
       if (pos_in + stream->match_fwd == max_in)
@@ -5862,9 +5893,15 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	      /* the match_setup will fail if the source window has been decided and the
 	       * match lies outside it.  You could consider forcing a window at this point
 	       * to permit a new source window. */
-	      if (xd3_source_match_setup (stream, stream->large_table[linx] - HASH_CKOFFSET) == 0)
+	      xoff_t adj_offset =
+		xd3_source_cksum_offset(stream,
+					stream->large_table[linx] - HASH_CKOFFSET);
+	      if (xd3_source_match_setup (stream, adj_offset) == 0)
 		{
-		  if ((ret = xd3_source_extend_match (stream))) { return ret; }
+		  if ((ret = xd3_source_extend_match (stream)))
+		    {
+		      return ret;
+		    }
 
 		  /* Update stream position.  match_fwd is zero if no match. */
 		  if (stream->match_fwd > 0)

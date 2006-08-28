@@ -2387,7 +2387,7 @@ main_input (xd3_cmd     cmd,
 		if (! option_quiet && IS_ENCODE (cmd) && main_file_isopen (sfile) && ! used_source)
 		  {
 		    XPR(NT "warning: input position %"Q"u no source copies\n",
-			stream.current_window * source.blksize);
+			stream.current_window * option_winsize);
 		  }
 
 		if (option_verbose)
