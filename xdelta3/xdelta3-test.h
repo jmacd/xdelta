@@ -2014,23 +2014,23 @@ test_string_matching (xd3_stream *stream, int ignore)
       xd3_init_config (& config, 0);
 
       config.smatch_cfg   = XD3_SMATCH_SOFT;
-      config.large_look   = 4;
-      config.large_step   = 4;
-      config.small_look   = 4;
-      config.small_chain  = 10;
-      config.small_lchain = 10;
-      config.max_lazy     = 10;
-      config.long_enough  = 10;
-      config.ssmatch      = (test->flags & SM_SSMATCH) && 1;
-      config.try_lazy     = (test->flags & SM_LAZY) && 1;
-      config.promote      = (test->flags & SM_PROMOTE) && 1;
+      config.smatcher_soft.large_look   = 4;
+      config.smatcher_soft.large_step   = 4;
+      config.smatcher_soft.small_look   = 4;
+      config.smatcher_soft.small_chain  = 10;
+      config.smatcher_soft.small_lchain = 10;
+      config.smatcher_soft.max_lazy     = 10;
+      config.smatcher_soft.long_enough  = 10;
+      config.smatcher_soft.ssmatch      = (test->flags & SM_SSMATCH) && 1;
+      config.smatcher_soft.try_lazy     = (test->flags & SM_LAZY) && 1;
+      config.smatcher_soft.promote      = (test->flags & SM_PROMOTE) && 1;
 
       if ((ret = xd3_config_stream (stream, & config))) { return ret; }
       if ((ret = xd3_encode_init (stream))) { return ret; }
 
       xd3_avail_input (stream, (uint8_t*)test->input, len);
 
-      if ((ret = stream->string_match (stream))) { return ret; }
+      if ((ret = stream->smatcher.string_match (stream))) { return ret; }
 
       *rptr = 0;
       while (! xd3_rlist_empty (& stream->iopt.used))
@@ -2093,16 +2093,16 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
   xd3_init_config (& config, 0);
 
   config.smatch_cfg    = XD3_SMATCH_SOFT;
-  config.large_look    = 16;
-  config.large_step    = 16;
-  config.small_look    = 4;
-  config.small_chain   = 128;
-  config.small_lchain  = 16;
-  config.ssmatch       = 0;
-  config.try_lazy      = 1;
-  config.max_lazy      = 8;
-  config.long_enough   = 128;
-  config.promote       = 0;
+  config.smatcher_soft.large_look    = 16;
+  config.smatcher_soft.large_step    = 16;
+  config.smatcher_soft.small_look    = 4;
+  config.smatcher_soft.small_chain   = 128;
+  config.smatcher_soft.small_lchain  = 16;
+  config.smatcher_soft.ssmatch       = 0;
+  config.smatcher_soft.try_lazy      = 1;
+  config.smatcher_soft.max_lazy      = 8;
+  config.smatcher_soft.long_enough   = 128;
+  config.smatcher_soft.promote       = 0;
 
   if ((ret = xd3_config_stream (stream, & config))) { return ret; }
 

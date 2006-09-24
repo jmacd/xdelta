@@ -38,21 +38,9 @@
 #define XD3_DEFAULT_WINSIZE (1U << 18)
 #endif
 
-/* The source block size.
- */
-#ifndef XD3_DEFAULT_SRCBLKSZ
-#define XD3_DEFAULT_SRCBLKSZ (1U << 18)
-#endif
-
-/* The source window starts with only a few checksums, then doubles up to
- * XD3_DEFAULT_MAX_CKSUM_ADVANCE. */
-#ifndef XD3_DEFAULT_START_CKSUM_ADVANCE
-#define XD3_DEFAULT_START_CKSUM_ADVANCE (1U << 14)
-#endif
-
-/* TODO: There is no command-line flag to set this value. */
-#ifndef XD3_DEFAULT_MAX_CKSUM_ADVANCE
-#define XD3_DEFAULT_MAX_CKSUM_ADVANCE (1U << 23)
+/* This is a unit of how far to advance the checksum position in one go. */
+#ifndef XD3_DEFAULT_CKSUM_ADVANCE
+#define XD3_DEFAULT_CKSUM_ADVANCE (1U << 14)
 #endif
 
 /* Default total size of the source window used in xdelta3-main.h */
@@ -69,7 +57,7 @@
 /* When Xdelta requests a memory allocation for certain buffers, it rounds up to units of
  * at least this size.  The code assumes (and asserts) that this is a power-of-two. */
 #ifndef XD3_ALLOCSIZE
-#define XD3_ALLOCSIZE (1U<<13)
+#define XD3_ALLOCSIZE (1U<<14)
 #endif
 
 /* The XD3_HARDMAXWINSIZE parameter is a safety mechanism to protect decoders against
@@ -506,9 +494,7 @@ struct _xd3_iopt_buf
   xd3_rinst *buffer;
 };
 
-/* This is the record of a pre-compiled configuration, a subset of xd3_config.  Keep them
- * in sync!  The user never sees this structure.  Note: update XD3_SOFTCFG_VARCNT when
- * changing. */
+/* This is the record of a pre-compiled configuration, a subset of xd3_config. */
 struct _xd3_smatcher
 {
   const char        *name;
@@ -577,7 +563,6 @@ struct _xd3_config
   usize_t             winsize;       /* The encoder window size. */
   usize_t             sprevsz;       /* How far back small string matching goes */
   usize_t             iopt_size;     /* entries in the instruction-optimizing buffer */
-
   usize_t             srcwin_size;   /* Initial size of the source-window lookahead */
   usize_t             srcwin_maxsz;  /* srcwin_size grows by a factor of 2 when no matches are found */
 
@@ -594,16 +579,7 @@ struct _xd3_config
   xd3_sec_cfg       sec_addr;       /* Secondary compressor config: addr */
 
   xd3_smatch_cfg     smatch_cfg;    /* See enum: use fields below for soft config */
-  uint               large_look;    /* large string lookahead (i.e., hashed chars) */
-  uint               large_step;    /* large string interval */
-  uint               small_look;    /* small string lookahead (i.e., hashed chars) */
-  uint               small_chain;   /* small string number of previous matches to try */
-  uint               small_lchain;  /* small string number of previous matches to try, when a lazy match */
-  uint               ssmatch;       /* boolean: insert checksums for matched strings */
-  uint               try_lazy;      /* boolean: whether lazy instruction optimization is attempted */
-  uint               max_lazy;      /* size of smallest match that will disable lazy matching */
-  uint               long_enough;   /* size of smallest match long enough to discontinue string matching. */
-  uint               promote;       /* whether to promote matches in the hash chain */
+  xd3_smatcher       smatcher_soft;
 };
 
 /* The primary source file object. You create one of these objects and initialize the
@@ -661,6 +637,8 @@ struct _xd3_stream
   usize_t           sprevsz;          /* small string, previous window size (power of 2) */
   usize_t           sprevmask;        /* small string, previous window size mask */
   uint              iopt_size;
+  uint              srcwin_size;
+  uint              srcwin_maxsz;
 
   /* general configuration */
   xd3_getblk_func  *getblk;           /* set nxtblk, nxtblkno to scanblkno */
@@ -668,40 +646,24 @@ struct _xd3_stream
   xd3_free_func    *free;             /* free function */
   void*             opaque;           /* private data object passed to alloc, free, and getblk */
   int               flags;            /* various options */
-  int               aborted;
   
   /* secondary compressor configuration */
   xd3_sec_cfg       sec_data;         /* Secondary compressor config: data */
   xd3_sec_cfg       sec_inst;         /* Secondary compressor config: inst */
   xd3_sec_cfg       sec_addr;         /* Secondary compressor config: addr */
 
-  /* fields common to xd3_stream_config, xd3_smatcher */
-  uint              large_look;
-  uint              large_step;
-  uint              small_look;
-  uint              small_chain;
-  uint              small_lchain;
-  uint              ssmatch;
-  uint              try_lazy;
-  uint              max_lazy;
-  uint              long_enough;
-  uint              promote;
-  uint              srcwin_size;
-  uint              srcwin_maxsz;
-  int             (*string_match) (xd3_stream  *stream);
+  xd3_smatcher      smatcher;
 
   usize_t           *large_table;      /* table of large checksums */
-  xd3_hash_cfg      large_hash;       /* large hash config */
+  xd3_hash_cfg       large_hash;       /* large hash config */
 
   usize_t           *small_table;      /* table of small checksums */
-  xd3_slist        *small_prev;       /* table of previous offsets, circular linked list (no sentinel) */
-  int               small_reset;      /* true if small table should be reset */
+  xd3_slist         *small_prev;       /* table of previous offsets, circular linked list */
+  int                small_reset;      /* true if small table should be reset */
 
-  xd3_hash_cfg      small_hash;       /* small hash config */
-
-  xd3_addr_cache    acache;           /* the vcdiff address cache */
-
-  xd3_encode_state  enc_state;        /* state of the encoder */
+  xd3_hash_cfg       small_hash;       /* small hash config */
+  xd3_addr_cache     acache;           /* the vcdiff address cache */
+  xd3_encode_state   enc_state;        /* state of the encoder */
 
   usize_t            taroff;           /* base offset of the target input */
   usize_t            input_position;   /* current input position */

@@ -29,23 +29,11 @@
  * 7. basic file support and OS interface
  */
 
-/* Definite TODO list:
+/* TODO list:
  * 1. do exact gzip-like filename, stdout handling.  make a .xz extension, refuse
  *    to encode to stdout without -cf, etc.
  * 2. Allow the user to add a comment string to the app header without disturbing the default
  *    behavior.
- * 3. Define zero-length window behavior
- * 4. Separate getopt() code from main and make flags modular, implement help.
- * 5. Catch up on related research!
- */
-
-/* Nice idea TODO list:
- *
- * 1. Should probably have a write buffer (option)?
- * 2. Add a reporting function for displaying progress, warning messages out of the library.
- * 3. Add WIN32 support in addition to XD3_POSIX/XD3_STDIO.  Should almost compile under windows
- *    with XD3_STDIO, but not quite (e.g., stat()?).
- * 4. Update-in-place, partial-encoding per the latest RFC: see "Wishful TODO" comments below
  */
 
 /* On error handling and printing:
@@ -72,13 +60,8 @@
 #endif
 
 /* XPRINTX (used by main) prefixes an "xdelta3: " to the output. */
-#if 0 && XD3_DEBUG
-#define XPR fprintf (stderr, "xdelta3[%u]: ", getpid()); fprintf
-#define NT stderr,
-#else
 #define XPR fprintf
 #define NT stderr, "xdelta3: "
-#endif
 
 #define VC fprintf
 #define OUT vcout,
@@ -96,11 +79,8 @@
 
 #define PRINTHDR_SPECIAL -4378291
 
-#define PIPE_BUFSIZE (usize_t)(1 << 12)
-#define MIN_BUFSIZE (usize_t)(1 << 12)
-
-/* The number of soft-config variables.  Update as field count changes! */
-#define XD3_SOFTCFG_VARCNT 10
+/* The number of soft-config variables.  */
+#define XD3_SOFTCFG_VARCNT 1
 
 /* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an error message
  * from the library. */
@@ -250,6 +230,7 @@ static const char *option_source_filename    = NULL;
 
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
+static usize_t     option_memsize            = XD3_DEFAULT_MEMSIZE;
 
 /* Wishful TODO: Support should probably be for partial deltas & update-in-place deltas,
  * following the latest draft RFC specs partial deltas [the changes have moderate
@@ -345,16 +326,19 @@ main_config (void)
   P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
   P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
   P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
-  /* Runtime sizes */
+
+  /* Runtime sizes/command-line */
   P(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
-  P(RINT "XD3_DEFAULT_SRCBLKSZ=%d\n", XD3_DEFAULT_SRCBLKSZ);
   P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
   P(RINT "XD3_DEFAULT_MEMSIZE=%d\n", XD3_DEFAULT_MEMSIZE);
+
+  /* TODO: the following cannot be set by command-line */
   P(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
-  P(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
-  P(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
+  P(RINT "XD3_DEFAULT_CKSUM_SIZE=%d\n", XD3_DEFAULT_CKSUM_ADVANCE);
   P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
   P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
+  P(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
+  P(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
 
   return EXIT_SUCCESS;
 }
@@ -1271,10 +1255,10 @@ main_decompress_input_check (main_file   *ifile,
 {
   int i;
   int ret;
-  uint8_t check_buf[PIPE_BUFSIZE];
+  uint8_t check_buf[XD3_ALLOCSIZE];
   usize_t  check_nread;
 
-  if ((ret = main_file_read (ifile, check_buf, min (input_size, PIPE_BUFSIZE), & check_nread, "input read failed")))
+  if ((ret = main_file_read (ifile, check_buf, min (input_size, XD3_ALLOCSIZE), & check_nread, "input read failed")))
     {
       return ret;
     }
@@ -1299,7 +1283,7 @@ main_decompress_input_check (main_file   *ifile,
 
 	  return main_input_decompress_setup (decomp, ifile,
 					      input_buf, input_size,
-					      check_buf, PIPE_BUFSIZE,
+					      check_buf, XD3_ALLOCSIZE,
 					      check_nread, nread);
 	}
     }
@@ -1307,9 +1291,9 @@ main_decompress_input_check (main_file   *ifile,
   /* Now read the rest of the input block. */
   (*nread) = 0;
 
-  if (check_nread == PIPE_BUFSIZE)
+  if (check_nread == XD3_ALLOCSIZE)
     {
-      ret = main_file_read (ifile, input_buf + PIPE_BUFSIZE, input_size - PIPE_BUFSIZE, nread, "input read failed");
+      ret = main_file_read (ifile, input_buf + XD3_ALLOCSIZE, input_size - XD3_ALLOCSIZE, nread, "input read failed");
     }
 
   memcpy (input_buf, check_buf, check_nread);
@@ -1834,11 +1818,23 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 
   if (option_verbose > 1) { XPR(NT "source window size: %u\n", option_srcwinsz); }
   if (option_verbose > 1) { XPR(NT "source block size: %u\n", source->blksize); }
-  
+  if (option_verbose > 1) { XPR(NT "memory size: %u\n", option_memsize); }
+
   lru_size = (option_srcwinsz / source->blksize);
   lru_size = max(1, lru_size);
 
-  XD3_ASSERT(lru_size <= 128);  /* TODO: fix performance here */
+  if (lru_size > 128)
+    {
+      /* TODO: fix performance here, the LRU is scanned sequentially to find blocks,
+       * except in encode, where it uses FIFO.  Fix is to set source->blksize
+       * accordingly. */
+      if (IS_ENCODE(cmd) && ! option_quiet)
+	{
+	  XPR(NT "warning: large source window (--B %u) "
+   	         "hurts performance except for encoding\n",
+	      option_srcwinsz);
+	}
+    }
 
   if ((lru = main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
     {
@@ -2179,18 +2175,16 @@ main_input (xd3_cmd     cmd,
 		}
 	    }
 
-	  config.large_look    = values[0];
-	  config.large_step    = values[1];
-	  config.small_look    = values[2];
-	  config.small_chain   = values[3];
-	  config.small_lchain  = values[4];
-	  config.ssmatch       = values[5];
-	  config.try_lazy      = values[6];
-	  config.max_lazy      = values[7];
-	  config.long_enough   = values[8];
-	  config.promote       = values[9];
-	  config.srcwin_size   = values[10];
-	  config.srcwin_maxsz  = values[11];
+	  config.smatcher_soft.large_look    = values[0];
+	  config.smatcher_soft.large_step    = values[1];
+	  config.smatcher_soft.small_look    = values[2];
+	  config.smatcher_soft.small_chain   = values[3];
+	  config.smatcher_soft.small_lchain  = values[4];
+	  config.smatcher_soft.ssmatch       = values[5];
+	  config.smatcher_soft.try_lazy      = values[6];
+	  config.smatcher_soft.max_lazy      = values[7];
+	  config.smatcher_soft.long_enough   = values[8];
+	  config.smatcher_soft.promote       = values[9];
 	}
       else if (option_level < 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
       else                       { config.smatch_cfg = XD3_SMATCH_SLOW; }
@@ -2210,33 +2204,32 @@ main_input (xd3_cmd     cmd,
 
   start_time = get_millisecs_now ();
 
-  /* allocate an input buffer.  min(file_size, option_winsize) */
-  {
-    xoff_t input_size = 0;
-    config.winsize = option_winsize;
-    if (main_file_stat (ifile, & input_size, 0) == 0)
-      {
-	config.winsize = min (input_size, (xoff_t) option_winsize);
-      }
-    config.winsize = max (config.winsize, MIN_BUFSIZE);
-  }
-  {
-    /* Source blocksize is not user-settable, only option_srcwinsz is,
-     * which determines the number of blocks. */
-    source.blksize = XD3_DEFAULT_SRCBLKSZ;
-    option_srcwinsz = max(option_srcwinsz, MIN_BUFSIZE);
-    config.srcwin_maxsz = option_srcwinsz;
-  }
+  xoff_t input_size = 0;
+  if (main_file_stat (ifile, & input_size, 0) == 0)
+    {
+      option_winsize = min (input_size, (xoff_t) option_winsize);
+    }
 
-  if (option_verbose > 1) { XPR(NT "input buffer size: %u\n", config.winsize); }
-  
-  if ((main_bdata = main_malloc (config.winsize)) == NULL)
+  option_srcwinsz = max(option_srcwinsz, XD3_ALLOCSIZE);
+  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
+
+  source.blksize = max(XD3_DEFAULT_WINSIZE, option_srcwinsz / 32);
+
+  config.srcwin_maxsz = option_srcwinsz;
+  config.winsize = option_winsize;
+  config.memsize = option_memsize;
+  config.getblk = main_getblk_func;
+  config.flags = stream_flags;
+
+  if (option_verbose > 1)
+    {
+      XPR(NT "input buffer size: %u\n", option_winsize);
+    }
+
+  if ((main_bdata = main_malloc (option_winsize)) == NULL)
     {
       return EXIT_FAILURE;
     }
-
-  config.getblk = main_getblk_func;
-  config.flags  = stream_flags;
 
   if ((ret = xd3_config_stream (& stream, & config)))
     {
@@ -2253,14 +2246,6 @@ main_input (xd3_cmd     cmd,
 	  return EXIT_FAILURE;
 	}
     }
-
-  /*XD3_ASSERT (option_first_offset <= option_last_offset);*/
-  /*XD3_ASSERT (option_first_window <= option_last_window);*/
-
-  /*if (option_first_offset != 0 && (ret = main_file_seek (ifile, option_first_offset)))
-    {
-      return EXIT_FAILURE;
-      }*/
 
   /* This times each window. */
   get_millisecs_since ();
@@ -2558,7 +2543,7 @@ main (int argc, char **argv)
   main_file ifile;
   main_file ofile;
   main_file sfile;
-  static char *flags = "0123456789cdefhnqvDJNRTVs:B:C:E:F:L:O:P:W:A::S::";
+  static char *flags = "0123456789cdefhnqvDJNRTVs:B:C:E:F:L:O:P:M:W:A::S::";
   int my_optind;
   char *my_optarg;
   char *my_optstr;
@@ -2720,12 +2705,6 @@ main (int argc, char **argv)
 	  XPR(NT "encoder support not compiled\n");
 	  return EXIT_FAILURE;
 #endif	  
-
-	  //case 'F': if ((ret = main_strtoxoff (my_optarg, & option_first_window, 'F'))) { goto exit; } break;
-	  //case 'L': if ((ret = main_strtoxoff (my_optarg, & option_last_window, 'L'))) { goto exit; } break;
-	  //case 'O': if ((ret = main_strtoxoff (my_optarg, & option_first_offset, 'O'))) { goto exit; } break;
-	  //case 'E': if ((ret = main_strtoxoff (my_optarg, & option_last_offset, 'E'))) { goto exit; } break;
-
 	case 'P':
 	  /* only set profile count once, since... */
 	  if (option_profile_cnt == 0)
@@ -2749,8 +2728,21 @@ main (int argc, char **argv)
 	          else { option_use_secondary = 1; option_secondary = my_optarg; } break;
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
 	          else { option_appheader = (uint8_t*) my_optarg; } break;
-	case 'B': if ((ret = main_atou (my_optarg, & option_srcwinsz, MIN_BUFSIZE, 'B'))) { goto exit; } break;
-	case 'W': if ((ret = main_atou (my_optarg, & option_winsize, MIN_BUFSIZE, 'W'))) { goto exit; } break;
+	case 'B': if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_ALLOCSIZE, 'B')))
+	  {
+	    goto exit;
+	  }
+	  break;
+	case 'W': if ((ret = main_atou (my_optarg, & option_winsize, XD3_ALLOCSIZE, 'W')))
+	  {
+	    goto exit;
+	  }
+	  break;
+	case 'M': if ((ret = main_atou (my_optarg, & option_memsize, XD3_ALLOCSIZE, 'M')))
+	  {
+	    goto exit;
+	  }
+	  break;
 	case 'D':
 #if EXTERNAL_COMPRESSION == 0
 	  if (! option_quiet)
@@ -2918,44 +2910,46 @@ main (int argc, char **argv)
 static int
 main_help (void)
 {
-  /* Not all options are shown, yet: 0-9, l J T C P F L O E
-   * Remember to update www/xdelta3-cmdline.html
-   */ 
-
+  /* TODO: update www/xdelta3-cmdline.html */ 
   main_version ();
   P(RINT "usage: xdelta3 [command/options] [input [output]]\n");
   P(RINT "commands are:\n");
-  P(RINT "    encode      encodes the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
-  P(RINT "    decode      decodes the input\n");
   P(RINT "    config      prints xdelta3 configuration\n");
+  P(RINT "    decode      decodes the input\n");
+  P(RINT "    encode      encodes the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
 #if REGRESSION_TEST
   P(RINT "    test        run the builtin tests\n");
 #endif
 #if VCDIFF_TOOLS
   P(RINT "special commands for VCDIFF inputs:\n");
+  P(RINT "    printdelta  print information about the entire delta\n");
   P(RINT "    printhdr    print information about the first window\n");
   P(RINT "    printhdrs   print information about all windows\n");
-  P(RINT "    printdelta  print information about the entire delta\n");
 #endif
   P(RINT "options are:\n");
+  P(RINT "   -0 .. -9     compression level\n");
+  P(RINT "   -A [apphead] disable/provide application header\n");
+  P(RINT "   -B blksize   source file block size\n");
+  P(RINT "   -C           soft config (see code)\n");
   P(RINT "   -c           use stdout instead of default\n");
+  P(RINT "   -D           disable external decompression (encode/decode)\n");
   P(RINT "   -d           same as decode command\n");
   P(RINT "   -e           same as encode command\n");
   P(RINT "   -f           force overwrite\n");
-  P(RINT "   -n           disable checksum (encode/decode)\n");
-  P(RINT "   -D           disable external decompression (encode/decode)\n");
-  P(RINT "   -R           disable external recompression (decode)\n");
-  P(RINT "   -N           disable small string-matching compression\n");
-  P(RINT "   -S [djw|fgk] disable/enable secondary compression\n");
-  P(RINT "   -A [apphead] disable/provide application header\n");
-  P(RINT "   -s source    source file to copy from (if any)\n");
-  P(RINT "   -B blksize   source file block size\n");
-  P(RINT "   -W winsize   input window buffer size\n");
-  P(RINT "   -v           be verbose (max 2)\n");
-  P(RINT "   -q           be quiet\n");
   P(RINT "   -h           show help\n");
-  P(RINT "   -V           show version\n");
+  P(RINT "   -J           disable output (check/compute only)\n");
+  P(RINT "   -M memsize   memory budget for hash tables\n");
+  P(RINT "   -n           disable checksum (encode/decode)\n");
+  P(RINT "   -N           disable small string-matching compression\n");
   P(RINT "   -P           repeat count (for profiling)\n");
+  P(RINT "   -q           be quiet\n");
+  P(RINT "   -R           disable external recompression (decode)\n");
+  P(RINT "   -S [djw|fgk] disable/enable secondary compression\n");
+  P(RINT "   -s source    source file to copy from (if any)\n");
+  P(RINT "   -T           use alternate code table (compatibility testing)\n");
+  P(RINT "   -v           be verbose (max 2)\n");
+  P(RINT "   -V           show version\n");
+  P(RINT "   -W winsize   input window buffer size\n");
 
   return EXIT_FAILURE;
 }

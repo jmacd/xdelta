@@ -23,16 +23,16 @@
 #if XD3_BUILD_SOFT
 
 #define TEMPLATE      soft
-#define LLOOK         stream->large_look
-#define LSTEP         stream->large_step
-#define SLOOK         stream->small_look
-#define SCHAIN        stream->small_chain
-#define SLCHAIN       stream->small_lchain
-#define SSMATCH       stream->ssmatch
-#define TRYLAZY       stream->try_lazy
-#define MAXLAZY       stream->max_lazy
-#define LONGENOUGH    stream->long_enough
-#define PROMOTE       stream->promote
+#define LLOOK         stream->smatcher.large_look
+#define LSTEP         stream->smatcher.large_step
+#define SLOOK         stream->smatcher.small_look
+#define SCHAIN        stream->smatcher.small_chain
+#define SLCHAIN       stream->smatcher.small_lchain
+#define SSMATCH       stream->smatcher.ssmatch
+#define TRYLAZY       stream->smatcher.try_lazy
+#define MAXLAZY       stream->smatcher.max_lazy
+#define LONGENOUGH    stream->smatcher.long_enough
+#define PROMOTE       stream->smatcher.promote
 
 #define SOFTCFG 1
 #include "xdelta3.c"

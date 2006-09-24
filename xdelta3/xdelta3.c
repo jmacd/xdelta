@@ -478,31 +478,16 @@ IF_BUILD_SLOW(static const xd3_smatcher    __smatcher_slow;)
 #if XD3_DEBUG
 #define SMALL_HASH_DEBUG1(s,inp)                                  \
   usize_t debug_hval = xd3_checksum_hash (& (s)->small_hash,       \
-         xd3_scksum ((inp), (s)->small_look))
+         xd3_scksum ((inp), (s)->smatcher.small_look))
 #define SMALL_HASH_DEBUG2(s,inp)                                  \
   XD3_ASSERT (debug_hval == xd3_checksum_hash (& (s)->small_hash, \
-	 xd3_scksum ((inp), (s)->small_look)))
+	 xd3_scksum ((inp), (s)->smatcher.small_look)))
 #define SMALL_HASH_STATS(x) x
 #else
 #define SMALL_HASH_DEBUG1(s,inp)
 #define SMALL_HASH_DEBUG2(s,inp)
 #define SMALL_HASH_STATS(x)
 #endif /* XD3_DEBUG */
-
-/* Config fields: three structures contain these variables, so this is non-typed. */
-#define XD3_COPY_CONFIG_FIELDS(dst,src)       \
-  do {                                        \
-  (dst)->large_look    = (src)->large_look;   \
-  (dst)->large_step    = (src)->large_step;   \
-  (dst)->small_look    = (src)->small_look;   \
-  (dst)->small_chain   = (src)->small_chain;  \
-  (dst)->small_lchain  = (src)->small_lchain; \
-  (dst)->ssmatch       = (src)->ssmatch;      \
-  (dst)->try_lazy      = (src)->try_lazy;     \
-  (dst)->max_lazy      = (src)->max_lazy;     \
-  (dst)->long_enough   = (src)->long_enough;  \
-  (dst)->promote       = (src)->promote;      \
-  } while (0)
 
 /* Update the run-length state */
 #define NEXTRUN(c) do { if ((c) == run_c) { run_l += 1; } else { run_c = (c); run_l = 1; } } while (0)
@@ -1190,20 +1175,21 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *cod
 
   /* Be exhaustive. */
   config.sprevsz = 1<<11;
-  config.memsize = CODE_TABLE_STRING_SIZE * 10;
+  config.memsize = CODE_TABLE_STRING_SIZE;
+  config.srcwin_size = CODE_TABLE_STRING_SIZE;
+  config.srcwin_maxsz = CODE_TABLE_STRING_SIZE;
 
-  config.large_look    = 4;
-  config.large_step    = 1;
-  config.small_look    = 4;
-  config.small_chain   = CODE_TABLE_STRING_SIZE;
-  config.small_lchain  = CODE_TABLE_STRING_SIZE;
-  config.ssmatch       = 1;
-  config.try_lazy      = 1;
-  config.max_lazy      = CODE_TABLE_STRING_SIZE;
-  config.long_enough   = CODE_TABLE_STRING_SIZE;
-  config.promote       = 1;
-  config.srcwin_size   = CODE_TABLE_STRING_SIZE;
-  config.srcwin_maxsz  = CODE_TABLE_STRING_SIZE;
+  config.smatch_cfg = XD3_SMATCH_SOFT;
+  config.smatcher_soft.large_look    = 4;
+  config.smatcher_soft.large_step    = 1;
+  config.smatcher_soft.small_look    = 4;
+  config.smatcher_soft.small_chain   = CODE_TABLE_STRING_SIZE;
+  config.smatcher_soft.small_lchain  = CODE_TABLE_STRING_SIZE;
+  config.smatcher_soft.ssmatch       = 1;
+  config.smatcher_soft.try_lazy      = 1;
+  config.smatcher_soft.max_lazy      = CODE_TABLE_STRING_SIZE;
+  config.smatcher_soft.long_enough   = CODE_TABLE_STRING_SIZE;
+  config.smatcher_soft.promote       = 1;
 
   if ((ret = xd3_config_stream (& stream, & config))) { goto fail; }
 
@@ -2432,11 +2418,11 @@ xd3_rtype_to_string (xd3_rtype type, int print_mode)
 
 int
 xd3_config_stream(xd3_stream *stream,
-		   xd3_config *config)
+		  xd3_config *config)
 {
   int ret;
   xd3_config defcfg;
-  const xd3_smatcher* smatcher;
+  xd3_smatcher *smatcher = &stream->smatcher;
 
   if (config == NULL)
     {
@@ -2450,16 +2436,15 @@ xd3_config_stream(xd3_stream *stream,
   stream->memsize   = config->memsize   ? config->memsize : XD3_DEFAULT_MEMSIZE;
   stream->winsize   = config->winsize   ? config->winsize : XD3_DEFAULT_WINSIZE;
   stream->sprevsz   = config->sprevsz   ? config->sprevsz : XD3_DEFAULT_SPREVSZ;
-  stream->srcwin_size  = config->srcwin_size ? config->srcwin_size : XD3_DEFAULT_START_CKSUM_ADVANCE;
-  stream->srcwin_maxsz = config->srcwin_maxsz ? config->srcwin_maxsz : XD3_DEFAULT_MAX_CKSUM_ADVANCE;
   stream->iopt_size = config->iopt_size ? config->iopt_size : XD3_DEFAULT_IOPT_SIZE;
+  stream->srcwin_size  = config->srcwin_size ? config->srcwin_size : XD3_DEFAULT_CKSUM_ADVANCE;
+  stream->srcwin_maxsz = config->srcwin_maxsz ? config->srcwin_maxsz : XD3_DEFAULT_SRCWINSZ;
+
   stream->getblk    = config->getblk;
   stream->alloc     = config->alloc ? config->alloc : __xd3_alloc_func;
   stream->free      = config->freef ? config->freef : __xd3_free_func;
   stream->opaque    = config->opaque;
   stream->flags     = config->flags;
-
-  XD3_ASSERT (stream->winsize > 0);
 
   /* Secondary setup. */
   stream->sec_data  = config->sec_data;
@@ -2517,7 +2502,7 @@ xd3_config_stream(xd3_stream *stream,
   }
 
   /* Check sprevsz */
-  if (config->small_chain == 1)
+  if (smatcher->small_chain == 1)
     {
       stream->sprevsz = 0;
     }
@@ -2536,45 +2521,36 @@ xd3_config_stream(xd3_stream *stream,
   switch (config->smatch_cfg)
     {
       IF_BUILD_SOFT(case XD3_SMATCH_SOFT:
-      smatcher = & __smatcher_soft; break;
-
-      if (config->large_look  < MIN_MATCH ||
-	  config->large_step  < 1         ||
-	  config->small_look  < MIN_MATCH ||
-	  config->small_chain < 1         ||
-	  config->large_look  < config->small_look ||
-	  config->small_chain < config->small_lchain ||
-	  (config->small_lchain == 0 && config->try_lazy) ||
-	  config->srcwin_size < stream->large_look ||
-	  config->srcwin_maxsz < stream->srcwin_size)
-	{
-	  stream->msg = "invalid soft string-match config";
-	  return XD3_INTERNAL;
-	}
-      break;)
+      {
+	*smatcher = config->smatcher_soft;
+	smatcher->string_match = __smatcher_soft.string_match;
+	smatcher->name = __smatcher_soft.name;
+	if (smatcher->large_look  < MIN_MATCH ||
+	    smatcher->large_step  < 1         ||
+	    smatcher->small_look  < MIN_MATCH ||
+	    smatcher->small_chain < 1         ||
+	    smatcher->large_look  < smatcher->small_look ||
+	    smatcher->small_chain < smatcher->small_lchain ||
+	    (smatcher->small_lchain == 0 && smatcher->try_lazy))
+	  {
+	    stream->msg = "invalid soft string-match config";
+	    return XD3_INTERNAL;
+	  }
+	break;
+      })
 
       IF_BUILD_SLOW(case XD3_SMATCH_DEFAULT:)
-      IF_BUILD_SLOW(case XD3_SMATCH_SLOW: smatcher = & __smatcher_slow; break;)
-      IF_BUILD_FAST(case XD3_SMATCH_FAST: smatcher = & __smatcher_fast; break;)
+      IF_BUILD_SLOW(case XD3_SMATCH_SLOW:
+		    *smatcher = __smatcher_slow;
+		    break;)
+      IF_BUILD_FAST(case XD3_SMATCH_FAST:
+		    *smatcher = __smatcher_fast;
+		    break;)
     default:
       stream->msg = "invalid string match config type";
       return XD3_INTERNAL;
     }
 
-  stream->string_match  = smatcher->string_match;
-  XD3_ASSERT(stream->string_match);
-
-  XD3_COPY_CONFIG_FIELDS (stream, smatcher);
-
-  /* If it is a soft config, the smatcher fields didn't set anything, copy from config
-   * instead. */
-  if (stream->large_look == 0)
-    {
-      XD3_COPY_CONFIG_FIELDS (stream, config);
-    }
-
-  IF_DEBUG1 (P(RINT "[stream cfg] llook %u lstep %u slook %u\n",
-	       stream->large_look, stream->large_step, stream->small_look));
   return 0;
 }
 
@@ -2638,7 +2614,7 @@ xd3_set_source (xd3_stream *stream,
 
   IF_DEBUG1 (P(RINT "[set source] size %"Q"u\n", src->size));
 
-  if (src == NULL || src->size < stream->large_look) { return 0; }
+  if (src == NULL || src->size < stream->smatcher.large_look) { return 0; }
 
   stream->src  = src;
   blk_num      = src->size / src->blksize;
@@ -3513,26 +3489,27 @@ xd3_encode_init (xd3_stream *stream)
   int i;
   int large_comp = (stream->src != NULL);
   int small_comp = ! (stream->flags & XD3_NOCOMPRESS);
-  /*int small_prev = (stream->small_chain > 1);*/
-  int space_fact = (large_comp + small_comp);
-  int memsize    = stream->memsize;
 
   /* Memory allocations for checksum tables are delayed until xd3_string_match_init in the
    * first call to string_match--that way identical or short inputs require no table
    * allocation. */
   if (large_comp)
     {
-      xd3_size_hashtable (stream, memsize / space_fact, & stream->large_hash);
+      xd3_size_hashtable (stream, stream->memsize, & stream->large_hash);
     }
 
   if (small_comp)
     {
-      xd3_size_hashtable (stream, memsize / space_fact, & stream->small_hash);
+      /* Keep table small because small matches become less efficient after long. */
+      xd3_size_hashtable (stream,
+			  min(stream->winsize, XD3_DEFAULT_MEMSIZE),
+			  & stream->small_hash);
     }
 
   for (i = 0; i < ENC_SECTS; i += 1)
     {
-      if ((stream->enc_heads[i] = stream->enc_tails[i] =
+      if ((stream->enc_heads[i] =
+	   stream->enc_tails[i] =
 	   xd3_alloc_output (stream, NULL)) == NULL)
 	{
 	  goto fail;
@@ -3735,7 +3712,7 @@ xd3_encode_input (xd3_stream *stream)
 
       /* String matching... */
       if (stream->avail_in != 0 &&
-	  (ret = stream->string_match (stream)))
+	  (ret = stream->smatcher.string_match (stream)))
 	{
 	  return ret;
 	}
@@ -3926,6 +3903,8 @@ xd3_string_match_init (xd3_stream *stream)
       if (stream->small_table != NULL)
 	{
 	  /* The target hash table is reinitialized once per window. */
+	  /* TODO: This would not have to be reinitialized if absolute offsets
+	   * were being stored. */
 	  if (stream->small_reset)
 	    {
 	      stream->small_reset = 0;
@@ -3935,17 +3914,21 @@ xd3_string_match_init (xd3_stream *stream)
 	  return 0;
 	}
 
-      if ((stream->small_table = xd3_alloc0 (stream, stream->small_hash.size, sizeof (usize_t))) == NULL)
+      if ((stream->small_table = xd3_alloc0 (stream,
+					     stream->small_hash.size,
+					     sizeof (usize_t))) == NULL)
 	{
 	  return ENOMEM;
 	}
 
       /* If there is a previous table needed. */
-      if (stream->small_chain > 1)
+      if (stream->smatcher.small_chain > 1)
 	{
 	  xd3_slist *p, *m;
 
-	  if ((stream->small_prev = xd3_alloc (stream, stream->sprevsz, sizeof (xd3_slist))) == NULL)
+	  if ((stream->small_prev = xd3_alloc (stream,
+					       stream->sprevsz,
+					       sizeof (xd3_slist))) == NULL)
 	    {
 	      return ENOMEM;
 	    }
@@ -4026,7 +4009,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       usize_t onblk = xd3_bytes_on_srcblk (stream->src, blkno);
       int ret;
 
-      if (blkoff + stream->large_look > onblk)
+      if (blkoff + stream->smatcher.large_look > onblk)
 	{
 	  /* Next block */
 	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
@@ -4042,19 +4025,19 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  return ret;
 	}
 
-      onblk -= stream->large_look;
+      onblk -= stream->smatcher.large_look;
       int diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
       onblk = min(blkoff + diff, onblk);
 
       while (blkoff <= onblk)
 	{
-	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkoff, stream->large_look);
+	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkoff, stream->smatcher.large_look);
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
 
 	  stream->large_table[hval] = stream->srcwin_cksum_pos + HASH_CKOFFSET;
 
-	  blkoff += stream->large_step;
-	  stream->srcwin_cksum_pos += stream->large_step;
+	  blkoff += stream->smatcher.large_step;
+	  stream->srcwin_cksum_pos += stream->smatcher.large_step;
 
 	  IF_DEBUG (stream->large_ckcnt += 1);
 	}
@@ -4543,7 +4526,7 @@ xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
 /* When the hash table indicates a possible small string match, it calls this routine to
  * find the best match.  The first matching position is taken from the small_table,
  * HASH_CKOFFSET is subtracted to get the actual position.  After checking that match, if
- * previous linked lists are in use (because stream->small_chain > 1), previous matches
+ * previous linked lists are in use (because stream->smatcher.small_chain > 1), previous matches
  * are tested searching for the longest match.  If (stream->min_match > MIN_MATCH) then a lazy
  * match is in effect.
  *
@@ -4563,8 +4546,8 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
   usize_t         cmp_len;
   usize_t         match_length = 0;
   usize_t         chain        = (stream->min_match == MIN_MATCH ?
-				  stream->small_chain :
-				  stream->small_lchain);
+				  stream->smatcher.small_chain :
+				  stream->smatcher.small_lchain);
   xd3_slist     *current      = NULL;
   xd3_slist     *first        = NULL;
   const uint8_t *inp_max      = stream->next_in + stream->avail_in;
@@ -4621,7 +4604,7 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
       (*match_offset) = base;
 
       /* Stop if we match the entire input or discover a long_enough match. */
-      if (inp == inp_max || cmp_len >= stream->long_enough)
+      if (inp == inp_max || cmp_len >= stream->smatcher.long_enough)
 	{
 	  goto done;
 	}
@@ -4661,7 +4644,7 @@ xd3_verify_small_state (xd3_stream    *stream,
 			const uint8_t *inp,
 			uint32_t          x_cksum)
 {
-  uint32_t cksum = xd3_scksum (inp, stream->small_look);
+  uint32_t cksum = xd3_scksum (inp, stream->smatcher.small_look);
 
   XD3_ASSERT (cksum == x_cksum);
 }
@@ -4671,7 +4654,7 @@ xd3_verify_large_state (xd3_stream    *stream,
 			const uint8_t *inp,
 			uint32_t          x_cksum)
 {
-  uint32_t cksum = xd3_lcksum (inp, stream->large_look);
+  uint32_t cksum = xd3_lcksum (inp, stream->smatcher.large_look);
 
   XD3_ASSERT (cksum == x_cksum);
 }
@@ -4682,7 +4665,7 @@ xd3_verify_run_state (xd3_stream    *stream,
 		      int            x_run_l,
 		      uint8_t        x_run_c)
 {
-  int     slook = stream->small_look;
+  int     slook = stream->smatcher.small_look;
   uint8_t run_c;
   int     run_l = xd3_comprun (inp, slook, &run_c);
 
