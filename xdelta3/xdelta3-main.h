@@ -317,7 +317,8 @@ static main_extcomp extcomp_types[] =
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
 };
 
-static void main_get_appheader (xd3_stream *stream, main_file *output, main_file *sfile);
+static void main_get_appheader (xd3_stream *stream, main_file *ifile,
+				main_file *output, main_file *sfile);
 
 static int main_help (void);
 
@@ -925,19 +926,23 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 	  if (ret == 0 && appheadsz > 0)
 	    {
 	      int sq = option_quiet;
-	      main_file o, s;
+	      main_file i, o, s;
 	      XD3_ASSERT (apphead != NULL);
 	      VC(OUT "VCDIFF application header:    ");
 	      fwrite (apphead, 1, appheadsz, vcout);
 	      VC(OUT "\n");
 
+	      main_file_init (& i);
 	      main_file_init (& o);
 	      main_file_init (& s);
 	      option_quiet = 1;
-	      main_get_appheader (stream, & o, & s);
+	      main_get_appheader (stream, &i, & o, & s);
 	      option_quiet = sq;
 	      main_print_vcdiff_file (& o, "output", vcout);
 	      main_print_vcdiff_file (& s, "source", vcout);
+	      main_file_cleanup (& i);
+	      main_file_cleanup (& o);
+	      main_file_cleanup (& s);
 	    }
 	}
     }
@@ -1653,7 +1658,7 @@ main_get_appheader_params (main_file *file, char **parsed, int output, const cha
 }
 
 static void
-main_get_appheader (xd3_stream *stream, main_file *output, main_file *sfile)
+main_get_appheader (xd3_stream *stream, main_file *ifile, main_file *output, main_file *sfile)
 {
   uint8_t *apphead;
   usize_t appheadsz;
@@ -1689,13 +1694,13 @@ main_get_appheader (xd3_stream *stream, main_file *output, main_file *sfile)
       /* First take the output parameters. */
       if (place == 2 || place == 4)
 	{
-	  main_get_appheader_params (output, parsed, 1, "output", sfile);
+	  main_get_appheader_params (output, parsed, 1, "output", ifile);
 	}
 
       /* Then take the source parameters. */
       if (place == 4)
 	{
-	  main_get_appheader_params (sfile, parsed+2, 0, "source", output);
+	  main_get_appheader_params (sfile, parsed+2, 0, "source", ifile);
 	}
     }
 
@@ -2324,7 +2329,7 @@ main_input (xd3_cmd     cmd,
 		int recv_src;
 
 		/* May need to set the sfile->filename if none was given. */
-		main_get_appheader (& stream, ofile, sfile);
+		main_get_appheader (& stream, ifile, ofile, sfile);
 
 		recv_src = sfile->filename != NULL;
 

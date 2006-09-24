@@ -32,7 +32,7 @@ static const double TEST_EPSILON      = 0.5;
 
 static int TESTBUFSIZE = 1024 * 16;
 
-#define TESTFILESIZE 1024
+#define TESTFILESIZE (1024)
 
 static char   TEST_TARGET_FILE[TESTFILESIZE];
 static char   TEST_SOURCE_FILE[TESTFILESIZE];
@@ -257,12 +257,19 @@ compare_files (xd3_stream *stream, const char* tgt, const char *rec)
   int i;
   int oc, rc;
 
-  if ((orig   = fopen (tgt, "r")) == NULL ||
-      (recons = fopen (rec, "r")) == NULL)
+  if ((orig = fopen (tgt, "r")) == NULL)
     {
-      stream->msg = "read failed";
+      P(RINT "open %s failed", tgt);
+      stream->msg = "open failed";
       return get_errno ();
     }
+
+    if ((recons = fopen (rec, "r")) == NULL)
+      {
+	P(RINT "open %s failed", rec);
+	stream->msg = "open failed";
+	return get_errno ();
+      }
 
   for (;;)
     {
@@ -324,6 +331,7 @@ test_file_size (const char* file, xoff_t *size)
 {
   struct stat sbuf;
   int ret;
+  (*size) = 0;
 
   if (stat (file, & sbuf) < 0)
     {
@@ -1480,22 +1488,23 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 
   for (i = 0; i < pairs; i += 1)
     {
-      sprintf (ecmd, cmdpairs[2*i], program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
-      sprintf (dcmd, cmdpairs[2*i+1], program_name, TEST_DELTA_FILE, TEST_RECON_FILE);
-
       test_setup ();
       if ((ret = test_make_inputs (stream, NULL, & tsize))) { return ret; }
 
+      sprintf (ecmd, cmdpairs[2*i], program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+      sprintf (dcmd, cmdpairs[2*i+1], program_name, TEST_DELTA_FILE, TEST_RECON_FILE);
+    
       /* Encode and decode. */
       if ((ret = system (ecmd)) != 0)
 	{
-	  P(RINT "xdelta3: command was: %s\n", ecmd);
+	  P(RINT "xdelta3: encode command: %s\n", ecmd);
 	  stream->msg = "encode cmd failed";
 	  return XD3_INTERNAL;
 	}
 
       if ((ret = system (dcmd)) != 0)
 	{
+	  P(RINT "xdelta3: decode command: %s\n", dcmd);
 	  stream->msg = "decode cmd failed";
 	  return XD3_INTERNAL;
 	}
@@ -1506,55 +1515,36 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	  return ret;
 	}
 
-      if (i == 0)
+      if ((ret = test_file_size (TEST_DELTA_FILE, & dsize)))
 	{
-	  /* The first time through, check the compression ratio and save a copy of the
-	   * delta. */
-	  if ((ret = test_save_copy (TEST_DELTA_FILE)))
-	    {
-	      stream->msg = "copy failed";
-	      return ret;
-	    }
-
-	  if ((ret = test_file_size (TEST_DELTA_FILE, & dsize)))
-	    {
-	      return ret;
-	    }
-
-	  ratio = (double) dsize / (double) tsize;
-
-	  /* Check that it is not too small, not too large. */
-	  if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
-	    {
-	      P(RINT "xdelta3: test encode with size ratio %.3f, expected < %.3f\n",
-		       ratio, TEST_ADD_RATIO + TEST_EPSILON);
-	      stream->msg = "strange encoding";
-	      return XD3_INTERNAL;
-	    }
-
-	  if (ratio <= TEST_ADD_RATIO - TEST_EPSILON)
-	    {
-	      P(RINT "xdelta3: test encode with size ratio %.3f, expected > %.3f\n",
-		       ratio, TEST_ADD_RATIO - TEST_EPSILON);
-	      stream->msg = "strange encoding";
-	      return XD3_INTERNAL;
-	    }
-
-	  /* Also check that compare_files works.  The delta and original should not be
-	   * identical. */
-	  if ((ret = compare_files (stream, TEST_DELTA_FILE, TEST_TARGET_FILE)) == 0)
-	    {
-	      stream->msg = "broken compare_files";
-	      return XD3_INTERNAL;
-	    }
+	  return ret;
 	}
-      else
+
+      ratio = (double) dsize / (double) tsize;
+
+      /* Check that it is not too small, not too large. */
+      if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
 	{
-	  /* In subsequent passes, verify that the copy and delta are the same. */
-	  if ((ret = compare_files (stream, TEST_COPY_FILE, TEST_DELTA_FILE)))
-	    {
-	      return ret;
-	    }
+	  P(RINT "xdelta3: test encode with size ratio %.3f, expected < %.3f\n",
+	    ratio, TEST_ADD_RATIO + TEST_EPSILON);
+	  stream->msg = "strange encoding";
+	  return XD3_INTERNAL;
+	}
+
+      if (ratio <= TEST_ADD_RATIO - TEST_EPSILON)
+	{
+	  P(RINT "xdelta3: test encode with size ratio %.3f, expected > %.3f\n",
+	    ratio, TEST_ADD_RATIO - TEST_EPSILON);
+	  stream->msg = "strange encoding";
+	  return XD3_INTERNAL;
+	}
+
+      /* Also check that compare_files works.  The delta and original should not be
+       * identical. */
+      if ((ret = compare_files (stream, TEST_DELTA_FILE, TEST_TARGET_FILE)) == 0)
+	{
+	  stream->msg = "broken compare_files";
+	  return XD3_INTERNAL;
 	}
 
       test_cleanup ();

@@ -725,11 +725,6 @@ static const xd3_sec_type djw_sec_type =
 
 /******************************************************************************************/
 
-/* Abbreviate frequently referenced fields. */
-#define max_in    stream->avail_in
-#define pos_in    stream->input_position
-#define min_match stream->min_match
-
 /* Process the inline pass. */
 #define __XDELTA3_C_INLINE_PASS__
 #include "xdelta3.c"
@@ -739,10 +734,6 @@ static const xd3_sec_type djw_sec_type =
 #define __XDELTA3_C_TEMPLATE_PASS__
 #include "xdelta3-cfgs.h"
 #undef __XDELTA3_C_TEMPLATE_PASS__
-
-#undef max_in
-#undef pos_in
-#undef min_match
 
 #if XD3_MAIN || PYTHON_MODULE
 #include "xdelta3-main.h"
@@ -3680,8 +3671,8 @@ xd3_encode_input (xd3_stream *stream)
       /* Initalize the address cache before each window. */
       xd3_init_cache (& stream->acache);
 
-      pos_in    = 0;
-      min_match = MIN_MATCH;
+      stream->input_position    = 0;
+      stream->min_match = MIN_MATCH;
       stream->unencoded_offset = 0;
 
       stream->enc_state = ENC_SEARCH;
@@ -5015,13 +5006,13 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     }
 
   /* Begin by advancing at twice the input rate, up to half the maximum window size. */
-  logical_input_cksum_pos = min((stream->total_in + pos_in) * 2,
-				(stream->total_in + pos_in) + (stream->srcwin_maxsz / 2));
+  logical_input_cksum_pos = min((stream->total_in + stream->input_position) * 2,
+				(stream->total_in + stream->input_position) + (stream->srcwin_maxsz / 2));
 
   /* If srcwin_cksum_pos is already greater, wait until the difference is met. */
   if (stream->srcwin_cksum_pos > logical_input_cksum_pos)
     {
-      *next_move_point = pos_in +
+      *next_move_point = stream->input_position +
 	(usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
       return 0;
     }
@@ -5040,7 +5031,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   logical_input_cksum_pos += stream->srcwin_size;
 
   IF_DEBUG1 (P(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n", 
-	       stream->total_in + pos_in,
+	       stream->total_in + stream->input_position,
 	       stream->srcwin_cksum_pos,
 	       logical_input_cksum_pos));
 
@@ -5091,7 +5082,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     // 32-bits of srcwin_cksum_pos, is guaranteed never to return a position > src->size
     stream->srcwin_cksum_pos = stream->src->size;
   }
-  *next_move_point = pos_in + stream->srcwin_size;
+  *next_move_point = stream->input_position + stream->srcwin_size;
   return 0;
 }
 
@@ -5213,12 +5204,12 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   
 
   /* Backward target match limit. */
-  XD3_ASSERT (pos_in >= greedy_or_not);
-  stream->match_maxback = pos_in - greedy_or_not;
+  XD3_ASSERT (stream->input_position >= greedy_or_not);
+  stream->match_maxback = stream->input_position - greedy_or_not;
 
   /* Forward target match limit. */
-  XD3_ASSERT (max_in > pos_in);
-  stream->match_maxfwd = max_in - pos_in;
+  XD3_ASSERT (stream->avail_in > stream->input_position);
+  stream->match_maxfwd = stream->avail_in - stream->input_position;
 
   /* Now we take the source position into account.  It depends whether the srclen/srcbase
    * have been decided yet. */
@@ -5305,7 +5296,7 @@ xd3_source_extend_match (xd3_stream *stream)
       /* Note: this code is practically duplicated below, substituting
        * match_fwd/match_back and direction.  Consolidate? */
       matchoff  = stream->match_srcpos - stream->match_back;
-      streamoff = pos_in - stream->match_back;
+      streamoff = stream->input_position - stream->match_back;
       tryblk    = matchoff / src->blksize;
       tryoff    = matchoff % src->blksize;
 
@@ -5353,7 +5344,7 @@ xd3_source_extend_match (xd3_stream *stream)
   XD3_ASSERT (stream->match_state == MATCH_FORWARD);
 
   matchoff  = stream->match_srcpos + stream->match_fwd;
-  streamoff = pos_in + stream->match_fwd;
+  streamoff = stream->input_position + stream->match_fwd;
   tryblk    = matchoff / src->blksize;
   tryoff    = matchoff % src->blksize;
 
@@ -5408,35 +5399,36 @@ xd3_source_extend_match (xd3_stream *stream)
    * back, then either remember what was deleted and re-insert it, or count on the
    * string-matching algorithm to find that match again.  I think it is more
    * worthwhile to implement large_hash duplicates. */
-  if (stream->match_fwd < min_match)
+  if (stream->match_fwd < stream->min_match)
     {
       stream->match_fwd = 0;
     }
   else
     {
       usize_t total  = stream->match_fwd + stream->match_back;
-      xoff_t match_end;
 
       /* Correct the variables to remove match_back from the equation. */
-      stream->input_position -= stream->match_back;
-      stream->match_srcpos   -= stream->match_back;
-      stream->match_fwd      += stream->match_back;
-      match_end               = stream->match_srcpos + stream->match_fwd;
+      // IT'S A BUG!
+      
+      usize_t target_position = stream->input_position - stream->match_back;
+      usize_t match_length   = stream->match_back      + stream->match_fwd;
+      xoff_t match_position  = stream->match_srcpos    - stream->match_back;
+      xoff_t match_end       = stream->match_srcpos    + stream->match_fwd;
 
       /* At this point we may have to erase any iopt-buffer instructions that are
        * fully covered by a backward-extending copy. */
       if (stream->match_back > 0)
 	{
-	  xd3_iopt_erase (stream, pos_in, total);
+	  xd3_iopt_erase (stream, target_position, total);
 	}
 
       stream->match_back = 0;
 
       /* Update ranges.  The first source match occurs with both values set to 0. */
       if (stream->match_maxaddr == 0 ||
-	  stream->match_srcpos < stream->match_minaddr)
+	  match_position < stream->match_minaddr)
 	{
-	  stream->match_minaddr = stream->match_srcpos;
+	  stream->match_minaddr = match_position;
 	}
 
       if (match_end > stream->match_maxaddr)
@@ -5448,29 +5440,29 @@ xd3_source_extend_match (xd3_stream *stream)
 	static int x = 0;
 	P(RINT "[source match:%d] <inp %"Q"u %"Q"u>  <src %"Q"u %"Q"u> (%s) [ %u bytes ]\n",
 	   x++,
-	   stream->total_in + pos_in,
-	   stream->total_in + pos_in + stream->match_fwd,
-	   stream->match_srcpos,
-	   stream->match_srcpos + stream->match_fwd,
-	   (stream->total_in + stream->input_position == stream->match_srcpos) ? "same" : "diff",
-	   stream->match_fwd);
+	   stream->total_in + target_position,
+	   stream->total_in + target_position + match_length,
+	   match_position,
+	   match_position + match_length,
+	   (stream->total_in + target_position == match_position) ? "same" : "diff",
+	   match_length);
       });
 
       if ((ret = xd3_found_match (stream,
-				/* decoder position */ pos_in,
-				/* length */ stream->match_fwd,
-				/* address */ stream->match_srcpos,
-				/* is_source */ 1)))
+				  /* decoder position */ target_position,
+				  /* length */ match_length,
+				  /* address */ match_position,
+				  /* is_source */ 1)))
 	{
 	  return ret;
 	}
 
       /* If the match ends with the available input: */
-      if (pos_in + stream->match_fwd == max_in)
+      if (target_position + match_length == stream->avail_in)
 	{
 	  /* Setup continuing match for the next window. */
-	  stream->match_state   = MATCH_TARGET;
-	  stream->match_srcpos += stream->match_fwd;
+	  stream->match_state  = MATCH_TARGET;
+	  stream->match_srcpos = match_end;
 	}
     }
 
@@ -5569,7 +5561,7 @@ xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
  * find the best match.  The first matching position is taken from the small_table,
  * HASH_CKOFFSET is subtracted to get the actual position.  After checking that match, if
  * previous linked lists are in use (because stream->small_chain > 1), previous matches
- * are tested searching for the longest match.  If (min_match > MIN_MATCH) then a lazy
+ * are tested searching for the longest match.  If (stream->min_match > MIN_MATCH) then a lazy
  * match is in effect.
  *
  * OPT: This is by far the most expensive function.  The slowdown is in part due to the data
@@ -5587,20 +5579,20 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
 {
   usize_t         cmp_len;
   usize_t         match_length = 0;
-  usize_t         chain        = (min_match == MIN_MATCH ?
+  usize_t         chain        = (stream->min_match == MIN_MATCH ?
 				  stream->small_chain :
 				  stream->small_lchain);
   xd3_slist     *current      = NULL;
   xd3_slist     *first        = NULL;
-  const uint8_t *inp_max      = stream->next_in + max_in;
+  const uint8_t *inp_max      = stream->next_in + stream->avail_in;
   const uint8_t *inp;
   const uint8_t *ref;
 
   SMALL_HASH_STATS  (usize_t search_cnt = 0);
-  SMALL_HASH_DEBUG1 (stream, stream->next_in + pos_in);
+  SMALL_HASH_DEBUG1 (stream, stream->next_in + stream->input_position);
   SMALL_HASH_STATS  (stream->sh_searches += 1);
 
-  XD3_ASSERT (min_match + pos_in <= max_in);
+  XD3_ASSERT (stream->min_match + stream->input_position <= stream->avail_in);
 
   base -= HASH_CKOFFSET;
 
@@ -5619,10 +5611,10 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
 
   /* For small matches, we can always go to the end-of-input because the matching position
    * must be less than the input position. */
-  XD3_ASSERT (base < pos_in);
+  XD3_ASSERT (base < stream->input_position);
 
   ref = stream->next_in + base;
-  inp = stream->next_in + pos_in;
+  inp = stream->next_in + stream->input_position;
 
   SMALL_HASH_DEBUG2 (stream, ref);
 
@@ -5633,10 +5625,10 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
       ++ref;
     }
 
-  cmp_len = inp - (stream->next_in + pos_in);
+  cmp_len = inp - (stream->next_in + stream->input_position);
 
   /* Verify correctness */
-  XD3_ASSERT (xd3_check_smatch (stream->next_in + base, stream->next_in + pos_in,
+  XD3_ASSERT (xd3_check_smatch (stream->next_in + base, stream->next_in + stream->input_position,
 				inp_max, cmp_len));
 
   /* Update longest match */
@@ -5664,7 +5656,7 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
 	  /* Stop if the next position was the first.  Stop if the position is wrong
 	   * (because the lists are not re-initialized across input windows). Skip if the
 	   * scksum is wrong. */
-	  if (current != first && base < pos_in)
+	  if (current != first && base < stream->input_position)
 	    {
 	      if (current->scksum != scksum)
 		{
@@ -5770,11 +5762,11 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   int            run_l;
   int            ret;
   usize_t         match_length;
-  usize_t         match_offset;  // Note: "may be unused" warnings are bogus
+  usize_t         match_offset;  // Note: "may be unused" warnings are bogus (due to min_match test)
   usize_t         next_move_point;
 
   /* If there will be no compression due to settings or short input, skip it entirely. */
-  if (! (DO_SMALL || DO_LARGE || DO_RUN) || pos_in + SLOOK > max_in) { goto loopnomore; }
+  if (! (DO_SMALL || DO_LARGE || DO_RUN) || stream->input_position + SLOOK > stream->avail_in) { goto loopnomore; }
 
   if ((ret = xd3_string_match_init (stream))) { return ret; }
 
@@ -5783,17 +5775,17 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
  restartloop:
 
   /* If there is not enough input remaining for any kind of match, skip it. */
-  if (pos_in + SLOOK > max_in) { goto loopnomore; }
+  if (stream->input_position + SLOOK > stream->avail_in) { goto loopnomore; }
 
   /* Now reset the incremental loop state: */
 
   /* The min_match variable is updated to avoid matching the same lazy match over and over
    * again.  For example, if you find a (small) match of length 9 at one position, you
    * will likely find a match of length 8 at the next position. */
-  min_match = MIN_MATCH;
+  stream->min_match = MIN_MATCH;
 
   /* The current input byte. */
-  inp = stream->next_in + pos_in;
+  inp = stream->next_in + stream->input_position;
 
   /* Small match state. */
   if (DO_SMALL)
@@ -5808,10 +5800,10 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
     }
 
   /* Large match state.  We continue the loop even after not enough bytes for LLOOK
-   * remain, so always check pos_in in DO_LARGE code. */
-  if (DO_LARGE && (pos_in + LLOOK <= max_in))
+   * remain, so always check stream->input_position in DO_LARGE code. */
+  if (DO_LARGE && (stream->input_position + LLOOK <= stream->avail_in))
     {
-      /* Source window: next_move_point is the point that pos_in must reach before
+      /* Source window: next_move_point is the point that stream->input_position must reach before
        * computing more source checksum. */
       if ((ret = xd3_srcwin_move_point (stream, & next_move_point)))
 	{
@@ -5830,14 +5822,14 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   /* HANDLELAZY: This statement is called each time an instruciton is emitted (three
    * cases).  If the instruction is large enough, the loop is restarted, otherwise lazy
    * matching may ensue. */
-#define HANDLELAZY(mlen)                                         \
-  if (TRYLAZYLEN ((mlen), pos_in, max_in))                       \
-    { min_match = (mlen) + LEAST_MATCH_INCR; goto updateone; }   \
-  else                                                           \
-    { pos_in += (mlen); goto restartloop; }
+#define HANDLELAZY(mlen) \
+  if (TRYLAZYLEN ((mlen), stream->input_position, stream->avail_in)) \
+    { stream->min_match = (mlen) + LEAST_MATCH_INCR; goto updateone; } \
+  else \
+    { stream->input_position += (mlen); goto restartloop; }
 
   /* Now loop over one input byte at a time until a match is found... */
-  for (;; inp += 1, pos_in += 1)
+  for (;; inp += 1, stream->input_position += 1)
     {
       /* Now we try three kinds of string match in order of expense:
        * run, large match, small match. */
@@ -5850,25 +5842,25 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
        * grow to SLOOK. */
       if (DO_RUN && run_l == SLOOK)
 	{
-	  usize_t max_len = max_in - pos_in;
+	  usize_t max_len = stream->avail_in - stream->input_position;
 
 	  IF_DEBUG (xd3_verify_run_state (stream, inp, run_l, run_c));
 
 	  while (run_l < max_len && inp[run_l] == run_c) { run_l += 1; }
 
 	  /* Output a RUN instruction. */
-	  if (run_l >= min_match && run_l >= MIN_RUN)
+	  if (run_l >= stream->min_match && run_l >= MIN_RUN)
 	    {
-	      if ((ret = xd3_emit_run (stream, pos_in, run_l, run_c))) { return ret; }
+	      if ((ret = xd3_emit_run (stream, stream->input_position, run_l, run_c))) { return ret; }
 
 	      HANDLELAZY (run_l);
 	    }
 	}
 
       /* If there is enough input remaining. */
-      if (DO_LARGE && (pos_in + LLOOK <= max_in))
+      if (DO_LARGE && (stream->input_position + LLOOK <= stream->avail_in))
 	{
-	  if ((pos_in >= next_move_point) &&
+	  if ((stream->input_position >= next_move_point) &&
 	      (ret = xd3_srcwin_move_point (stream, & next_move_point)))
 	    {
 	      return ret;
@@ -5914,14 +5906,6 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  /* Verify incremental state in debugging mode. */
 	  IF_DEBUG (xd3_verify_small_state (stream, inp, scksum));
 
-	  if (stream->input_position == 138898) {
-	    printf("stop here");
-	    int x = 1;
-	    while (x) {
-	      //
-	    }
-	  }
-
 	  /* Search for the longest match */
 	  if (unlikely (stream->small_table[sinx] != 0))
 	    {
@@ -5936,7 +5920,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	    }
 
 	  /* Insert a hash for this string. */
-	  xd3_scksum_insert (stream, sinx, scksum, pos_in);
+	  xd3_scksum_insert (stream, sinx, scksum, stream->input_position);
 
 	  /* Promote the previous match address to head of the hash bucket.  This is
 	   * intended to improve the same cache hit rate. */
@@ -5946,36 +5930,36 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	    }
 
 	  /* Maybe output a COPY instruction */
-	  if (unlikely (match_length >= min_match))
+	  if (unlikely (match_length >= stream->min_match))
 	    {
 	      IF_DEBUG1 ({
 		static int x = 0;
 		P(RINT "[target match:%d] <inp %u %u>  <cpy %u %u> (-%d) [ %u bytes ]\n",
 		   x++,
-		   pos_in,
-		   pos_in + match_length,
+		   stream->input_position,
+		   stream->input_position + match_length,
 		   match_offset,
 		   match_offset + match_length,
-		   pos_in - match_offset,
+		   stream->input_position - match_offset,
 		   match_length);
 	      });
 
 	      if ((ret = xd3_found_match (stream,
-					/* decoder position */ pos_in,
+					/* decoder position */ stream->input_position,
 					/* length */ match_length,
 					/* address */ match_offset,
 					/* is_source */ 0))) { return ret; }
 
 	      /* SSMATCH option: search small matches: continue the incremental checksum
 	       * through the matched material.  Only if not lazy matching.  */
-	      if (SSMATCH && !TRYLAZYLEN (match_length, pos_in, max_in))
+	      if (SSMATCH && !TRYLAZYLEN (match_length, stream->input_position, stream->avail_in))
 		{
-		  usize_t avail = max_in - SLOOK - pos_in;
+		  usize_t avail = stream->avail_in - SLOOK - stream->input_position;
 		  usize_t ml_m1 = match_length - 1;
 		  usize_t right;
 		  int    aincr;
 
-		  IF_DEBUG (usize_t nposi = pos_in + match_length);
+		  IF_DEBUG (usize_t nposi = stream->input_position + match_length);
 
 		  /* Avail is the last offset we can compute an incremental cksum.  If the
 		   * match length exceeds that offset then we are finished performing
@@ -5995,33 +5979,33 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 		  while (right > 0)
 		    {
 		      SMALL_CKSUM_UPDATE (scksum, inp, SLOOK);
-		      if (DO_LARGE && (pos_in + LLOOK < max_in)) {
+		      if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in)) {
 			LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK);
 		      }
 
 		      inp    += 1;
-		      pos_in += 1;
+		      stream->input_position += 1;
 		      right  -= 1;
 		      sinx = xd3_checksum_hash (& stream->small_hash, scksum);
 
 		      IF_DEBUG (xd3_verify_small_state (stream, inp, scksum));
 
-		      xd3_scksum_insert (stream, sinx, scksum, pos_in);
+		      xd3_scksum_insert (stream, sinx, scksum, stream->input_position);
 		    }
 
 		  if (aincr)
 		    {
 		      /* Keep searching... */
 		      if (DO_RUN) { run_l = xd3_comprun (inp+1, SLOOK-1, & run_c); }
-		      XD3_ASSERT (nposi == pos_in + 1);
-		      XD3_ASSERT (pos_in + SLOOK < max_in);
-		      min_match = MIN_MATCH;
+		      XD3_ASSERT (nposi == stream->input_position + 1);
+		      XD3_ASSERT (stream->input_position + SLOOK < stream->avail_in);
+		      stream->min_match = MIN_MATCH;
 		      goto updatesure;
 		    }
 		  else
 		    {
 		      /* Not enough input for another match. */
-		      XD3_ASSERT (pos_in + SLOOK >= max_in);
+		      XD3_ASSERT (stream->input_position + SLOOK >= stream->avail_in);
 		      goto loopnomore;
 		    }
 		}
@@ -6032,17 +6016,17 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	}
 
       /* The logic above prevents excess work during lazy matching by increasing min_match
-       * to avoid smaller matches.  Each time we advance pos_in by one, the minimum match
+       * to avoid smaller matches.  Each time we advance stream->input_position by one, the minimum match
        * shortens as well.  */
-      if (min_match > MIN_MATCH)
+      if (stream->min_match > MIN_MATCH)
 	{
-	  min_match -= 1;
+	  stream->min_match -= 1;
 	}
 
     updateone:
 
       /* See if there are no more incremental cksums to compute. */
-      if (pos_in + SLOOK == max_in)
+      if (stream->input_position + SLOOK == stream->avail_in)
 	{
 	  goto loopnomore;
 	}
@@ -6052,7 +6036,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       /* Compute next RUN, CKSUM */
       if (DO_RUN)   { NEXTRUN (inp[SLOOK]); }
       if (DO_SMALL) { SMALL_CKSUM_UPDATE (scksum, inp, SLOOK); }
-      if (DO_LARGE && (pos_in + LLOOK < max_in)) { LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK); }
+      if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in)) { LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK); }
     }
 
  loopnomore:
