@@ -1,6 +1,0 @@
-2006-07-02  Joshua MacDonald  <jmacd@google.com>
-
-	* xdelta3.c (xd3_iopt_flush_instructions): Fixed a bug in flush_instructions
-	clears more than half of the instructions, thus encodes the last two, which may
-	still overlap.
-

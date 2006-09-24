@@ -306,7 +306,8 @@ static int main_help (void);
 static int
 main_version (void)
 {
-  P(RINT "VERSION=3_PRERFC_0\n");
+  /* $Format: "  P(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
+  P(RINT "VERSION=3.0g\n");
   return EXIT_SUCCESS;
 }
 
@@ -314,31 +315,27 @@ static int
 main_config (void)
 {
   main_version ();
-  /* Compile-time */
-  P(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
-  P(RINT "REGRESSION_TEST=%d\n", REGRESSION_TEST);
-  P(RINT "SECONDARY_FGK=%d\n", SECONDARY_FGK);
-  P(RINT "SECONDARY_DJW=%d\n", SECONDARY_DJW);
+
+  P(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
   P(RINT "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
   P(RINT "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
-  P(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
-  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
-  P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
-  P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
-  P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
-
-  /* Runtime sizes/command-line */
-  P(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
-  P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
-  P(RINT "XD3_DEFAULT_MEMSIZE=%d\n", XD3_DEFAULT_MEMSIZE);
-
-  /* TODO: the following cannot be set by command-line */
+  P(RINT "REGRESSION_TEST=%d\n", REGRESSION_TEST);
+  P(RINT "SECONDARY_DJW=%d\n", SECONDARY_DJW);
+  P(RINT "SECONDARY_FGK=%d\n", SECONDARY_FGK);
+  P(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
   P(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
+  P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
   P(RINT "XD3_DEFAULT_CKSUM_SIZE=%d\n", XD3_DEFAULT_CKSUM_ADVANCE);
   P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
+  P(RINT "XD3_DEFAULT_MEMSIZE=%d\n", XD3_DEFAULT_MEMSIZE);
   P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
+  P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
+  P(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
+  P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
   P(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
   P(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
+  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
+  P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
 
   return EXIT_SUCCESS;
 }
@@ -2213,7 +2210,8 @@ main_input (xd3_cmd     cmd,
   option_srcwinsz = max(option_srcwinsz, XD3_ALLOCSIZE);
   option_winsize = max(option_winsize, XD3_ALLOCSIZE);
 
-  source.blksize = max(XD3_DEFAULT_WINSIZE, option_srcwinsz / 32);
+  source.blksize = (option_srcwinsz / 32) & ~(XD3_ALLOCSIZE-1);
+  source.blksize = max(XD3_DEFAULT_WINSIZE, source.blksize);
 
   config.srcwin_maxsz = option_srcwinsz;
   config.winsize = option_winsize;
@@ -2552,6 +2550,10 @@ main (int argc, char **argv)
   char **orig_argv = argv;
   int ret;
 
+  main_file_init (& ifile);
+  main_file_init (& ofile);
+  main_file_init (& sfile);
+
  go:  /* Go. */
   cmd = CMD_NONE;
   sfilename = NULL;
@@ -2816,10 +2818,6 @@ main (int argc, char **argv)
       XPR(NT "command line: %s\n", buf);
     }      
 
-  main_file_init (& ifile);
-  main_file_init (& ofile);
-  main_file_init (& sfile);
-
   ifile.flags    = RD_FIRST;
   sfile.flags    = RD_FIRST;
   sfile.filename = option_source_filename;
@@ -2930,7 +2928,7 @@ main_help (void)
   P(RINT "   -0 .. -9     compression level\n");
   P(RINT "   -A [apphead] disable/provide application header\n");
   P(RINT "   -B blksize   source file block size\n");
-  P(RINT "   -C           soft config (see code)\n");
+  P(RINT "   -C           soft config (see xdelta3-cfgs.h)\n");
   P(RINT "   -c           use stdout instead of default\n");
   P(RINT "   -D           disable external decompression (encode/decode)\n");
   P(RINT "   -d           same as decode command\n");
@@ -2946,7 +2944,7 @@ main_help (void)
   P(RINT "   -R           disable external recompression (decode)\n");
   P(RINT "   -S [djw|fgk] disable/enable secondary compression\n");
   P(RINT "   -s source    source file to copy from (if any)\n");
-  P(RINT "   -T           use alternate code table (compatibility testing)\n");
+  P(RINT "   -T           use alternate code table\n");
   P(RINT "   -v           be verbose (max 2)\n");
   P(RINT "   -V           show version\n");
   P(RINT "   -W winsize   input window buffer size\n");
