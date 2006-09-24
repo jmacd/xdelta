@@ -630,15 +630,11 @@ static int         xd3_selftest      (void);
 #if SIZEOF_XOFF_T == 4
 #define XOFF_T_MAX        UINT32_MAX
 #define xd3_decode_offset xd3_decode_uint32_t
-//#define xd3_emit_offset   xd3_emit_uint32_t
-//#define xd3_sizeof_offset xd3_sizeof_uint32_t
-//#define xd3_read_offset   xd3_read_uint32_t
+#define xd3_emit_offset   xd3_emit_uint32_t
 #elif SIZEOF_XOFF_T == 8
 #define XOFF_T_MAX        UINT64_MAX
 #define xd3_decode_offset xd3_decode_uint64_t
-//#define xd3_emit_offset   xd3_emit_uint64_t
-//#define xd3_sizeof_offset xd3_sizeof_uint64_t
-//#define xd3_read_offset   xd3_read_uint64_t
+#define xd3_emit_offset   xd3_emit_uint64_t
 #endif
 
 #define USIZE_T_OVERFLOW(a,b) ((USIZE_T_MAX - (usize_t) (a)) < (usize_t) (b))
@@ -1855,7 +1851,7 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (PART & OFLOW)                                                \
 	{                                                              \
 	  stream->msg = "overflow in decode_integer";                  \
-	  return XD3_INTERNAL;                                               \
+	  return XD3_INTERNAL;                                         \
 	}                                                              \
                                                                        \
       PART = (PART << 7) | (next & 127);                               \
@@ -1881,13 +1877,13 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (inp == max)                                                  \
 	{                                                              \
 	  stream->msg = "end-of-input in read_integer";                \
-	  return XD3_INTERNAL;                                               \
+	  return XD3_INTERNAL;                                         \
 	}                                                              \
                                                                        \
       if (val & OFLOW)                                                 \
 	{                                                              \
 	  stream->msg = "overflow in read_intger";                     \
-	  return XD3_INTERNAL;                                               \
+	  return XD3_INTERNAL;                                         \
 	}                                                              \
                                                                        \
       next = (*inp++);                                                 \
@@ -1903,7 +1899,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define EMIT_INTEGER_TYPE()                                            \
   /* max 64-bit value in base-7 encoding is 9.1 bytes */               \
   uint8_t buf[10];                                                     \
-  usize_t  bufi = 10;                                                   \
+  usize_t  bufi = 10;                                                  \
                                                                        \
   XD3_ASSERT (num >= 0);                                               \
                                                                        \
@@ -1933,16 +1929,17 @@ xd3_sizeof_uint32_t (uint32_t num)
   IF_SIZEOF32(2);
   IF_SIZEOF32(3);
   IF_SIZEOF32(4);
-
   return 5;
 }
 
 static int
 xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_32part, UINT32_OFLOW_MASK); }
+
 static int
 xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp, const uint8_t *max, uint32_t *valp)
 { READ_INTEGER_TYPE (uint32_t, UINT32_OFLOW_MASK); }
+
 #if XD3_ENCODER
 static int
 xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
@@ -1951,17 +1948,18 @@ xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
 #endif
 
 #if USE_UINT64
-/* We only ever decode offsets, but the other three are part of the regression test
- * anyway. */
 static int
 xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
-#if REGRESSION_TEST
+
 #if XD3_ENCODER
 static int
 xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 { EMIT_INTEGER_TYPE (); }
 #endif
+
+/* These are tested but not used */
+#if REGRESSION_TEST
 static int
 xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp, const uint8_t *max, uint64_t *valp)
 { READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
@@ -1982,6 +1980,7 @@ xd3_sizeof_uint64_t (uint64_t num)
   return 10;
 }
 #endif
+
 #endif
 
 /******************************************************************************************
@@ -3402,7 +3401,7 @@ xd3_emit_hdr (xd3_stream *stream)
     {
       /* or (vcd_target) { ... } */
       if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream), stream->src->srclen)) ||
-	  (ret = xd3_emit_size (stream, & HDR_TAIL (stream), stream->src->srcbase))) { return ret; }
+	  (ret = xd3_emit_offset (stream, & HDR_TAIL (stream), stream->src->srcbase))) { return ret; }
     }
 
   tgt_len  = stream->avail_in;
