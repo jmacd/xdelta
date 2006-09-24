@@ -30,16 +30,20 @@ static const double TEST_ADD_MAX      = 256;
 static const double TEST_ADD_RATIO    = 0.1;
 static const double TEST_EPSILON      = 0.5;
 
-static char   TEST_TARGET_FILE[32];
-static char   TEST_SOURCE_FILE[32];
-static char   TEST_DELTA_FILE[32];
-static char   TEST_RECON_FILE[32];
-static char   TEST_RECON2_FILE[32];
-static char   TEST_COPY_FILE[32];
-
 static int TESTBUFSIZE = 1024 * 16;
 
+#define TESTFILESIZE 1024
+
+static char   TEST_TARGET_FILE[TESTFILESIZE];
+static char   TEST_SOURCE_FILE[TESTFILESIZE];
+static char   TEST_DELTA_FILE[TESTFILESIZE];
+static char   TEST_RECON_FILE[TESTFILESIZE];
+static char   TEST_RECON2_FILE[TESTFILESIZE];
+static char   TEST_COPY_FILE[TESTFILESIZE];
+
 static int test_exponential_dist (usize_t mean, usize_t max);
+
+#define CHECK(cond) if (!(cond)) { P(RINT "check failure: " #cond); abort(); }
 
 /* TODO
  *
@@ -68,7 +72,7 @@ static int do_cmd (xd3_stream *stream, const char *buf)
 	{
 	  stream->msg = "abnormal command termination";
 	}
-      return EINVAL;
+      return XD3_INTERNAL;
     }
   DOT ();
   return 0;
@@ -81,7 +85,7 @@ static int do_fail (xd3_stream *stream, const char *buf)
     {
       stream->msg = "command should have not succeeded";
       P(RINT "command was %s", buf);
-      return EINVAL;
+      return XD3_INTERNAL;
     }
   DOT ();
   return 0;
@@ -123,7 +127,7 @@ test_random_numbers (xd3_stream *stream, int ignore)
     }
 
   stream->msg = "random distribution looks broken";
-  return EINVAL;
+  return XD3_INTERNAL;
 }
 
 static int
@@ -274,7 +278,7 @@ compare_files (xd3_stream *stream, const char* tgt, const char *rec)
 	if (oc != rc)
 	  {
 	    stream->msg = "compare files: different length";
-	    return EINVAL;
+	    return XD3_INTERNAL;
 	  }
 
 	if (oc == 0)
@@ -287,7 +291,7 @@ compare_files (xd3_stream *stream, const char* tgt, const char *rec)
 	    if (obuf[i] != rbuf[i])
 	      {
 		stream->msg = "compare files: different values";
-		return EINVAL;
+		return XD3_INTERNAL;
 	      }
 	  }
 
@@ -309,7 +313,7 @@ test_save_copy (const char *origname)
 
   if ((ret = system (buf)) != 0)
     {
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   return 0;
@@ -330,7 +334,7 @@ test_file_size (const char* file, xoff_t *size)
 
   if (! S_ISREG (sbuf.st_mode))
     {
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       P(RINT "xdelta3: not a regular file: %s: %s\n", file, strerror (ret));
       return ret;
     }
@@ -345,11 +349,11 @@ test_file_size (const char* file, xoff_t *size)
 
 /* Common test for read_integer errors: encodes a 64-bit value and then attempts to read
  * as a 32-bit value.  If TRUNC is non-zero, attempts to get errors by shortening the
- * input, otherwise it should overflow.  Expects EINVAL and MSG. */
+ * input, otherwise it should overflow.  Expects XD3_INTERNAL and MSG. */
 static int
 test_read_integer_error (xd3_stream *stream, int trunto, const char *msg)
 {
-  uint64_t eval = (uint64_t) UINT32_MAX + 1ULL;
+  uint64_t eval = 1ULL << 34;
   uint32_t rval;
   xd3_output *buf = NULL;
   const uint8_t *max;
@@ -368,9 +372,9 @@ test_read_integer_error (xd3_stream *stream, int trunto, const char *msg)
   inp = buf->base;
   max = buf->base + buf->next - trunto;
 
-  if ((ret = xd3_read_uint32_t (stream, & inp, max, & rval)) != EINVAL || !MSG_IS (msg))
+  if ((ret = xd3_read_uint32_t (stream, & inp, max, & rval)) != XD3_INTERNAL || !MSG_IS (msg))
     {
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
     }
   else if (trunto && trunto < buf->next)
     {
@@ -443,7 +447,7 @@ test_decode_integer_end_of_input (xd3_stream *stream, int unused)
                                                                                 \
       if (rbuf->next != xd3_sizeof_ ## TYPE (values[i]))                        \
 	{                                                                       \
-	  ret = EINVAL;                                                         \
+	  ret = XD3_INTERNAL;                                                         \
 	  goto fail;                                                            \
 	}                                                                       \
                                                                                 \
@@ -454,7 +458,7 @@ test_decode_integer_end_of_input (xd3_stream *stream, int unused)
                                                                                 \
       if (val != values[i])                                                     \
 	{                                                                       \
-	  ret = EINVAL;                                                         \
+	  ret = XD3_INTERNAL;                                                         \
 	  goto fail;                                                            \
 	}                                                                       \
                                                                                 \
@@ -475,14 +479,14 @@ test_decode_integer_end_of_input (xd3_stream *stream, int unused)
                                                                                 \
       if (val != values[i])                                                     \
         {                                                                       \
-          ret = EINVAL;                                                         \
+          ret = XD3_INTERNAL;                                                         \
           goto fail;                                                            \
         }                                                                       \
     }                                                                           \
                                                                                 \
   if (stream->avail_in != 0)                                                    \
     {                                                                           \
-      ret = EINVAL;                                                             \
+      ret = XD3_INTERNAL;                                                             \
       goto fail;                                                                \
     }                                                                           \
                                                                                 \
@@ -522,7 +526,7 @@ test_usize_t_overflow (xd3_stream *stream, int unused)
 
  fail:
   stream->msg = "incorrect overflow computation";
-  return EINVAL;
+  return XD3_INTERNAL;
 }
 
 /******************************************************************************************
@@ -604,7 +608,7 @@ test_address_cache (xd3_stream *stream, int unused)
       if (addr != addrs[offset])
 	{
 	  stream->msg = "incorrect decoded address";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
 
@@ -612,7 +616,7 @@ test_address_cache (xd3_stream *stream, int unused)
   if (buf != buf_max)
     {
       stream->msg = "address bytes not used";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   for (i = 0; i < (2 + stream->acache.s_same + stream->acache.s_near); i += 1)
@@ -620,7 +624,7 @@ test_address_cache (xd3_stream *stream, int unused)
       if (mode_counts[i] == 0)
 	{
 	  stream->msg = "address mode not used";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
 
@@ -702,7 +706,7 @@ test_decompress_text (xd3_stream *stream, uint8_t *enc, usize_t enc_size, usize_
  input:
   /* Test decoding test_desize input bytes at a time */
   take = min (enc_size - pos, test_desize);
-  XD3_ASSERT (take > 0);
+  CHECK(take > 0);
 
   xd3_avail_input (stream, enc + pos, take);
  again:
@@ -726,13 +730,13 @@ test_decompress_text (xd3_stream *stream, uint8_t *enc, usize_t enc_size, usize_
       goto fail;
     }
 
-  XD3_ASSERT (ret == XD3_OUTPUT);
-  XD3_ASSERT (pos == enc_size);
+  CHECK(ret == XD3_OUTPUT);
+  CHECK(pos == enc_size);
 
   if (stream->avail_out != sizeof (test_text))
     {
       stream->msg = "incorrect output size";
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       goto fail;
     }
 
@@ -746,7 +750,7 @@ test_decompress_text (xd3_stream *stream, uint8_t *enc, usize_t enc_size, usize_
   if (apphead_size != sizeof (test_apphead) || memcmp (apphead, test_apphead, sizeof (test_apphead)) != 0)
     {
       stream->msg = "incorrect appheader";
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       goto fail;
     }
 
@@ -795,7 +799,7 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
    */
   system ("rm -rf test_text.*");
   {
-    char buf[64];
+    char buf[TESTBUFSIZE];
     FILE *f;
     sprintf (buf, "test_text");
     f = fopen (buf, "w");
@@ -804,7 +808,7 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
   }
 #define TEST_FAILURES()                                                         \
   do {                                                                          \
-    char buf[64];                                                               \
+    char buf[TESTBUFSIZE]                                                       \
     FILE *f;                                                                    \
     sprintf (buf, "test_text.xz.%d", non_failures);                             \
     f = fopen (buf, "w");                                                       \
@@ -853,7 +857,7 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
 	{
 	  /*P(RINT "%u[%u] cksum mismatch\n", i/8, i%8);*/
 	  stream->msg = "checksum mismatch";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Undo single bit error. */
@@ -872,7 +876,7 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
     {
       P(RINT "non-failures %u; expected %u", non_failures, expected_non_failures);
       stream->msg = "incorrect";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   DOT ();
@@ -1094,21 +1098,21 @@ test_secondary_decode (xd3_stream         *stream,
   if (dec_input_used != dec_input_end)
     {
       stream->msg = "unused input";
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       goto fail;
     }
 
   if (dec_output_used != dec_output_end)
     {
       stream->msg = "unfinished output";
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       goto fail;
     }
 
   if (memcmp (dec_output, dec_correct, input_size) != 0)
     {
       stream->msg = "incorrect output";
-      ret = EINVAL;
+      ret = XD3_INTERNAL;
       goto fail;
     }
 
@@ -1174,7 +1178,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 	      memcpy (dec_input + p_off, p->base, p->next);
 	    }
 
-	  XD3_ASSERT (p_off == compress_size);
+	  CHECK(p_off == compress_size);
 
 	  /* Fill the input data array */
 	  for (p_off = 0, p = in_head; p != NULL; p_off += p->next, p = p->next_page)
@@ -1182,7 +1186,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 	      memcpy (dec_correct + p_off, p->base, p->next);
 	    }
 
-	  XD3_ASSERT (p_off == input_size);
+	  CHECK(p_off == input_size);
 
 	  if ((ret = test_secondary_decode (stream, sec, input_size, compress_size, dec_input, dec_correct, dec_output)))
 	    {
@@ -1253,7 +1257,7 @@ test_choose_instruction (xd3_stream *stream, int ignore)
       const xd3_dinst *d = stream->code_table + i;
       xd3_rinst prev, inst;
 
-      XD3_ASSERT (d->type1 > 0);
+      CHECK(d->type1 > 0);
 
       memset (& prev, 0, sizeof (prev));
       memset (& inst, 0, sizeof (inst));
@@ -1272,7 +1276,7 @@ test_choose_instruction (xd3_stream *stream, int ignore)
 	  if (inst.code2 != 0 || inst.code1 != i)
 	    {
 	      stream->msg = "wrong single instruction";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 	}
       else
@@ -1287,7 +1291,7 @@ test_choose_instruction (xd3_stream *stream, int ignore)
 	  if (prev.code2 != i)
 	    {
 	      stream->msg = "wrong double instruction";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 	}
     }
@@ -1324,7 +1328,7 @@ test_encode_code_table (xd3_stream *stream, int ignore)
   if (memcmp (stream->code_table, xd3_alternate_code_table (), sizeof (xd3_dinst) * 256) != 0)
     {
       stream->msg = "wrong code table reconstruction";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   return 0;
@@ -1376,7 +1380,7 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 	  memcmp (encbuf, decbuf, 1 << 20) != 0)
 	{
 	  in_stream->msg = "wrong result";
-	  ret = EINVAL;
+	  ret = XD3_INTERNAL;
 	  goto fail;
 	}
     }
@@ -1409,14 +1413,14 @@ test_compressed_stream_overflow (xd3_stream *stream, int ignore)
     {
       ret = test_streaming (stream, buf, buf + (1 << 20), buf + (2 << 20), (1 << 12) + 1);
 
-      if (ret == EINVAL && MSG_IS ("decoder file offset overflow"))
+      if (ret == XD3_INTERNAL && MSG_IS ("decoder file offset overflow"))
 	{
 	  ret = 0;
 	}
       else
 	{
 	  stream->msg = "expected overflow condition";
-	  ret = EINVAL;
+	  ret = XD3_INTERNAL;
 	  goto fail;
 	}
     }
@@ -1466,7 +1470,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
     "%s -f encode -A= %s %s", "%s -f decode -f %s %s",
   };
 
-  char ecmd[128], dcmd[128];
+  char ecmd[TESTBUFSIZE], dcmd[TESTBUFSIZE];
   int pairs = SIZEOF_ARRAY (cmdpairs) / 2;
   xoff_t tsize;
   xoff_t dsize;
@@ -1487,13 +1491,13 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	{
 	  P(RINT "xdelta3: command was: %s\n", ecmd);
 	  stream->msg = "encode cmd failed";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       if ((ret = system (dcmd)) != 0)
 	{
 	  stream->msg = "decode cmd failed";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       /* Compare the target file. */
@@ -1525,7 +1529,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	      P(RINT "xdelta3: test encode with size ratio %.3f, expected < %.3f\n",
 		       ratio, TEST_ADD_RATIO + TEST_EPSILON);
 	      stream->msg = "strange encoding";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 
 	  if (ratio <= TEST_ADD_RATIO - TEST_EPSILON)
@@ -1533,7 +1537,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	      P(RINT "xdelta3: test encode with size ratio %.3f, expected > %.3f\n",
 		       ratio, TEST_ADD_RATIO - TEST_EPSILON);
 	      stream->msg = "strange encoding";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 
 	  /* Also check that compare_files works.  The delta and original should not be
@@ -1541,7 +1545,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	  if ((ret = compare_files (stream, TEST_DELTA_FILE, TEST_TARGET_FILE)) == 0)
 	    {
 	      stream->msg = "broken compare_files";
-	      return EINVAL;
+	      return XD3_INTERNAL;
 	    }
 	}
       else
@@ -1596,12 +1600,12 @@ test_compressed_pipe (xd3_stream *stream, main_extcomp *ext, char* buf,
   if ((ret = system (buf)) != 0)
     {
       stream->msg = msg;
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE)))
     {
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   DOT ();
@@ -1743,7 +1747,7 @@ static int
 test_force_behavior (xd3_stream *stream, int ignore)
 {
   int ret;
-  char buf[128];
+  char buf[TESTBUFSIZE];
 
   /* Create empty target file */
   test_setup ();
@@ -1755,7 +1759,7 @@ test_force_behavior (xd3_stream *stream, int ignore)
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Encode again, should fail. */
-  sprintf (buf, "%s -e %s %s 2> /dev/null", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e %s %s ", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* Force it, should succeed. */
@@ -1772,7 +1776,7 @@ static int
 test_stdout_behavior (xd3_stream *stream, int ignore)
 {
   int ret;
-  char buf[128];
+  char buf[TESTBUFSIZE];
 
   test_setup();
   sprintf (buf, "cp /dev/null %s", TEST_TARGET_FILE);
@@ -1787,7 +1791,7 @@ test_stdout_behavior (xd3_stream *stream, int ignore)
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Without -c, decode writes to target file name, but it fails because the file exists. */
-  sprintf (buf, "%s -d %s 2> /dev/null", program_name, TEST_DELTA_FILE);
+  sprintf (buf, "%s -d %s ", program_name, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* With -c, decode writes to stdout */
@@ -1809,7 +1813,7 @@ test_no_output (xd3_stream *stream, int ignore)
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
   /* Try no_output encode w/out unwritable output file */
-  sprintf (buf, "%s -e %s /dont_run_xdelta3_test_as_root 2> /dev/null", program_name, TEST_TARGET_FILE);
+  sprintf (buf, "%s -e %s /dont_run_xdelta3_test_as_root ", program_name, TEST_TARGET_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
   sprintf (buf, "%s -J -e %s /dont_run_xdelta3_test_as_root", program_name, TEST_TARGET_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
@@ -1818,7 +1822,7 @@ test_no_output (xd3_stream *stream, int ignore)
   sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  sprintf (buf, "%s -d %s /dont_run_xdelta3_test_as_root 2> /dev/null", program_name, TEST_DELTA_FILE);
+  sprintf (buf, "%s -d %s /dont_run_xdelta3_test_as_root ", program_name, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
   sprintf (buf, "%s -J -d %s /dont_run_xdelta3_test_as_root", program_name, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
@@ -1889,7 +1893,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 
       if (ret != XD3_OUTPUT) { goto fail; }
 
-      XD3_ASSERT (delpos + stream->avail_out <= IDB_DELSZ);
+      CHECK(delpos + stream->avail_out <= IDB_DELSZ);
 
       memcpy (del + delpos, stream->next_out, stream->avail_out);
 
@@ -2047,7 +2051,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    {
 	    case XD3_RUN: *rptr++ = 'R'; break;
 	    case XD3_CPY: *rptr++ = 'C'; break;
-	    default: XD3_ASSERT (0);
+	    default: CHECK(0);
 	    }
 
 	  sprintf (rptr, "%d/%d", inst->pos, inst->size);
@@ -2074,16 +2078,12 @@ test_string_matching (xd3_stream *stream, int ignore)
 	{
 	  P(RINT "test %u: expected %s: got %s", i, test->result, rbuf);
 	  stream->msg = "wrong result";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
 
   return 0;
 }
-
-/******************************************************************************************
- Source window advance, update
- ******************************************************************************************/
 
 /*
  * This is a test for many overlapping instructions. It must be a lazy
@@ -2144,9 +2144,57 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
       return ret;
     }
 
-  XD3_ASSERT(tpos == recon_size);
-  XD3_ASSERT(memcmp(target, recon, recon_size) == 0);
+  CHECK(tpos == recon_size);
+  CHECK(memcmp(target, recon, recon_size) == 0);
 
+  return 0;
+}
+
+/*
+ * This tests the 32/64bit ambiguity for source-window matching.
+ */
+static int
+test_source_cksum_offset (xd3_stream *stream, int ignore)
+{
+  xd3_source source;
+  stream->src = &source;
+
+  // Inputs are:
+  struct {
+    xoff_t   cpos;   // stream->srcwin_cksum_pos;
+    xoff_t   ipos;   // stream->total_in;
+    xoff_t   size;   // stream->src->size;
+
+    usize_t  input;  // input  32-bit offset
+    xoff_t   output; // output 64-bit offset
+
+  } cksum_test[] = {
+    // If cpos is <= 2^32 
+    { 1, 1, 1, 1, 1 },
+
+#if XD3_USE_LARGEFILE64
+//    cpos            ipos            size            input         output
+//    0x____xxxxxULL, 0x____xxxxxULL, 0x____xxxxxULL, 0x___xxxxxUL, 0x____xxxxxULL
+    { 0x100100000ULL, 0x100000000ULL, 0x100200000ULL, 0x00000000UL, 0x100000000ULL },
+    { 0x100100000ULL, 0x100000000ULL, 0x100200000ULL, 0xF0000000UL, 0x0F0000000ULL },
+
+    { 0x100200000ULL, 0x100100000ULL, 0x100200000ULL, 0x00300000UL, 0x000300000ULL },
+
+    { 25771983104ULL, 25770000000ULL, 26414808769ULL, 2139216707UL, 23614053187ULL },
+
+#endif
+
+    { 0, 0, 0, 0, 0 },
+  }, *test_ptr;
+
+  for (test_ptr = cksum_test; test_ptr->cpos; test_ptr++) {
+    stream->srcwin_cksum_pos = test_ptr->cpos;
+    stream->total_in = test_ptr->ipos;
+    stream->src->size = test_ptr->size;
+
+    xoff_t r = xd3_source_cksum_offset(stream, test_ptr->input);
+    CHECK(r == test_ptr->output);
+  }
   return 0;
 }
 
@@ -2194,6 +2242,7 @@ xd3_selftest (void)
 
   DO_TEST (identical_behavior, 0, 0);
   DO_TEST (iopt_flush_instructions, 0, 0);
+  DO_TEST (source_cksum_offset, 0, 0);
 
   IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));
   IF_FGK (DO_TEST (secondary_fgk, 0, 1));
@@ -2208,8 +2257,6 @@ xd3_selftest (void)
    * instruction codes are used. */
   IF_GENCODETBL (DO_TEST (decompress_single_bit_error, XD3_ALT_CODE_TABLE, 224));
 
-  DO_TEST (compressed_stream_overflow, 0, 0);
-
   /* The following tests have random failures on my OSX box.
    */
   DO_TEST (force_behavior, 0, 0);
@@ -2221,6 +2268,10 @@ xd3_selftest (void)
   DO_TEST (source_decompression, 0, 0);
   DO_TEST (externally_compressed_io, 0, 0);
 #endif
+
+  /* This test takes a while.
+   */
+  DO_TEST (compressed_stream_overflow, 0, 0);
 
 failure:
   test_cleanup ();

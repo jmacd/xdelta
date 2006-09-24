@@ -105,7 +105,7 @@ static INLINE int xd3_decode_bits     (xd3_stream     *stream,
       if (*input == input_max)
 	{
 	  stream->msg = "secondary decoder end of input";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       bits->cur_byte = *(*input)++;
@@ -129,7 +129,7 @@ static INLINE int xd3_decode_bit     (xd3_stream     *stream,
       if (*input == input_max)
 	{
 	  stream->msg = "secondary decoder end of input";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       bits->cur_byte = *(*input)++;
@@ -157,7 +157,7 @@ xd3_test_clean_bits (xd3_stream *stream, bit_state *bits)
       if (bits->cur_byte & bits->cur_mask)
 	{
 	  stream->msg = "secondary decoder garbage";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
     }
 
@@ -214,13 +214,13 @@ xd3_decode_secondary (xd3_stream      *stream,
   if (sect->buf != sect->buf_max)
     {
       stream->msg = "secondary decoder finished with unused input";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if (out_used != sect->copied2 + dec_size)
     {
       stream->msg = "secondary decoder short output";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   sect->buf     = sect->copied2;

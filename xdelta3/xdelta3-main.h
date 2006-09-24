@@ -186,9 +186,10 @@ struct _main_file
   int                 file;
 #endif
 
-  int                 mode;       /* XO_READ and XO_WRITE */
-  const char         *filename;   /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
-  const char         *realname;   /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
+  int                 mode;          /* XO_READ and XO_WRITE */
+  const char         *filename;      /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
+  char               *filename_copy; /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
+  const char         *realname;      /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
   const main_extcomp *compressor; /* External compression struct. */
   int                 flags;      /* RD_FIRST or RD_NONEXTERNAL */
   xoff_t              nread;      /* for input position */
@@ -383,13 +384,12 @@ main_alloc (void   *opaque,
 }
 
 static void
-main_free (void **ptr)
+main_free (void *ptr)
 {
-  if (*ptr)
+  if (ptr)
     {
       IF_DEBUG (main_mallocs -= 1); 
-      free (*ptr);
-      (*ptr) = NULL;
+      free (ptr);
     }
 }
 
@@ -407,7 +407,7 @@ get_errno (void)
   if (errno == 0)
     {
       XPR(NT "you found a bug: expected errno != 0\n");
-      errno = EINVAL;
+      errno = XD3_INTERNAL;
     }
   return errno;
 }
@@ -569,6 +569,14 @@ main_file_init (main_file *xfile)
 #if XD3_POSIX
   xfile->file = -1;
 #endif
+}
+
+static void
+main_file_cleanup (main_file *xfile)
+{
+  if (xfile->filename_copy) {
+    main_free(xfile->filename_copy);
+  }
 }
 
 static int
@@ -849,19 +857,19 @@ main_print_window (xd3_stream* stream, FILE *vcout)
   if (stream->dec_tgtlen != size && (stream->flags & XD3_SKIP_WINDOW) == 0)
     {
       XPR(NT "target window size inconsistency");
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if (stream->dec_position != stream->dec_maxpos)
     {
       XPR(NT "target window position inconsistency");
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   if (stream->addr_sect.buf != stream->addr_sect.buf_max)
     {
       XPR(NT "address section inconsistency");
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   IF_DEBUG (VC(OUT "SIZE=%u  TGTLEN=%u\n", size, stream->dec_tgtlen));
@@ -1022,7 +1030,7 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 #define PIPE_WRITE_FD 1
 
 static pid_t ext_subprocs[2];
-static const char* ext_tmpfile = NULL;
+static char* ext_tmpfile = NULL;
 
 /* Like write(), but makes repeated calls to empty the buffer. */
 static int
@@ -1546,6 +1554,7 @@ main_apphead_string (const char* x)
       strcmp (x, "/dev/stdout") == 0 ||
       strcmp (x, "/dev/stderr") == 0) { return "-"; }
 
+  // TODO: this is not portable
   return (y = strrchr (x, '/')) == NULL ? x : y + 1;
 }
 
@@ -1606,12 +1615,29 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 #endif
 
 static void
-main_get_appheader_params (main_file *file, char **parsed, int output, const char *type)
+main_get_appheader_params (main_file *file, char **parsed, int output, const char *type,
+			   main_file *other)
 {
   /* Set the filename if it was not specified.  If output, option_stdout (-c) overrides. */
   if (file->filename == NULL && ! (output && option_stdout) && strcmp (parsed[0], "-") != 0)
     {
       file->filename = parsed[0];
+
+      if (other->filename != NULL) {
+	/* Take directory from the other file, if it has one. */
+	char *last_slash = strrchr(other->filename, '/');
+
+	if (last_slash != NULL) {
+	  int dlen = last_slash - other->filename;
+	  file->filename_copy = main_malloc(dlen + 2 + strlen(file->filename));
+
+	  strncpy(file->filename_copy, other->filename, dlen);
+	  file->filename_copy[dlen] = '/';
+	  strcpy(file->filename_copy + dlen + 1, parsed[0]);
+
+	  file->filename = file->filename_copy;
+	}
+      }
 
       if (! option_quiet)
 	{
@@ -1663,13 +1689,13 @@ main_get_appheader (xd3_stream *stream, main_file *output, main_file *sfile)
       /* First take the output parameters. */
       if (place == 2 || place == 4)
 	{
-	  main_get_appheader_params (output, parsed, 1, "output");
+	  main_get_appheader_params (output, parsed, 1, "output", sfile);
 	}
 
       /* Then take the source parameters. */
       if (place == 4)
 	{
-	  main_get_appheader_params (sfile, parsed+2, 0, "source");
+	  main_get_appheader_params (sfile, parsed+2, 0, "source", output);
 	}
     }
 
@@ -1805,6 +1831,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   if (option_verbose > 1) { XPR(NT "source block size: %u\n", source->blksize); }
   
   lru_size = (option_srcwinsz / source->blksize);
+  lru_size = max(1, lru_size);
 
   XD3_ASSERT(lru_size <= 128);  /* TODO: fix performance here */
 
@@ -2014,7 +2041,7 @@ main_getblk_func (xd3_stream *stream,
   if (nread != onblk)
     {
       XPR(NT "source file size change: %s\n", sfile->filename);
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   main_blklru_list_push_back (& lru_list, blru);
@@ -2494,19 +2521,19 @@ main_cleanup (void)
   
   if (option_appheader) { appheader_used = NULL; }
 
-  main_free ((void**) & appheader_used);
-  main_free ((void**) & main_bdata);
+  main_free (appheader_used);
+  main_free (main_bdata);
 
 #if EXTERNAL_COMPRESSION
-  main_free ((void**) & ext_tmpfile);
+  main_free (ext_tmpfile);
 #endif
 
   for (i = 0; lru && i < lru_size; i += 1)
     {
-      main_free ((void**) & lru[i].blk);
+      main_free (lru[i].blk);
     }
 
-  main_free ((void**) & lru);
+  main_free (lru);
 
   lru_hits = 0;
   lru_misses = 0;
@@ -2871,6 +2898,10 @@ main (int argc, char **argv)
     exit:
       (void)0;
     }
+
+  main_file_cleanup (& ifile);
+  main_file_cleanup (& ofile);
+  main_file_cleanup (& sfile);
 
   main_cleanup ();
 

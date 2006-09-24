@@ -818,7 +818,7 @@ xd3_decode_fgk (xd3_stream     *stream,
       if (input == input_max)
 	{
 	  stream->msg = "secondary decoder end of input";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       bstate.cur_byte = *input++;

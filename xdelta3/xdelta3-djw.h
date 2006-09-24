@@ -708,7 +708,7 @@ xd3_encode_howmany_groups (xd3_stream *stream,
       if (cfg->ngroups < 0 || cfg->ngroups > DJW_MAX_GROUPS)
 	{
 	  stream->msg = "invalid secondary encoder group number";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       cfg_groups = cfg->ngroups;
@@ -719,7 +719,7 @@ xd3_encode_howmany_groups (xd3_stream *stream,
       if (cfg->sector_size < DJW_SECTORSZ_MULT || cfg->sector_size > DJW_SECTORSZ_MAX || (cfg->sector_size % DJW_SECTORSZ_MULT) != 0)
 	{
 	  stream->msg = "invalid secondary encoder sector size";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       cfg_sector_size = cfg->sector_size;
@@ -1334,7 +1334,7 @@ djw_decode_symbol (xd3_stream     *stream,
       if (*input == input_end)
 	{
 	  stream->msg = "secondary decoder end of input";
-	  return EINVAL;
+	  return XD3_INTERNAL;
 	}
 
       bstate->cur_byte = *(*input)++;
@@ -1357,7 +1357,7 @@ djw_decode_symbol (xd3_stream     *stream,
 
  corrupt:
   stream->msg = "secondary decoder invalid code";
-  return EINVAL;
+  return XD3_INTERNAL;
 }
 
 static int
@@ -1475,7 +1475,7 @@ djw_decode_1_2 (xd3_stream     *stream,
   if (rep != 0)
     {
       stream->msg = "secondary decoder invalid repeat code";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
   
   return 0;
@@ -1522,7 +1522,7 @@ xd3_decode_huff (xd3_stream     *stream,
   if (output_bytes == 0)
     {
       stream->msg = "secondary decoder invalid input";
-      return EINVAL;
+      return XD3_INTERNAL;
     }
 
   /* Decode: number of groups */

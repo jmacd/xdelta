@@ -2601,6 +2601,7 @@ xd3_getblk (xd3_stream *stream/*, xd3_source *source*/, xoff_t blkno)
 
   if (blkno >= source->blocks)
     {
+      IF_DEBUG1 (P(RINT "[getblk] block %"Q"u\n", blkno));
       stream->msg = "source file too short";
       return XD3_INTERNAL;
     }
@@ -5006,7 +5007,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 {
   xoff_t logical_input_cksum_pos;
 
-  if (stream->srcwin_cksum_pos >= stream->src->size)
+  XD3_ASSERT(stream->srcwin_cksum_pos <= stream->src->size);
+  if (stream->srcwin_cksum_pos == stream->src->size)
     {
       *next_move_point = USIZE_T_MAX;
       return 0;
@@ -5030,15 +5032,17 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
   if (diff > stream->srcwin_size)
     {
-      stream->srcwin_cksum_pos = stream->total_in + pos_in - stream->srcwin_size;
-      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
+      // TODO: I think this should use the last match position in the source!
+      //stream->srcwin_cksum_pos = logical_input_cksum_pos - stream->srcwin_size;
     }
 
-  if (diff < stream->srcwin_size)
-    {
-      /* Advance a minimum of srcwin_size bytes */
-      logical_input_cksum_pos = stream->srcwin_cksum_pos + stream->srcwin_size;
-    }
+  /* Advance an extra srcwin_size bytes */
+  logical_input_cksum_pos += stream->srcwin_size;
+
+  IF_DEBUG1 (P(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n", 
+	       stream->total_in + pos_in,
+	       stream->srcwin_cksum_pos,
+	       logical_input_cksum_pos));
 
   while (stream->srcwin_cksum_pos < logical_input_cksum_pos &&
 	 stream->srcwin_cksum_pos < stream->src->size)
@@ -5048,19 +5052,12 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       usize_t onblk = xd3_bytes_on_srcblk (stream->src, blkno);
       int ret;
 
-      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
-      onblk = min(onblk, blkoff + diff);
-
-      if (blkoff + stream->large_look >= onblk)
+      if (blkoff + stream->large_look > onblk)
 	{
 	  /* Next block */
-	  stream->srcwin_cksum_pos = (blkno * stream->src->blksize) + onblk;
+	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
 	  continue;
 	}
-
-      IF_DEBUG1 (P(RINT "[move_p1] T=%"Q"u S=%"Q"u\n", 
-		   stream->total_in + pos_in,
-		   stream->srcwin_cksum_pos));
 
       if ((ret = xd3_getblk (stream, blkno)))
 	{
@@ -5071,7 +5068,11 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  return ret;
 	}
 
-      while (blkoff + stream->large_look < onblk)
+      onblk -= stream->large_look;
+      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
+      onblk = min(blkoff + diff, onblk);
+
+      while (blkoff <= onblk)
 	{
 	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkoff, stream->large_look);
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
@@ -5080,47 +5081,40 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
 	  blkoff += stream->large_step;
 	  stream->srcwin_cksum_pos += stream->large_step;
+
 	  IF_DEBUG (stream->large_ckcnt += 1);
 	}
-
-      IF_DEBUG1 (P(RINT "[move_p2] T=%"Q"u S=%"Q"u\n", 
-		   stream->total_in + pos_in,
-		   stream->srcwin_cksum_pos));
-
     }
-  *next_move_point = pos_in +
-    (usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
 
+  if (stream->srcwin_cksum_pos > stream->src->size) {
+    // We do this so the xd3_source_cksum_offset() function, which uses the high/low
+    // 32-bits of srcwin_cksum_pos, is guaranteed never to return a position > src->size
+    stream->srcwin_cksum_pos = stream->src->size;
+  }
+  *next_move_point = pos_in + stream->srcwin_size;
   return 0;
 }
 
+/* This function handles the 32/64bit ambiguity -- file positions are 64bit but the hash
+ * table for source-offsets is 32bit. */
 static xoff_t 
 xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 {
-  /* This function handles the 32/64bit boundary crossing. */
-  if (stream->srcwin_cksum_pos <= (xoff_t)USIZE_T_MAX)
-    {
-      return (xoff_t)low;
-    }
+  xoff_t scp = stream->srcwin_cksum_pos;
+  xoff_t s0 = scp >> 32;
 
-  /* total_in + pos_in would be more correct. */
+  if (s0 == 0) {
+    return low;
+  }
 
-  xoff_t ti = stream->total_in;
-  xoff_t s0 = ti >> 32;
-  xoff_t l1 = ((s0+0) << 32) | low;
-  xoff_t l2 = ((s0+1) << 32) | low;
+  usize_t sr = (usize_t) scp;
 
-  if (l1 > ti)
-    {
-      return l1;
-    }
+  // This should not be >= because srcwin_cksum_pos is the next position to index
+  if (low > sr) {
+    return (--s0 << 32) | low;
+  }
 
-  if (l2 - ti < ti - l1)
-    {
-      return l2;
-    }
-
-  return l1;
+  return (s0 << 32) | low;
 }
 
 /* This function sets up the stream->src fields srcbase, srclen.  The call is delayed
@@ -5919,6 +5913,14 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 
 	  /* Verify incremental state in debugging mode. */
 	  IF_DEBUG (xd3_verify_small_state (stream, inp, scksum));
+
+	  if (stream->input_position == 138898) {
+	    printf("stop here");
+	    int x = 1;
+	    while (x) {
+	      //
+	    }
+	  }
 
 	  /* Search for the longest match */
 	  if (unlikely (stream->small_table[sinx] != 0))
