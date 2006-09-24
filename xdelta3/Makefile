@@ -2,7 +2,7 @@
 PYTHON = python
 PYTGT = build/temp.linux-i686-2.3/xdelta3.so
 
-TARGETS = xdelta3 xdelta3-64 xdelta3-everything \
+TARGETS = xdelta3 xdelta3-2 xdelta3-64 xdelta3-everything \
 	  xdelta3-Opg xdelta3-64-O xdelta3-Op xdelta3-O \
 	  xdelta3-decoder xdelta3-decoder-nomain.o \
 	  $(PYTGT) \
@@ -40,6 +40,10 @@ $(PYTGT): $(SOURCES)
 xdelta3: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=1 -DSECONDARY_DJW=1 -lm
+
+xdelta3-2: $(SOURCES)
+	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-2 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
+		-DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=2 -DSECONDARY_DJW=1 -lm
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \

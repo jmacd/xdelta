@@ -5007,7 +5007,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
   /* Begin by advancing at twice the input rate, up to half the maximum window size. */
   logical_input_cksum_pos = min((stream->total_in + stream->input_position) * 2,
-				(stream->total_in + stream->input_position) + (stream->srcwin_maxsz / 2));
+				(stream->total_in + stream->input_position) +
+				  (stream->srcwin_maxsz / 2));
 
   /* If srcwin_cksum_pos is already greater, wait until the difference is met. */
   if (stream->srcwin_cksum_pos > logical_input_cksum_pos)
@@ -5019,12 +5020,14 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
   /* If the stream has matched beyond the srcwin_cksum_pos (good), we shouldn't
    * begin reading so far back. */
-  int diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
-
-  if (diff > stream->srcwin_size)
+  if (stream->match_maxaddr > stream->srcwin_cksum_pos)
     {
-      // TODO: I think this should use the last match position in the source!
-      //stream->srcwin_cksum_pos = logical_input_cksum_pos - stream->srcwin_size;
+      stream->srcwin_cksum_pos = stream->match_maxaddr;
+    }
+
+  if (logical_input_cksum_pos < stream->srcwin_cksum_pos) 
+    {
+      logical_input_cksum_pos = stream->srcwin_cksum_pos;
     }
 
   /* Advance an extra srcwin_size bytes */
@@ -5060,7 +5063,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	}
 
       onblk -= stream->large_look;
-      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
+      int diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
       onblk = min(blkoff + diff, onblk);
 
       while (blkoff <= onblk)

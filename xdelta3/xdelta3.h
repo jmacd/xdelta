@@ -234,7 +234,9 @@ typedef int    (xd3_getblk_func)   (xd3_stream *stream,
  * alternate code tables.  See the comments & code enabled by GENERIC_ENCODE_TABLES. */
 
 typedef const xd3_dinst* (xd3_code_table_func) (void);
-typedef int              (xd3_comp_table_func) (xd3_stream *stream, const uint8_t **data, usize_t *size);
+typedef int              (xd3_comp_table_func) (xd3_stream *stream,
+						const uint8_t **data,
+						usize_t *size);
 
 
 /* Some junk. */
@@ -294,9 +296,9 @@ typedef enum {
   XD3_GOTHEADER = -17706, /* (decode-only) after the initial VCDIFF & first window header */
   XD3_WINSTART  = -17707, /* notification: returned before a window is processed, giving a
 			   * chance to XD3_SKIP_WINDOW or not XD3_SKIP_EMIT that window. */
-  XD3_WINFINISH = -17708, /* notification: returned after encode/decode & output for a window */
+  XD3_WINFINISH  = -17708, /* notification: returned after encode/decode & output for a window */
   XD3_TOOFARBACK = -17709, /* (encoder only) may be returned by getblk() if the block is too old */
-  XD3_INTERNAL = -17710, /* internal error */
+  XD3_INTERNAL   = -17710, /* internal error */
 
 } xd3_rvalues;
 
@@ -314,7 +316,7 @@ typedef enum
 
   XD3_SEC_NODATA     = (1 << 7),   /* disable secondary compression of the data section. */
   XD3_SEC_NOINST     = (1 << 8),   /* disable secondary compression of the inst section. */
-  XD3_SEC_NOADDR     = (1 << 9),   /* disable secondary compression of the addr section (which is most random). */
+  XD3_SEC_NOADDR     = (1 << 9),   /* disable secondary compression of the addr section. */
 
   XD3_SEC_OTHER      = (XD3_SEC_NODATA | XD3_SEC_NOINST | XD3_SEC_NOADDR),
 
@@ -604,9 +606,10 @@ struct _xd3_config
   uint               promote;       /* whether to promote matches in the hash chain */
 };
 
-/* The primary source file object. You create one of these objects and initialize the first
- * four fields.  This library maintains the next 5 fields.  The configured getblk implementation is
- * responsible for setting the final 3 fields when called (and/or when XD3_GETSRCBLK is returned).
+/* The primary source file object. You create one of these objects and initialize the
+ * first four fields.  This library maintains the next 5 fields.  The configured getblk
+ * implementation is responsible for setting the final 3 fields when called (and/or when
+ * XD3_GETSRCBLK is returned).
  */
 struct _xd3_source
 {
