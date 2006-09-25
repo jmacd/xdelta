@@ -214,7 +214,7 @@ XD3_MAKELIST(main_blklru_list,main_blklru,link);
 /* Program options: various command line flags and options. */
 static int         option_stdout             = 0;
 static int         option_force              = 0;
-static int         option_verbose            = 3;
+static int         option_verbose            = 0;
 static int         option_quiet              = 0;
 static int         option_level              = 6;
 static int         option_use_appheader      = 1;
