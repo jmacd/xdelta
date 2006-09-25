@@ -940,7 +940,6 @@ void    xd3_avail_input  (xd3_stream    *stream,
    * a stream->winsize buffer.  This is to avoid an unwanted allocation. */
   XD3_ASSERT (idata != NULL);
 
-  /* TODO: Should check for a call to xd3_avail_input in the wrong state. */
   stream->next_in  = idata;
   stream->avail_in = isize;
 }
@@ -950,7 +949,6 @@ void    xd3_avail_input  (xd3_stream    *stream,
 static inline
 void xd3_consume_output (xd3_stream  *stream)
 {
-  /* TODO: Is it correct to set avail_in = 0 here, then check == 0 in avail_in? */
   stream->avail_out  = 0;
 }
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python2.3
+#!/usr/bin/python2.4
 # xdelta 3 - delta compression tools and library
 # Copyright (C) 2003 and onward.  Joshua P. MacDonald
 #
@@ -51,7 +51,7 @@ FORK  = 0
 
 #
 #
-RCSDIR = '/Volumes/LACIE120RAID/orbit_linux/home/jmacd/PRCS/prcs/b'
+RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS/prcs/b'
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
@@ -551,7 +551,7 @@ class Xdelta3Run1:
         if self.reps:
             assert(reps == 1)
             reps = self.reps
-        RunXdelta3(['-P', '%d' % reps, '-efq', self.file, DFILE],kind=self.kind)
+        RunXdelta3(['-vvv', '-P', '%d' % reps, '-efq', self.file, DFILE],kind=self.kind)
         if trial > 0:
             return None
         return Xdelta3Info(self.file,DFILE)

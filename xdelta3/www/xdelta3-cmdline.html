@@ -128,33 +128,38 @@ VCDIFF addr section length:   3
 <pre>
 usage: xdelta3 [command/options] [input [output]]
 commands are:
-    encode      encodes the input
-    decode      decodes the input
     config      prints xdelta3 configuration
+    decode      decodes the input
+    encode      encodes the input
     test        run the builtin tests
 special commands for VCDIFF inputs:
+    printdelta  print information about the entire delta
     printhdr    print information about the first window
     printhdrs   print information about all windows
-    printdelta  print information about the entire delta
 options are:
+   -0 .. -9     compression level
+   -A [apphead] disable/provide application header
+   -B blksize   source file block size
+   -C           soft config (see xdelta3-cfgs.h)
    -c           use stdout instead of default
+   -D           disable external decompression (encode/decode)
    -d           same as decode command
    -e           same as encode command
    -f           force overwrite
-   -n           disable checksum (encode/decode)
-   -D           disable external decompression (encode/decode)
-   -R           disable external recompression (decode)
-   -N           disable small string-matching compression
-   -S [djw|fgk] disable/enable secondary compression
-   -A [apphead] disable/provide application header
-   -s source    source file to copy from (if any)
-   -B blksize   source file block size
-   -W winsize   input window buffer size
-   -v           be verbose (max 2)
-   -q           be quiet
    -h           show help
-   -V           show version
+   -J           disable output (check/compute only)
+   -M memsize   memory budget for hash tables
+   -n           disable checksum (encode/decode)
+   -N           disable small string-matching compression
    -P           repeat count (for profiling)
+   -q           be quiet
+   -R           disable external recompression (decode)
+   -S [djw|fgk] disable/enable secondary compression
+   -s source    source file to copy from (if any)
+   -T           use alternate code table
+   -v           be verbose (max 2)
+   -V           show version
+   -W winsize   input window buffer size
 </pre>
 <p>
 

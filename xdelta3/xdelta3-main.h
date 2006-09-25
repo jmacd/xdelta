@@ -214,7 +214,7 @@ XD3_MAKELIST(main_blklru_list,main_blklru,link);
 /* Program options: various command line flags and options. */
 static int         option_stdout             = 0;
 static int         option_force              = 0;
-static int         option_verbose            = 0;
+static int         option_verbose            = 3;
 static int         option_quiet              = 0;
 static int         option_level              = 6;
 static int         option_use_appheader      = 1;
@@ -231,24 +231,6 @@ static const char *option_source_filename    = NULL;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
 static usize_t     option_memsize            = XD3_DEFAULT_MEMSIZE;
-
-/* Wishful TODO: Support should probably be for partial deltas & update-in-place deltas,
- * following the latest draft RFC specs partial deltas [the changes have moderate
- * complexity].  The following flags implement primitive controls to skip sections
- * of the input & output, mainly for debugging purposes. */
-
-/* DECODE-ONLY: Skips processing windows up to first_window and past last_window using the
- * XD3_SKIP_WINDOW flag, but main_ still reads reads/parses every window.  TODO: make it
- * meaningful for encode, etc... */
-/*static xoff_t      option_first_window = 0;*/
-/*static xoff_t      option_last_window  = XOFF_T_MAX;*/
-
-/* ENCODE-ONLY: Seeks to first_offset, EOF at last_offset, done entirely in this main_
- * routines, so the library actually sees a shortened input.  TODO: implement this for
- * decode, implement proper partial deltas, works with external compression?, works with
- * non-seekable inputs?, change ranges, etc... */
-/*static xoff_t      option_first_offset = 0;*/
-/*static xoff_t      option_last_offset  = XOFF_T_MAX;*/
 
 /* This controls the number of times main repeats itself, only for profiling. */
 static int option_profile_cnt = 0;
@@ -307,7 +289,7 @@ static int
 main_version (void)
 {
   /* $Format: "  P(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
-  P(RINT "VERSION=3.0g\n");
+  P(RINT "VERSION=3.0h_pre0\n");
   return EXIT_SUCCESS;
 }
 
@@ -345,7 +327,7 @@ main_malloc1 (usize_t size)
 {
   void* r = malloc (size);
   if (r == NULL) { XPR(NT "malloc: %s\n", xd3_strerror (ENOMEM)); }
-  else if (option_verbose > 2) { XPR(NT "malloc: %u\n", size); }
+  else if (option_verbose > 2) { XPR(NT "malloc: %u: %p\n", size, r); }
   return r;
 }
 
@@ -366,19 +348,20 @@ main_alloc (void   *opaque,
 }
 
 static void
+main_free1 (void *opaque, void *ptr)
+{
+  if (option_verbose > 2) { XPR(NT "free: %p\n", ptr); }
+  free (ptr);
+}
+
+static void
 main_free (void *ptr)
 {
   if (ptr)
     {
-      IF_DEBUG (main_mallocs -= 1); 
-      free (ptr);
+      IF_DEBUG (main_mallocs -= 1);
+      main_free1 (NULL, ptr);
     }
-}
-
-static void
-main_free1 (void *opaque, void *ptr)
-{
-  free (ptr);
 }
 
 /* This ensures that (ret = errno) always indicates failure, in case errno was
@@ -1820,19 +1803,6 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   lru_size = (option_srcwinsz / source->blksize);
   lru_size = max(1, lru_size);
 
-  if (lru_size > 128)
-    {
-      /* TODO: fix performance here, the LRU is scanned sequentially to find blocks,
-       * except in encode, where it uses FIFO.  Fix is to set source->blksize
-       * accordingly. */
-      if (IS_ENCODE(cmd) && ! option_quiet)
-	{
-	  XPR(NT "warning: large source window (--B %u) "
-   	         "hurts performance except for encoding\n",
-	      option_srcwinsz);
-	}
-    }
-
   if ((lru = main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
     {
       return ENOMEM;
@@ -2073,9 +2043,6 @@ main_getblk_func (xd3_stream *stream,
 /* This is a generic input function.  It calls the xd3_encode_input or xd3_decode_input
  * functions and makes calls to the various input handling routines above, which
  * coordinate external decompression.
- *
- * TODO config: Still need options for the at least: smatch config, memsize, sprevsz,
- * XD3_SEC_* flags, greedy/1.5
  */
 static int
 main_input (xd3_cmd     cmd,
@@ -2570,7 +2537,7 @@ main (int argc, char **argv)
    * main() and thus care about freeing all memory.  I never had much trust for getopt
    * anyway, it's too opaque.  This implements a fairly standard non-long-option getopt
    * with support for named operations (e.g., "xdelta3 [encode|decode|printhdr...] < in >
-   * out").  I'll probably add long options at some point. See TODO. */
+   * out").  I'll probably add long options at some point. */
   if (my_optstr)
     {
       if (*my_optstr == '-')    { my_optstr += 1; }

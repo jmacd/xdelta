@@ -29,10 +29,10 @@ PYFILES = xdelta3-regtest.py setup.py
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0g
+REL=0h_pre0
 RELDIR = xdelta3$(REL)
 
-all: xdelta3
+all: xdelta3 $(PYTGT)
 
 all-targets: $(TARGETS)
 
@@ -48,17 +48,18 @@ tar:
 clean:
 	rm -f $(TARGETS)
 
-$(PYTGT): $(SOURCES)
-	$(PYTHON) setup.py install --compile --force
-
 xdelta3: $(SOURCES)
 	$(CC) -O3 -Wall -Wshadow xdelta3.c -lm -o xdelta3 \
               -DXD3_DEBUG=0 \
               -DXD3_USE_LARGEFILE64=1 \
               -DREGRESSION_TEST=1 \
               -DSECONDARY_DJW=1 \
+              -DSECONDARY_FGK=1 \
               -DXD3_MAIN=1 \
               -DXD3_POSIX=1
+
+$(PYTGT): $(SOURCES)
+	$(PYTHON) setup.py install --verbose --compile --force
 
 xdelta3-1: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-1 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \

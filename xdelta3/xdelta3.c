@@ -239,6 +239,7 @@
      xdelta3-main.h     The command-line interface, external compression
                         support, POSIX-specific, info & VCDIFF-debug tools.
      xdelta3-second.h   The common secondary compression routines.
+     xdelta3-decoder.h  All decoding routines.
      xdelta3-djw.h      The semi-adaptive huffman secondary encoder.
      xdelta3-fgk.h      The adaptive huffman secondary encoder.
      xdelta3-test.h     The unit test covers major algorithms,
@@ -268,8 +269,6 @@
                         generated using an expoential distribution
                         which approximates the expected error_prob
 			distribution.
-     show.c             Prints an offset/length segment from a file.
-     testh.c            Checks that xdelta3.h is can be #included
    --------------------------------------------------------------------
 
    This file itself is unusually large.  I hope to defend this layout

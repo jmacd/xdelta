@@ -45,14 +45,7 @@ static int test_exponential_dist (usize_t mean, usize_t max);
 
 #define CHECK(cond) if (!(cond)) { P(RINT "check failure: " #cond); abort(); }
 
-/* TODO
- *
- * 1. Test state changes: that config is called before open, open called before
- * encode/decode..., close incomplete works, invalid options, consume_output always
- * called, no mixing of encode/decode, etc.
- *
- * 2. Test window selection, window alignment, 1.5 pass alg vs. greedy
- */
+/* TODO: Test 1.5 pass alg vs. greedy */
 
 /******************************************************************************************
  TEST HELPERS
