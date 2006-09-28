@@ -79,6 +79,10 @@
 
 #define PRINTHDR_SPECIAL -4378291
 
+#ifndef XDELTA1PATH
+#define XDELTA1PATH "xdelta1"
+#endif
+
 /* The number of soft-config variables.  */
 #define XD3_SOFTCFG_VARCNT 1
 
@@ -275,6 +279,7 @@ static main_extcomp extcomp_types[] =
 {
   /* The entry for xdelta must be first because the program_name is set here. */
   { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3, RD_NONEXTERNAL },
+  { XDELTA1PATH,"delta", XDELTA1PATH,  "patch",  "1", "%XD",          3, 0 },
   { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
