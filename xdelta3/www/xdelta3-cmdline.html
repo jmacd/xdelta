@@ -127,39 +127,35 @@ VCDIFF addr section length:   3
 
 <pre>
 usage: xdelta3 [command/options] [input [output]]
-commands are:
+special command names:
     config      prints xdelta3 configuration
-    decode      decodes the input
-    encode      encodes the input
+    decode      decompress the input
+    encode      compress the input
     test        run the builtin tests
 special commands for VCDIFF inputs:
     printdelta  print information about the entire delta
     printhdr    print information about the first window
     printhdrs   print information about all windows
-options are:
+standard options:
    -0 .. -9     compression level
-   -A [apphead] disable/provide application header
-   -B blksize   source file block size
-   -C           soft config (see xdelta3-cfgs.h)
-   -c           use stdout instead of default
-   -D           disable external decompression (encode/decode)
-   -d           same as decode command
-   -e           same as encode command
+   -c           use stdout
+   -d           decompress
+   -e           compress
    -f           force overwrite
    -h           show help
-   -J           disable output (check/compute only)
-   -M memsize   memory budget for hash tables
-   -n           disable checksum (encode/decode)
-   -N           disable small string-matching compression
-   -P           repeat count (for profiling)
    -q           be quiet
-   -R           disable external recompression (decode)
-   -S [djw|fgk] disable/enable secondary compression
-   -s source    source file to copy from (if any)
-   -T           use alternate code table
    -v           be verbose (max 2)
    -V           show version
+memory options:
+   -B blksize   source file block size
+   -M memsize   memory budget for hash tables
    -W winsize   input window buffer size
+compression options:
+   -s source    source file to copy from (if any)
+   -S [djw|fgk] enable/disable secondary compression
+   -N           disable small string-matching compression
+   -D           disable external decompression (encode/decode)
+   -R           disable external recompression (decode)
 </pre>
 <p>
 

@@ -2883,10 +2883,10 @@ main_help (void)
   /* TODO: update www/xdelta3-cmdline.html */ 
   main_version ();
   P(RINT "usage: xdelta3 [command/options] [input [output]]\n");
-  P(RINT "commands are:\n");
+  P(RINT "special command names:\n");
   P(RINT "    config      prints xdelta3 configuration\n");
-  P(RINT "    decode      decodes the input\n");
-  P(RINT "    encode      encodes the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
+  P(RINT "    decode      decompress the input\n");
+  P(RINT "    encode      compress the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
 #if REGRESSION_TEST
   P(RINT "    test        run the builtin tests\n");
 #endif
@@ -2896,30 +2896,37 @@ main_help (void)
   P(RINT "    printhdr    print information about the first window\n");
   P(RINT "    printhdrs   print information about all windows\n");
 #endif
-  P(RINT "options are:\n");
+  P(RINT "standard options:\n");
   P(RINT "   -0 .. -9     compression level\n");
-  P(RINT "   -A [apphead] disable/provide application header\n");
-  P(RINT "   -B blksize   source file block size\n");
-  P(RINT "   -C           soft config (see xdelta3-cfgs.h)\n");
-  P(RINT "   -c           use stdout instead of default\n");
-  P(RINT "   -D           disable external decompression (encode/decode)\n");
-  P(RINT "   -d           same as decode command\n");
-  P(RINT "   -e           same as encode command\n");
+  P(RINT "   -c           use stdout\n");
+  P(RINT "   -d           decompress\n");
+  P(RINT "   -e           compress%s\n", XD3_ENCODER ? "" : " [Not compiled]");
   P(RINT "   -f           force overwrite\n");
   P(RINT "   -h           show help\n");
-  P(RINT "   -J           disable output (check/compute only)\n");
-  P(RINT "   -M memsize   memory budget for hash tables\n");
-  P(RINT "   -n           disable checksum (encode/decode)\n");
-  P(RINT "   -N           disable small string-matching compression\n");
-  P(RINT "   -P           repeat count (for profiling)\n");
   P(RINT "   -q           be quiet\n");
-  P(RINT "   -R           disable external recompression (decode)\n");
-  P(RINT "   -S [djw|fgk] disable/enable secondary compression\n");
-  P(RINT "   -s source    source file to copy from (if any)\n");
-  P(RINT "   -T           use alternate code table\n");
   P(RINT "   -v           be verbose (max 2)\n");
   P(RINT "   -V           show version\n");
+
+  P(RINT "memory options:\n");
+  P(RINT "   -B blksize   source file block size\n");
+  P(RINT "   -M memsize   memory budget for hash tables\n");
   P(RINT "   -W winsize   input window buffer size\n");
 
+  P(RINT "compression options:\n");
+  P(RINT "   -s source    source file to copy from (if any)\n");
+  P(RINT "   -S [djw|fgk] enable/disable secondary compression\n");
+  P(RINT "   -N           disable small string-matching compression\n");
+  P(RINT "   -D           disable external decompression (encode/decode)\n");
+  P(RINT "   -R           disable external recompression (decode)\n");
+
+#if XD3_DEBUG > 0
+  P(RINT "developer options:\n");
+  P(RINT "   -A [apphead] disable/provide application header\n");
+  P(RINT "   -C           soft config (see xdelta3-cfgs.h)\n");
+  P(RINT "   -J           disable output (check/compute only)\n");
+  P(RINT "   -P           repeat count (for profiling)\n");
+  P(RINT "   -T           use alternate code table\n");
+  P(RINT "   -n           disable checksum (encode/decode)\n");
+#endif
   return EXIT_FAILURE;
 }
