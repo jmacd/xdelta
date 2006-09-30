@@ -1,0 +1,38 @@
+#!/bin/sh
+
+trap "rm -rf tmp.files" 0
+
+tar -xzf linux-kernels/linux-2.1.0.tar.gz
+
+mv linux linux-2.1.0
+
+(cd linux-2.1.0 && tar -cf linux.tar.gz *)
+
+LASTVER=0
+
+for VER in `cat runtest-versions`; do
+  echo Creating version 2.1.$VER
+  mkdir linux-2.1.$VER
+  (cd linux-2.1.$LASTVER && tar -cf - .) | (cd linux-2.1.$VER && tar -xf -)
+  gzip -dc linux-kernels/patch-2.1.$VER.gz | (cd linux-2.1.$VER && patch -s -f -p1)
+  find linux-2.1.$VER -name \*.orig | xargs rm -rf
+  find linux-2.1.$VER -name \*.rej | xargs rm -rf
+  (cd linux-2.1.$VER && tar -cf linux.tar.gz *)
+
+  FILES=""
+
+  for f in `(cd linux-2.1.$VER; find . -type f)`; do
+    if test -f linux-2.1.$LASTVER/$f; then
+      FILES="$FILES $f"
+    fi
+  done
+
+  echo $FILES > tmp.files
+
+  ./runtest-one linux-2.1.$LASTVER linux-2.1.$VER tmp.files \
+     2>> runtest.errs 1>>runtest.out
+
+  rm -rf linux-2.1.$LASTVER
+  rm -rf linux-2.1.$LASTVER.tar.gz
+  LASTVER=$VER
+done

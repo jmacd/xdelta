@@ -1,0 +1,96 @@
+;; -*- PRCS -*-
+(Created-By-Prcs-Version 1 3 1)
+(Project-Description "")
+(Project-Version xdelta 1.1-maint 10)
+(Parent-Version xdelta 1.1-maint 9)
+(Version-Log "")
+(New-Version-Log "")
+(Checkin-Time "Sun, 24 Feb 2002 22:31:12 +0300")
+(Checkin-Login jmacd)
+(Populate-Ignore ("\\.o$"
+		  "\\.deps"
+		  "\\.lo$"
+		  ".libs/"
+		  "^\\.#"
+		  "\\.la$"
+		  "stamp-"
+		  "libedsio"
+		  "mkinstalldirs"
+		  "missing"
+		  "ltmain\\.sh"
+		  "ltconfig"
+		  "install-sh"
+		  "xdser\\.h"
+		  "xdser\\.c"
+		  "config\\."
+		  "aclocal\\.m4"
+		  "CVS/"
+		  "Makefile\\.in$"
+		  "Makefile$"
+		  ".cvsignore"
+		  "configure$"
+		  "xdelta$"
+		  "libtool"
+		  "doc/xdelta.info"
+		  ))
+(Project-Keywords
+  (ReleaseMajorVersion 1)
+  (ReleaseMinorVersion 1)
+  (ReleaseMicroVersion 3)
+  (LibCurrent  2)
+  (LibRevision 0)
+  (LibAge      0)
+  (ReleaseVersion "$ReleaseMajorVersion$.$ReleaseMinorVersion$.$ReleaseMicroVersion$")
+)
+(Files
+  ;; Config
+  (configure.in (xdelta/1_configure. 1.10.1.37 644))
+  (Makefile.am (xdelta/2_Makefile.a 1.19.1.40.1.4 644))
+  (ChangeLog (xdelta/d/9_ChangeLog 1.6 644))
+  (runtest (xdelta/d/5_runtest 1.7 755))
+  (README (xdelta/d/6_README 1.5 644))
+  (INSTALL (xdelta/d/10_INSTALL 1.3 644))
+  (COPYING (xdelta/d/11_COPYING 1.2 644))
+  (AUTHORS (xdelta/d/12_AUTHORS 1.2 644))
+  (NEWS (xdelta/d/13_NEWS 1.15.1.9 644))
+  (xdelta.magic (xdelta/d/20_xdelta.mag 1.2 644))
+  (xdelta-config.in (xdelta/d/33_xdelta-con 1.4 644))
+  (autogen.sh (xdelta/d/34_autogen.sh 1.1 755))
+  (xdelta.m4 (xdelta/d/35_xdelta.m4 1.5 644))
+
+  ;; Library
+  (xdelta.h (xdelta/b/8_xdelta.h 1.4.1.8.1.50.1.3 644))
+  (xdeltapriv.h (xdelta/c/42_xdeltapriv 1.29 644))
+  (xdelta.c (xdelta/b/14_xdelta.c 1.4.1.50.1.3 644))
+  (xd.ser (xdelta/d/7_xd.ser 1.12 644))
+  (xdrsync.c (xdelta/d/44_xdrsync.c 1.2 644))
+  (xdapply.c (xdelta/e/37_xdapply.c 1.1 644))
+
+  ;; Application
+  (xdmain.c (xdelta/d/15_xdmain.c 1.22.1.7 600))
+  (getopt1.c (xdelta/d/17_getopt1.c 1.1 644))
+  (getopt.h (xdelta/d/18_getopt.h 1.1 644))
+  (getopt.c (xdelta/d/19_getopt.c 1.1 644))
+
+  ;; Windows project files
+  (xdelta.dsp (xdelta/d/36_xdelta.dsp 1.2 644) :no-keywords)
+  (xdelta.dsw (xdelta/d/37_xdelta.dsw 1.2 644) :no-keywords)
+
+  ;; Testing
+  (test/Makefile.am (xdelta/e/39_Makefile.a 1.1.1.3 644))
+  (test/xdeltatest.c (xdelta/e/38_xdeltatest 1.7 644))
+  (test/README.test (xdelta/21_README.tes 1.2 644))
+
+  ;; Not much docs
+  (doc/Makefile.am (xdelta/d/21_Makefile.a 1.4 644))
+  (doc/xdelta.1 (xdelta/d/23_xdelta.1 1.6 644))
+  (doc/xdelta.cat (xdelta/22_xdelta.cat 1.2 644))
+
+  ;; DJGPP contrib
+  (djgpp/readme.djg (xdelta/18_readme.djg 1.2 644))
+  (djgpp/announce.djg (xdelta/19_announce.d 1.2 644))
+  (djgpp/Makefile.am (xdelta/20_Makefile.a 1.1 644))
+
+)
+(Merge-Parents)
+(New-Merge-Parents)

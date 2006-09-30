@@ -1,0 +1,67 @@
+xdelta.lo xdelta.o : xdelta.c /usr/include/string.h /usr/include/features.h \
+  /usr/include/sys/cdefs.h /usr/include/gnu/stubs.h \
+  /usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/stddef.h \
+  /usr/include/bits/string.h /usr/include/bits/string2.h \
+  /usr/include/endian.h /usr/include/bits/endian.h \
+  /usr/include/bits/types.h /usr/include/bits/wordsize.h \
+  /usr/include/bits/typesizes.h /usr/include/stdlib.h \
+  /usr/include/sys/types.h /usr/include/time.h /usr/include/sys/select.h \
+  /usr/include/bits/select.h /usr/include/bits/sigset.h \
+  /usr/include/bits/time.h /usr/include/sys/sysmacros.h \
+  /usr/include/bits/pthreadtypes.h /usr/include/bits/sched.h \
+  /usr/include/alloca.h /usr/include/ctype.h xdelta.h xd_edsio.h \
+  ./libedsio/edsio.h ./config.h /usr/local/include/glib-1.2/glib.h \
+  /usr/local/lib/glib/include/glibconfig.h \
+  /usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/limits.h \
+  /usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/syslimits.h \
+  /usr/include/limits.h /usr/include/bits/posix1_lim.h \
+  /usr/include/bits/local_lim.h /usr/include/linux/limits.h \
+  /usr/include/bits/posix2_lim.h \
+  /usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/float.h \
+  /usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/stdarg.h \
+  ./libedsio/edsio_edsio.h ./libedsio/edsio.h ./libedsio/edsio_edsio.h \
+  xdeltapriv.h
+xdelta.c :
+/usr/include/string.h :
+/usr/include/features.h :
+/usr/include/sys/cdefs.h :
+/usr/include/gnu/stubs.h :
+/usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/stddef.h :
+/usr/include/bits/string.h :
+/usr/include/bits/string2.h :
+/usr/include/endian.h :
+/usr/include/bits/endian.h :
+/usr/include/bits/types.h :
+/usr/include/bits/wordsize.h :
+/usr/include/bits/typesizes.h :
+/usr/include/stdlib.h :
+/usr/include/sys/types.h :
+/usr/include/time.h :
+/usr/include/sys/select.h :
+/usr/include/bits/select.h :
+/usr/include/bits/sigset.h :
+/usr/include/bits/time.h :
+/usr/include/sys/sysmacros.h :
+/usr/include/bits/pthreadtypes.h :
+/usr/include/bits/sched.h :
+/usr/include/alloca.h :
+/usr/include/ctype.h :
+xdelta.h :
+xd_edsio.h :
+./libedsio/edsio.h :
+./config.h :
+/usr/local/include/glib-1.2/glib.h :
+/usr/local/lib/glib/include/glibconfig.h :
+/usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/limits.h :
+/usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/syslimits.h :
+/usr/include/limits.h :
+/usr/include/bits/posix1_lim.h :
+/usr/include/bits/local_lim.h :
+/usr/include/linux/limits.h :
+/usr/include/bits/posix2_lim.h :
+/usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/float.h :
+/usr/lib/gcc/i586-pc-linux-gnu/3.4.4/include/stdarg.h :
+./libedsio/edsio_edsio.h :
+./libedsio/edsio.h :
+./libedsio/edsio_edsio.h :
+xdeltapriv.h :

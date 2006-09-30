@@ -1,0 +1,518 @@
+The first technique for computing file deltas was based upon finding
+the longest common subsequence (LCS) of two files \cite{Hunt77}.
+Improvements to the file delta problem have been influenced by
+compression techniques, but have been much slower in being adopted for
+file-archival and transmition, perhaps because the market for such
+improvements has been small.  Recently, these techniques have become
+feasible and the growth of the internet has renewed interest in these
+approaches.
+
+Systems for distributed file-backup have been built upon the storage
+of file deltas \cite{Burns:Backup}, this work applies for a single,
+centralized server.  Protocols for the delta-based distribution and
+replication of \texttt{http} have been proposed \cite{w3}.  The
+present work describes a decentralized protocol with several features
+required for an efficient implementation.  These compressed transport
+protocols have applications to version control, file backup,
+\texttt{http}, software update, groupware applications, and many more.
+
+
+\begin{appendix}
+\section{Optimality of Algorithm \ref{alg:generate}} \label{app:proof}
+
+This is B.S.
+
+You know that the new encoding is not optimal because copies are not
+unit cost.  BUT, we do know that this encoding is no more than a
+factor of $min(s)$ greater than a similar metric for the unit-cost
+solution.
+
+Also, for the min copy length solution, its another factor of $s$
+worst, PER INSTRUCTION, this is good.
+
+The proof uses the number of copy instructions encoded by a greedy
+algorithm $g$ and an optimal algorithm $h$ for prefixes of the file
+being constructed.  $g_i$ and $h_i$ are partial solutions which
+consist of a sequence of instructions which contains exactly $i$ copy
+instructions and no more than $i+1$ insert instructions.  $m$ is the
+copy/insert metric for delta size developed in section
+\ref{sec:greedy} and $e(g_i)$ denotes the sum of the length operands
+to each instruction.  Initially, we know:
+
+\begin{align}
+m(g_0) &= 0 \\
+m(h_0) &= 0 \\
+e(g_0) &= 0 \\
+e(h_0) &= 0
+\end{align}
+
+\noindent and the following lemma:
+
+\begin{lemm}
+Suppose that $e(g_i) = e(h_j)$ and $m(g_i) \le m(h_j)$.  Then for all
+$k>i$, $l>j$ such that $e(g_k) = e(h_l)$, $m(g_k) \le m(h_l)$ must
+hold.
+\end{lemm}
+
+\noindent {\sc Proof} This is demonstrated by case analysis.  FILL ME
+IN: PICTURES HELP!
+
+\end{appendix}
+
+
+
+
+A distributed \xd {} file-archive is set of \xd {} file-archives.  These
+archives may require significant space, and should be placed at the
+border of a slow network link to reduce communication across the slow
+link.  The archive stores multiple file families named in a
+hierarchical fashion.  Versions inside a particular family are named
+by their MD5 checksum.  The contents of each of the archives may be
+disjoint--the application must decide at each particular node which
+versions of which families should be stored, but the distributed
+archive does not, as presented, require any centralized control.
+
+This model suggests a two-level transport protocol: an efficient
+server-to-server communication is used to reduce transport over slow
+links, while a simpler protocol is used for the client-server
+interaction.  This greatly reduces application complexity, and fits
+common network topologies--server-proxies should be placed at the
+gateway between a high-speed LAN and a slow internet or modem link.
+
+A \emph{synchronize} operation between two servers allows them to
+exchange each other's state and request copies of desired files.
+Since it is a symmetric operation, it allows for both push and pull
+configurations.  The goal is to implement synchronize efficiently and
+minimize network transfer.
+
+There is an immediate obstacle.  Since the set of files and order they
+were received in may differ on each server, they cannot simply
+exchange their deltas.  We would like to synchronize servers by
+exchanging as many un-interpreted files as possible, as they can be
+efficiently copied to the network.  Ideally, each server would simply
+send a precomputed delta for each file the peer is lacking, but the
+deltas cannot be easily exchanged because they depend on \emph{other}
+deltas which the peer may not have.
+A \emph{normalized copy/insert delta} contains additional information
+for each instruction which copies from another delta.  Each delta
+contains the MD5 checksum of each input file, and for each input file
+which is also a delta, the MD5 checksum of the file the delta
+represents.  This allows the normalized delta $d_1$ which copies from
+another delta $d_2$ to be applied by someone who posseses either the
+actual delta $d_2$ or the file which $d_2$ constructs.  The copy
+instruction for $d_2$ is followed by an alternate instruction sequence
+to be used when $d_2$ is not present, these index the actual file.
+
+
+A normalized copy/insert delta can be transmitted if the receiving
+peer will, at the end of the transmission, have enough files to apply
+it.  The resulting protocol places most of the computation required to
+accept a new file version on the receiver-side of the connection.
+
+At synchronization, each server sends an incremental log update of
+file additions since the last synchronize.  Global deletion policy
+must be handled by the application.  After synchronizing logs, each
+server transmits a list of file versions it wants to receive.  For
+each family requested, the server knows: $S$, the set of versions it
+has; $P_b$, the set of versions the peer has before the transfer; $W$,
+the set of files the peer wants; and $P_a = P_b+W$, the set of files
+the peer will have after the transfer.  Then, for each file $f$ in
+$W$, it computes a strategy for sending $f$:
+
+\begin{itemize}
+\item If $f$ is not stored literally, then it is stored as a reverse
+delta $d$.  If $P_a$ contains every MD5 checksum that $d$ depends on,
+then send the literal delta (or a pre-compressed copy).
+\item If $f$ is stored literally, and $P_b \cap S \not = \emptyset$, a
+forward delta must be computed for sending the peer.  The server is
+required to reconstruct a recent version which the peer has then
+compute the forward delta.  This forward delta may be cached, and the
+number of such forward deltas required is limited by how recently its
+peers last synchronized.
+\item If $S$ and $P_b$ contain no common elements and $P_b$ is not
+empty, the rsync algorithm may be applied.
+\item Otherwise, the literal file must be sent.
+\end{itemize}
+
+For a peer who's policy is to request every file version in $S-P_b$,
+sending $n$ file versions from the same family always results in
+sending at least $n-1$ pre-computed deltas and at most one forward
+delta (which can be cached).  This suggests that a tree network
+topology where each file archive contains at least the contents of its
+parent will produce efficient delta transfers.
+
+
+
+
+
+
+
+
+
+
+
+Network transmissions can be reduced in size by sending file deltas
+rather than literal files.  It can improve protocols for file-backup,
+software-update, distributed version-control, and http.  This section
+will describe a protocol for the efficient peer-to-peer
+synchronization of two \xd {} file archives.  This suggests a framework
+for implementing the server and proxy-cache of a generic application
+requiring delta communication, high availability, and replicated,
+compressed file-archival.
+
+
+There are two modes of operation possible, one when forward deltas are
+being inserted and one
+
+Instead of using a version tree organization, it stores only the
+youngest version of the file family and reverse deltas.  Since there
+are no branches, each version of a file is simply identified by a
+serial number.  The deltas computed are not the same as the reverse
+deltas used in RCS, instead they are computed from the set consisting
+of the youngest file and a window of previous deltas' insert-data to
+the second youngest file.  Figure \ref{fig:onestep} illustrates this
+process.  Each delta encodes the residual data required to construct
+it from the deltas which came before it and the version which follows
+it in time.  Suppose the archive $A$ consists of an ordered set of $n$
+versions labelled $a_i$.  For each $0 \le i < n-1$, $a_i$ is stored as
+a delta $d_i$, otherwise it is stored as the literal file $a_{n-1}$.
+Logically, the $A$ contains each of $n$ files, but is physically
+stored as $n-1$ deltas and a literal file.
+
+\begin{equation}
+d_i = generate ( \left\{ d_j | j < i \wedge j \ge i-w \right\} \cup a_{i+1}, a_i )
+\end{equation}
+
+Here, $w$ is the \emph{window-size} parameter, and limits the number
+of deltas presented to {\tt generate}.  Conceptually, files are
+retrieved by the repeated application of these deltas.  The $i^{th}$
+version put into an archive of $n$ versions requires the application
+of $n-i$ deltas.
+
+$O(\underset{\textrm{\emph{all paths}} d_r \rightarrow d_1 \rightarrow \ldots d_n \rightarrow l_i}{\max} 1)$.
+
+The implementation of apply is straightforward.  Reconstruct can be
+made quite efficient.  When multiple from inputs are allowed to the
+delta algorithm, a delta chain measured in length becomes a delta-dag
+measured in depth.  For the purposes of analysis, let $copies(d)$ be
+the number of copy instructions in delta $d$, $inserts(d)$ be the
+number of insert instructions, and $instructions(d)$ be the sum.
+
+An interval tree $intervals(d)$ can be built for locating the
+instruction of a particular offset in the file $d$ constructs.  In
+addition, it maps each insert-instruction into an appropriate offset
+in the delta's insert-data.  Constructing the interval table requires
+in $O(instructions(d) \lg instructions(d))$ steps and
+$O(instructions(d))$ space \cite{clr}.
+
+A recursive function Reconstruct-Range outputs
+
+$(d_i, r_l, r_h)$
+outputs a range $r_l \ldots r_h$ from file $f_i$ which is represented
+by delta $d_i$.  $f_0$ is represented by a literal file.
+
+Reconstruct-Range(
+
+
+
+
+
+For each instruction in $d_i$ containing elements in the range,
+
+\begin{itemize}
+\item If the instruction is $\texttt{copy} \; f_k \; o_k \; l_k$ and
+$k > 0$ recurse on the appropriate offset and length in $d_k$,
+otherwise copy the appropriate range out of the literal file $f_0$.
+\item If the instruction is $\texttt{insert} \; l$, output the
+appropriate range in $d_i$'s insert-data.
+\end{itemize}
+
+It takes $O(\lg instructions(d))$ steps to locate the instruction
+containing $r_l$.  If the instruction is {\tt copy},
+
+
+We can compute $reconstruct(d_1 \ldots
+d_n)$ with the following function:
+
+\begin{tabbing}
+reconstructRange (d, o, l) \{ \\
+  /* Output length $l$ beginning at offset $o$ from the file \\
+   * which delta $d$ constructs. */ \\
+\\
+  while (l > 0) \{ \\
+    $i \leftarrow \emph{instruction containing} o$ \\
+    if ($i = \texttt{copy} \; f \; o_f \; l_f$) \{ \\
+      reconstructRange (deltaWhichConstructs(f),
+
+
+
+\end{tabbing}
+An additional operation $index$ precomputes an index for the set of
+input files the {\tt generate} operation will later use.  The $index$
+operation computes the $adler32$ function on short segments of each $f
+\in F$.  The checksum length $l$ is chosen as a small power of
+2--values of between $2^4$ and $2^7$ have been used.  An array of
+checksum values $c_{f}[i]$ is built for each $f$ where $i$ indexes the
+checksum beginning at an offset $il$.  For each distinct set $F$ that
+will be used during {\tt generate}, an additional hash table is built.
+The table $t_F$ contains the data $(f,i)$ for each checksum offset $i$
+in $f$ keyed by $c_{f}[i]$.  The table is easy to compute from the $c$
+arrays so it is often left until {\tt generate}.
+
+During {\tt generate}, the file $t$ is scanned.  At each offset $j$
+the same checksum is computed and tested in the table.  When a match
+for $(f,i)$ is found the files are compared at offset $f$'s offset
+$il$ and $t$'s offset $j$.  A record of the match is constructed out
+of the longest matching substrings of $f$ and $t$ at those alignments.
+These records are used to emit a sequence of instructions for
+constructing $t$ from $p$ and $F$ and the scan is resumed after the
+match.  For each match $(f, t, i, j)$ a {\tt copy} instruction is
+emitted, and for each range $k..l$ that was not matched an
+{\tt insert} instruction is emitted along with the missing segment.
+
+\subsection{Encoding}
+
+% informal here...
+
+So far, the issue of encoding has not been raised.  Since there are
+many encoding approaches and I must choose one to measure with, I will
+define a class of {\tt generate} functions that produce patches for
+the pre-defined instruction set of a standard apply function.  This is
+a fair assumption, as it has arisen in practice \cite{w3} and since it
+is simple to implement {\tt apply}, making applications of the delta
+algorithm easier to write and standardize.
+
+Abstractly, the \emph{copy/insert} class of deltas are represented by
+a sequence of instructions and a segment, {\tt insert-data}.  For
+these deltas, {\tt apply} constructs its output by executing a
+sequence of the following instructions:
+
+\begin{itemize}
+\item {\tt copy} $f$ $o$ $l$
+
+Copy $l$ bytes at offset $o$ of file $f$ into the output file.
+\item {\tt insert} $l$
+
+Read $l$ bytes from {\tt insert-data} and insert them into the output
+file.
+\end{itemize}
+
+For reasons that will be discussed in the following section, \xd
+encodes deltas in two seperate parts: the control instructions, and
+{\tt insert-data}, the concatenation of each {\tt insert}
+instruction's data.  This turns out to be useful in two ways: {\tt
+insert-data} may be treated as a file for inputs to other
+computations, and {\tt apply} can efficiently produce a partial output
+by seeking through the control segment without reading the entire data
+segment.  This does not exactly specify a format for the
+\emph{copy/insert} delta, leaving the exact storage up to the
+application.  Another encoding that appears in the W3 Consortium's
+proposed standard delta format, named \emph{GDIFF}, is to simply
+append the data for each {\tt insert} instruction after the
+instruction itself, making the delta a single stream.  Other encodings
+are more compressed, such the one used by Vo's \emph{vdelta}
+algorithm.  Again, using a simple, uncompressed format proves useful
+for file-archival, suggesting that general compression techniques be
+used orthogonally to delta-encoding for a complete system.
+
+\subsection{Analysis}
+
+% need some diagrams here
+
+By pre-defining an abstract delta format the comparison of algorithms
+is much easier.  The algorithm described above computes a
+\emph{copy/insert} delta.  {\tt index} first computes an array for
+each file then the hash table.
+
+\begin{tabbing}
+preprocess ($F$) \\
+  $T \leftarrow$ \emph{empty hash table}
+  for each $f \in F$ \\
+    $c_f$ = generateChecksums ($f$) \\
+  for each $f \in F$ \\
+    addToTable ($T$, $c_f$, $f$) \\
+\\
+generateChecksums($f$) \\
+  $count \leftarrow (length(f)-1)/l$ \\
+  $array \leftarrow new checksum[count]$ \\
+  for $i = 0..count$ \\
+    $array[i] \leftarrow$ adler32 ($f$, $i*l$, $l$) \\
+  return $array$ \\
+addToTable($T$, $c$, $f$) \\
+  $count \leftarrow (length(f)-1)/l$ \\
+  for $i = 0..count$ \\
+    $insert (T, c[i], [i,f])$
+\end{tabbing}
+
+The {\tt generateChecksums} function fills in an array of length
+$floor(length(f) / l)$.  Each entry is the 32-bit adler32 checksum for
+the range of length $l$ for a particular offset.  Let $length(F) =
+\sum_{f \in F} length(f)$.  This step has $O(length(F))$ time
+complexity and requires $length(F)/l = O(length(F))$ space.
+
+The {\tt addToTable} function inserts $length(F)/l$ checksums into a
+table in $length(F)/l$ time and space as well.  All together, {\tt
+apreprocess} requires $O(length(F)/l)$ time and space and has small
+coefficients.
+
+% Take a look at how rsync deals with this.
+
+\begin{tabbing}
+generate ($F$, $t$) \\
+  for $i = 0..length(t)-l$ \\
+    $a \leftarrow $ adler32($t$, $i$, $l$) \\
+    if ($(f, j) \leftarrow$ lookup ($T$, $a$) $\wedge$ \\
+        $c_f[j] = a$ $\wedge$ \\
+        $f$ and $t$ match at $jl$ and $i$) \\
+      emitMatch ($f$, $t$, $jl$, $i$)
+\end{tabbing}
+
+The {\tt generate} operation searches for matching checksums in $t$.
+It requires constant additional space and $length(t)$ operations to
+scan $t$ and in the worse case, $2 length(t)$ operations for finding
+matches by literally comparing files.  The resulting
+\emph{copy/insert} {\tt generate} algorithm is linear in both time and
+space.  The linear space requirement is not ideal.  For $l=16$, the
+algorithm requires a memory approximately $1/2$ the size of the
+inputs.
+
+In practice, {\tt generate} is implemented in a single page-by-page
+pass through $t$.  Therefore, when a partial match is found, the match
+is grown as far forward in the files as possible, but will only grow
+backwards up to the first page boundary.
+
+For speed and space concerns, the hash table is implemented as a
+single integer array with length chosen to be approximately the size
+of the input.  Each bucket contains $f$ and $i$, and no duplicate
+records are kept.  This leads to a clobbering decision--how to handle
+multiple checksums with the same hash code.  By keeping only one
+record for each bucket the inner {\tt generate} loop is quite
+efficient and lengthy, repeated segments in the inputs do not produce
+over-full buckets.  Several policies have been used:
+
+\begin{itemize}
+\item ordered winner
+
+If the checksums are in the same file, the first to appear wins,
+otherwise an arbitrary order is placed on $F$ to determine the winner.
+
+\item random winner
+
+At each collision, a random trial is performed to determine the
+winner.  By setting the probability of clobbering in the $k^{th}$
+trial to $P(k) = 1/(k+1)$, the winner is uniformely distributed over
+all like checksum hash values.
+
+\item weighted winner
+
+A match occuring earlier in a file rather than later is desirable
+since matches grow foward and not backward.  This can be encoded in
+the above decision's trial probability to favor earlier matches, for
+example.
+\end{itemize}
+
+How confident can we be that this algorithm computes a compact delta?
+There are many approximations and assumptions that have been made, but
+the following property may be shown:
+
+\begin{theorem}
+For a match to be discovered between files $f$ and $t$ of length $k
+\ge 2l$, the probability of emitting a copy instruction is
+$\frac{1}{number of}$.
+\end{theorem}
+
+[I'd like to show that it is not much worse than optimal.]  And since
+it is fast and performs well in practice, it seems very good.
+
+\subsection{The \emph{copy/insert} Delta}\label{sec:copyinsert}
+
+% Move this section?  Pull it out of analysis?
+
+Deletions are cheap, insertion is expensive.  This could be done as a
+better dynamic program, but more expensive than the LCS algorithms.
+
+This simple encoding
+
+
+
+
+
+
+
+
+
+
+
+
+
+storage mechanism does not use branches and never
+stores forward deltas.  To avoid accumulating multiple copies of
+deltas transforming one diverging branch into another, {\sc Xdelta}
+computes a new delta based not only on two input files, but on
+previous deltas as well.  The equivalent {\sc Xdelta} encoding is
+illustrated in figure \ref{xdelta}.  The delta algorithm employed by
+{\sc Xdelta} encodes deltas as a sequence of \texttt{copy} and
+\texttt{insert} instructions.  A copy instruction occupies $O(1)$
+space, while an insertion of length $N$ requires $O(N)$ space.  Note
+that forward insertions are encoded as reverse deletions and forward
+deletions are encoded as reverse insertions.  We are only concerned
+with insertions, since deletions are not reflected in the sequence of
+\texttt{copy} and \texttt{insert} instructions.
+
+%RCS succeeds at efficiently storing
+%these five versions because files on the $1.1.1.x$ branch do not
+%interfere with deltas computed for files on the $1.x$ branch.  The
+%next delta computed on either branch is not affected by the
+%differences between files at the head of either branch.  In this way,
+%parallel development does not impact the storage mechanism.  The RCS
+%mechanism does, however, have a great impact on the amount of work
+%required to extract each version: files checked in on the $1.x$ branch
+%are available in time proportional to the distance from the head,
+%while files checked in on the $1.1.1.x$ branch are available in time
+%proportional to the distance from the root version ($1.1$) plus the
+%number of files on the $1.x$ branch.  Unfortunately, this type of
+%scenario degrades the performance of the RCS storage mechanism and is
+%exactly what version control utilities are designed to handle.  This
+%feature of the RCS storage mechanism makes efficient allocation of new
+%version numbers difficult for both users and higher level version
+%control utilities.
+
+%\section{Delta Algorithms}
+
+%\section{And Compression...}
+
+%\section{Encoding/Matching (Empirical) Gripe}
+
+%\section{Delta Algorithm}
+
+%\section{Empirical Results on Delta Algorithm}
+
+%\section{Storage Model}
+
+%\section{Empirical Results on Storage Model}
+
+%\section{Comparison to RCS}
+
+%* Ability to delete old files
+%* Usage of a binary delta
+%* Freedom from version tree:
+%    performance implications
+%    lack of information
+%* Available as a library without the clutter
+%* file retrieval time is always proportional to its age, not ancestry
+%* partial compression, late decompression
+%* cached indices
+
+%\section{Distribution Model}
+
+%What to solve.  What are the network applications.
+
+%\section{Normalized Deltas}
+
+%How to achive it.
+
+%\section{Implementation of DRP}
+
+%Complete 4-method protocol description.
+
+%\section{Conclusion}
