@@ -3982,9 +3982,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
   /* If the stream has matched beyond the srcwin_cksum_pos (good), we shouldn't
    * begin reading so far back. */
-  if (stream->match_maxaddr > stream->srcwin_cksum_pos)
+  if (stream->maxsrcaddr > stream->srcwin_cksum_pos)
     {
-      stream->srcwin_cksum_pos = stream->match_maxaddr;
+      stream->srcwin_cksum_pos = stream->maxsrcaddr;
     }
 
   if (logical_input_cksum_pos < stream->srcwin_cksum_pos) 
@@ -4019,7 +4019,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	{
 	  if (ret == XD3_TOOFARBACK)
 	    {
-	      // TODO: this is still happening
+	      // TODO: this may still be happening, or fixed by stream->srcmaxaddr?
  	      ret = XD3_INTERNAL;
 	    }
 	  return ret;
@@ -4399,7 +4399,14 @@ xd3_source_extend_match (xd3_stream *stream)
 
       if (match_end > stream->match_maxaddr)
 	{
+	  // Note: per-window
 	  stream->match_maxaddr = match_end;
+	}
+
+      if (match_end > stream->maxsrcaddr)
+	{
+	  // Note: across windows
+	  stream->maxsrcaddr = match_end;
 	}
 
       IF_DEBUG1 ({

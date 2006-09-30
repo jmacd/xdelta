@@ -13,7 +13,7 @@ SOURCES = xdelta3-cfgs.h \
           xdelta3.c \
           xdelta3.h
 
-TARGETS = xdelta3 xdelta3-1 xdelta3-2 xdelta3-64 xdelta3-everything \
+TARGETS = xdelta3 xdelta3-1 xdelta3-debug xdelta3-64 xdelta3-everything \
 	  xdelta3-Opg xdelta3-64-O xdelta3-Op xdelta3-O \
 	  xdelta3-decoder xdelta3-decoder-nomain.o \
 	  $(PYTGT) \
@@ -32,7 +32,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www
 REL=0h_pre0
 RELDIR = xdelta3$(REL)
 
-all: xdelta3 $(PYTGT)
+all: xdelta3 xdelta3-debug $(PYTGT)
 
 all-targets: $(TARGETS)
 
@@ -65,8 +65,8 @@ xdelta3-1: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-1 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=1 -DSECONDARY_DJW=1 -lm
 
-xdelta3-2: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-2 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
+xdelta3-debug: $(SOURCES)
+	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=2 -DSECONDARY_DJW=1 -lm
 
 xdelta3-decoder: $(SOURCES)

@@ -689,6 +689,8 @@ struct _xd3_stream
   usize_t            match_fwd;        /* match extends forward so far */
   usize_t            match_maxfwd;     /* match extends forward maximum */
 
+  xoff_t             maxsrcaddr;      /* address of the last source match (across windows) */
+
   uint8_t          *buf_in;           /* for saving buffered input */
   usize_t            buf_avail;        /* amount of saved input */
   const uint8_t    *buf_leftover;     /* leftover content of next_in (i.e., user's buffer) */
