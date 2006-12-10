@@ -13,7 +13,7 @@ SOURCES = xdelta3-cfgs.h \
           xdelta3.c \
           xdelta3.h
 
-TARGETS = xdelta3 xdelta3-1 xdelta3-debug xdelta3-64 xdelta3-everything \
+TARGETS = xdelta3 xdelta3-debug xdelta3-64 xdelta3-everything \
 	  xdelta3-Opg xdelta3-64-O xdelta3-Op xdelta3-O \
 	  xdelta3-decoder xdelta3-decoder-nomain.o \
 	  $(PYTGT) \
@@ -32,7 +32,9 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www
 REL=0h_pre0
 RELDIR = xdelta3$(REL)
 
-all: xdelta3 xdelta3-debug $(PYTGT)
+XDELTA1 = ../xdelta11/xdelta
+
+all: xdelta3-debug xdelta3 $(PYTGT)
 
 all-targets: $(TARGETS)
 
@@ -58,23 +60,18 @@ xdelta3: $(SOURCES)
               -DXD3_MAIN=1 \
               -DXD3_POSIX=1
 
-$(PYTGT): $(SOURCES)
-	$(PYTHON) setup.py install --verbose --compile --force
-
-xdelta3-1: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-1 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
-		-DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=1 -DSECONDARY_DJW=1 -lm
-
 xdelta3-debug: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
-		-DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=2 -DSECONDARY_DJW=1 -lm
+		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=2 -DSECONDARY_DJW=1 -lm
+
+$(PYTGT): $(SOURCES)
+	$(PYTHON) setup.py install --verbose --compile --force
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \
 	    -DXD3_ENCODER=0 -DXD3_MAIN=1 -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 \
-	    -DXD3_POSIX=0 -DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0 \
+	    -DXD3_STDIO=1 -DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0 \
 	    -o xdelta3-decoder
-	strip xdelta3-decoder
 
 xdelta3-decoder-nomain.o: $(SOURCES) linkxd3lib.c
 	$(CC) -O2 -Wall -Wshadow xdelta3.c linkxd3lib.c \

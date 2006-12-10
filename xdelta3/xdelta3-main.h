@@ -55,19 +55,16 @@
 #ifndef XD3_STDIO
 #define XD3_STDIO 0
 #endif
-#ifndef XD3_WIN32
-#define XD3_WIN32 0
-#endif
 
 /* XPRINTX (used by main) prefixes an "xdelta3: " to the output. */
 #define XPR fprintf
 #define NT stderr, "xdelta3: "
 
 #define VC fprintf
-#define OUT vcout,
+#define UT vcout,
 
 /* If none are set, default to posix. */
-#if (XD3_POSIX + XD3_STDIO + XD3_WIN32) == 0
+#if (XD3_POSIX + XD3_STDIO) == 0
 #undef XD3_POSIX
 #define XD3_POSIX 1
 #endif
@@ -79,10 +76,6 @@
 
 #define PRINTHDR_SPECIAL -4378291
 
-#ifndef XDELTA1PATH
-#define XDELTA1PATH "xdelta1"
-#endif
-
 /* The number of soft-config variables.  */
 #define XD3_SOFTCFG_VARCNT 1
 
@@ -91,7 +84,6 @@
 #define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", xd3_errstring (stream), xd3_strerror (ret)
 
 #include <stdio.h>  /* fprintf */
-#include <unistd.h> /* lots */
 
 #if XD3_POSIX
 #include <unistd.h> /* close, read, write... */
@@ -99,8 +91,12 @@
 #include <fcntl.h>
 #endif
 
+#ifndef _WIN32
+#include <unistd.h> /* lots */
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() and fstat() */
+#else
+#endif
 
 /******************************************************************************************
  ENUMS and TYPES
@@ -120,6 +116,7 @@ typedef enum
 {
   RD_FIRST        = (1 << 0),
   RD_NONEXTERNAL  = (1 << 1),
+  RD_EXTERNAL_V1  = (1 << 2),
 } xd3_read_flags;
 
 /* main_file->mode values */
@@ -175,7 +172,7 @@ struct _main_file
   char               *filename_copy; /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
   const char         *realname;      /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
   const main_extcomp *compressor; /* External compression struct. */
-  int                 flags;      /* RD_FIRST or RD_NONEXTERNAL */
+  int                 flags;      /* RD_FIRST, RD_NONEXTERNAL, ... */
   xoff_t              nread;      /* for input position */
   xoff_t              nwrite;     /* for output position */
 };
@@ -231,6 +228,7 @@ static char*       option_smatch_config      = NULL;
 static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* go through the motions, but do not open or write output */
 static const char *option_source_filename    = NULL;
+static const char *option_xdelta1            = "xdelta1";
 
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
@@ -277,9 +275,9 @@ static int allow_fake_source = 0;
  * the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
-  /* The entry for xdelta must be first because the program_name is set here. */
+  /* The entry for xdelta3/1 must be 0/1 because the program_names are set there. */
   { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3, RD_NONEXTERNAL },
-  { XDELTA1PATH,"delta", XDELTA1PATH,  "patch",  "1", "%XD",          3, 0 },
+  { "xdelta1",  "delta", "xdelta1",    "patch", "1", "%XD",          3, RD_EXTERNAL_V1 },
   { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
@@ -783,7 +781,7 @@ main_print_window (xd3_stream* stream, FILE *vcout)
   int ret;
   usize_t size = 0;
 
-  VC(OUT "  Offset Code Type1 Size1 @Addr1 + Type2 Size2 @Addr2\n");
+  VC(UT "  Offset Code Type1 Size1 @Addr1 + Type2 Size2 @Addr2\n");
 
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
@@ -791,7 +789,7 @@ main_print_window (xd3_stream* stream, FILE *vcout)
 
       if ((ret = xd3_decode_instruction (stream))) { return ret; }
 
-      VC(OUT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, code,
+      VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, code,
 	       xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
 	       stream->dec_current1.size);
 
@@ -800,28 +798,28 @@ main_print_window (xd3_stream* stream, FILE *vcout)
 	  size += stream->dec_current1.size;
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
-	      VC(OUT " @%-6u", stream->dec_current1.addr);
+	      VC(UT " @%-6u", stream->dec_current1.addr);
 	    }
 	  else
 	    {
-	      VC(OUT "        ");
+	      VC(UT "        ");
 	    }
 	}
 
       if (stream->dec_current2.type != XD3_NOOP)
 	{
 	  size += stream->dec_current2.size;
-	  VC(OUT "  %s %3u",
+	  VC(UT "  %s %3u",
 		   xd3_rtype_to_string (stream->dec_current2.type, option_print_cpymode),
 		   stream->dec_current2.size);
 
 	  if (stream->dec_current2.type >= XD3_CPY)
 	    {
-	      VC(OUT " @%-6u", stream->dec_current2.addr);
+	      VC(UT " @%-6u", stream->dec_current2.addr);
 	    }
 	}
 
-      VC(OUT "\n");
+      VC(UT "\n");
     }
 
   if (stream->dec_tgtlen != size && (stream->flags & XD3_SKIP_WINDOW) == 0)
@@ -842,7 +840,7 @@ main_print_window (xd3_stream* stream, FILE *vcout)
       return XD3_INTERNAL;
     }
 
-  IF_DEBUG (VC(OUT "SIZE=%u  TGTLEN=%u\n", size, stream->dec_tgtlen));
+  IF_DEBUG (VC(UT "SIZE=%u  TGTLEN=%u\n", size, stream->dec_tgtlen));
 
   return 0;
 }
@@ -850,8 +848,8 @@ main_print_window (xd3_stream* stream, FILE *vcout)
 static void
 main_print_vcdiff_file (main_file *file, const char *type, FILE *vcout)
 {
-  if (file->filename)   { VC(OUT "XDELTA filename (%s):     %s\n", type, file->filename); }
-  if (file->compressor) { VC(OUT "XDELTA ext comp (%s):     %s\n", type, file->compressor->recomp_cmdname); }  
+  if (file->filename)   { VC(UT "XDELTA filename (%s):     %s\n", type, file->filename); }
+  if (file->compressor) { VC(UT "XDELTA ext comp (%s):     %s\n", type, file->compressor->recomp_cmdname); }  
 }
 
 /* This function prints a VCDIFF input, mainly for debugging purposes. */
@@ -873,18 +871,18 @@ main_print_func (xd3_stream* stream, main_file *xfile)
   XD3_ASSERT (vcout);
   if (stream->dec_winstart == 0)
     {
-      VC(OUT "VCDIFF version:               0\n");
+      VC(UT "VCDIFF version:               0\n");
 
-      VC(OUT "VCDIFF header size:           %d\n", stream->dec_hdrsize);
-      VC(OUT "VCDIFF header indicator:      ");
-      if ((stream->dec_hdr_ind & VCD_SECONDARY) != 0) VC(OUT "VCD_SECONDARY ");
-      if ((stream->dec_hdr_ind & VCD_CODETABLE) != 0) VC(OUT "VCD_CODETABLE ");
-      if ((stream->dec_hdr_ind & VCD_APPHEADER) != 0) VC(OUT "VCD_APPHEADER ");
-      if (stream->dec_hdr_ind == 0) VC(OUT "none");
-      VC(OUT "\n");
+      VC(UT "VCDIFF header size:           %d\n", stream->dec_hdrsize);
+      VC(UT "VCDIFF header indicator:      ");
+      if ((stream->dec_hdr_ind & VCD_SECONDARY) != 0) VC(UT "VCD_SECONDARY ");
+      if ((stream->dec_hdr_ind & VCD_CODETABLE) != 0) VC(UT "VCD_CODETABLE ");
+      if ((stream->dec_hdr_ind & VCD_APPHEADER) != 0) VC(UT "VCD_APPHEADER ");
+      if (stream->dec_hdr_ind == 0) VC(UT "none");
+      VC(UT "\n");
 
-      IF_SEC(VC(OUT "VCDIFF secondary compressor:  %s\n", stream->sec_type ? stream->sec_type->name : "none"));
-      IF_NSEC(VC(OUT "VCDIFF secondary compressor: unsupported\n"));
+      IF_SEC(VC(UT "VCDIFF secondary compressor:  %s\n", stream->sec_type ? stream->sec_type->name : "none"));
+      IF_NSEC(VC(UT "VCDIFF secondary compressor: unsupported\n"));
 
       if (stream->dec_hdr_ind & VCD_APPHEADER)
 	{
@@ -897,9 +895,9 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 	      int sq = option_quiet;
 	      main_file i, o, s;
 	      XD3_ASSERT (apphead != NULL);
-	      VC(OUT "VCDIFF application header:    ");
+	      VC(UT "VCDIFF application header:    ");
 	      fwrite (apphead, 1, appheadsz, vcout);
-	      VC(OUT "\n");
+	      VC(UT "\n");
 
 	      main_file_init (& i);
 	      main_file_init (& o);
@@ -917,49 +915,49 @@ main_print_func (xd3_stream* stream, main_file *xfile)
     }
   else
     {
-      VC(OUT "\n");
+      VC(UT "\n");
     }
 
-  VC(OUT "VCDIFF window number:         %"Q"u\n", stream->current_window);
-  VC(OUT "VCDIFF window indicator:      ");
-  if ((stream->dec_win_ind & VCD_SOURCE) != 0) VC(OUT "VCD_SOURCE ");
-  if ((stream->dec_win_ind & VCD_TARGET) != 0) VC(OUT "VCD_TARGET ");
-  if ((stream->dec_win_ind & VCD_ADLER32) != 0) VC(OUT "VCD_ADLER32 ");
-  if (stream->dec_win_ind == 0) VC(OUT "none");
-  VC(OUT "\n");
+  VC(UT "VCDIFF window number:         %"Q"u\n", stream->current_window);
+  VC(UT "VCDIFF window indicator:      ");
+  if ((stream->dec_win_ind & VCD_SOURCE) != 0) VC(UT "VCD_SOURCE ");
+  if ((stream->dec_win_ind & VCD_TARGET) != 0) VC(UT "VCD_TARGET ");
+  if ((stream->dec_win_ind & VCD_ADLER32) != 0) VC(UT "VCD_ADLER32 ");
+  if (stream->dec_win_ind == 0) VC(UT "none");
+  VC(UT "\n");
 
   if ((stream->dec_win_ind & VCD_ADLER32) != 0)
     {
-      VC(OUT "VCDIFF adler32 checksum:      %08X\n", stream->dec_adler32);
+      VC(UT "VCDIFF adler32 checksum:      %08X\n", stream->dec_adler32);
     }
 
   if (stream->dec_del_ind != 0)
     {
-      VC(OUT "VCDIFF delta indicator:       ");
-      if ((stream->dec_del_ind & VCD_DATACOMP) != 0) VC(OUT "VCD_DATACOMP ");
-      if ((stream->dec_del_ind & VCD_INSTCOMP) != 0) VC(OUT "VCD_INSTCOMP ");
-      if ((stream->dec_del_ind & VCD_ADDRCOMP) != 0) VC(OUT "VCD_ADDRCOMP ");
-      if (stream->dec_del_ind == 0) VC(OUT "none");
-      VC(OUT "\n");
+      VC(UT "VCDIFF delta indicator:       ");
+      if ((stream->dec_del_ind & VCD_DATACOMP) != 0) VC(UT "VCD_DATACOMP ");
+      if ((stream->dec_del_ind & VCD_INSTCOMP) != 0) VC(UT "VCD_INSTCOMP ");
+      if ((stream->dec_del_ind & VCD_ADDRCOMP) != 0) VC(UT "VCD_ADDRCOMP ");
+      if (stream->dec_del_ind == 0) VC(UT "none");
+      VC(UT "\n");
     }
 
   if (stream->dec_winstart != 0)
     {
-      VC(OUT "VCDIFF window at offset:      %"Q"u\n", stream->dec_winstart);
+      VC(UT "VCDIFF window at offset:      %"Q"u\n", stream->dec_winstart);
     }
 
   if (SRCORTGT (stream->dec_win_ind))
     {
-      VC(OUT "VCDIFF copy window length:    %u\n", stream->dec_cpylen);
-      VC(OUT "VCDIFF copy window offset:    %"Q"u\n", stream->dec_cpyoff);
+      VC(UT "VCDIFF copy window length:    %u\n", stream->dec_cpylen);
+      VC(UT "VCDIFF copy window offset:    %"Q"u\n", stream->dec_cpyoff);
     }
 
-  VC(OUT "VCDIFF delta encoding length: %u\n", stream->dec_enclen);
-  VC(OUT "VCDIFF target window length:  %u\n", stream->dec_tgtlen);
+  VC(UT "VCDIFF delta encoding length: %u\n", stream->dec_enclen);
+  VC(UT "VCDIFF target window length:  %u\n", stream->dec_tgtlen);
 
-  VC(OUT "VCDIFF data section length:   %u\n", stream->data_sect.size);
-  VC(OUT "VCDIFF inst section length:   %u\n", stream->inst_sect.size);
-  VC(OUT "VCDIFF addr section length:   %u\n", stream->addr_sect.size);
+  VC(UT "VCDIFF data section length:   %u\n", stream->data_sect.size);
+  VC(UT "VCDIFF inst section length:   %u\n", stream->inst_sect.size);
+  VC(UT "VCDIFF addr section length:   %u\n", stream->addr_sect.size);
 
   ret = 0; 
   if ((stream->flags & XD3_JUST_HDR) != 0)
@@ -1278,7 +1276,9 @@ main_decompress_input_check (main_file   *ifile,
 
   if (check_nread == XD3_ALLOCSIZE)
     {
-      ret = main_file_read (ifile, input_buf + XD3_ALLOCSIZE, input_size - XD3_ALLOCSIZE, nread, "input read failed");
+      ret = main_file_read (ifile, input_buf + XD3_ALLOCSIZE,
+			    input_size - XD3_ALLOCSIZE, nread,
+			    "input read failed");
     }
 
   memcpy (input_buf, check_buf, check_nread);
@@ -1878,7 +1878,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 	    {
 	      XPR(NT "source file too large for external decompression: %s: %"Q"u\n",
 		       sfile->filename, osize);
-	      return EFBIG;
+	      return XD3_INTERNAL;
 	    }
 
 	  if ((ret = main_decompress_source (sfile, source)))
@@ -2427,6 +2427,14 @@ done:
   main_file_close (ifile);
   main_file_close (sfile);
 
+#if EXTERNAL_COMPRESSION
+  if ((ret = main_external_compression_finish ()))
+    {
+      XPR(NT "external compression commands failed\n");
+      return EXIT_FAILURE;
+    }
+#endif
+
   /* If output file is not open yet because of delayed-open, it means we never encountered
    * a window in the delta, but it could have had a VCDIFF header?  TODO: solve this
    * elsewhere.  For now, it prints "nothing to output" below, but the check doesn't
@@ -2452,10 +2460,6 @@ done:
       return EXIT_FAILURE;
     }
 
-#if EXTERNAL_COMPRESSION
-  if ((ret = main_external_compression_finish ())) { return EXIT_FAILURE; }
-#endif
-
   xd3_free_stream (& stream);
 
   if (option_verbose)
@@ -2463,9 +2467,6 @@ done:
       char tm[32];
       long end_time = get_millisecs_now ();
       XPR(NT "command finished in %s\n", main_format_millis (end_time - start_time, tm));
-    }
-  if (option_verbose > 1)
-    {
       XPR(NT "input bytes:  %"Q"u\n",  ifile->nread);
       XPR(NT "output bytes: %"Q"u\n", ofile->nwrite);
     }
@@ -2513,7 +2514,7 @@ main (int argc, char **argv)
   main_file ifile;
   main_file ofile;
   main_file sfile;
-  static char *flags = "0123456789cdefhnqvDJNRTVs:B:C:E:F:L:O:P:M:W:A::S::";
+  static char *flags = "0123456789cdefhnqvDJNORTVs:B:C:E:F:L:O:P:M:W:A::S::";
   int my_optind;
   char *my_optarg;
   char *my_optstr;
@@ -2698,6 +2699,7 @@ main (int argc, char **argv)
 	case 'T': option_use_altcodetable = 1; break;
 	case 'C': option_smatch_config = my_optarg; break;
 	case 'J': option_no_output = 1; break;
+	case 'O': option_xdelta1 = my_optarg; break;
 	case 'S': if (my_optarg == NULL) { option_use_secondary = 0; }
 	          else { option_use_secondary = 1; option_secondary = my_optarg; } break;
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
@@ -2772,6 +2774,9 @@ main (int argc, char **argv)
       goto cleanup;
     }
 
+  extcomp_types[1].recomp_cmdname = option_xdelta1;
+  extcomp_types[1].decomp_cmdname = option_xdelta1;
+  
   if (option_verbose > 1)
     {
       int l = 1;

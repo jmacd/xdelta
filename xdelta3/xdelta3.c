@@ -637,7 +637,7 @@ const char* xd3_strerror (int ret)
     case XD3_TOOFARBACK: return "XD3_TOOFARBACK";
     case XD3_INTERNAL: return "XD3_INTERNAL";
     }
-  return strerror (ret);
+  return strerror(ret);
 }
 
 /******************************************************************************************/
@@ -4007,6 +4007,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       usize_t blkoff = stream->srcwin_cksum_pos % stream->src->blksize;
       usize_t onblk = xd3_bytes_on_srcblk (stream->src, blkno);
       int ret;
+      int diff;
 
       if (blkoff + stream->smatcher.large_look > onblk)
 	{
@@ -4026,7 +4027,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	}
 
       onblk -= stream->smatcher.large_look;
-      int diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
+      diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
       onblk = min(blkoff + diff, onblk);
 
       while (blkoff <= onblk)
@@ -4060,11 +4061,11 @@ xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
   xoff_t scp = stream->srcwin_cksum_pos;
   xoff_t s0 = scp >> 32;
 
+  usize_t sr = (usize_t) scp;
+
   if (s0 == 0) {
     return low;
   }
-
-  usize_t sr = (usize_t) scp;
 
   // This should not be >= because srcwin_cksum_pos is the next position to index
   if (low > sr) {

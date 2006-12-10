@@ -104,9 +104,9 @@ typedef u_int32_t       uint32_t;
 typedef u_int64_t       uint64_t;
 #else
 #include <windows.h>
-#define INLINE
+#define inline
 typedef unsigned int   uint;
-typedef unsigned int   usize_t
+typedef unsigned int   usize_t;
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned long  uint32_t;
@@ -990,7 +990,7 @@ usize_t xd3_bytes_on_srcblk (xd3_source *source, xoff_t blkno)
       return source->blksize;
     }
 
-  return ((source->size - 1) % source->blksize) + 1;
+  return (usize_t)((source->size - 1) % source->blksize) + 1;
 }
 
 #endif /* _XDELTA3_H_ */
