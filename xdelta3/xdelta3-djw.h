@@ -897,8 +897,8 @@ xd3_real_encode_huff (xd3_stream   *stream,
       usize_t select_bits;
       usize_t sym1 = 0, sym2 = 0, s;
       usize_t   gcost[DJW_MAX_GROUPS];
-      uint     gbest_code[DJW_MAX_GROUPS+1];
-      uint8_t  gbest_clen[DJW_MAX_GROUPS+1];
+      uint     gbest_code[DJW_MAX_GROUPS+2];
+      uint8_t  gbest_clen[DJW_MAX_GROUPS+2];
       usize_t   gbest_max = 1 + (input_bytes - 1) / sector_size;
       int      best_bits = 0;
       usize_t   gbest_no;
@@ -1231,8 +1231,8 @@ djw_build_decoder (xd3_stream    *stream,
 {
   int i, l;
   const uint8_t *ci;
-  uint nr_clen [DJW_MAX_CODELEN+1];
-  uint tmp_base[DJW_MAX_CODELEN+1];
+  uint nr_clen [DJW_MAX_CODELEN+2];
+  uint tmp_base[DJW_MAX_CODELEN+2];
   int min_clen;
   int max_clen;
 
@@ -1552,8 +1552,8 @@ xd3_decode_huff (xd3_stream     *stream,
   /* Outer scope: per-group symbol decoder tables. */
   {
     uint8_t inorder[DJW_MAX_GROUPS][ALPHABET_SIZE];
-    uint    base   [DJW_MAX_GROUPS][DJW_MAX_CODELEN+1];
-    uint    limit  [DJW_MAX_GROUPS][DJW_MAX_CODELEN+1];
+    uint    base   [DJW_MAX_GROUPS][DJW_MAX_CODELEN+2];
+    uint    limit  [DJW_MAX_GROUPS][DJW_MAX_CODELEN+2];
     uint    minlen [DJW_MAX_GROUPS];
     uint    maxlen [DJW_MAX_GROUPS];
 
@@ -1561,8 +1561,8 @@ xd3_decode_huff (xd3_stream     *stream,
     {
       uint8_t clen      [DJW_MAX_GROUPS][ALPHABET_SIZE];
       uint8_t cl_inorder[DJW_TOTAL_CODES];
-      uint    cl_base   [DJW_MAX_CLCLEN+1];
-      uint    cl_limit  [DJW_MAX_CLCLEN+1];
+      uint    cl_base   [DJW_MAX_CLCLEN+2];
+      uint    cl_limit  [DJW_MAX_CLCLEN+2];
       uint8_t cl_mtf    [DJW_TOTAL_CODES];
       uint    cl_minlen;
       uint    cl_maxlen;
@@ -1589,10 +1589,10 @@ xd3_decode_huff (xd3_stream     *stream,
 
     /* Decode: selector clens. */
     {
-      uint8_t sel_inorder[DJW_MAX_GROUPS+1];
-      uint    sel_base   [DJW_MAX_GBCLEN+1];
-      uint    sel_limit  [DJW_MAX_GBCLEN+1];
-      uint8_t sel_mtf    [DJW_MAX_GROUPS+1];
+      uint8_t sel_inorder[DJW_MAX_GROUPS+2];
+      uint    sel_base   [DJW_MAX_GBCLEN+2];
+      uint    sel_limit  [DJW_MAX_GBCLEN+2];
+      uint8_t sel_mtf    [DJW_MAX_GROUPS+2];
       uint    sel_minlen;
       uint    sel_maxlen;
 
