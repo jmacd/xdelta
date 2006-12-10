@@ -9,7 +9,7 @@
 (Checkin-Login jmacd)
 (Populate-Ignore ())
 (Project-Keywords
- (Xdelta3Version "0h_pre0")
+ (Xdelta3Version "0h")
  (WWWLeftNavBar "<table cellpadding=\"20px\" width=700> <tr> <td class=\"leftbdr\" valign=top height=600 width=100> <div class=\"leftbody\"> <h1>Xdelta</h1> <a href=\"xdelta3.html\">overview</a><br> <a href=\"xdelta3-cmdline.html\">command&nbsp;line</a><br> <a href=\"xdelta3-api-guide.html\">api&nbsp;guide</a><br> <br><a href=\"http://xdelta.org\">xdelta.org</a></h2> </div> </td> <td valign=top width=500>")
  )
 (Files
@@ -38,7 +38,6 @@
   (www/xdelta3.html (xdelta3/b/24_Xdelta3.ht 1.4 644))
 
   (badcopy.c (xdelta3/20_badcopy.c 1.1 644))
-  (junk.py ())
   (linkxd3lib.c (xdelta3/19_linkxd3lib 1.1 644))
   (rcs_junk.cc (xdelta3/15_rcs_junk.c 1.1 644))
 )
