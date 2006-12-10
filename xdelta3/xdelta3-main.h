@@ -96,6 +96,22 @@
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() and fstat() */
 #else
+#define strtoll _strtoi64
+#include <sys/types.h>
+#include <sys/stat.h>
+#ifndef WIFEXITED
+#   define WIFEXITED(stat)  (((*((int *) &(stat))) & 0xff) == 0)
+#endif
+#ifndef WEXITSTATUS
+#   define WEXITSTATUS(stat) (((*((int *) &(stat))) >> 8) & 0xff)
+#endif
+#ifndef S_ISREG
+#   ifdef S_IFREG
+#       define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#   else
+#       define S_ISREG(m) 1
+#   endif
+#endif /* !S_ISREG */
 #endif
 
 /******************************************************************************************
@@ -380,34 +396,40 @@ get_errno (void)
   return errno;
 }
 
+
+
 static long
 get_millisecs_now (void)
 {
+#ifndef WIN32
   struct timeval tv;
 
   gettimeofday (& tv, NULL);
 
   return (tv.tv_sec) * 1000L + (tv.tv_usec) / 1000;
+#else
+  // Found this in an example on www.codeproject.com
+  // It doesn't matter that the offset is Jan 1, 1601
+  // Result is the numbre of 100 nanosecond units
+  // 100ns * 10,000 = 1ms
+  SYSTEMTIME st;
+  FILETIME ft;
+  __int64 *pi = (__int64*)&ft;
+  GetLocalTime(&st);
+  SystemTimeToFileTime(&st, &ft);
+  return (long)((*pi) / 10000);
+#endif
 }
 
 /* Always >= 1 millisec, right? */
 static long
 get_millisecs_since (void)
 {
-  double millis;
-  struct timeval tv;
-  /* static holds the first timeval */
-  static struct timeval init;
- 
-  gettimeofday (& tv, NULL);
-
-  millis = (tv.tv_sec - init.tv_sec) * 1e6;
-  millis += (tv.tv_usec - init.tv_usec);
-  millis /= 1000;
-
-  init = tv;
-
-  return max ((long)millis, 1L);
+  static long last = 0;
+  long now = get_millisecs_now();
+  long diff = now - last;
+  last = now;
+  return diff;
 }
 
 static char*
@@ -418,11 +440,11 @@ main_format_bcnt (xoff_t r, char *buf)
 
   for (i = 0; i < SIZEOF_ARRAY(fmts); i += 1)
     {
-      if (r < 10 * 1e3 || i == -1 + SIZEOF_ARRAY(fmts))
-	{
-	  sprintf (buf, "%"Q"u %s", r, fmts[i]);
-	  break;
-	}
+      if (r < 10 * 1e3 || i == (-1 + (int)SIZEOF_ARRAY(fmts)))
+  	    {
+	      sprintf (buf, "%"Q"u %s", r, fmts[i]);
+	      break;
+	    }
       r /= 1000;
     }
   return buf;
@@ -431,7 +453,7 @@ main_format_bcnt (xoff_t r, char *buf)
 static char*
 main_format_rate (xoff_t bytes, long millis, char *buf)
 {
-  xoff_t r = 1.0 * bytes / (1.0 * millis / 1000.0);
+  xoff_t r = (xoff_t)(1.0 * bytes / (1.0 * millis / 1000.0));
   static char lbuf[32];
 
   main_format_bcnt (r, lbuf);
@@ -497,7 +519,7 @@ main_atou (const char* arg, usize_t *xo, usize_t low, char which)
       XPR(NT "-%c: minimum value: %u", which, low);
       return EXIT_FAILURE;
     }
-  (*xo) = x;
+  (*xo) = (usize_t)x;
   return 0;
 }
 
@@ -2064,6 +2086,7 @@ main_input (xd3_cmd     cmd,
   xoff_t     last_total_in = 0;
   xoff_t     last_total_out = 0;
   long       start_time;
+  xoff_t     input_size = 0;
 
   int (*input_func) (xd3_stream*);
   int (*output_func) (xd3_stream*, main_file *);
@@ -2173,7 +2196,6 @@ main_input (xd3_cmd     cmd,
 
   start_time = get_millisecs_now ();
 
-  xoff_t input_size = 0;
   if (main_file_stat (ifile, & input_size, 0) == 0)
     {
       option_winsize = min (input_size, (xoff_t) option_winsize);

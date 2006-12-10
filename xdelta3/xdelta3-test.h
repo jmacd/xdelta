@@ -17,7 +17,11 @@
  */
 
 #include <math.h>
+
+#ifndef WIN32
 #include <sys/wait.h>
+#else
+#endif
 
 #define MSG_IS(x) (stream->msg != NULL && strcmp ((x), stream->msg) == 0)
 
@@ -30,7 +34,7 @@ static const double TEST_ADD_MAX      = 256;
 static const double TEST_ADD_RATIO    = 0.1;
 static const double TEST_EPSILON      = 0.5;
 
-static int TESTBUFSIZE = 1024 * 16;
+#define TESTBUFSIZE (1024 * 16)
 
 #define TESTFILESIZE (1024)
 
@@ -88,7 +92,7 @@ static int
 test_exponential_dist (usize_t mean, usize_t max)
 {
   double mean_d = mean;
-  double erand  = log (1.0 / drand48 ());
+  double erand  = log (1.0 / (rand () / (double)RAND_MAX));
   usize_t x = (usize_t) (mean_d * erand + 0.5);
 
   return min (x, max);
@@ -141,13 +145,13 @@ test_setup (void)
 static void
 test_unlink (char* file)
 {
+  char buf[TESTBUFSIZE];
   while (unlink (file) != 0)
     {
       if (errno == ENOENT)
-	{
-	  break;
-	}
-      char buf[TESTBUFSIZE];
+	    {
+	      break;
+	    }
       sprintf (buf, "rm -f %s", file);
       system (buf);
     }
@@ -170,8 +174,8 @@ test_cleanup (void)
 static int
 test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 {
-  usize_t ts = (lrand48 () % TEST_FILE_MEAN) + TEST_FILE_MEAN;
-  usize_t ss = (lrand48 () % TEST_FILE_MEAN) + TEST_FILE_MEAN;
+  usize_t ts = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN;
+  usize_t ss = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN;
   uint8_t *buf = malloc (ts + ss), *sbuf = buf /*, *tbuf = buf + ss*/;
   usize_t sadd = 0, sadd_max = ss * TEST_ADD_RATIO;
   FILE  *tf /*, *sf*/;
@@ -199,10 +203,10 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 
       next = min (left, next);
 
-      if (i > 0 && (next > add_left || drand48 () >= add_prob))
+      if (i > 0 && (next > add_left || (rand() / (double)RAND_MAX) >= add_prob))
 	{
 	  /* Copy */
-	  usize_t offset = lrand48 () % i;
+	  usize_t offset = rand () % i;
 
 	  for (j = 0; j < next; j += 1)
 	    {
@@ -214,7 +218,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 	  /* Add */
 	  for (j = 0; j < next; j += 1)
 	    {
-	      sbuf[i++] = lrand48 ();
+	      sbuf[i++] = rand ();
 	    }
 	}
     }
@@ -559,7 +563,7 @@ test_address_cache (xd3_stream *stream, int unused)
 
   addrs[0] = 0;
 
-  srand48 (0x9f73f7fc);
+  srand (0x9f73f7fc);
 
   /* First pass: encode addresses */
   xd3_init_cache (& stream->acache);
@@ -571,9 +575,9 @@ test_address_cache (xd3_stream *stream, int unused)
       usize_t prev_i;
       usize_t nearby;
 
-      p         = drand48 ();
-      prev_i    = lrand48 () % offset;
-      nearby    = (lrand48 () % 256) % offset, 1;
+      p         = (rand () / (double)RAND_MAX);
+      prev_i    = rand () % offset;
+      nearby    = (rand () % 256) % offset, 1;
       nearby    = max (1U, nearby);
 
       if (p < 0.1)      { addr = addrs[offset-nearby]; }
@@ -984,7 +988,7 @@ sec_dist_func6 (xd3_stream *stream, xd3_output *data)
   int i, ret, x;
   for (i = 0; i < ALPHABET_SIZE*20; i += 1)
     {
-      x = lrand48 () % (ALPHABET_SIZE/2);
+      x = rand () % (ALPHABET_SIZE/2);
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
     }
   return 0;
@@ -997,7 +1001,7 @@ sec_dist_func7 (xd3_stream *stream, xd3_output *data)
   int i, ret, x;
   for (i = 0; i < ALPHABET_SIZE*20; i += 1)
     {
-      x = lrand48 () % ALPHABET_SIZE;
+      x = rand () % ALPHABET_SIZE;
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
     }
   return 0;
@@ -1141,7 +1145,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
       P(RINT "\n...");
       for (test_i = 0; test_i < SIZEOF_ARRAY (sec_dists); test_i += 1)
 	{
-	  srand48 (0x84687674);
+	  srand (0x84687674);
 
 	  in_head  = xd3_alloc_output (stream, NULL);
 	  out_head = xd3_alloc_output (stream, NULL);
@@ -1477,7 +1481,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
   xoff_t dsize;
   double ratio;
 
-  srand48 (0x89162337);
+  srand (0x89162337);
 
   for (i = 0; i < pairs; i += 1)
     {
@@ -1617,7 +1621,7 @@ test_externally_compressed_io (xd3_stream *stream, int ignore)
   int i, ret;
   char buf[TESTBUFSIZE];
 
-  srand48 (0x91723913);
+  srand (0x91723913);
 
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
@@ -1664,7 +1668,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
   char buf[TESTBUFSIZE];
   const main_extcomp *ext;
 
-  srand48 (0x9ff56acb);
+  srand (0x9ff56acb);
 
   test_setup ();
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
@@ -1838,7 +1842,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   usize_t delpos = 0, recsize;
   xd3_config config;
 
-  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = lrand48 (); } 
+  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = rand (); } 
 
   stream->winsize = IDB_WINSZ;
 
@@ -2140,7 +2144,6 @@ static int
 test_source_cksum_offset (xd3_stream *stream, int ignore)
 {
   xd3_source source;
-  stream->src = &source;
 
   // Inputs are:
   struct {
@@ -2170,12 +2173,15 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
     { 0, 0, 0, 0, 0 },
   }, *test_ptr;
 
+  stream->src = &source;
+
   for (test_ptr = cksum_test; test_ptr->cpos; test_ptr++) {
+	xoff_t r;
     stream->srcwin_cksum_pos = test_ptr->cpos;
     stream->total_in = test_ptr->ipos;
     stream->src->size = test_ptr->size;
 
-    xoff_t r = xd3_source_cksum_offset(stream, test_ptr->input);
+    r = xd3_source_cksum_offset(stream, test_ptr->input);
     CHECK(r == test_ptr->output);
   }
   return 0;

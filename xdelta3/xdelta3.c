@@ -315,7 +315,11 @@
 #endif
 
 #if XD3_USE_LARGEFILE64          /* How does everyone else do this? */
+#ifndef WIN32
 #define Q "q"
+#else
+#define Q "I64"
+#endif
 #else
 #define Q
 #endif
