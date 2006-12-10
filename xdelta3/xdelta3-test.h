@@ -32,7 +32,7 @@ static const usize_t TEST_FILE_MEAN    = 16384;
 static const double TEST_ADD_MEAN     = 16;
 static const double TEST_ADD_MAX      = 256;
 static const double TEST_ADD_RATIO    = 0.1;
-static const double TEST_EPSILON      = 0.5;
+static const double TEST_EPSILON      = 0.55;
 
 #define TESTBUFSIZE (1024 * 16)
 
@@ -1522,8 +1522,8 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       /* Check that it is not too small, not too large. */
       if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
 	{
-	  P(RINT "xdelta3: test encode with size ratio %.3f, expected < %.3f\n",
-	    ratio, TEST_ADD_RATIO + TEST_EPSILON);
+	  P(RINT "xdelta3: test encode with size ratio %.3f, expected < %.3f (%"Q"u, %"Q"u)\n",
+	    ratio, TEST_ADD_RATIO + TEST_EPSILON, dsize, tsize);
 	  stream->msg = "strange encoding";
 	  return XD3_INTERNAL;
 	}

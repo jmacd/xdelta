@@ -293,10 +293,15 @@ static main_extcomp extcomp_types[] =
 {
   /* The entry for xdelta3/1 must be 0/1 because the program_names are set there. */
   { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3, RD_NONEXTERNAL },
-  { "xdelta1",  "delta", "xdelta1",    "patch", "1", "%XD",          3, RD_EXTERNAL_V1 },
   { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
+
+  /* TODO: xdelta1 isn't working */
+  /*{ "xdelta1",  "delta", "xdelta1",    "patch",  "1", "%XD",          3, RD_EXTERNAL_V1 },*/
+
+  /* TODO: add commandline support for magic-less formats */
+  /*{ "lzma",     "-cf",   "lzma",       "-dcf",   "M", "]\000",        2, 0 },*/
 };
 
 static void main_get_appheader (xd3_stream *stream, main_file *ifile,
@@ -1821,7 +1826,9 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
 
-  option_srcwinsz = min(source->size, (xoff_t) option_srcwinsz);
+  // Note: to avoid unnecessary allocs for small files: problem
+  // was with --decompress_inputs, we don't know the true size
+  // option_srcwinsz = min(source->size, (xoff_t) option_srcwinsz);
 
   if (option_verbose > 1) { XPR(NT "source window size: %u\n", option_srcwinsz); }
   if (option_verbose > 1) { XPR(NT "source block size: %u\n", source->blksize); }
@@ -2198,7 +2205,9 @@ main_input (xd3_cmd     cmd,
 
   if (main_file_stat (ifile, & input_size, 0) == 0)
     {
-      option_winsize = min (input_size, (xoff_t) option_winsize);
+      // Note: to avoid unnecessary allocs for small files: problem
+      // was with --decompress_inputs, we don't know the true size
+      // option_winsize = min (input_size, (xoff_t) option_winsize);
     }
 
   option_srcwinsz = max(option_srcwinsz, XD3_ALLOCSIZE);
