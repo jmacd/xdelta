@@ -922,7 +922,7 @@ int     xd3_get_appheader (xd3_stream     *stream,
  * if the decoder will require source data. */
 int     xd3_decoder_needs_source (xd3_stream *stream);
 
-/* Includes the above rvalues */
+/* Gives an error string for xdelta3-speficic errors, returns NULL for system errors */
 const char* xd3_strerror (int ret);
 
 /* For convenience, zero & initialize the xd3_config structure with specified flags. */

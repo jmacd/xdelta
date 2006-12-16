@@ -59,6 +59,9 @@
 #define XD3_WIN32 0
 #endif
 
+/* Combines xd3_strerror() and strerror() */
+const char* xd3_mainerror(int err_num);
+
 /* XPRINTX (used by main) prefixes an "xdelta3: " to the output. */
 #define XPR fprintf
 #define NT stderr, "xdelta3: "
@@ -84,7 +87,7 @@
 
 /* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an error message
  * from the library. */
-#define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", xd3_errstring (stream), xd3_strerror (ret)
+#define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", xd3_errstring (stream), xd3_mainerror (ret)
 
 #include <stdio.h>  /* fprintf */
 
@@ -357,7 +360,7 @@ static void*
 main_malloc1 (usize_t size)
 {
   void* r = malloc (size);
-  if (r == NULL) { XPR(NT "malloc: %s\n", xd3_strerror (ENOMEM)); }
+  if (r == NULL) { XPR(NT "malloc: %s\n", xd3_mainerror (ENOMEM)); }
   else if (option_verbose > 2) { XPR(NT "malloc: %u: %p\n", size, r); }
   return r;
 }
@@ -400,20 +403,45 @@ main_free (void *ptr)
 static int
 get_errno (void)
 {
+#ifndef _WIN32
   if (errno == 0)
     {
       XPR(NT "you found a bug: expected errno != 0\n");
       errno = XD3_INTERNAL;
     }
   return errno;
+#else
+  DWORD errNum = GetLastError();
+  if (errNum == NO_ERROR) {
+	  errNum = XD3_INTERNAL;
+  }
+  return errNum;
+#endif
 }
 
-
+const char* 
+xd3_mainerror(int err_num) {
+#ifndef _WIN32
+	return strerror(err_num);
+#else
+	static char err_buf[256];
+	const char* x = xd3_strerror (err_num);
+	if (x != NULL) {
+		return x;
+	}
+	memset (err_buf, 0, 256);
+	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		NULL, err_num, 
+		MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
+		err_buf, 256, NULL);
+	return err_buf;
+#endif
+}
 
 static long
 get_millisecs_now (void)
 {
-#ifndef WIN32
+#ifndef _WIN32
   struct timeval tv;
 
   gettimeofday (& tv, NULL);
@@ -548,7 +576,7 @@ main_atou (const char* arg, usize_t *xo, usize_t low, char which)
 #define XOPEN_POSIX  (xfile->mode == XO_READ ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC)
 #define XOPEN_MODE   (xfile->mode == XO_READ ? 0 : 0666)
 
-#define XF_ERROR(op, name, ret) XPR(NT "file %s failed: %s: %s: %s\n", (op), XOPEN_OPNAME, (name), xd3_strerror (ret))
+#define XF_ERROR(op, name, ret) XPR(NT "file %s failed: %s: %s: %s\n", (op), XOPEN_OPNAME, (name), xd3_mainerror (ret))
 
 #if XD3_STDIO
 #define XFNO(f) fileno(f->file)
@@ -563,10 +591,10 @@ main_atou (const char* arg, usize_t *xo, usize_t low, char which)
 #define XSTDIN_XF(f)  { (f)->file = STDIN_FILENO;  (f)->filename = "/dev/stdin"; }
 
 #elif XD3_WIN32
-#define XFNO(f) 0
-#define XSTDOUT_XF(f) { (f)->file = 0; (f)->filename = "/dev/stdout"; }
-#define XSTDERR_XF(f) { (f)->file = 0; (f)->filename = "/dev/stderr"; }
-#define XSTDIN_XF(f)  { (f)->file = 0;  (f)->filename = "/dev/stdin"; }
+#define XFNO(f) -1
+#define XSTDOUT_XF(f) { (f)->file = INVALID_HANDLE_VALUE; (f)->filename = "/dev/stdout"; }
+#define XSTDERR_XF(f) { (f)->file = INVALID_HANDLE_VALUE; (f)->filename = "/dev/stderr"; }
+#define XSTDIN_XF(f)  { (f)->file = INVALID_HANDLE_VALUE;  (f)->filename = "/dev/stdin"; }
 #endif
 
 static void
@@ -623,7 +651,9 @@ main_file_close (main_file *xfile)
   xfile->file = -1;
 
 #elif XD3_WIN32
-  ret = CloseHandle(xfile->file);
+  if (!CloseHandle(xfile->file)) {
+    ret = get_errno ();
+  }
   xfile->file = INVALID_HANDLE_VALUE;
 #endif
 
@@ -661,10 +691,12 @@ main_file_open (main_file *xfile, const char* name, int mode)
 	  (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
 	  0,
 	  NULL,
-	  (option_force ? CREATE_ALWAYS : CREATE_NEW),
+	  (mode == XO_READ) ? OPEN_EXISTING : (option_force ? CREATE_ALWAYS : CREATE_NEW),
 	  FILE_ATTRIBUTE_NORMAL,
 	  NULL);
-  ret = (xfile->file != INVALID_HANDLE_VALUE);
+  if (xfile->file == INVALID_HANDLE_VALUE) {
+	  ret = get_errno ();
+  }
 #endif
   if (ret) { XF_ERROR ("open", name, ret); }
   else     { xfile->realname = name; xfile->nread = 0; }
@@ -676,8 +708,11 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
 {
   int ret = 0;
 #if XD3_WIN32
-  if (!GetFileSizeEx(xfile->file, size)) {
-	  ret = 1;
+  LARGE_INTEGER li;
+  if (GetFileSizeEx(xfile->file, &li) == 0) {
+	  ret = get_errno ();
+  } else {
+      *size = li.QuadPart;
   }
   // TODO: check err_ifnoseek
 #else
@@ -772,15 +807,16 @@ main_file_read (main_file   *ifile,
 
 #elif XD3_WIN32
   DWORD nread2;
-  if (!ReadFile (ifile->file, buf, size, &nread2, NULL)) {
-	  ret = 1;
+  if (ReadFile (ifile->file, buf, size, &nread2, NULL) == 0) {
+	  ret = get_errno();
+  } else {
+      *nread = (usize_t)nread2;
   }
-  *nread = (usize_t)nread2;
 #endif
 
   if (ret)
     {
-      XPR(NT "%s: %s: %s\n", msg, ifile->filename, xd3_strerror (ret));
+      XPR(NT "%s: %s: %s\n", msg, ifile->filename, xd3_mainerror (ret));
     }
   else
     {
@@ -808,14 +844,19 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
 
 #elif XD3_WIN32
   DWORD nwrite;
-  if (!WriteFile(ofile->file, &buf, size, &nwrite, NULL)) {
-	  ret = 1;
+  if (WriteFile(ofile->file, buf, size, &nwrite, NULL) == 0) {
+	  ret = get_errno ();
+  } else {
+	  if (size != nwrite) {
+		  XPR(NT "Incorrect write count");
+		  ret = XD3_INTERNAL;
+	  }
   }
 #endif
 
   if (ret)
     {
-      XPR(NT "%s: %s: %s\n", msg, ofile->filename, xd3_strerror (ret));
+      XPR(NT "%s: %s: %s\n", msg, ofile->filename, xd3_mainerror (ret));
     }
   else
     {
@@ -838,23 +879,16 @@ main_file_seek (main_file *xfile, xoff_t pos)
   if (lseek (xfile->file, pos, SEEK_SET) != pos) { ret = get_errno (); }
 
 #elif XD3_WIN32
-  DWORD sfp;
-  DWORD low = (DWORD)(pos & 0xffffffff);
-  DWORD high = (DWORD)(pos >> 32);
-  // TODO: What's the proper shift for WIN64?
-  sfp = SetFilePointer(xfile->file, low, &high, FILE_BEGIN);
-  if (sfp == (DWORD)-1 &&
-	  GetLastError() != NO_ERROR) {
-      // This example is from MSDN, note that the 
-	  // (error = GetLastError()) part of this code is used 
-	  // only for the case where &high is passed.
-	  ret = 1;
+  LARGE_INTEGER move, out;
+  move.QuadPart = pos;
+  if (SetFilePointerEx(xfile->file, move, &out, FILE_BEGIN) == 0) {
+	  ret = get_errno ();
   }
 #endif
 
   if (ret)
     {
-      XPR(NT "seek failed: %s: %s\n", xfile->filename, xd3_strerror (ret));
+      XPR(NT "seek failed: %s: %s\n", xfile->filename, xd3_mainerror (ret));
     }
 
   return ret;
@@ -953,7 +987,7 @@ main_print_func (xd3_stream* stream, main_file *xfile)
   if (! (vcout = fdopen (dup(xfile->file), "w")))
     {
       ret = get_errno ();
-      XPR(NT "fdopen: %s: %s\n", xfile->filename, xd3_strerror (ret));
+      XPR(NT "fdopen: %s: %s\n", xfile->filename, xd3_mainerror (ret));
       return ret;
     }
 #elif XD3_STDIO
@@ -1103,7 +1137,7 @@ main_pipe_write (int outfd, const uint8_t *exist_buf, usize_t remain)
 
   if ((ret = xd3_posix_io (outfd, (uint8_t*) exist_buf, remain, (xd3_posix_func*) &write, NULL)))
     {
-      XPR(NT "pipe write failed: %s", xd3_strerror (ret));
+      XPR(NT "pipe write failed: %s", xd3_mainerror (ret));
       return ret;
     }
 
@@ -1120,7 +1154,7 @@ main_waitpid_check(pid_t pid)
   if (waitpid (pid, & status, 0) < 0)
     {
       ret = get_errno ();
-      XPR(NT "compression subprocess: wait: %s\n", xd3_strerror (ret));
+      XPR(NT "compression subprocess: wait: %s\n", xd3_mainerror (ret));
     }
   else if (! WIFEXITED (status))
     {
@@ -1215,13 +1249,13 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 
   if (pipe (outpipefd) || pipe (inpipefd))
     {
-      XPR(NT "pipe failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "pipe failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
   if ((decomp_id = fork ()) < 0)
     {
-      XPR(NT "fork failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "fork failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -1237,7 +1271,7 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 	  close (inpipefd[PIPE_WRITE_FD]) ||
 	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname, decomp->decomp_options, NULL))
 	{
-	  XPR(NT "child process %s failed to execute: %s\n", decomp->decomp_cmdname, xd3_strerror (get_errno ()));
+	  XPR(NT "child process %s failed to execute: %s\n", decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
 	}
 
       _exit (127);
@@ -1247,7 +1281,7 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 
   if ((copier_id = fork ()) < 0)
     {
-      XPR(NT "fork failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "fork failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -1260,7 +1294,7 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 	  main_pipe_copier (pipe_buf, pipe_bufsize, pipe_avail, ifile, inpipefd[PIPE_WRITE_FD]) ||
 	  close (inpipefd[PIPE_WRITE_FD]))
 	{
-	  XPR(NT "child copier process failed: %s\n", xd3_strerror (get_errno ()));
+	  XPR(NT "child copier process failed: %s\n", xd3_mainerror (get_errno ()));
 	  exitval = 1;
 	}
 
@@ -1279,7 +1313,7 @@ main_input_decompress_setup (const main_extcomp     *decomp,
       close (inpipefd[PIPE_READ_FD]) ||
       close (inpipefd[PIPE_WRITE_FD]))
     {
-      XPR(NT "dup/close failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "dup/close failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -1287,7 +1321,7 @@ main_input_decompress_setup (const main_extcomp     *decomp,
   /* Note: fdopen() acquires the fd, closes it when finished. */
   if ((ifile->file = fdopen (input_fd, "r")) == NULL)
     {
-      XPR(NT "fdopen failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "fdopen failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -1404,7 +1438,7 @@ main_decompress_source (main_file *sfile, xd3_source *source)
   /* Open the output FD. */
   if ((output_fd = mkstemp (tmpname)) < 0)
     {
-      XPR(NT "mkstemp failed: %s: %s", tmpname, xd3_strerror (ret = get_errno ()));
+      XPR(NT "mkstemp failed: %s: %s", tmpname, xd3_mainerror (ret = get_errno ()));
       goto cleanup;
     }
 
@@ -1413,7 +1447,7 @@ main_decompress_source (main_file *sfile, xd3_source *source)
 #if XD3_STDIO
   if ((input_fd = dup (fileno (sfile->file))) < 0)
     {
-      XPR(NT "dup failed: %s", xd3_strerror (ret = get_errno ()));
+      XPR(NT "dup failed: %s", xd3_mainerror (ret = get_errno ()));
       goto cleanup;
     }
   main_file_close (sfile);
@@ -1425,13 +1459,13 @@ main_decompress_source (main_file *sfile, xd3_source *source)
 
   if ((ret = lseek (input_fd, SEEK_SET, 0)) != 0)
     {
-      XPR(NT "lseek failed: : %s", xd3_strerror (ret = get_errno ()));
+      XPR(NT "lseek failed: : %s", xd3_mainerror (ret = get_errno ()));
       goto cleanup;
     }
 
   if ((decomp_id = fork ()) < 0)
     {
-      XPR(NT "fork failed: %s", xd3_strerror (ret = get_errno ()));
+      XPR(NT "fork failed: %s", xd3_mainerror (ret = get_errno ()));
       goto cleanup;
     }
 
@@ -1444,7 +1478,7 @@ main_decompress_source (main_file *sfile, xd3_source *source)
 	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname, decomp->decomp_options, NULL))
 	{
 	  XPR(NT "child process %s failed to execute: %s\n",
-		   decomp->decomp_cmdname, xd3_strerror (get_errno ()));
+		   decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
 	}
 
       _exit (127);
@@ -1491,13 +1525,13 @@ main_recompress_output (main_file *ofile)
 
   if (pipe (pipefd))
     {
-      XPR(NT "pipe failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "pipe failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
   if ((recomp_id = fork ()) < 0)
     {
-      XPR(NT "fork failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "fork failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -1511,7 +1545,7 @@ main_recompress_output (main_file *ofile)
 	  close (pipefd[PIPE_WRITE_FD]) ||
 	  execlp (recomp->recomp_cmdname, recomp->recomp_cmdname, recomp->recomp_options, NULL))
 	{
-	  XPR(NT "child process %s failed to execute: %s\n", recomp->recomp_cmdname, xd3_strerror (get_errno ()));
+	  XPR(NT "child process %s failed to execute: %s\n", recomp->recomp_cmdname, xd3_mainerror (get_errno ()));
 	}
 
       _exit (127);
@@ -1528,7 +1562,7 @@ main_recompress_output (main_file *ofile)
       close (pipefd[PIPE_READ_FD]) ||
       close (pipefd[PIPE_WRITE_FD]))
     {
-      XPR(NT "close failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "close failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -1536,7 +1570,7 @@ main_recompress_output (main_file *ofile)
   /* Note: fdopen() acquires the fd, closes it when finished. */
   if ((ofile->file = fdopen (output_fd, "w")) == NULL)
     {
-      XPR(NT "fdopen failed: %s\n", xd3_strerror (ret = get_errno ()));
+      XPR(NT "fdopen failed: %s\n", xd3_mainerror (ret = get_errno ()));
       goto pipe_cleanup;
     }
 
@@ -2974,6 +3008,8 @@ main (int argc, char **argv)
 
   if (--option_profile_cnt > 0 && ret == EXIT_SUCCESS) { goto go; }
 
+  fflush (stdout);
+  fflush (stderr);
   return ret;
 }
 

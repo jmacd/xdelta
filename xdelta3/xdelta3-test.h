@@ -2206,7 +2206,7 @@ xd3_selftest (void)
       P(RINT " success\n");                                           \
     } else {                                                          \
       P(RINT " failed: %s: %s\n", xd3_errstring (& stream),           \
-               xd3_strerror (ret)); }                                 \
+               xd3_mainerror (ret)); }                                 \
     xd3_free_stream (& stream);                                       \
     if (ret != 0) { goto failure; }                                   \
   } while (0)
