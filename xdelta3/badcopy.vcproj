@@ -2,8 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="8.00"
-	Name="xdelta3"
-	ProjectGUID="{7F30EDF1-4493-4E47-8664-0661516BC9E4}"
+	Name="badcopy"
+	ProjectGUID="{FED2964C-7114-41AC-81EE-68A4D2B67503}"
+	RootNamespace="badcopy"
 	Keyword="Win32Proj"
 	>
 	<Platforms>
@@ -37,7 +38,6 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions="/DXD3_DEBUG=0 /DXD3_USE_LARGEFILE64=1 /DREGRESSION_TEST=1 /DSECONDARY_DJW=1 /DSECONDARY_FGK=1 /DXD3_MAIN=1 /DXD3_WIN32=1 /DEXTERNAL_COMPRESSION=0"
 				Optimization="0"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;"
 				MinimalRebuild="true"
@@ -112,7 +112,6 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalOptions="/DXD3_DEBUG=0 /DXD3_USE_LARGEFILE64=1 /DREGRESSION_TEST=1 /DSECONDARY_DJW=1 /DSECONDARY_FGK=1 /DXD3_MAIN=1 /DXD3_WIN32=1 /DEXTERNAL_COMPRESSION=0"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
@@ -172,56 +171,16 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
-			<File
-				RelativePath=".\xdelta.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-cfgs.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-decode.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-djw.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-fgk.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-list.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-main.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-python.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-second.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3-test.h"
-				>
-			</File>
-			<File
-				RelativePath=".\xdelta3.h"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"
 			Filter="rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx"
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
+			<File
+				RelativePath=".\releases\xdelta30h.ppc-osx.bin"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Source Files"
@@ -229,10 +188,30 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\xdelta3.c"
+				RelativePath=".\badcopy.c"
 				>
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\release\BuildLog.htm"
+			>
+		</File>
+		<File
+			RelativePath=".\debug\BuildLog.htm"
+			>
+		</File>
+		<File
+			RelativePath=".\www\xdelta3-api-guide.html"
+			>
+		</File>
+		<File
+			RelativePath=".\www\xdelta3-cmdline.html"
+			>
+		</File>
+		<File
+			RelativePath=".\www\xdelta3.html"
+			>
+		</File>
 	</Files>
 	<Globals>
 	</Globals>

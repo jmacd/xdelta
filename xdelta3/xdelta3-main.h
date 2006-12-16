@@ -55,6 +55,9 @@
 #ifndef XD3_STDIO
 #define XD3_STDIO 0
 #endif
+#ifndef XD3_WIN32
+#define XD3_WIN32 0
+#endif
 
 /* XPRINTX (used by main) prefixes an "xdelta3: " to the output. */
 #define XPR fprintf
@@ -64,7 +67,7 @@
 #define UT vcout,
 
 /* If none are set, default to posix. */
-#if (XD3_POSIX + XD3_STDIO) == 0
+#if (XD3_POSIX + XD3_STDIO + XD3_WIN32) == 0
 #undef XD3_POSIX
 #define XD3_POSIX 1
 #endif
@@ -106,11 +109,11 @@
 #   define WEXITSTATUS(stat) (((*((int *) &(stat))) >> 8) & 0xff)
 #endif
 #ifndef S_ISREG
-#   ifdef S_IFREG
-#       define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
-#   else
+//#   ifdef S_IFREG
+//#       define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+//#   else
 #       define S_ISREG(m) 1
-#   endif
+//#   endif
 #endif /* !S_ISREG */
 #endif
 
@@ -181,6 +184,8 @@ struct _main_file
   FILE               *file;
 #elif XD3_POSIX
   int                 file;
+#elif XD3_WIN32
+  HANDLE              file;  
 #endif
 
   int                 mode;          /* XO_READ and XO_WRITE */
@@ -340,8 +345,10 @@ main_config (void)
   P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
   P(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
   P(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
-  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
   P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
+  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
+  P(RINT "XD3_STDIO=%d\n", XD3_STDIO);
+  P(RINT "XD3_WIN32=%d\n", XD3_WIN32);
 
   return EXIT_SUCCESS;
 }
@@ -554,6 +561,12 @@ main_atou (const char* arg, usize_t *xo, usize_t low, char which)
 #define XSTDOUT_XF(f) { (f)->file = STDOUT_FILENO; (f)->filename = "/dev/stdout"; }
 #define XSTDERR_XF(f) { (f)->file = STDERR_FILENO; (f)->filename = "/dev/stderr"; }
 #define XSTDIN_XF(f)  { (f)->file = STDIN_FILENO;  (f)->filename = "/dev/stdin"; }
+
+#elif XD3_WIN32
+#define XFNO(f) 0
+#define XSTDOUT_XF(f) { (f)->file = 0; (f)->filename = "/dev/stdout"; }
+#define XSTDERR_XF(f) { (f)->file = 0; (f)->filename = "/dev/stderr"; }
+#define XSTDIN_XF(f)  { (f)->file = 0;  (f)->filename = "/dev/stdin"; }
 #endif
 
 static void
@@ -563,6 +576,9 @@ main_file_init (main_file *xfile)
 
 #if XD3_POSIX
   xfile->file = -1;
+#endif
+#if XD3_WIN32
+  xfile->file = INVALID_HANDLE_VALUE;
 #endif
 }
 
@@ -582,6 +598,9 @@ main_file_isopen (main_file *xfile)
 
 #elif XD3_POSIX
   return xfile->file != -1;
+
+#elif XD3_WIN32
+  return xfile->file != INVALID_HANDLE_VALUE;
 #endif
 }
 
@@ -602,6 +621,10 @@ main_file_close (main_file *xfile)
 #elif XD3_POSIX
   ret = close (xfile->file);
   xfile->file = -1;
+
+#elif XD3_WIN32
+  ret = CloseHandle(xfile->file);
+  xfile->file = INVALID_HANDLE_VALUE;
 #endif
 
   if (ret != 0) { XF_ERROR ("close", xfile->filename, ret = get_errno ()); }
@@ -632,6 +655,16 @@ main_file_open (main_file *xfile, const char* name, int mode)
       xfile->file = ret;
       ret = 0;
     }
+
+#elif XD3_WIN32
+  xfile->file = CreateFile(name, 
+	  (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
+	  0,
+	  NULL,
+	  (option_force ? CREATE_ALWAYS : CREATE_NEW),
+	  FILE_ATTRIBUTE_NORMAL,
+	  NULL);
+  ret = (xfile->file != INVALID_HANDLE_VALUE);
 #endif
   if (ret) { XF_ERROR ("open", name, ret); }
   else     { xfile->realname = name; xfile->nread = 0; }
@@ -641,11 +674,14 @@ main_file_open (main_file *xfile, const char* name, int mode)
 static int
 main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
 {
-  int ret;
+  int ret = 0;
+#if XD3_WIN32
+  if (!GetFileSizeEx(xfile->file, size)) {
+	  ret = 1;
+  }
+  // TODO: check err_ifnoseek
+#else
   struct stat sbuf;
-
-  XD3_ASSERT (main_file_isopen (xfile));
-
   if (fstat (XFNO (xfile), & sbuf) < 0)
     {
       ret = get_errno ();
@@ -658,9 +694,9 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
       if (err_ifnoseek) { XPR(NT "source file must be seekable: %s\n", xfile->filename); }
       return ESPIPE;
     }
-
   (*size) = sbuf.st_size;
-  return 0;
+#endif
+  return ret;
 }
 
 static int
@@ -733,6 +769,13 @@ main_file_read (main_file   *ifile,
 
 #elif XD3_POSIX
   ret = xd3_posix_io (ifile->file, buf, size, (xd3_posix_func*) &read, nread);
+
+#elif XD3_WIN32
+  DWORD nread2;
+  if (!ReadFile (ifile->file, buf, size, &nread2, NULL)) {
+	  ret = 1;
+  }
+  *nread = (usize_t)nread2;
 #endif
 
   if (ret)
@@ -762,6 +805,12 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
 
 #elif XD3_POSIX
   ret = xd3_posix_io (ofile->file, buf, size, (xd3_posix_func*) &write, NULL);
+
+#elif XD3_WIN32
+  DWORD nwrite;
+  if (!WriteFile(ofile->file, &buf, size, &nwrite, NULL)) {
+	  ret = 1;
+  }
 #endif
 
   if (ret)
@@ -784,8 +833,23 @@ main_file_seek (main_file *xfile, xoff_t pos)
 
 #if XD3_STDIO
   if (fseek (xfile->file, pos, SEEK_SET) != 0) { ret = get_errno (); }
-#else
+
+#elif XD3_POSIX
   if (lseek (xfile->file, pos, SEEK_SET) != pos) { ret = get_errno (); }
+
+#elif XD3_WIN32
+  DWORD sfp;
+  DWORD low = (DWORD)(pos & 0xffffffff);
+  DWORD high = (DWORD)(pos >> 32);
+  // TODO: What's the proper shift for WIN64?
+  sfp = SetFilePointer(xfile->file, low, &high, FILE_BEGIN);
+  if (sfp == (DWORD)-1 &&
+	  GetLastError() != NO_ERROR) {
+      // This example is from MSDN, note that the 
+	  // (error = GetLastError()) part of this code is used 
+	  // only for the case where &high is passed.
+	  ret = 1;
+  }
 #endif
 
   if (ret)

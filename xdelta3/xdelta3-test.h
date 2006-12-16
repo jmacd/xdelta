@@ -249,7 +249,7 @@ static int
 compare_files (xd3_stream *stream, const char* tgt, const char *rec)
 {
   FILE *orig, *recons;
-  uint8_t obuf[TESTBUFSIZE], rbuf[TESTBUFSIZE];
+  static uint8_t obuf[TESTBUFSIZE], rbuf[TESTBUFSIZE];
   int offset = 0;
   int i;
   int oc, rc;
