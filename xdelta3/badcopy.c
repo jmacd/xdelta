@@ -32,6 +32,16 @@ long lrand48() {
 }
 #endif
 
+#ifdef _WIN32
+#define XD3_WIN32 1
+#else
+#define XD3_POSIX 1
+#endif
+#define XD3_MAIN 1
+#define main notmain
+#define EXTERNAL_COMPRESSION 0
+#include "xdelta3.c"
+#undef main
 static usize_t
 edist (usize_t mean, usize_t max)
 {
@@ -84,9 +94,11 @@ void modify (char *buf, usize_t size)
 
 int main(int argc, char **argv)
 {
-  FILE *in, *out;
+  main_file inp, out;
   char *buf = malloc(BUFSZ);
   int c, ret;
+  main_file_init(&inp);
+  main_file_init(&out);
 
   if (argc > 5)
     {
@@ -98,15 +110,10 @@ int main(int argc, char **argv)
   if (argc > 3) { error_prob  = atof (argv[3]); }
   fprintf (stderr, "mean change = %u; error_prob = %0.10f\n", mean_change, error_prob);
 
-  in = fopen(argv[1], "rb");
-  out = fopen(argv[2], "wb");
-
-  if (in == NULL) {
-	  fprintf (stderr, "Cannot open input: %s\n", argv[1]);
+  if ((ret = main_file_open (&inp, argv[1], XO_READ)) != 0) {
 	  return 1;
   }
-  if (out == NULL) {
-	  fprintf (stderr, "Cannot open output: %s\n", argv[2]);
+  if ((ret = main_file_open (&out, argv[2], XO_WRITE)) != 0) {
 	  return 1;
   }
 
@@ -118,19 +125,22 @@ int main(int argc, char **argv)
 
   do
     {
-      c = fread (buf, 1, BUFSZ, in);
+		if ((ret = main_file_read (&inp, buf, BUFSZ, &c, "read failed")) != 0) {
+			return 1;
+		}
 
-      if (c == 0) { break; }
+        if (c == 0) { break; }
 
-      modify (buf, c);
+        modify (buf, c);
 
-      ret = fwrite (buf, 1, c, out);
+		if ((ret = main_file_write (&out, buf, c, "write failed")) != 0) {
+			return 1;
+		}
     }
   while (c == BUFSZ);
 
-  if ((ret = fclose (stdout)))
+  if ((ret = main_file_close (&out)))
     {
-      perror ("fclose");
       return 1;
     }
 
