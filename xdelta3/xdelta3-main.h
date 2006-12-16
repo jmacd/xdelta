@@ -2512,8 +2512,8 @@ main_input (xd3_cmd     cmd,
 		    char rdb[32], wdb[32];
 		    char trdb[32], twdb[32];
 		    long millis = get_millisecs_since ();
-		    usize_t this_read = stream.total_in - last_total_in;
-		    usize_t this_write = stream.total_out - last_total_out;
+		    usize_t this_read = (usize_t)(stream.total_in - last_total_in);
+		    usize_t this_write = (usize_t)(stream.total_out - last_total_out);
 		    last_total_in = stream.total_in;
 		    last_total_out = stream.total_out;
 

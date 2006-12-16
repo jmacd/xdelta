@@ -4,17 +4,6 @@
 
 #define BUFSZ (1 << 22)
 
-typedef unsigned int usize_t;
-
-double error_prob   = 0.0001;
-usize_t mean_change  = 100;
-usize_t total_change = 0;
-usize_t total_size   = 0;
-usize_t max_change   = 0;
-usize_t num_change   = 0;
-
-int last_end = 0;
-
 #ifdef WIN32
 // whatever
 static 
@@ -40,8 +29,19 @@ long lrand48() {
 #define XD3_MAIN 1
 #define main notmain
 #define EXTERNAL_COMPRESSION 0
+#define XD3_USE_LARGEFILE64 1
 #include "xdelta3.c"
 #undef main
+
+
+double error_prob   = 0.0001;
+usize_t mean_change  = 100;
+xoff_t total_change = 0;
+xoff_t total_size   = 0;
+usize_t max_change   = 0;
+usize_t num_change   = 0;
+
+
 static usize_t
 edist (usize_t mean, usize_t max)
 {
@@ -55,8 +55,7 @@ edist (usize_t mean, usize_t max)
 void modify (char *buf, usize_t size)
 {
   usize_t bufpos = 0, j;
-
-  last_end = 0;
+  usize_t last_end = 0;
 
   for (;; /* bufpos and j are incremented in the inner loop */)
     {
@@ -73,8 +72,14 @@ void modify (char *buf, usize_t size)
 
       bufpos += next_mod;
 
-      fprintf (stderr, "COPY: %u-%u (%u)\n", total_size + last_end, total_size + bufpos, bufpos - last_end);
-      fprintf (stderr, "ADD:  %u-%u (%u) is change %u\n", total_size + bufpos , total_size + bufpos + next_size, next_size, num_change);
+      fprintf (stderr, "COPY: %I64u-%I64u (%u)\n", 
+		  total_size + (xoff_t)last_end, 
+		  total_size + (xoff_t)bufpos, 
+		  bufpos - last_end);
+      fprintf (stderr, "ADD:  %I64u-%I64u (%u) is change %u\n", 
+		  total_size + (xoff_t)bufpos, 
+		  total_size + (xoff_t)(bufpos + next_size),
+		  next_size, num_change);
 
       total_change += next_size;
       num_change   += 1;
@@ -87,7 +92,9 @@ void modify (char *buf, usize_t size)
       last_end = bufpos;
     }
 
-  fprintf (stderr, "COPY: %u-%u (%u)\n", total_size + last_end, total_size + size, size - last_end);
+  fprintf (stderr, "COPY: %I64u-%I64u (%u)\n", 
+	  total_size + last_end, 
+	  total_size + size, size - last_end);
 
   total_size += size;
 }
@@ -99,7 +106,7 @@ int main(int argc, char **argv)
   int c, ret;
   main_file_init(&inp);
   main_file_init(&out);
-
+  option_force = 1;
   if (argc > 5)
     {
       fprintf (stderr, "usage: badcopy [byte_error_prob [mean_error_size]]\n");
