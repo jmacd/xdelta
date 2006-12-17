@@ -29,7 +29,7 @@ PYFILES = xdelta3-regtest.py setup.py
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0h
+REL=0i
 RELDIR = xdelta3$(REL)
 
 XDELTA1 = ../xdelta11/xdelta
