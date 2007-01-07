@@ -20,7 +20,6 @@
 
 #ifndef WIN32
 #include <sys/wait.h>
-#else
 #endif
 
 #define MSG_IS(x) (stream->msg != NULL && strcmp ((x), stream->msg) == 0)
@@ -2206,7 +2205,7 @@ xd3_selftest (void)
       P(RINT " success\n");                                           \
     } else {                                                          \
       P(RINT " failed: %s: %s\n", xd3_errstring (& stream),           \
-               xd3_mainerror (ret)); }                                 \
+               xd3_mainerror (ret)); }                                \
     xd3_free_stream (& stream);                                       \
     if (ret != 0) { goto failure; }                                   \
   } while (0)
@@ -2246,8 +2245,7 @@ xd3_selftest (void)
    * instruction codes are used. */
   IF_GENCODETBL (DO_TEST (decompress_single_bit_error, XD3_ALT_CODE_TABLE, 224));
 
-  /* The following tests have random failures on my OSX box.
-   */
+#ifndef WIN32
   DO_TEST (force_behavior, 0, 0);
   DO_TEST (stdout_behavior, 0, 0);
   DO_TEST (no_output, 0, 0);
@@ -2257,6 +2255,8 @@ xd3_selftest (void)
   DO_TEST (source_decompression, 0, 0);
   DO_TEST (externally_compressed_io, 0, 0);
 #endif
+
+#endif /* WIN32 */
 
   /* This test takes a while.
    */

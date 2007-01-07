@@ -2556,14 +2556,6 @@ done:
   main_file_close (ifile);
   main_file_close (sfile);
 
-#if EXTERNAL_COMPRESSION
-  if ((ret = main_external_compression_finish ()))
-    {
-      XPR(NT "external compression commands failed\n");
-      return EXIT_FAILURE;
-    }
-#endif
-
   /* If output file is not open yet because of delayed-open, it means we never encountered
    * a window in the delta, but it could have had a VCDIFF header?  TODO: solve this
    * elsewhere.  For now, it prints "nothing to output" below, but the check doesn't
@@ -2582,6 +2574,14 @@ done:
 	  return EXIT_FAILURE;
 	}
     }
+
+#if EXTERNAL_COMPRESSION
+  if ((ret = main_external_compression_finish ()))
+    {
+      XPR(NT "external compression commands failed\n");
+      return EXIT_FAILURE;
+    }
+#endif
 
   if ((ret = xd3_close_stream (& stream)))
     {
