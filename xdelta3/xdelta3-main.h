@@ -1,5 +1,6 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001 and onward.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+ * Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -67,7 +68,7 @@ const char* xd3_mainerror(int err_num);
 #define NT stderr, "xdelta3: "
 
 #define VC fprintf
-#define UT vcout,
+#define UT stdout,
 
 /* If none are set, default to posix. */
 #if (XD3_POSIX + XD3_STDIO + XD3_WIN32) == 0
@@ -252,7 +253,6 @@ static char*       option_smatch_config      = NULL;
 static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* go through the motions, but do not open or write output */
 static const char *option_source_filename    = NULL;
-static const char *option_xdelta1            = "xdelta1";
 
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
@@ -305,9 +305,6 @@ static main_extcomp extcomp_types[] =
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
 
-  /* TODO: xdelta1 isn't working */
-  /*{ "xdelta1",  "delta", "xdelta1",    "patch",  "1", "%XD",          3, RD_EXTERNAL_V1 },*/
-
   /* TODO: add commandline support for magic-less formats */
   /*{ "lzma",     "-cf",   "lzma",       "-dcf",   "M", "]\000",        2, 0 },*/
 };
@@ -321,7 +318,7 @@ static int
 main_version (void)
 {
   /* $Format: "  P(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
-  P(RINT "VERSION=3.0i\n");
+  P(RINT "VERSION=3.0j\n");
   return EXIT_SUCCESS;
 }
 
@@ -395,6 +392,7 @@ main_free (void *ptr)
     {
       IF_DEBUG (main_mallocs -= 1);
       main_free1 (NULL, ptr);
+      IF_DEBUG (XD3_ASSERT(main_mallocs >= 0));
     }
 }
 
@@ -613,8 +611,9 @@ main_file_init (main_file *xfile)
 static void
 main_file_cleanup (main_file *xfile)
 {
-  if (xfile->filename_copy) {
+  if (xfile->filename_copy != NULL) {
     main_free(xfile->filename_copy);
+    xfile->filename_copy = NULL;
   }
 }
 
@@ -901,7 +900,7 @@ main_file_seek (main_file *xfile, xoff_t pos)
 #if VCDIFF_TOOLS
 /* This function prints a single VCDIFF window, mainly for debugging purposes. */
 static int
-main_print_window (xd3_stream* stream, FILE *vcout)
+main_print_window (xd3_stream* stream)
 {
   int ret;
   usize_t size = 0;
@@ -965,13 +964,11 @@ main_print_window (xd3_stream* stream, FILE *vcout)
       return XD3_INTERNAL;
     }
 
-  IF_DEBUG (VC(UT "SIZE=%u  TGTLEN=%u\n", size, stream->dec_tgtlen));
-
   return 0;
 }
 
 static void
-main_print_vcdiff_file (main_file *file, const char *type, FILE *vcout)
+main_print_vcdiff_file (main_file *file, const char *type)
 {
   if (file->filename)   { VC(UT "XDELTA filename (%s):     %s\n", type, file->filename); }
   if (file->compressor) { VC(UT "XDELTA ext comp (%s):     %s\n", type, file->compressor->recomp_cmdname); }  
@@ -982,18 +979,6 @@ static int
 main_print_func (xd3_stream* stream, main_file *xfile)
 {
   int ret;
-  FILE *vcout;
-#if XD3_POSIX
-  if (! (vcout = fdopen (dup(xfile->file), "w")))
-    {
-      ret = get_errno ();
-      XPR(NT "fdopen: %s: %s\n", xfile->filename, xd3_mainerror (ret));
-      return ret;
-    }
-#elif XD3_STDIO
-  vcout = xfile->file;
-#endif
-  XD3_ASSERT (vcout);
   if (stream->dec_winstart == 0)
     {
       VC(UT "VCDIFF version:               0\n");
@@ -1021,7 +1006,7 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 	      main_file i, o, s;
 	      XD3_ASSERT (apphead != NULL);
 	      VC(UT "VCDIFF application header:    ");
-	      fwrite (apphead, 1, appheadsz, vcout);
+	      fwrite (apphead, 1, appheadsz, stdout);
 	      VC(UT "\n");
 
 	      main_file_init (& i);
@@ -1030,8 +1015,8 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 	      option_quiet = 1;
 	      main_get_appheader (stream, &i, & o, & s);
 	      option_quiet = sq;
-	      main_print_vcdiff_file (& o, "output", vcout);
-	      main_print_vcdiff_file (& s, "source", vcout);
+	      main_print_vcdiff_file (& o, "output");
+	      main_print_vcdiff_file (& s, "source");
 	      main_file_cleanup (& i);
 	      main_file_cleanup (& o);
 	      main_file_cleanup (& s);
@@ -1092,10 +1077,9 @@ main_print_func (xd3_stream* stream, main_file *xfile)
     }
   else if ((stream->flags & XD3_SKIP_WINDOW) == 0)
     {
-      ret = main_print_window (stream, vcout);
+      ret = main_print_window (stream);
     }
 
-  fclose (vcout);
   return ret;
 }
 #endif /* VCDIFF_TOOLS */
@@ -1728,6 +1712,8 @@ main_get_appheader_params (main_file *file, char **parsed, int output, const cha
 
 	if (last_slash != NULL) {
 	  int dlen = last_slash - other->filename;
+
+	  XD3_ASSERT(file->filename_copy == NULL);
 	  file->filename_copy = main_malloc(dlen + 2 + strlen(file->filename));
 
 	  strncpy(file->filename_copy, other->filename, dlen);
@@ -2453,7 +2439,8 @@ main_input (xd3_cmd     cmd,
 	case XD3_WINSTART:
 	  {
 	    /* Set or unset XD3_SKIP_WINDOW. */
-	    /*if (stream.current_window < option_first_window || stream.current_window > option_last_window)
+	    /*if (stream.current_window < option_first_window ||
+	          stream.current_window > option_last_window)
 	      { stream_flags |= XD3_SKIP_WINDOW; }
 	    else
   	      { stream_flags &= ~XD3_SKIP_WINDOW; }*/
@@ -2609,13 +2596,19 @@ main_cleanup (void)
 {
   int i;
   
-  if (option_appheader) { appheader_used = NULL; }
+  if (appheader_used != NULL &&
+      appheader_used != option_appheader)
+    {
+      main_free (appheader_used);
+      appheader_used = NULL;
+    }
 
-  main_free (appheader_used);
   main_free (main_bdata);
+  main_bdata = NULL;
 
 #if EXTERNAL_COMPRESSION
   main_free (ext_tmpfile);
+  ext_tmpfile = NULL;
 #endif
 
   for (i = 0; lru && i < lru_size; i += 1)
@@ -2624,6 +2617,7 @@ main_cleanup (void)
     }
 
   main_free (lru);
+  lru = NULL;
 
   lru_hits = 0;
   lru_misses = 0;
@@ -2828,7 +2822,6 @@ main (int argc, char **argv)
 	case 'T': option_use_altcodetable = 1; break;
 	case 'C': option_smatch_config = my_optarg; break;
 	case 'J': option_no_output = 1; break;
-	case 'O': option_xdelta1 = my_optarg; break;
 	case 'S': if (my_optarg == NULL) { option_use_secondary = 0; }
 	          else { option_use_secondary = 1; option_secondary = my_optarg; } break;
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
@@ -2903,9 +2896,6 @@ main (int argc, char **argv)
       goto cleanup;
     }
 
-  extcomp_types[1].recomp_cmdname = option_xdelta1;
-  extcomp_types[1].decomp_cmdname = option_xdelta1;
-  
   if (option_verbose > 1)
     {
       int l = 1;
@@ -2989,7 +2979,10 @@ main (int argc, char **argv)
     }
 
 #if EXTERNAL_COMPRESSION
-  if (ext_tmpfile != NULL) { unlink (ext_tmpfile); }
+  if (ext_tmpfile != NULL)
+    {
+      unlink (ext_tmpfile);
+    }
 #endif
 
   if (0)

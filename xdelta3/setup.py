@@ -1,5 +1,5 @@
 # xdelta 3 - delta compression tools and library
-# Copyright (C) 2004 and onward.  Joshua P. MacDonald
+# Copyright (C) 2004, 2007.  Joshua P. MacDonald
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -20,14 +20,21 @@ from distutils.core import setup, Extension
 
 xdelta3_ext = Extension('xdelta3',
                         ['xdelta3.c'],
-                        define_macros = [('PYTHON_MODULE',1),
-                                         ('XD3_POSIX',1),
-                                         ('REGRESSION_TEST',1),
-                                         ('XD3_DEBUG',1),
+                        define_macros = [
                                          ('EXTCOMP',1),
+                                         ('REGRESSION_TEST',1),
+                                         ('SECONDARY_DJW',1),
+                                         ('SECONDARY_FGK',1),
                                          ('VCDIFF_TOOLS',1),
-                                         ('XD3_USE_LARGEFILE64',1)])
+                                         ('XD3_DEBUG',1),
+                                         ('XD3_POSIX',1),
+                                         ('XD3_USE_LARGEFILE64',1),
+                                         ('PYTHON_MODULE',1),
+                                         ])
+
+# $Format: "REL='$Xdelta3Version$'" $
+REL='0j'
 
 setup(name='xdelta3',
-      version='pre',
+      version=REL,
       ext_modules=[xdelta3_ext])

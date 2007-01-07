@@ -22,21 +22,21 @@ TARGETS = xdelta3 xdelta3-debug xdelta3-64 xdelta3-everything \
 	  xdelta3-notools
 
 PYTHON = python
-PYTGT = build/temp.linux-i686-2.3/xdelta3.so
+PYTGT = build/lib.linux-i686-2.4/xdelta3.so
 
 PYFILES = xdelta3-regtest.py setup.py
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0i
+REL=0j
 RELDIR = xdelta3$(REL)
-
-XDELTA1 = ../xdelta11/xdelta
 
 all: xdelta3-debug xdelta3 $(PYTGT)
 
 all-targets: $(TARGETS)
+
+pytgt: $(PYTGT)
 
 tar:
 	tar --exclude ".svn" -czf /tmp/$(RELDIR)-tmp.tar.gz $(SOURCES) $(PYFILES) $(EXTRA)

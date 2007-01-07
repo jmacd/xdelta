@@ -42,13 +42,6 @@ MAX_TRIALS     = 1
 MIN_STDDEV_PCT = 1.5 # stop
 MAX_RUN        = 1000 * 1000 * 10
 
-XD3CMD = './xdelta3-64'
-#XD3CMD = './xdelta3'
-
-# kind:
-PYEXT = 1
-FORK  = 0
-
 #
 #
 RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS/prcs/b'
@@ -433,14 +426,11 @@ def RunCommandIO(args,infn,outfn):
         if not os.WIFEXITED(s[1]) or o != 0:
             raise CommandError(args, 'exited %d' % o)
 
-def RunXdelta3(args,kind=FORK):
-    if 0: # kind == FORK:
-        RunCommand([XD3CMD] + args)
-    else:
-        try:
-            xdelta3.main(args)
-        except Exception, e:
-            raise CommandError(args, "xdelta3.main exception")
+def RunXdelta3(args):
+    try:
+        xdelta3.main(args)
+    except Exception, e:
+        raise CommandError(args, "xdelta3.main exception")
 
 class GzipInfo:
     def __init__(self,target,delta):
@@ -449,13 +439,7 @@ class GzipInfo:
         
 class Xdelta3Info:
     def __init__(self,target,delta):
-        RunXdelta3(['printhdr',
-                    '-f',
-                    delta,
-                    HFILE])
-        o = open(HFILE, "r")
-        l = o.readline()
-        self.extcomp = 0
+        self.extcomp = 0  # @@@
         self.hdrsize = 0
         self.tgtsize = os.stat(target).st_size
         self.dsize   = os.stat(delta).st_size
@@ -463,19 +447,25 @@ class Xdelta3Info:
             self.ideal = 100.0 * self.dsize / self.tgtsize;
         else:
             self.ideal = 0.0
-        while l:
-            #print l.strip()
-            m = RE_HDRSZ.match(l)
-            if m:
-                self.hdrsize = int(m.group(1))
-            m = RE_EXTCOMP.match(l)
-            if m:
-                #print 'EXTCOMP', m.group(0)
-                self.extcomp = 1
-            l = o.readline()
-        if self.hdrsize == 0:
-            raise CommandError(cmd, 'no hdrsize')
-        o.close()
+#         RunXdelta3(['printhdr',
+#                     '-f',
+#                     delta,
+#                     HFILE])
+#         o = open(HFILE, "r")
+#         l = o.readline()
+#         while l:
+#             #print l.strip()
+#             m = RE_HDRSZ.match(l)
+#             if m:
+#                 self.hdrsize = int(m.group(1))
+#             m = RE_EXTCOMP.match(l)
+#             if m:
+#                 #print 'EXTCOMP', m.group(0)
+#                 self.extcomp = 1
+#             l = o.readline()
+#         if self.hdrsize == 0:
+#             raise CommandError(cmd, 'no hdrsize')
+#         o.close()
 
 class Xdelta3Pair:
     def __init__(self):
@@ -542,16 +532,15 @@ def Decimals(max):
     return l
 
 class Xdelta3Run1:
-    def __init__(self,file,kind,reps=0):
+    def __init__(self,file,reps=0):
         self.file = file
         self.reps = reps
         self.canrep = 1
-        self.kind   = kind
     def Run(self,trial,reps):
         if self.reps:
             assert(reps == 1)
             reps = self.reps
-        RunXdelta3(['-vvv', '-P', '%d' % reps, '-efq', self.file, DFILE],kind=self.kind)
+        RunXdelta3(['-P', '%d' % reps, '-efq', self.file, DFILE])
         if trial > 0:
             return None
         return Xdelta3Info(self.file,DFILE)
@@ -580,7 +569,7 @@ def ReportSpeed(L,tr,desc):
 def RunSpeed():
     for L in Decimals(MAX_RUN):
         SetFileSize(RUNFILE, L)
-        trx = TimeRun(Xdelta3Run1(RUNFILE,kind=PYEXT))
+        trx = TimeRun(Xdelta3Run1(RUNFILE))
         ReportSpeed(L,trx,'xdelta3')
         trg = TimeRun(GzipRun1(RUNFILE))
         ReportSpeed(L,trg,'gzip   ')
