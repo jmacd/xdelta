@@ -48,12 +48,6 @@
 #define XD3_DEFAULT_SRCWINSZ (1U << 23)
 #endif
 
-/* Default configured value of stream->memsize.  This dictates how much memory Xdelta will
- * use for string-matching data structures. */
-#ifndef XD3_DEFAULT_MEMSIZE
-#define XD3_DEFAULT_MEMSIZE (1U << 18)
-#endif
-
 /* When Xdelta requests a memory allocation for certain buffers, it rounds up to units of
  * at least this size.  The code assumes (and asserts) that this is a power-of-two. */
 #ifndef XD3_ALLOCSIZE
@@ -563,7 +557,6 @@ struct _xd3_sec_cfg
 /* This is the user-visible stream configuration. */
 struct _xd3_config
 {
-  usize_t             memsize;       /* How much memory Xdelta may allocate */
   usize_t             winsize;       /* The encoder window size. */
   usize_t             sprevsz;       /* How far back small string matching goes */
   usize_t             iopt_size;     /* entries in the instruction-optimizing buffer */
@@ -637,7 +630,6 @@ struct _xd3_stream
 
   /* encoder memory configuration */
   usize_t           winsize;          /* suggested window size */
-  usize_t           memsize;          /* memory size parameter */
   usize_t           sprevsz;          /* small string, previous window size (power of 2) */
   usize_t           sprevmask;        /* small string, previous window size mask */
   uint              iopt_size;

@@ -755,14 +755,6 @@ static void fgk_destroy (xd3_stream *stream,
 {
   if (h != NULL)
     {
-      IF_DEBUG1({
-	int i;
-	for (i = 0; i < ALPHABET_SIZE; i += 1)
-	  {
-	    XP(OF, "freq[%u] = %u\n", i, h->alphabet[i].weight);
-	  }
-      });
-      
       xd3_free (stream, h->alphabet);
       xd3_free (stream, h->coded_bits);
       xd3_free (stream, h->block_array);

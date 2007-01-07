@@ -256,7 +256,6 @@ static const char *option_source_filename    = NULL;
 
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
-static usize_t     option_memsize            = XD3_DEFAULT_MEMSIZE;
 
 /* This controls the number of times main repeats itself, only for profiling. */
 static int option_profile_cnt = 0;
@@ -338,7 +337,6 @@ main_config (void)
   P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
   P(RINT "XD3_DEFAULT_CKSUM_SIZE=%d\n", XD3_DEFAULT_CKSUM_ADVANCE);
   P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
-  P(RINT "XD3_DEFAULT_MEMSIZE=%d\n", XD3_DEFAULT_MEMSIZE);
   P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
   P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
   P(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
@@ -1916,7 +1914,6 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 
   if (option_verbose > 1) { XPR(NT "source window size: %u\n", option_srcwinsz); }
   if (option_verbose > 1) { XPR(NT "source block size: %u\n", source->blksize); }
-  if (option_verbose > 1) { XPR(NT "memory size: %u\n", option_memsize); }
 
   lru_size = (option_srcwinsz / source->blksize);
   lru_size = max(1, lru_size);
@@ -2304,7 +2301,6 @@ main_input (xd3_cmd     cmd,
 
   config.srcwin_maxsz = option_srcwinsz;
   config.winsize = option_winsize;
-  config.memsize = option_memsize;
   config.getblk = main_getblk_func;
   config.flags = stream_flags;
 
@@ -2838,11 +2834,6 @@ main (int argc, char **argv)
 	    goto exit;
 	  }
 	  break;
-	case 'M': if ((ret = main_atou (my_optarg, & option_memsize, XD3_ALLOCSIZE, 'M')))
-	  {
-	    goto exit;
-	  }
-	  break;
 	case 'D':
 #if EXTERNAL_COMPRESSION == 0
 	  if (! option_quiet)
@@ -3039,9 +3030,8 @@ main_help (void)
   P(RINT "   -V           show version\n");
 
   P(RINT "memory options:\n");
-  P(RINT "   -B blksize   source file block size\n");
-  P(RINT "   -M memsize   memory budget for hash tables\n");
-  P(RINT "   -W winsize   input window buffer size\n");
+  P(RINT "   -B bytes     source window size\n");
+  P(RINT "   -W bytes     input window size\n");
 
   P(RINT "compression options:\n");
   P(RINT "   -s source    source file to copy from (if any)\n");

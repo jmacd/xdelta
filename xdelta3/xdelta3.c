@@ -1178,7 +1178,6 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *cod
 
   /* Be exhaustive. */
   config.sprevsz = 1<<11;
-  config.memsize = CODE_TABLE_STRING_SIZE;
   config.srcwin_size = CODE_TABLE_STRING_SIZE;
   config.srcwin_maxsz = CODE_TABLE_STRING_SIZE;
 
@@ -1580,11 +1579,9 @@ xd3_size_log2 (usize_t slots)
 
 static void
 xd3_size_hashtable (xd3_stream    *stream,
-		    usize_t         space,
+		    usize_t        slots,
 		    xd3_hash_cfg  *cfg)
 {
-  usize_t slots = space / sizeof (usize_t);
-
   /* initialize ctable: the number of hash buckets is computed from the table of primes or
    * the nearest power-of-two, in both cases rounding down in favor of using less
    * memory. */
@@ -2436,7 +2433,6 @@ xd3_config_stream(xd3_stream *stream,
   /* Initial setup: no error checks yet */
   memset (stream, 0, sizeof (*stream));
 
-  stream->memsize   = config->memsize   ? config->memsize : XD3_DEFAULT_MEMSIZE;
   stream->winsize   = config->winsize   ? config->winsize : XD3_DEFAULT_WINSIZE;
   stream->sprevsz   = config->sprevsz   ? config->sprevsz : XD3_DEFAULT_SPREVSZ;
   stream->iopt_size = config->iopt_size ? config->iopt_size : XD3_DEFAULT_IOPT_SIZE;
@@ -3496,17 +3492,27 @@ xd3_encode_init (xd3_stream *stream)
   /* Memory allocations for checksum tables are delayed until xd3_string_match_init in the
    * first call to string_match--that way identical or short inputs require no table
    * allocation. */
+
+  // TODO: experiments have to be done!!!
   if (large_comp)
     {
-      xd3_size_hashtable (stream, stream->memsize, & stream->large_hash);
+      usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_look);
+
+      xd3_size_hashtable (stream,
+			  hash_values,
+			  & stream->large_hash);
+      IF_DEBUG1 (P(RINT "[encode_init] large hash %u slots\n", hash_values));
     }
 
   if (small_comp)
     {
-      /* Keep table small because small matches become less efficient after long. */
+      /* Hard-coded, keeps table small because small matches become inefficient. */
+      usize_t hash_values = min(stream->winsize / stream->smatcher.small_look, 65536U);
+
       xd3_size_hashtable (stream,
-			  min(stream->winsize, XD3_DEFAULT_MEMSIZE),
+			  hash_values,
 			  & stream->small_hash);
+      IF_DEBUG1 (P(RINT "[encode_init] small hash %u slots\n", hash_values));
     }
 
   for (i = 0; i < ENC_SECTS; i += 1)
