@@ -35,9 +35,9 @@ SKIP_TRIALS    = 1
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
 
-SKIP_TRIALS    = 0
-MIN_TRIALS     = 1
-MAX_TRIALS     = 1
+#SKIP_TRIALS    = 0
+#MIN_TRIALS     = 1
+#MAX_TRIALS     = 1
 
 MIN_STDDEV_PCT = 1.5 # stop
 MAX_RUN        = 1000 * 1000 * 10
@@ -499,6 +499,8 @@ def Test():
     print StatList([x.rcssize for x in rcsf.rcsfiles], "rcssize", 1).str
     print StatList([x.totrev for x in rcsf.rcsfiles], "totrev", 1).str
     pairs = rcsf.PairsByDate(Xdelta3Pair())
+
+    print pairs
 
 def Decimals(max):
     l = [0]
