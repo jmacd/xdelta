@@ -2178,6 +2178,7 @@ main_input (xd3_cmd     cmd,
   xoff_t     last_total_out = 0;
   long       start_time;
   xoff_t     input_size = 0;
+  int        stdout_only = 0;
 
   int (*input_func) (xd3_stream*);
   int (*output_func) (xd3_stream*, main_file *);
@@ -2202,6 +2203,7 @@ main_input (xd3_cmd     cmd,
       input_func    = xd3_decode_input;
       output_func   = main_print_func;
       stream_flags |= XD3_ADLER32_NOVER;
+      stdout_only   = 1;
       break;
 #endif
 #if XD3_ENCODER
@@ -2546,10 +2548,10 @@ done:
   /* If output file is not open yet because of delayed-open, it means we never encountered
    * a window in the delta, but it could have had a VCDIFF header?  TODO: solve this
    * elsewhere.  For now, it prints "nothing to output" below, but the check doesn't
-   * happen in case of option_no_output. */
+   * happen in case of option_no_output.  */
   if (! option_no_output)
     {
-      if (! main_file_isopen (ofile))
+      if (!stdout_only && ! main_file_isopen (ofile))
 	{
 	  XPR(NT "nothing to output: %s\n", ifile->filename);
 	  return EXIT_FAILURE;

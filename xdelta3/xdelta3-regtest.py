@@ -439,33 +439,14 @@ class GzipInfo:
         
 class Xdelta3Info:
     def __init__(self,target,delta):
-        self.extcomp = 0  # @@@
-        self.hdrsize = 0
+        self.extcomp = 0  # TODO: I removed some code that called printhdr
+        self.hdrsize = 0  # to compute these, but printhdr uses stdout (now)
         self.tgtsize = os.stat(target).st_size
         self.dsize   = os.stat(delta).st_size
         if self.tgtsize > 0:
             self.ideal = 100.0 * self.dsize / self.tgtsize;
         else:
             self.ideal = 0.0
-#         RunXdelta3(['printhdr',
-#                     '-f',
-#                     delta,
-#                     HFILE])
-#         o = open(HFILE, "r")
-#         l = o.readline()
-#         while l:
-#             #print l.strip()
-#             m = RE_HDRSZ.match(l)
-#             if m:
-#                 self.hdrsize = int(m.group(1))
-#             m = RE_EXTCOMP.match(l)
-#             if m:
-#                 #print 'EXTCOMP', m.group(0)
-#                 self.extcomp = 1
-#             l = o.readline()
-#         if self.hdrsize == 0:
-#             raise CommandError(cmd, 'no hdrsize')
-#         o.close()
 
 class Xdelta3Pair:
     def __init__(self):
