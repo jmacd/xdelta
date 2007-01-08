@@ -84,7 +84,7 @@ const char* xd3_mainerror(int err_num);
 #define PRINTHDR_SPECIAL -4378291
 
 /* The number of soft-config variables.  */
-#define XD3_SOFTCFG_VARCNT 1
+#define XD3_SOFTCFG_VARCNT 10
 
 /* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an error message
  * from the library. */
@@ -2278,7 +2278,8 @@ main_input (xd3_cmd     cmd,
 		  (got < XD3_SOFTCFG_VARCNT-1 && *e == 0) ||
 		  (got == XD3_SOFTCFG_VARCNT-1 && *e != 0))
 		{
-		  XPR(NT "invalid string match specifier (-C)\n");
+		  XPR(NT "invalid string match specifier (-C) %d: %s\n",
+		      got, s);
 		  return EXIT_FAILURE;
 		}
 	    }

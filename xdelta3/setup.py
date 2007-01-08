@@ -33,7 +33,7 @@ xdelta3_ext = Extension('xdelta3',
                                          ])
 
 # $Format: "REL='$Xdelta3Version$'" $
-REL='0j'
+REL='0k'
 
 setup(name='xdelta3',
       version=REL,

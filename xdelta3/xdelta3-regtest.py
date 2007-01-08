@@ -21,7 +21,7 @@
 # TODO: This is really part test, part performance evaluation suite, and
 # really incomplete.
 
-import os, sys, math, re, time, types, array
+import os, sys, math, re, time, types, array, random
 import xdelta3
 
 HIST_SIZE      = 10   # the number of buckets
@@ -31,7 +31,7 @@ TIME_TOO_SHORT = 0.050
 
 MIN_REPS       = 1
 MAX_REPS       = 1
-SKIP_TRIALS    = 1
+SKIP_TRIALS    = 2
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
 
@@ -216,6 +216,15 @@ class RcsFile:
         os.remove(self.Verf(self.totrev-1))
         os.remove(self.Verf(self.totrev-2))
         return ntrials
+
+    def AppendVersion(self, f, n):
+        self.Checkout(n)
+        rf = open(self.Verf(n), "r")
+        data = rf.read()
+        f.write(data)
+        rf.close()
+        return len(data)
+
 #
 # This class recursively scans a directory for rcsfiles
 class RcsFinder:
@@ -428,6 +437,7 @@ def RunCommandIO(args,infn,outfn):
 
 def RunXdelta3(args):
     try:
+        #print 'RUN', args
         xdelta3.main(args)
     except Exception, e:
         raise CommandError(args, "xdelta3.main exception")
@@ -453,6 +463,7 @@ class Xdelta3Pair:
         self.type        = 'xdelta3'
         self.decode_args = '-dqf'
         self.encode_args = '-eqf'
+        self.extra       = []
         self.presrc      = '-s'
         self.canrep      = 1
 
@@ -465,8 +476,9 @@ class Xdelta3Pair:
 
     def Run(self,trial,reps):
         RunXdelta3(['-P',
-                    '%d' % reps,
-                    self.encode_args,
+                    '%d' % reps] +
+                   self.extra + 
+                   [self.encode_args,
                     self.presrc,
                     self.old,
                     self.new,
@@ -498,7 +510,7 @@ def Test():
                                                                         len(rcsf.skipped))
     print StatList([x.rcssize for x in rcsf.rcsfiles], "rcssize", 1).str
     print StatList([x.totrev for x in rcsf.rcsfiles], "totrev", 1).str
-    pairs = rcsf.PairsByDate(Xdelta3Pair())
+    return rcsf
 
 def Decimals(max):
     l = [0]
@@ -547,6 +559,52 @@ def ReportSpeed(L,tr,desc):
     print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %ux%u trials' % \
           (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials, tr.reps)
 
+def BigFileRuns(rcsf):
+    rand = random.Random()
+    f1 = open(TMPDIR + "/big.1", "w")
+    f2 = open(TMPDIR + "/big.2", "w")
+    f1sz = 0
+    f2sz = 0
+    for file in rcsf.rcsfiles:
+        if file.versions < 2:
+            continue
+        r1 = 0
+        r2 = 0
+        while r1 == r2:
+            r1 = rand.randint(0, len(file.versions) - 1)
+            r2 = rand.randint(0, len(file.versions) - 1)
+        f1sz += file.AppendVersion(f1, r1)
+        f2sz += file.AppendVersion(f2, r2)
+
+    f1.close()
+    f2.close()
+
+    print "Test input sizes: %d %d" % (f1sz, f2sz)
+
+    while 1:
+
+        extras = [
+            ['-1'],
+            ['-C', '32,32,4,2,2,1,0,0,64,0'],
+            ['-9'],
+            ['-C', '64,64,4,128,16,0,1,8,128,0'],
+            ]
+
+        for extra in extras:
+            runner = Xdelta3Pair()
+            runner.extra = extra
+            result = TimeRun(runner.Runner(TMPDIR + "/big.1", 1,
+                                           TMPDIR + "/big.2", 2))
+
+            print 'testing %s dsize %d: time %.7f: in %u/%u trials' % \
+                  (extra,
+                   result.r1.dsize,
+                   result.time.mean,
+                   result.trials,
+                   result.reps)
+        # continue
+    # end
+
 def RunSpeed():
     for L in Decimals(MAX_RUN):
         SetFileSize(RUNFILE, L)
@@ -558,9 +616,11 @@ def RunSpeed():
 if __name__ == "__main__":
     try:
         os.mkdir(TMPDIR)
-        Test()
-        RunSpeed()
+        rcsf = Test()
+        #rcsf.PairsByDate(Xdelta3Pair())
+        #RunSpeed()
+        BigFileRuns(rcsf)
     except CommandError:
         pass
-    else:
-        RunCommand(['rm', '-rf', TMPDIR])
+
+    RunCommand(['rm', '-rf', TMPDIR])
