@@ -500,8 +500,6 @@ def Test():
     print StatList([x.totrev for x in rcsf.rcsfiles], "totrev", 1).str
     pairs = rcsf.PairsByDate(Xdelta3Pair())
 
-    print pairs
-
 def Decimals(max):
     l = [0]
     step = 1

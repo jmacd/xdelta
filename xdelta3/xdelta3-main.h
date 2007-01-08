@@ -256,6 +256,7 @@ static const char *option_source_filename    = NULL;
 
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
+static int         option_srcwinsz_set       = 0;
 
 /* This controls the number of times main repeats itself, only for profiling. */
 static int option_profile_cnt = 0;
@@ -268,7 +269,7 @@ static int         option_recompress_outputs = 1;
 #endif
 
 /* This is for comparing "printdelta" output without attention to
- * copy-instruction modes, useful for reverse engineering. */
+ * copy-instruction modes. */
 #if VCDIFF_TOOLS
 static int         option_print_cpymode = 1;
 #endif
@@ -1879,11 +1880,13 @@ main_open_output (xd3_stream *stream, main_file *ofile)
 }
 
 /* This is called at different times for encoding and decoding.  The encoder calls it
- * immediately, the decoder delays until the application header is received. */
+ * immediately, the decoder delays until the application header is received.
+ * Stream may be NULL, in which case xd3_set_source is not called. */
 static int
 main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *source)
 {
-  int ret, i;
+  int ret = 0, i;
+  uint8_t *tmp_buf = NULL;
 
   /* Open it, check for seekability, set required xd3_source fields. */
   if (allow_fake_source)
@@ -1896,7 +1899,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   else if ((ret = main_file_open (sfile, sfile->filename, XO_READ)) ||
 	   (ret = main_file_stat (sfile, & source->size, 1)))
     {
-      return ret;
+      goto error;
     }
 
   source->name     = sfile->filename;
@@ -1904,50 +1907,19 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   source->curblkno = (xoff_t) -1;
   source->curblk   = NULL;
 
-  /* Source block LRU init. */
-  main_blklru_list_init (& lru_list);
-  main_blklru_list_init (& lru_free);
-
-  // Note: to avoid unnecessary allocs for small files: problem
-  // was with --decompress_inputs, we don't know the true size
-  // option_srcwinsz = min(source->size, (xoff_t) option_srcwinsz);
-
-  if (option_verbose > 1) { XPR(NT "source window size: %u\n", option_srcwinsz); }
-  if (option_verbose > 1) { XPR(NT "source block size: %u\n", source->blksize); }
-
-  lru_size = (option_srcwinsz / source->blksize);
-  lru_size = max(1, lru_size);
-
-  if ((lru = main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
-    {
-      return ENOMEM;
-    }
-
-  for (i = 0; i < lru_size; i += 1)
-    {
-      lru[i].blkno = (xoff_t) -1;
-
-      if ((lru[i].blk = main_malloc (source->blksize)) == NULL)
-	{
-	  return ENOMEM;
-	}
-
-      main_blklru_list_push_back (& lru_free, & lru[i]);
-    }
-
 #if EXTERNAL_COMPRESSION
   if (option_decompress_inputs)
     {
+      /* If encoding, read the header to check for decompression. */
       if (IS_ENCODE (cmd))
 	{
 	  usize_t nread;
+	  tmp_buf = main_malloc(XD3_ALLOCSIZE);
 
-	  source->curblk = lru[0].blk;
-
-	  /* If encoding, read the first block now to check for decompression. */
-	  if ((ret = main_file_read (sfile, (uint8_t*) source->curblk, source->blksize, & nread, "source read failed")))
+	  if ((ret = main_file_read (sfile, tmp_buf, XD3_ALLOCSIZE,
+				     & nread, "source read failed")))
 	    {
-	      return ret;
+	      goto error;
 	    }
 
 	  /* Check known magic numbers. */
@@ -1955,23 +1927,16 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 	    {
 	      const main_extcomp *decomp = & extcomp_types[i];
 
-	      if ((nread > decomp->magic_size) && memcmp (source->curblk, decomp->magic, decomp->magic_size) == 0)
+	      if ((nread > decomp->magic_size) &&
+		  memcmp (tmp_buf, decomp->magic, decomp->magic_size) == 0)
 		{
 		  sfile->compressor = decomp;
 		  break;
 		}
 	    }
 
-	  /* If no decompression, the current buffer is now a valid source->curblock. */
 	  if (sfile->compressor == NULL)
 	    {
-	      main_blklru_list_remove (& lru[0]);
-	      main_blklru_list_push_back (& lru_list, & lru[0]);
-
-	      lru[0].blkno     = 0;
-	      source->curblkno = 0;
-	      source->onblk    = nread;
-
 	      if (option_verbose > 2)
 		{
 		  XPR(NT "source block 0 read (not compressed)\n");
@@ -1988,12 +1953,13 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 	    {
 	      XPR(NT "source file too large for external decompression: %s: %"Q"u\n",
 		       sfile->filename, osize);
-	      return XD3_INTERNAL;
+	      ret = XD3_INTERNAL;
+	      goto error;
 	    }
 
 	  if ((ret = main_decompress_source (sfile, source)))
 	    {
-	      return ret;
+	      goto error;
 	    }
 
 	  if (! option_quiet)
@@ -2012,15 +1978,72 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
     }
 #endif
 
-  if (option_verbose > 1) { XPR(NT "source file: %s: %"Q"u bytes\n", sfile->realname, source->size); }
-
-  if ((ret = xd3_set_source (stream, source)))
+  /* At this point we know source->size.
+   * Source buffer, blksize, LRU init. */
+  if (source->size < option_srcwinsz)
     {
-      XPR(NT XD3_LIB_ERRMSG (stream, ret));
-      return EXIT_FAILURE;
+      /* Reduce sizes to actual source size, read whole file */
+      option_srcwinsz = source->size;
+      source->blksize = source->size;
+      lru_size = 1;
+    }
+  else
+    {
+      /* Minimum size check */
+      option_srcwinsz = max(option_srcwinsz, XD3_ALLOCSIZE);
+
+      if (!option_srcwinsz_set)
+	{
+	  /* If the flag was not set, scale srcwinsz up to 64MB. */
+	  option_srcwinsz = min(1ULL<<26, source->size);
+	}
+
+      source->blksize = (option_srcwinsz / 32) & ~(XD3_ALLOCSIZE - 1);;
+      lru_size = 32;
     }
 
-  return 0;
+  main_blklru_list_init (& lru_list);
+  main_blklru_list_init (& lru_free);
+
+  if ((lru = main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
+    {
+      ret = ENOMEM;
+      goto error;
+    }
+
+  for (i = 0; i < lru_size; i += 1)
+    {
+      lru[i].blkno = (xoff_t) -1;
+
+      if ((lru[i].blk = main_malloc (source->blksize)) == NULL)
+	{
+	  ret = ENOMEM;
+	  goto error;
+	}
+
+      main_blklru_list_push_back (& lru_free, & lru[i]);
+    }
+
+  if (option_verbose > 1)
+    {
+      XPR(NT "source window size: %u\n", option_srcwinsz);
+      XPR(NT "source block size: %u\n", source->blksize);
+      XPR(NT "source file: %s: %"Q"u bytes\n", sfile->realname, source->size);
+    }
+
+  if (stream && (ret = xd3_set_source (stream, source)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (stream, ret));
+      goto error;
+    }
+
+ error:
+  if (tmp_buf != NULL)
+    {
+      main_free (tmp_buf);
+    }
+
+  return ret;
 }
 
 /******************************************************************************************
@@ -2174,7 +2197,6 @@ main_input (xd3_cmd     cmd,
   xoff_t     last_total_in = 0;
   xoff_t     last_total_out = 0;
   long       start_time;
-  xoff_t     input_size = 0;
   int        stdout_only = 0;
 
   int (*input_func) (xd3_stream*);
@@ -2188,6 +2210,9 @@ main_input (xd3_cmd     cmd,
   config.sec_data.ngroups = 1;
   config.sec_addr.ngroups = 1;
   config.sec_inst.ngroups = 1;
+
+  /* TODO: eliminate static variables. */
+  do_not_lru = 0;
 
   /* main_input setup. */
   switch ((int) cmd)
@@ -2205,6 +2230,7 @@ main_input (xd3_cmd     cmd,
 #endif
 #if XD3_ENCODER
     case CMD_ENCODE:
+      do_not_lru  = 1;
       input_func  = xd3_encode_input;
       output_func = main_write_output;
 
@@ -2286,24 +2312,6 @@ main_input (xd3_cmd     cmd,
 
   start_time = get_millisecs_now ();
 
-  if (main_file_stat (ifile, & input_size, 0) == 0)
-    {
-      // Note: to avoid unnecessary allocs for small files: problem
-      // was with --decompress_inputs, we don't know the true size
-      // option_winsize = min (input_size, (xoff_t) option_winsize);
-    }
-
-  option_srcwinsz = max(option_srcwinsz, XD3_ALLOCSIZE);
-  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
-
-  source.blksize = (option_srcwinsz / 32) & ~(XD3_ALLOCSIZE-1);
-  source.blksize = max(XD3_DEFAULT_WINSIZE, source.blksize);
-
-  config.srcwin_maxsz = option_srcwinsz;
-  config.winsize = option_winsize;
-  config.getblk = main_getblk_func;
-  config.flags = stream_flags;
-
   if (option_verbose > 1)
     {
       XPR(NT "input buffer size: %u\n", option_winsize);
@@ -2314,20 +2322,34 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 
+  if (IS_ENCODE (cmd))
+    {
+      /* When encoding, open the source file, possibly decompress it.  The decoder delays
+       * this step until XD3_GOTHEADER. */
+      if (sfile->filename != NULL && (ret = main_set_source (NULL, cmd, sfile, & source)))
+	{
+	  return EXIT_FAILURE;
+	}
+    }
+
+  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
+
+  config.winsize = option_winsize;
+  config.srcwin_maxsz = option_srcwinsz;
+  config.getblk = main_getblk_func;
+  config.flags = stream_flags;
+
   if ((ret = xd3_config_stream (& stream, & config)))
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
       return EXIT_FAILURE;
     }
 
-  if (IS_ENCODE (cmd))
+  if (IS_ENCODE (cmd) && sfile->filename != NULL &&
+      (ret = xd3_set_source (& stream, & source)))
     {
-      /* When encoding, open the source file, possibly decompress it.  The decoder delays
-       * this step until XD3_GOTHEADER. */
-      if (sfile->filename != NULL && (ret = main_set_source (& stream, cmd, sfile, & source)))
-	{
-	  return EXIT_FAILURE;
-	}
+      XPR(NT XD3_LIB_ERRMSG (& stream, ret));
+      return EXIT_FAILURE;
     }
 
   /* This times each window. */
@@ -2341,9 +2363,8 @@ main_input (xd3_cmd     cmd,
       usize_t try_read;
 
       input_offset = ifile->nread;
-      /*XD3_ASSERT (input_offset <= option_last_offset);*/
 
-      input_remain = /*option_last_offset*/ XOFF_T_MAX - input_offset;
+      input_remain = XOFF_T_MAX - input_offset;
 
       try_read = (usize_t) min ((xoff_t) config.winsize, input_remain);
 
@@ -2376,7 +2397,6 @@ main_input (xd3_cmd     cmd,
 
     again:
       ret = input_func (& stream);
-      /*if (option_verbose > 1) { XPR(NT XD3_LIB_ERRMSG (& stream, ret)); }*/
 
       switch (ret)
 	{
@@ -2436,22 +2456,14 @@ main_input (xd3_cmd     cmd,
 	/* FALLTHROUGH */
 	case XD3_WINSTART:
 	  {
-	    /* Set or unset XD3_SKIP_WINDOW. */
-	    /*if (stream.current_window < option_first_window ||
-	          stream.current_window > option_last_window)
-	      { stream_flags |= XD3_SKIP_WINDOW; }
-	    else
-  	      { stream_flags &= ~XD3_SKIP_WINDOW; }*/
-
-	    xd3_set_flags (& stream, stream_flags);
+	    /* e.g., set or unset XD3_SKIP_WINDOW. */
+	    /* xd3_set_flags (& stream, stream_flags); */
 	    goto again;
 	  }
 
 	case XD3_OUTPUT:
 	  {
-	    if (option_no_output == 0/* &&
-		stream.current_window >= option_first_window &&
-		stream.current_window <= option_last_window*/)
+	    if (option_no_output == 0)
 	      {
 		/* Defer opening the output file until the stream produces its first
 		 * output for both encoder and decoder, this way we delay long enough for
@@ -2664,7 +2676,7 @@ main (int argc, char **argv)
    * main() and thus care about freeing all memory.  I never had much trust for getopt
    * anyway, it's too opaque.  This implements a fairly standard non-long-option getopt
    * with support for named operations (e.g., "xdelta3 [encode|decode|printhdr...] < in >
-   * out").  I'll probably add long options at some point. */
+   * out"). */
   if (my_optstr)
     {
       if (*my_optstr == '-')    { my_optstr += 1; }
@@ -2824,10 +2836,12 @@ main (int argc, char **argv)
 	          else { option_use_secondary = 1; option_secondary = my_optarg; } break;
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
 	          else { option_appheader = (uint8_t*) my_optarg; } break;
-	case 'B': if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_ALLOCSIZE, 'B')))
-	  {
-	    goto exit;
-	  }
+	case 'B':
+	  option_srcwinsz_set = 1;
+	  if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_ALLOCSIZE, 'B')))
+	    {
+	      goto exit;
+	    }
 	  break;
 	case 'W': if ((ret = main_atou (my_optarg, & option_winsize, XD3_ALLOCSIZE, 'W')))
 	  {
@@ -2947,10 +2961,6 @@ main (int argc, char **argv)
     case CMD_PRINTDELTA:
 #if XD3_ENCODER
     case CMD_ENCODE:
-      if (cmd == CMD_ENCODE)
-	{
-	  do_not_lru = 1;
-	}
 #endif
     case CMD_DECODE:
       ret = main_input (cmd, & ifile, & ofile, & sfile);
