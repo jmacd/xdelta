@@ -560,50 +560,89 @@ def ReportSpeed(L,tr,desc):
           (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials, tr.reps)
 
 def BigFileRuns(rcsf):
-    rand = random.Random()
-    f1 = open(TMPDIR + "/big.1", "w")
-    f2 = open(TMPDIR + "/big.2", "w")
-    f1sz = 0
-    f2sz = 0
-    for file in rcsf.rcsfiles:
-        if file.versions < 2:
-            continue
-        r1 = 0
-        r2 = 0
-        while r1 == r2:
-            r1 = rand.randint(0, len(file.versions) - 1)
-            r2 = rand.randint(0, len(file.versions) - 1)
-        f1sz += file.AppendVersion(f1, r1)
-        f2sz += file.AppendVersion(f2, r2)
-
-    f1.close()
-    f2.close()
-
-    print "Test input sizes: %d %d" % (f1sz, f2sz)
-
     while 1:
 
-        extras = [
-            ['-1'],
-            ['-C', '32,32,4,2,2,1,0,0,64,0'],
-            ['-9'],
-            ['-C', '64,64,4,128,16,0,1,8,128,0'],
-            ]
+        rand = random.Random()
+        f1 = open(TMPDIR + "/big.1", "w")
+        f2 = open(TMPDIR + "/big.2", "w")
+        f1sz = 0
+        f2sz = 0
+        for file in rcsf.rcsfiles:
+            if file.versions < 2:
+                continue
+            r1 = 0
+            r2 = 0
+            while r1 == r2:
+                r1 = rand.randint(0, len(file.versions) - 1)
+                r2 = rand.randint(0, len(file.versions) - 1)
+            f1sz += file.AppendVersion(f1, r1)
+            f2sz += file.AppendVersion(f2, r2)
 
-        for extra in extras:
-            runner = Xdelta3Pair()
-            runner.extra = extra
-            result = TimeRun(runner.Runner(TMPDIR + "/big.1", 1,
-                                           TMPDIR + "/big.2", 2))
+        f1.close()
+        f2.close()
 
-            print 'testing %s dsize %d: time %.7f: in %u/%u trials' % \
-                  (extra,
-                   result.r1.dsize,
-                   result.time.mean,
-                   result.trials,
-                   result.reps)
-        # continue
-    # end
+        print "Test input sizes: %d %d" % (f1sz, f2sz)
+
+        BigFileRun(TMPDIR + "/big.1",
+                   TMPDIR + "/big.2")
+        #continue
+    #end
+
+def BigFileRun(f1, f2):
+                   
+    testcases = [
+        # large_look large_step small_look small_chain small_lchain
+        # ssmatch try_lazy max_lazy long_enough promote
+        ['-DC', '16,32,4,2,2,1,0,0,64,0'],
+        ['-DC', '24,32,4,2,2,1,0,0,64,0'],
+        ['-DC', '32,32,4,2,2,1,0,0,64,0'],
+    ]
+
+    for test in testcases:
+        runner = Xdelta3Pair()
+        runner.extra = ['-DC', test]
+        result = TimeRun(runner.Runner(f1, 1, f2, 2))
+
+        print 'test %s dsize %d: time %.7f: in %u/%u trials' % \
+              (test,
+               result.r1.dsize,
+               result.time.mean,
+               result.trials,
+               result.reps)
+    #end
+    return 1
+
+def RandomBigRun(f1, f2):
+
+    input_ranges = [
+        (8, 32, 4),
+        (8, 64, 8),
+        (4, 6, 1),
+        (1, 8, 1),
+        (1, 4, 1),
+        (0, 1, 1),
+        (0, 1, 1),
+        (8, 128, 32),
+        (8, 128, 32),
+        (0, 1, 1),
+    ]
+
+    config = []
+    rand = random.Random()
+
+    for input in input_ranges:
+        config.append(str(rand.randrange(input[0], input[1] + 1, input[2])))
+
+    runner = Xdelta3Pair()
+    runner.extra = ['-DC', ','.join(config)]
+    result = TimeRun(runner.Runner(f1, 1, f2, 2))
+
+    print 'test %s dsize %d: time %.7f: in %u/%u trials' % \
+          (','.join(config),
+           result.r1.dsize,
+           result.time.mean,
+           result.trials,
+           result.reps)
 
 def RunSpeed():
     for L in Decimals(MAX_RUN):
@@ -616,11 +655,15 @@ def RunSpeed():
 if __name__ == "__main__":
     try:
         os.mkdir(TMPDIR)
-        rcsf = Test()
+        #rcsf = Test()
         #rcsf.PairsByDate(Xdelta3Pair())
         #RunSpeed()
-        BigFileRuns(rcsf)
+        #BigFileRuns(rcsf)
+        #BigFileRun("/tmp/big.1", "/tmp/big.2")
+        while 1:
+            RandomBigRun("/tmp/big.1", "/tmp/big.2")
     except CommandError:
         pass
-
-    RunCommand(['rm', '-rf', TMPDIR])
+    else:
+        #RunCommand(['rm', '-rf', TMPDIR])
+        pass

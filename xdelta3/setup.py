@@ -21,16 +21,19 @@ from distutils.core import setup, Extension
 xdelta3_ext = Extension('xdelta3',
                         ['xdelta3.c'],
                         define_macros = [
-                                         ('EXTCOMP',1),
                                          ('REGRESSION_TEST',1),
                                          ('SECONDARY_DJW',1),
                                          ('SECONDARY_FGK',1),
                                          ('VCDIFF_TOOLS',1),
                                          ('XD3_DEBUG',1),
                                          ('XD3_POSIX',1),
+                                         ('EXTERNAL_COMPRESSION',1),
                                          ('XD3_USE_LARGEFILE64',1),
                                          ('PYTHON_MODULE',1),
-                                         ])
+                                         ],
+                        extra_compile_args = [ '-O3',
+                                               '-funroll-loops',
+                                               ])
 
 # $Format: "REL='$Xdelta3Version$'" $
 REL='0k'

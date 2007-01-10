@@ -242,7 +242,7 @@ static int         option_stdout             = 0;
 static int         option_force              = 0;
 static int         option_verbose            = 0;
 static int         option_quiet              = 0;
-static int         option_level              = 6;
+static int         option_level              = 5;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
 static int         option_use_secondary      = /* until-standardized, leave this off */ 0;
@@ -350,6 +350,51 @@ main_config (void)
   P(RINT "XD3_WIN32=%d\n", XD3_WIN32);
 
   return EXIT_SUCCESS;
+}
+
+static void
+reset_defaults()
+{
+  option_stdout = 0;
+  option_force = 0;
+  option_verbose = 0;
+  option_quiet = 0;
+  option_level = 5;
+  option_use_appheader = 1;
+  option_appheader = NULL;
+  option_use_secondary = 0;
+  option_secondary = NULL;
+  option_use_checksum = 1;
+  option_use_altcodetable = 0;
+  option_smatch_config = NULL;
+  option_no_compress = 0;
+  option_no_output = 0;
+  option_source_filename = NULL;
+  option_winsize = XD3_DEFAULT_WINSIZE;
+  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
+  option_srcwinsz_set = 0;
+  option_profile_cnt = 0;
+#if EXTERNAL_COMPRESSION
+  option_decompress_inputs  = 1;
+  option_recompress_outputs = 1;
+#endif
+#if VCDIFF_TOOLS
+  option_print_cpymode = 1;
+#endif
+  program_name = NULL;
+  appheader_used = NULL;
+  main_bdata = NULL;
+  lru_size = 0;
+  lru = NULL;
+  do_not_lru = 0;
+  lru_hits   = 0;
+  lru_misses = 0;
+  lru_filled = 0;
+  allow_fake_source = 0;
+  option_winsize = XD3_DEFAULT_WINSIZE;
+  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
+  option_srcwinsz_set = 0;
+  option_smatch_config = NULL;
 }
 
 static void*
@@ -2295,8 +2340,8 @@ main_input (xd3_cmd     cmd,
 	  config.smatcher_soft.long_enough   = values[8];
 	  config.smatcher_soft.promote       = values[9];
 	}
-      else if (option_level < 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
-      else                       { config.smatch_cfg = XD3_SMATCH_SLOW; }
+      else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
+      else                        { config.smatch_cfg = XD3_SMATCH_SLOW; }
       break;
 #endif
     case CMD_DECODE:
@@ -2351,6 +2396,11 @@ main_input (xd3_cmd     cmd,
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
       return EXIT_FAILURE;
+    }
+
+  if (option_verbose > 1)
+    {
+      XPR(NT "scanner configuration: %s\n", stream.smatcher.name); 
     }
 
   /* This times each window. */
@@ -2660,6 +2710,8 @@ main (int argc, char **argv)
   main_file_init (& ifile);
   main_file_init (& ofile);
   main_file_init (& sfile);
+
+  reset_defaults();
 
  go:  /* Go. */
   cmd = CMD_NONE;
