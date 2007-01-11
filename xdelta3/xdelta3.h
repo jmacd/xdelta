@@ -285,6 +285,7 @@ typedef enum {
   XD3_WINFINISH  = -17708, /* notification: returned after encode/decode & output for a window */
   XD3_TOOFARBACK = -17709, /* (encoder only) may be returned by getblk() if the block is too old */
   XD3_INTERNAL   = -17710, /* internal error */
+  XD3_INVALID    = -17711, /* invalid config */
 
 } xd3_rvalues;
 

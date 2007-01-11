@@ -593,14 +593,15 @@ def BigFileRun(f1, f2):
     testcases = [
         # large_look large_step small_look small_chain small_lchain
         # ssmatch try_lazy max_lazy long_enough promote
-        ['-DC', '16,32,4,2,2,1,0,0,64,0'],
-        ['-DC', '24,32,4,2,2,1,0,0,64,0'],
-        ['-DC', '32,32,4,2,2,1,0,0,64,0'],
+        ['-DC', '9,7,4,8,1,1,1,16,114,0'],
+        ['-DC', '9,6,4,8,1,1,1,16,114,0'],
+        ['-DC', '9,5,4,8,1,1,1,16,114,0'],
+        ['-DC', '9,4,4,8,1,1,1,16,114,0'],
     ]
 
     for test in testcases:
         runner = Xdelta3Pair()
-        runner.extra = ['-DC', test]
+        runner.extra = test
         result = TimeRun(runner.Runner(f1, 1, f2, 2))
 
         print 'test %s dsize %d: time %.7f: in %u/%u trials' % \
@@ -615,34 +616,45 @@ def BigFileRun(f1, f2):
 def RandomBigRun(f1, f2):
 
     input_ranges = [
-        (8, 32, 4),
-        (8, 64, 8),
-        (4, 6, 1),
-        (1, 8, 1),
-        (1, 4, 1),
-        (0, 1, 1),
-        (0, 1, 1),
-        (8, 128, 32),
-        (8, 128, 32),
-        (0, 1, 1),
+        (7, 13, 'large_look'),
+        (1, 50, 'large_step'),
+        (4, 6, 'small_look'),
+        (1, 10, 'small_chain'),
+        (1, 5, 'small_lchain'),
+        (0, 0, 'ssmatch'),
+        (0, 1, 'trylazy'),
+        (1, 32, 'max_lazy'),
+        (1, 64, 'long_enough'),
+        (0, 1, 'promote'),
     ]
 
     config = []
     rand = random.Random()
+    map = {}
 
     for input in input_ranges:
-        config.append(str(rand.randrange(input[0], input[1] + 1, input[2])))
+        x = rand.randrange(input[0], input[1] + 1)
+        config.append(x)
+        map[input[2]] = x
+    #end
+
+    if map['small_chain'] < map['small_lchain']:
+        return
+
+    if map['large_look'] < map['small_look']:
+        return
+    
+    strs = [str(x) for x in config]
 
     runner = Xdelta3Pair()
-    runner.extra = ['-DC', ','.join(config)]
+    runner.extra = ['-DC', ','.join(strs)]
     result = TimeRun(runner.Runner(f1, 1, f2, 2))
 
-    print 'test %s dsize %d: time %.7f: in %u/%u trials' % \
-          (','.join(config),
+    print 'config %s dsize %d time %.7f in %u trials' % \
+          (' '.join(strs),
            result.r1.dsize,
            result.time.mean,
-           result.trials,
-           result.reps)
+           result.trials)
 
 def RunSpeed():
     for L in Decimals(MAX_RUN):
@@ -661,7 +673,12 @@ if __name__ == "__main__":
         #BigFileRuns(rcsf)
         #BigFileRun("/tmp/big.1", "/tmp/big.2")
         while 1:
-            RandomBigRun("/tmp/big.1", "/tmp/big.2")
+            try:
+                RandomBigRun("/tmp/big.1", "/tmp/big.2")
+            except CommandError, e:
+                pass
+            #end
+        #end
     except CommandError:
         pass
     else:

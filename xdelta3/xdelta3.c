@@ -2533,7 +2533,7 @@ xd3_config_stream(xd3_stream *stream,
 	    (smatcher->small_lchain == 0 && smatcher->try_lazy))
 	  {
 	    stream->msg = "invalid soft string-match config";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID;
 	  }
 	break;
       })
