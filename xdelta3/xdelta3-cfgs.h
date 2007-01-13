@@ -58,17 +58,15 @@
  ******************************************************************************************/
 #if XD3_BUILD_FAST
 #define TEMPLATE      fast
-#define LLOOK         32
-#define LSTEP         32
-#define SLOOK         4
-
-#define SCHAIN        2 // For testcase/3, this produces miserable performance
-#define SLCHAIN       2 // with these values != 1 and large input window size
-
-#define SSMATCH       1
+#define LLOOK         9
+#define LSTEP         28
+#define SLOOK         5
+#define SCHAIN        1
+#define SLCHAIN       1
+#define SSMATCH       0
 #define TRYLAZY       0
-#define MAXLAZY       0
-#define LONGENOUGH    64
+#define MAXLAZY       23
+#define LONGENOUGH    36
 #define PROMOTE       0
 
 #include "xdelta3.c"
@@ -91,16 +89,16 @@
  ******************************************************************************************/
 #if XD3_BUILD_SLOW
 #define TEMPLATE      slow
-#define LLOOK         64
-#define LSTEP         64 // TODO
+#define LLOOK         8
+#define LSTEP         3
 #define SLOOK         4
-#define SCHAIN        128
-#define SLCHAIN       16
+#define SCHAIN        7
+#define SLCHAIN       3
 #define SSMATCH       0
 #define TRYLAZY       1
-#define MAXLAZY       8
-#define LONGENOUGH    128
-#define PROMOTE       0
+#define MAXLAZY       32
+#define LONGENOUGH    15
+#define PROMOTE       1
 
 #include "xdelta3.c"
 

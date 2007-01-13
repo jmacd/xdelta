@@ -318,7 +318,7 @@ static int
 main_version (void)
 {
   /* $Format: "  P(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
-  P(RINT "VERSION=3.0j\n");
+  P(RINT "VERSION=3.0k\n");
   return EXIT_SUCCESS;
 }
 
