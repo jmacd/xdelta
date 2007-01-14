@@ -234,6 +234,9 @@ struct _main_blklru
   main_blklru_list  link;
 };
 
+#define LRU_SIZE 32U
+#define XD3_MINSRCWINSZ XD3_ALLOCSIZE
+
 /* ... represented as a list (no cache index). */
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
@@ -402,7 +405,7 @@ main_malloc1 (usize_t size)
 {
   void* r = malloc (size);
   if (r == NULL) { XPR(NT "malloc: %s\n", xd3_mainerror (ENOMEM)); }
-  else if (option_verbose > 2) { XPR(NT "malloc: %u: %p\n", size, r); }
+  else if (option_verbose > 3) { XPR(NT "malloc: %u: %p\n", size, r); }
   return r;
 }
 
@@ -425,7 +428,7 @@ main_alloc (void   *opaque,
 static void
 main_free1 (void *opaque, void *ptr)
 {
-  if (option_verbose > 2) { XPR(NT "free: %p\n", ptr); }
+  if (option_verbose > 3) { XPR(NT "free: %p\n", ptr); }
   free (ptr);
 }
 
@@ -589,16 +592,25 @@ main_strtoxoff (const char* s, xoff_t *xo, char which)
 }
 
 static int
-main_atou (const char* arg, usize_t *xo, usize_t low, char which)
+main_atou (const char* arg, usize_t *xo, usize_t low, usize_t high, char which)
 {
   xoff_t x;
   int ret;
 
   if ((ret = main_strtoxoff (arg, & x, which))) { return ret; }
 
-  if (x > USIZE_T_MAX || x < low)
+  if (x < low)
     {
-      XPR(NT "-%c: minimum value: %u", which, low);
+      XPR(NT "-%c: minimum value: %u\n", which, low);
+      return EXIT_FAILURE;
+    }
+  if (high == 0)
+    {
+      high = USIZE_T_MAX;
+    }
+  if (x > high)
+    {
+      XPR(NT "-%c: maximum value: %u\n", which, high);
       return EXIT_FAILURE;
     }
   (*xo) = (usize_t)x;
@@ -863,7 +875,7 @@ main_file_read (main_file   *ifile,
     }
   else
     {
-      if (option_verbose > 2) { XPR(NT "main read: %s: %u\n", ifile->filename, (*nread)); }
+      if (option_verbose > 3) { XPR(NT "main read: %s: %u\n", ifile->filename, (*nread)); }
       ifile->nread += (*nread);
     }
 
@@ -903,7 +915,7 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
     }
   else
     {
-      if (option_verbose > 2) { XPR(NT "main write: %s: %u\n", ofile->filename, size); }
+      if (option_verbose > 3) { XPR(NT "main write: %s: %u\n", ofile->filename, size); }
       ofile->nwrite += size;
     }
 
@@ -2035,16 +2047,16 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   else
     {
       /* Minimum size check */
-      option_srcwinsz = max(option_srcwinsz, XD3_ALLOCSIZE);
+      option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
 
       if (!option_srcwinsz_set)
 	{
 	  /* If the flag was not set, scale srcwinsz up to 64MB. */
-	  option_srcwinsz = min(1ULL<<26, source->size);
+	  option_srcwinsz = min((xoff_t) XD3_DEFAULT_SRCWINSZ, source->size);
 	}
 
-      source->blksize = (option_srcwinsz / 32) & ~(XD3_ALLOCSIZE - 1);;
-      lru_size = 32;
+      source->blksize = (option_srcwinsz / LRU_SIZE);
+      lru_size = LRU_SIZE;
     }
 
   main_blklru_list_init (& lru_list);
@@ -2398,11 +2410,6 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 
-  if (option_verbose > 1)
-    {
-      XPR(NT "scanner configuration: %s\n", stream.smatcher.name); 
-    }
-
   /* This times each window. */
   get_millisecs_since ();
 
@@ -2635,6 +2642,24 @@ done:
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
       return EXIT_FAILURE;
+    }
+
+  if (option_verbose > 1)
+    {
+      XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
+      XPR(NT "target hash table size: %u\n", stream.small_hash.size);
+      if (sfile->filename != NULL)
+	{
+	  XPR(NT "source hash table size: %u\n", stream.large_hash.size);
+	}
+    }
+
+  if (option_verbose > 2)
+    {
+      XPR(NT "source copies: %"Q"u (%"Q"u bytes)\n", stream.n_scpy, stream.l_scpy);
+      XPR(NT "target copies: %"Q"u (%"Q"u bytes)\n", stream.n_tcpy, stream.l_tcpy);
+      XPR(NT "adds: %"Q"u (%"Q"u bytes)\n", stream.n_add, stream.l_add);
+      XPR(NT "runs: %"Q"u (%"Q"u bytes)\n", stream.n_run, stream.l_run);
     }
 
   xd3_free_stream (& stream);
@@ -2870,7 +2895,10 @@ main (int argc, char **argv)
 	  /* only set profile count once, since... */
 	  if (option_profile_cnt == 0)
 	    {
-	      if ((ret = main_atou(my_optarg, (usize_t*) & option_profile_cnt, 0, 'P'))) { goto exit; }
+	      if ((ret = main_atou(my_optarg, (usize_t*) & option_profile_cnt, 0, 0, 'P')))
+		{
+		  goto exit;
+		}
 
 	      if (option_profile_cnt <= 0)
 		{
@@ -2891,12 +2919,15 @@ main (int argc, char **argv)
 	          else { option_appheader = (uint8_t*) my_optarg; } break;
 	case 'B':
 	  option_srcwinsz_set = 1;
-	  if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_ALLOCSIZE, 'B')))
+	  if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_MINSRCWINSZ,
+				0, 'B')))
 	    {
 	      goto exit;
 	    }
 	  break;
-	case 'W': if ((ret = main_atou (my_optarg, & option_winsize, XD3_ALLOCSIZE, 'W')))
+	case 'W':
+	  if ((ret = main_atou (my_optarg, & option_winsize, XD3_ALLOCSIZE,
+				XD3_HARDMAXWINSIZE, 'W')))
 	  {
 	    goto exit;
 	  }

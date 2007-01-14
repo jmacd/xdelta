@@ -1908,7 +1908,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   if (memcmp (rec, buf, IDB_TGTSZ) != 0) { stream->msg = "wrong data reconstruction"; goto fail; }
 
   /* Check that there was one copy per window. */
-  IF_DEBUG (if (stream->n_cpy != IDB_WINCNT ||
+  IF_DEBUG (if (stream->n_scpy != IDB_WINCNT ||
 		stream->n_add != 0 ||
 		stream->n_run != 0) { stream->msg = "wrong copy count"; goto fail; });
 

@@ -45,7 +45,7 @@
 
 /* Default total size of the source window used in xdelta3-main.h */
 #ifndef XD3_DEFAULT_SRCWINSZ
-#define XD3_DEFAULT_SRCWINSZ (1U << 23)
+#define XD3_DEFAULT_SRCWINSZ (1U << 26)
 #endif
 
 /* When Xdelta requests a memory allocation for certain buffers, it rounds up to units of
@@ -61,7 +61,7 @@
  * without a copy window will require 3 bytes to encode (7 bits per byte, HERE and SAME
  * modes making every address within half the window away. */
 #ifndef XD3_HARDMAXWINSIZE
-#define XD3_HARDMAXWINSIZE (1U<<23)
+#define XD3_HARDMAXWINSIZE (1U<<24)
 #endif
 
 /* The XD3_NODECOMPRESSSIZE parameter tells the xdelta main routine not to try to
@@ -774,26 +774,20 @@ struct _xd3_stream
   xd3_sec_stream     *sec_stream_i;
   xd3_sec_stream     *sec_stream_a;
 
-#if XD3_DEBUG
   /* statistics */
-  usize_t            n_cpy;
-  usize_t            n_add;
-  usize_t            n_run;
+  xoff_t            n_scpy;
+  xoff_t            n_tcpy;
+  xoff_t            n_add;
+  xoff_t            n_run;
 
-  usize_t            n_ibytes;
-  usize_t            n_sbytes;
-  usize_t            n_dbytes;
+  xoff_t            l_scpy;
+  xoff_t            l_tcpy;
+  xoff_t            l_add;
+  xoff_t            l_run;
 
-  usize_t            l_cpy;
-  usize_t            l_add;
-  usize_t            l_run;
-
+#if XD3_DEBUG
   usize_t            sh_searches;
   usize_t            sh_compares;
-
-  usize_t           *i_freqs;
-  usize_t           *i_modes;
-  usize_t           *i_sizes;
 
   usize_t            large_ckcnt;
 

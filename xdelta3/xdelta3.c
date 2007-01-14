@@ -1970,46 +1970,6 @@ xd3_sizeof_uint64_t (uint64_t num)
 #endif
 
 /******************************************************************************************
- Debug instruction statistics
- ******************************************************************************************/
-
-#if XD3_DEBUG
-static void
-xd3_count_inst (xd3_stream *stream, uint code)
-{
-  IF_DEBUG1 ({
-    if (stream->i_freqs == NULL &&
-	(stream->i_freqs = xd3_alloc0 (stream, sizeof (stream->i_freqs[0]), 256)) == NULL) { abort (); }
-
-    stream->i_freqs[code] += 1;
-  });
-  stream->n_ibytes += 1;
-}
-
-static void
-xd3_count_mode (xd3_stream *stream, uint mode)
-{
-  IF_DEBUG1 ({
-  if (stream->i_modes == NULL &&
-      (stream->i_modes = xd3_alloc0 (stream, sizeof (stream->i_modes[0]), TOTAL_MODES (stream))) == NULL) { abort (); }
-  stream->i_modes[mode] += 1;
-  });
-}
-
-static void
-xd3_count_size (xd3_stream *stream, usize_t size)
-{
-  IF_DEBUG1({
-    if (stream->i_sizes == NULL &&
-	(stream->i_sizes = xd3_alloc0 (stream, sizeof (stream->i_sizes[0]), 64)) == NULL) { abort (); }
-
-    if (size < 64) { stream->i_sizes[size] += 1; }
-  });
-  stream->n_sbytes += xd3_sizeof_size (size);
-}
-#endif
-
-/******************************************************************************************
  Address cache stuff
  ******************************************************************************************/
 
@@ -2113,8 +2073,6 @@ xd3_encode_address (xd3_stream *stream, usize_t addr, usize_t here, uint8_t* mod
     }
 
   xd3_update_cache (acache, addr);
-
-  IF_DEBUG (xd3_count_mode (stream, bestm));
 
   (*mode) += bestm;
 
@@ -2367,10 +2325,6 @@ xd3_free_stream (xd3_stream *stream)
       stream->sec_type->destroy (stream, stream->sec_stream_a);
     }
 #endif
-
-  IF_DEBUG (xd3_free (stream, stream->i_freqs));
-  IF_DEBUG (xd3_free (stream, stream->i_modes));
-  IF_DEBUG (xd3_free (stream, stream->i_sizes));
 
   XD3_ASSERT (stream->alloc_cnt == stream->free_cnt);
 
@@ -2768,16 +2722,22 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 		XD3_ASSERT (inst->addr >= src->srcbase);
 		XD3_ASSERT (inst->addr + inst->size <= src->srcbase + src->srclen);
 		addr = (inst->addr - src->srcbase);
+		stream->n_scpy += 1;
+		stream->l_scpy += inst->size;
 	      }
 	    else
 	      {
 		/* with source window: target copy address is offset by taroff. */
 		addr = stream->taroff + (usize_t) inst->addr;
+		stream->n_tcpy += 1;
+		stream->l_tcpy += inst->size;
 	      }
 	  }
 	else
 	  {
 	    addr = (usize_t) inst->addr;
+	    stream->n_tcpy += 1;
+	    stream->l_tcpy += inst->size;
 	  }
 
 	XD3_ASSERT (inst->size >= MIN_MATCH);
@@ -2787,9 +2747,6 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	  {
 	    return ret;
 	  }
-
-	IF_DEBUG (stream->n_cpy += 1);
-	IF_DEBUG (stream->l_cpy += inst->size);
 
 	IF_DEBUG1 ({
 	  static int cnt;
@@ -2807,9 +2764,8 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 
 	if ((ret = xd3_emit_byte (stream, & DATA_TAIL (stream), inst->xtra))) { return ret; }
 
-	IF_DEBUG (stream->n_run += 1);
-	IF_DEBUG (stream->l_run += inst->size);
-	IF_DEBUG (stream->n_dbytes += 1);
+	stream->n_run += 1;
+	stream->l_run += inst->size;
 
 	IF_DEBUG1 ({
 	  static int cnt;
@@ -2822,9 +2778,8 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	if ((ret = xd3_emit_bytes (stream, & DATA_TAIL (stream),
 				   stream->next_in + inst->pos, inst->size))) { return ret; }
 
-	IF_DEBUG (stream->n_add += 1);
-	IF_DEBUG (stream->l_add += inst->size);
-	IF_DEBUG (stream->n_dbytes += inst->size);
+	stream->n_add += 1;
+	stream->l_add += inst->size;
 
 	IF_DEBUG1 ({
 	  static int cnt;
@@ -3196,11 +3151,7 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint code)
   if (has_size)
     {
       if ((ret = xd3_emit_size (stream, & INST_TAIL (stream), single->size))) { return ret; }
-
-      IF_DEBUG (xd3_count_size (stream, single->size));
     }
-
-  IF_DEBUG (xd3_count_inst (stream, code));
 
   return 0;
 }
@@ -3224,8 +3175,6 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, uint c
 	       xd3_rtype_to_string (second->type, 0),
 	       second->size,
 	       code));
-
-  IF_DEBUG (xd3_count_inst (stream, code));
 
   return 0;
 }
@@ -3496,23 +3445,22 @@ xd3_encode_init (xd3_stream *stream)
   // TODO: experiments have to be done!!!
   if (large_comp)
     {
-      usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_look);
+      usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_step);
 
       xd3_size_hashtable (stream,
 			  hash_values,
 			  & stream->large_hash);
-      IF_DEBUG1 (P(RINT "[encode_init] large hash %u slots\n", hash_values));
     }
 
   if (small_comp)
     {
       /* Hard-coded, keeps table small because small matches become inefficient. */
-      usize_t hash_values = min(stream->winsize / stream->smatcher.small_look, 65536U);
+      // TODO: verify this
+      usize_t hash_values = min(stream->winsize, 65536U);
 
       xd3_size_hashtable (stream,
 			  hash_values,
 			  & stream->small_hash);
-      IF_DEBUG1 (P(RINT "[encode_init] small hash %u slots\n", hash_values));
     }
 
   for (i = 0; i < ENC_SECTS; i += 1)
@@ -4040,6 +3988,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
       onblk = min(blkoff + diff, onblk);
 
+      // TODO: is this inefficient for large_step < large_look?
       while (blkoff <= onblk)
 	{
 	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkoff, stream->smatcher.large_look);

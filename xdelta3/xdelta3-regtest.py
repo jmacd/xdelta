@@ -559,34 +559,27 @@ def ReportSpeed(L,tr,desc):
     print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %ux%u trials' % \
           (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials, tr.reps)
 
-def BigFileRuns(rcsf):
-    while 1:
+def MakeBigFiles(rcsf):
+    rand = random.Random()
+    f1 = open(TMPDIR + "/big.1", "w")
+    f2 = open(TMPDIR + "/big.2", "w")
+    f1sz = 0
+    f2sz = 0
+    for file in rcsf.rcsfiles:
+        if file.versions < 2:
+            continue
+        r1 = 0
+        r2 = 0
+        while r1 == r2:
+            r1 = rand.randint(0, len(file.versions) - 1)
+            r2 = rand.randint(0, len(file.versions) - 1)
+        f1sz += file.AppendVersion(f1, r1)
+        f2sz += file.AppendVersion(f2, r2)
 
-        rand = random.Random()
-        f1 = open(TMPDIR + "/big.1", "w")
-        f2 = open(TMPDIR + "/big.2", "w")
-        f1sz = 0
-        f2sz = 0
-        for file in rcsf.rcsfiles:
-            if file.versions < 2:
-                continue
-            r1 = 0
-            r2 = 0
-            while r1 == r2:
-                r1 = rand.randint(0, len(file.versions) - 1)
-                r2 = rand.randint(0, len(file.versions) - 1)
-            f1sz += file.AppendVersion(f1, r1)
-            f2sz += file.AppendVersion(f2, r2)
-
-        f1.close()
-        f2.close()
-
-        print "Test input sizes: %d %d" % (f1sz, f2sz)
-
-        BigFileRun(TMPDIR + "/big.1",
-                   TMPDIR + "/big.2")
-        #continue
-    #end
+    f1.close()
+    f2.close()
+    return (TMPDIR + "/big.1",
+            TMPDIR + "/big.2")
 
 def BigFileRun(f1, f2):
                    
@@ -616,12 +609,12 @@ def BigFileRun(f1, f2):
 def RandomBigRun(f1, f2):
 
     input_ranges = [
-        (7, 13, 'large_look'),
-        (1, 50, 'large_step'),
-        (4, 6, 'small_look'),
-        (1, 10, 'small_chain'),
-        (1, 5, 'small_lchain'),
-        (0, 0, 'ssmatch'),
+        (7, 9, 'large_look'),
+        (1, 10, 'large_step'),
+        (4, 5, 'small_look'),
+        (1, 20, 'small_chain'),
+        (1, 10, 'small_lchain'),
+        (0, 1, 'ssmatch'),
         (0, 1, 'trylazy'),
         (1, 32, 'max_lazy'),
         (1, 64, 'long_enough'),
@@ -656,6 +649,8 @@ def RandomBigRun(f1, f2):
            result.time.mean,
            result.trials)
 
+    return (config, result.r1.dsize, result.time.mean)
+
 def RunSpeed():
     for L in Decimals(MAX_RUN):
         SetFileSize(RUNFILE, L)
@@ -670,8 +665,6 @@ if __name__ == "__main__":
         #rcsf = Test()
         #rcsf.PairsByDate(Xdelta3Pair())
         #RunSpeed()
-        #BigFileRuns(rcsf)
-        #BigFileRun("/tmp/big.1", "/tmp/big.2")
         while 1:
             try:
                 RandomBigRun("/tmp/big.1", "/tmp/big.2")
