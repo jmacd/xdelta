@@ -21,6 +21,8 @@
 # TODO: This is really part test, part performance evaluation suite, and
 # really incomplete.
 
+# TODO: Test IOPT (1.5 vs. greedy)
+
 import os, sys, math, re, time, types, array, random
 import xdelta3
 

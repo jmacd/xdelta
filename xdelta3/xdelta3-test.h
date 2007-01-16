@@ -48,7 +48,8 @@ static int test_exponential_dist (usize_t mean, usize_t max);
 
 #define CHECK(cond) if (!(cond)) { P(RINT "check failure: " #cond); abort(); }
 
-/* TODO: Test 1.5 pass alg vs. greedy */
+/* Use a fixed soft config so that test values are fixed.  See also test_compress_text(). */
+static const char* test_softcfg_str = "-C64,64,4,128,16,0,1,8,128,0";
 
 /******************************************************************************************
  TEST HELPERS
@@ -673,9 +674,28 @@ test_compress_text (xd3_stream  *stream,
 {
   int ret;
   xd3_config cfg;
-  int flags = stream->flags;
+  int oflags = stream->flags;
+  int flags = stream->flags | XD3_FLUSH;
 
-  stream->flags |= XD3_FLUSH;
+  xd3_free_stream (stream);
+  xd3_init_config (& cfg, flags);
+
+  /* This configuration is fixed so that the "expected non-error" the counts in
+   * decompress_single_bit_errors are too.  See test_coftcfg_str. */
+  cfg.smatch_cfg = XD3_SMATCH_SOFT;
+  cfg.smatcher_soft.name = "test";
+  cfg.smatcher_soft.large_look = 64; /* no source, not used */
+  cfg.smatcher_soft.large_step = 64; /* no source, not used */
+  cfg.smatcher_soft.small_look = 4;
+  cfg.smatcher_soft.small_chain = 128;
+  cfg.smatcher_soft.small_lchain = 16;
+  cfg.smatcher_soft.ssmatch = 0;
+  cfg.smatcher_soft.try_lazy = 1;
+  cfg.smatcher_soft.max_lazy = 8;
+  cfg.smatcher_soft.long_enough = 128;
+  cfg.smatcher_soft.promote = 0;
+  
+  xd3_config_stream (stream, & cfg);
 
   (*encoded_size) = 0;
 
@@ -688,7 +708,7 @@ test_compress_text (xd3_stream  *stream,
 
  fail:
   xd3_free_stream (stream);
-  xd3_init_config (& cfg, flags);
+  xd3_init_config (& cfg, oflags);
   xd3_config_stream (stream, & cfg);
   return ret;
 }
@@ -1453,25 +1473,25 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
   static const char* cmdpairs[] =
   {
     /* standard input, output */
-    "%s -A < %s > %s", "%s -d < %s > %s",
-    "%s -A -e < %s > %s", "%s -d < %s > %s",
-    "%s -A= encode < %s > %s", "%s decode < %s > %s",
-    "%s -A -q encode < %s > %s", "%s -qdq < %s > %s",
+    "%s %s -A < %s > %s", "%s -d < %s > %s",
+    "%s %s -A -e < %s > %s", "%s -d < %s > %s",
+    "%s %s -A= encode < %s > %s", "%s decode < %s > %s",
+    "%s %s -A -q encode < %s > %s", "%s -qdq < %s > %s",
 
     /* file input, standard output */
-    "%s -A= %s > %s", "%s -d %s > %s",
-    "%s -A -e %s > %s", "%s -d %s > %s",
-    "%s encode -A= %s > %s", "%s decode %s > %s",
+    "%s %s -A= %s > %s", "%s -d %s > %s",
+    "%s %s -A -e %s > %s", "%s -d %s > %s",
+    "%s %s encode -A= %s > %s", "%s decode %s > %s",
 
     /* file input, output */
-    "%s -A= %s %s", "%s -d %s %s",
-    "%s -A -e %s %s", "%s -d %s %s",
-    "%s -A= encode %s %s", "%s decode %s %s",
+    "%s %s -A= %s %s", "%s -d %s %s",
+    "%s %s -A -e %s %s", "%s -d %s %s",
+    "%s %s -A= encode %s %s", "%s decode %s %s",
 
     /* option placement */
-    "%s -A -f %s %s", "%s -f -d %s %s",
-    "%s -e -A= %s %s", "%s -d -f %s %s",
-    "%s -f encode -A= %s %s", "%s -f decode -f %s %s",
+    "%s %s -A -f %s %s", "%s -f -d %s %s",
+    "%s %s -e -A= %s %s", "%s -d -f %s %s",
+    "%s %s -f encode -A= %s %s", "%s -f decode -f %s %s",
   };
 
   char ecmd[TESTBUFSIZE], dcmd[TESTBUFSIZE];
@@ -1487,7 +1507,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       test_setup ();
       if ((ret = test_make_inputs (stream, NULL, & tsize))) { return ret; }
 
-      sprintf (ecmd, cmdpairs[2*i], program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+      sprintf (ecmd, cmdpairs[2*i], program_name, test_softcfg_str, TEST_TARGET_FILE, TEST_DELTA_FILE);
       sprintf (dcmd, cmdpairs[2*i+1], program_name, TEST_DELTA_FILE, TEST_RECON_FILE);
     
       /* Encode and decode. */
