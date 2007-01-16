@@ -76,7 +76,7 @@
  * instructions before they are optimized by picking the best non-overlapping ranges.  The
  * larger this buffer, the longer a forced xd3_srcwin_setup() decision is held off. */
 #ifndef XD3_DEFAULT_IOPT_SIZE
-#define XD3_DEFAULT_IOPT_SIZE    128
+#define XD3_DEFAULT_IOPT_SIZE    (1U<<12)
 #endif
 
 /* The maximum distance backward to search for small matches */

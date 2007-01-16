@@ -9,7 +9,7 @@
 (Checkin-Login jmacd)
 (Populate-Ignore ())
 (Project-Keywords
- (Xdelta3Version "0k")
+ (Xdelta3Version "0l")
  (WWWLeftNavBar "<table cellpadding=\"20px\" width=700> <tr> <td class=\"leftbdr\" valign=top height=600 width=100> <div class=\"leftbody\"> <h1>Xdelta</h1> <a href=\"xdelta3.html\">overview</a><br> <a href=\"xdelta3-cmdline.html\">command&nbsp;line</a><br> <a href=\"xdelta3-api-guide.html\">api&nbsp;guide</a><br> <br><a href=\"http://xdelta.org\">xdelta.org</a></h2> </div> </td> <td valign=top width=500>")
  )
 (Files
