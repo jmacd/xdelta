@@ -2049,9 +2049,9 @@ test_string_matching (xd3_stream *stream, int ignore)
       if ((ret = stream->smatcher.string_match (stream))) { return ret; }
 
       *rptr = 0;
-      while (! xd3_rlist_empty (& stream->iopt.used))
+      while (! xd3_rlist_empty (& stream->iopt_used))
 	{
-	  xd3_rinst *inst = xd3_rlist_pop_front (& stream->iopt.used);
+	  xd3_rinst *inst = xd3_rlist_pop_front (& stream->iopt_used);
 
 	  switch (inst->type)
 	    {
@@ -2072,7 +2072,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 
 	  *rptr++ = ' ';
 
-	  xd3_rlist_push_back (& stream->iopt.free, inst);
+	  xd3_rlist_push_back (& stream->iopt_free, inst);
 	}
 
       if (rptr != rbuf)

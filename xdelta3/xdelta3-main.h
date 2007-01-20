@@ -248,7 +248,7 @@ static int         option_quiet              = 0;
 static int         option_level              = 5;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
-static int         option_use_secondary      = /* until-standardized, leave this off */ 0;
+static int         option_use_secondary      = 0;
 static char*       option_secondary          = NULL;
 static int         option_use_checksum       = 1;
 static int         option_use_altcodetable   = 0;
@@ -257,6 +257,7 @@ static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* go through the motions, but do not open or write output */
 static const char *option_source_filename    = NULL;
 
+static int         option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
 static int         option_srcwinsz_set       = 0;
@@ -2267,6 +2268,7 @@ main_input (xd3_cmd     cmd,
   config.sec_data.ngroups = 1;
   config.sec_addr.ngroups = 1;
   config.sec_inst.ngroups = 1;
+  config.iopt_size = option_iopt_size;
 
   /* TODO: eliminate static variables. */
   do_not_lru = 0;
@@ -2553,12 +2555,22 @@ main_input (xd3_cmd     cmd,
 	  {
 	    if (IS_ENCODE (cmd) || cmd == CMD_DECODE)
 	      {
-		int used_source = xd3_encoder_used_source (& stream);
-
-		if (! option_quiet && IS_ENCODE (cmd) && main_file_isopen (sfile) && ! used_source)
+		if (! option_quiet && IS_ENCODE (cmd))
 		  {
-		    XPR(NT "warning: input position %"Q"u no source copies\n",
-			stream.current_window * option_winsize);
+		    /* Warn when no source copies are found */
+		    if (main_file_isopen (sfile) && ! xd3_encoder_used_source (& stream))
+		      {
+			XPR(NT "warning: input position %"Q"u no source copies\n",
+			    stream.current_window * option_winsize);
+		      }
+
+		    /* Warn about bad compression due to limited instruction buffer */
+		    if (stream.i_slots_used > stream.iopt_size)
+		      {
+			XPR(NT "warning: input position %"Q"u overflowed instruction buffer, "
+			    "needed %u (vs. %u)\n",
+			    stream.current_window * option_winsize, stream.i_slots_used, stream.iopt_size);
+		      }
 		  }
 
 		if (option_verbose)
@@ -2723,7 +2735,7 @@ main (int argc, char **argv)
   main_file ifile;
   main_file ofile;
   main_file sfile;
-  static char *flags = "0123456789cdefhnqvDJNORTVs:B:C:E:F:L:O:P:M:W:A::S::";
+  static char *flags = "0123456789cdefhnqvDJNORTVs:B:C:E:F:I:L:O:P:M:W:A::S::";
   int my_optind;
   char *my_optarg;
   char *my_optstr;
@@ -2921,6 +2933,13 @@ main (int argc, char **argv)
 	  option_srcwinsz_set = 1;
 	  if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_MINSRCWINSZ,
 				0, 'B')))
+	    {
+	      goto exit;
+	    }
+	  break;
+	case 'I':
+	  if ((ret = main_atou (my_optarg, & option_iopt_size, 0,
+				0, 'I')))
 	    {
 	      goto exit;
 	    }
@@ -3126,6 +3145,7 @@ main_help (void)
   P(RINT "memory options:\n");
   P(RINT "   -B bytes     source window size\n");
   P(RINT "   -W bytes     input window size\n");
+  P(RINT "   -I size      instruction buffer size (0 = unlimited)\n");
 
   P(RINT "compression options:\n");
   P(RINT "   -s source    source file to copy from (if any)\n");
@@ -3133,15 +3153,15 @@ main_help (void)
   P(RINT "   -N           disable small string-matching compression\n");
   P(RINT "   -D           disable external decompression (encode/decode)\n");
   P(RINT "   -R           disable external recompression (decode)\n");
+  P(RINT "   -n           disable checksum (encode/decode)\n");
+  P(RINT "   -C           soft config (encode, undocumented)\n");
+  P(RINT "   -A [apphead] disable/provide application header (encode)\n");
 
 #if XD3_DEBUG > 0
   P(RINT "developer options:\n");
-  P(RINT "   -A [apphead] disable/provide application header\n");
-  P(RINT "   -C           soft config (see xdelta3-cfgs.h)\n");
   P(RINT "   -J           disable output (check/compute only)\n");
   P(RINT "   -P           repeat count (for profiling)\n");
   P(RINT "   -T           use alternate code table\n");
-  P(RINT "   -n           disable checksum (encode/decode)\n");
 #endif
   return EXIT_FAILURE;
 }

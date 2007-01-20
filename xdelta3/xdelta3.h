@@ -74,7 +74,8 @@
 
 /* The IOPT_SIZE value sets the size of a buffer used to batch overlapping copy
  * instructions before they are optimized by picking the best non-overlapping ranges.  The
- * larger this buffer, the longer a forced xd3_srcwin_setup() decision is held off. */
+ * larger this buffer, the longer a forced xd3_srcwin_setup() decision is held off.
+ * Setting this value to 0 causes an unlimited buffer to be used. */
 #ifndef XD3_DEFAULT_IOPT_SIZE
 #define XD3_DEFAULT_IOPT_SIZE    (1U<<12)
 #endif
@@ -192,7 +193,7 @@ typedef struct _xd3_rpage              xd3_rpage;
 typedef struct _xd3_addr_cache         xd3_addr_cache;
 typedef struct _xd3_output             xd3_output;
 typedef struct _xd3_desect             xd3_desect;
-typedef struct _xd3_iopt_buf           xd3_iopt_buf;
+typedef struct _xd3_iopt_buflist       xd3_iopt_buflist;
 typedef struct _xd3_rlist              xd3_rlist;
 typedef struct _xd3_sec_type           xd3_sec_type;
 typedef struct _xd3_sec_cfg            xd3_sec_cfg;
@@ -484,13 +485,12 @@ struct _xd3_addr_cache
   usize_t *same_array; /* array of size s_same*256    */
 };
 
-/* the IOPT buffer has a used list of (ordered) instructions, possibly overlapping in
- * target addresses, awaiting a flush */
-struct _xd3_iopt_buf
+/* the IOPT buffer list is just a list of buffers, which may be allocated
+ * during encode when using an unlimited buffer. */
+struct _xd3_iopt_buflist
 {
-  xd3_rlist  used;
-  xd3_rlist  free;
   xd3_rinst *buffer;
+  xd3_iopt_buflist *next;
 };
 
 /* This is the record of a pre-compiled configuration, a subset of xd3_config. */
@@ -634,6 +634,7 @@ struct _xd3_stream
   usize_t           sprevsz;          /* small string, previous window size (power of 2) */
   usize_t           sprevmask;        /* small string, previous window size mask */
   uint              iopt_size;
+  uint              iopt_unlimited;
   uint              srcwin_size;
   uint              srcwin_maxsz;
 
@@ -698,8 +699,10 @@ struct _xd3_stream
   xd3_output       *enc_heads[4];     /* array of encoded outputs: head of chain */
   xd3_output       *enc_tails[4];     /* array of encoded outputs: tail of chain */
 
-  xd3_iopt_buf      iopt;             /* instruction optimizing buffer */
+  xd3_rlist         iopt_used;        /* instruction optimizing buffer */
+  xd3_rlist         iopt_free;
   xd3_rinst        *iout;             /* next single instruction */
+  xd3_iopt_buflist *iopt_alloc;
 
   const uint8_t    *enc_appheader;    /* application header to encode */
   usize_t            enc_appheadsz;    /* application header size */
@@ -784,6 +787,8 @@ struct _xd3_stream
   xoff_t            l_tcpy;
   xoff_t            l_add;
   xoff_t            l_run;
+
+  usize_t           i_slots_used;
 
 #if XD3_DEBUG
   usize_t            sh_searches;

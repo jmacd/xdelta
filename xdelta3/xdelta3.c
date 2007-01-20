@@ -550,7 +550,7 @@ static void*       xd3_alloc0 (xd3_stream *stream,
 static xd3_output* xd3_alloc_output (xd3_stream *stream,
 				     xd3_output *old_output);
 
-
+static int         xd3_alloc_iopt (xd3_stream *stream, int elts);
 
 static void        xd3_free_output (xd3_stream *stream,
 				    xd3_output *output);
@@ -2281,11 +2281,20 @@ xd3_free_output (xd3_stream *stream,
 void
 xd3_free_stream (xd3_stream *stream)
 {
+  xd3_iopt_buflist *blist = stream->iopt_alloc;
+
+  do
+    {
+      xd3_iopt_buflist *tmp = blist;
+      blist = blist->next;
+      xd3_free (stream, tmp->buffer);
+      xd3_free (stream, tmp);
+    }
+  while (blist != NULL);
 
   xd3_free (stream, stream->large_table);
   xd3_free (stream, stream->small_table);
   xd3_free (stream, stream->small_prev);
-  xd3_free (stream, stream->iopt.buffer);
 
 #if XD3_ENCODER
   {
@@ -2392,6 +2401,12 @@ xd3_config_stream(xd3_stream *stream,
   stream->iopt_size = config->iopt_size ? config->iopt_size : XD3_DEFAULT_IOPT_SIZE;
   stream->srcwin_size  = config->srcwin_size ? config->srcwin_size : XD3_DEFAULT_CKSUM_ADVANCE;
   stream->srcwin_maxsz = config->srcwin_maxsz ? config->srcwin_maxsz : XD3_DEFAULT_SRCWINSZ;
+
+  if (stream->iopt_size == 0)
+    {
+      stream->iopt_size = XD3_ALLOCSIZE / sizeof(xd3_rinst);
+      stream->iopt_unlimited = 1;
+    }
 
   stream->getblk    = config->getblk;
   stream->alloc     = config->alloc ? config->alloc : __xd3_alloc_func;
@@ -2663,8 +2678,8 @@ xd3_set_appheader (xd3_stream    *stream,
 static int
 xd3_iopt_check (xd3_stream *stream)
 {
-  int ul = xd3_rlist_length (& stream->iopt.used);
-  int fl = xd3_rlist_length (& stream->iopt.free);
+  int ul = xd3_rlist_length (& stream->iopt_used);
+  int fl = xd3_rlist_length (& stream->iopt_free);
 
   return (ul + fl + (stream->iout ? 1 : 0)) == stream->iopt_size;
 }
@@ -2674,7 +2689,7 @@ static xd3_rinst*
 xd3_iopt_free (xd3_stream *stream, xd3_rinst *i)
 {
   xd3_rinst *n = xd3_rlist_remove (i);
-  xd3_rlist_push_back (& stream->iopt.free, i);
+  xd3_rlist_push_back (& stream->iopt_free, i);
   return n;
 }
 
@@ -2683,7 +2698,7 @@ xd3_iopt_free_nonadd (xd3_stream *stream, xd3_rinst *i)
 {
   if (i->type != XD3_ADD)
     {
-      xd3_rlist_push_back (& stream->iopt.free, i);
+      xd3_rlist_push_back (& stream->iopt_free, i);
     }
 }
 
@@ -2885,7 +2900,7 @@ xd3_iopt_add_finalize (xd3_stream *stream)
 static int
 xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 {
-  xd3_rinst *r1 = xd3_rlist_front (& stream->iopt.used);
+  xd3_rinst *r1 = xd3_rlist_front (& stream->iopt_used);
   xd3_rinst *r2;
   xd3_rinst *r3;
   usize_t r1end;
@@ -2901,8 +2916,8 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
   /* Note: once tried to skip this step if it's possible to assert there are no
    * overlapping instructions.  Doesn't work because xd3_opt_erase leaves overlapping
    * instructions. */
-  while (! xd3_rlist_end (& stream->iopt.used, r1) &&
-	 ! xd3_rlist_end (& stream->iopt.used, r2 = xd3_rlist_next (r1)))
+  while (! xd3_rlist_end (& stream->iopt_used, r1) &&
+	 ! xd3_rlist_end (& stream->iopt_used, r2 = xd3_rlist_next (r1)))
     {
       r1end = r1->pos + r1->size;
 
@@ -2919,7 +2934,7 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
       XD3_ASSERT (r2end > (r1end + LEAST_MATCH_INCR));
 
       /* If r3 is available... */
-      if (! xd3_rlist_end (& stream->iopt.used, r3 = xd3_rlist_next (r2)))
+      if (! xd3_rlist_end (& stream->iopt_used, r3 = xd3_rlist_next (r2)))
 	{
 	  /* If r3 starts before r1 finishes or just about, r2 is irrelevant */
 	  if (r3->pos <= r1end + 1)
@@ -3026,9 +3041,9 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 
   /* If forcing, pick instructions until the list is empty, otherwise this empties 50% of
    * the queue. */
-  for (flushed = 0; ! xd3_rlist_empty (& stream->iopt.used); )
+  for (flushed = 0; ! xd3_rlist_empty (& stream->iopt_used); )
     {
-      xd3_rinst *renc = xd3_rlist_pop_front (& stream->iopt.used);
+      xd3_rinst *renc = xd3_rlist_pop_front (& stream->iopt_used);
       if ((ret = xd3_iopt_add_encoding (stream, renc)))
 	{
 	  return ret;
@@ -3044,10 +3059,10 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 	  /* If there are only two instructions remaining, break, because they were
 	   * not optimized.  This means there were more than 50% eliminated by the
 	   * loop above. */
- 	  r1 = xd3_rlist_front (& stream->iopt.used);
- 	  if (xd3_rlist_end(& stream->iopt.used, r1) ||
- 	      xd3_rlist_end(& stream->iopt.used, r2 = xd3_rlist_next (r1)) ||
- 	      xd3_rlist_end(& stream->iopt.used, r3 = xd3_rlist_next (r2)))
+ 	  r1 = xd3_rlist_front (& stream->iopt_used);
+ 	  if (xd3_rlist_end(& stream->iopt_used, r1) ||
+ 	      xd3_rlist_end(& stream->iopt_used, r2 = xd3_rlist_next (r1)) ||
+ 	      xd3_rlist_end(& stream->iopt_used, r3 = xd3_rlist_next (r2)))
  	    {
  	      break;
  	    }
@@ -3056,7 +3071,7 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 
   XD3_ASSERT (xd3_iopt_check (stream));
 
-  XD3_ASSERT (!force || xd3_rlist_length (& stream->iopt.used) == 0);
+  XD3_ASSERT (!force || xd3_rlist_length (& stream->iopt_used) == 0);
 
   return 0;
 }
@@ -3067,18 +3082,32 @@ xd3_iopt_get_slot (xd3_stream *stream, xd3_rinst** iptr)
   xd3_rinst *i;
   int ret;
 
-  if (xd3_rlist_empty (& stream->iopt.free))
+  if (xd3_rlist_empty (& stream->iopt_free))
     {
-      if ((ret = xd3_iopt_flush_instructions (stream, 0))) { return ret; }
+      if (stream->iopt_unlimited)
+	{
+	  int elts = XD3_ALLOCSIZE / sizeof(xd3_rinst);
+	  if ((ret = xd3_alloc_iopt (stream, elts)))
+	    {
+	      return ret;
+	    }
+	  stream->iopt_size += elts;
+	}
+      else
+	{
+	  if ((ret = xd3_iopt_flush_instructions (stream, 0))) { return ret; }
 
-      XD3_ASSERT (! xd3_rlist_empty (& stream->iopt.free));
+	  XD3_ASSERT (! xd3_rlist_empty (& stream->iopt_free));
+	}
     }
 
-  i = xd3_rlist_pop_back (& stream->iopt.free);
+  i = xd3_rlist_pop_back (& stream->iopt_free);
 
-  xd3_rlist_push_back (& stream->iopt.used, i);
+  xd3_rlist_push_back (& stream->iopt_used, i);
 
   (*iptr) = i;
+
+  ++stream->i_slots_used;
 
   return 0;
 }
@@ -3090,9 +3119,9 @@ xd3_iopt_get_slot (xd3_stream *stream, xd3_rinst** iptr)
 static void
 xd3_iopt_erase (xd3_stream *stream, usize_t pos, usize_t size)
 {
-  while (! xd3_rlist_empty (& stream->iopt.used))
+  while (! xd3_rlist_empty (& stream->iopt_used))
     {
-      xd3_rinst *r = xd3_rlist_back (& stream->iopt.used);
+      xd3_rinst *r = xd3_rlist_back (& stream->iopt_used);
 
       /* Verify that greedy is working.  The previous instruction should end before the
        * new one begins. */
@@ -3110,7 +3139,8 @@ xd3_iopt_erase (xd3_stream *stream, usize_t pos, usize_t size)
 
       /* Otherwise, the new instruction covers the old one, delete it and repeat. */
       xd3_rlist_remove (r);
-      xd3_rlist_push_back (& stream->iopt.free, r);
+      xd3_rlist_push_back (& stream->iopt_free, r);
+      --stream->i_slots_used;
     }
 }
 
@@ -3120,12 +3150,12 @@ xd3_iopt_last_matched (xd3_stream *stream)
 {
   xd3_rinst *r;
 
-  if (xd3_rlist_empty (& stream->iopt.used))
+  if (xd3_rlist_empty (& stream->iopt_used))
     {
       return 0;
     }
 
-  r = xd3_rlist_back (& stream->iopt.used);
+  r = xd3_rlist_back (& stream->iopt_used);
 
   return r->pos + r->size;
 }
@@ -3430,6 +3460,31 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
   return 0;
 }
 
+/* Allocates one block of xd3_rlist elements */
+static int
+xd3_alloc_iopt (xd3_stream *stream, int elts)
+{
+  int i;
+  xd3_iopt_buflist* next = stream->iopt_alloc;
+  xd3_iopt_buflist* last = xd3_alloc (stream, sizeof (xd3_iopt_buflist), 1);
+
+  if (last == NULL ||
+      (last->buffer = xd3_alloc (stream, sizeof (xd3_rinst), elts)) == NULL)
+    {
+      return ENOMEM;
+    }
+
+  last->next = next;
+  stream->iopt_alloc = last;
+
+  for (i = 0; i < elts; i += 1)
+    {
+      xd3_rlist_push_back (& stream->iopt_free, & last->buffer[i]);
+    }
+
+  return 0;
+}
+
 /* This function allocates all memory initially used by the encoder. */
 static int
 xd3_encode_init (xd3_stream *stream)
@@ -3454,9 +3509,9 @@ xd3_encode_init (xd3_stream *stream)
 
   if (small_comp)
     {
-      /* Hard-coded, keeps table small because small matches become inefficient. */
-      // TODO: verify this
-      usize_t hash_values = min(stream->winsize, 65536U);
+      /* Hard-coded, keeps table small because small matches become inefficient.
+       * TODO: verify this stuff. */
+      usize_t hash_values = min(stream->winsize, XD3_DEFAULT_SPREVSZ);
 
       xd3_size_hashtable (stream,
 			  hash_values,
@@ -3474,21 +3529,13 @@ xd3_encode_init (xd3_stream *stream)
     }
 
   /* iopt buffer */
-  xd3_rlist_init (& stream->iopt.used);
-  xd3_rlist_init (& stream->iopt.free);
+  xd3_rlist_init (& stream->iopt_used);
+  xd3_rlist_init (& stream->iopt_free);
 
-  if ((stream->iopt.buffer = xd3_alloc (stream, sizeof (xd3_rinst), stream->iopt_size)) == NULL)
-    {
-      goto fail;
-    }
+  if (xd3_alloc_iopt (stream, stream->iopt_size) != 0) { goto fail; }
 
-  for (i = 0; i < stream->iopt_size; i += 1)
-    {
-      xd3_rlist_push_back (& stream->iopt.free, & stream->iopt.buffer[i]);
-    }
-
-  XD3_ASSERT (xd3_rlist_length (& stream->iopt.free) == stream->iopt_size);
-  XD3_ASSERT (xd3_rlist_length (& stream->iopt.used) == 0);
+  XD3_ASSERT (xd3_rlist_length (& stream->iopt_free) == stream->iopt_size);
+  XD3_ASSERT (xd3_rlist_length (& stream->iopt_used) == 0);
 
   /* address cache, code table */
   stream->acache.s_near = stream->code_table_desc->near_modes;
@@ -3532,6 +3579,7 @@ xd3_encode_reset (xd3_stream *stream)
   IF_DEBUG (stream->n_emit = 0);
   stream->avail_in     = 0;
   stream->small_reset  = 1;
+  stream->i_slots_used = 0;
 
   if (stream->src != NULL)
     {

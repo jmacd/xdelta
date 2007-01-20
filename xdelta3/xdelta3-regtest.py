@@ -611,15 +611,15 @@ def BigFileRun(f1, f2):
 def RandomBigRun(f1, f2):
 
     input_ranges = [
-        (7, 9, 'large_look'),
-        (1, 10, 'large_step'),
+        (7, 20, 'large_look'),
+        (1, 30, 'large_step'),
         (4, 5, 'small_look'),
-        (1, 20, 'small_chain'),
-        (1, 10, 'small_lchain'),
+        (1, 32, 'small_chain'),
+        (1, 16, 'small_lchain'),
         (0, 1, 'ssmatch'),
         (0, 1, 'trylazy'),
-        (1, 32, 'max_lazy'),
-        (1, 64, 'long_enough'),
+        (1, 128, 'max_lazy'),
+        (1, 256, 'long_enough'),
         (0, 1, 'promote'),
     ]
 
