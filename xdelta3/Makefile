@@ -113,7 +113,7 @@ xdelta3-tune: $(SOURCES)
 		-DSECONDARY_FGK=1 -DSECONDARY_DJW=1 -DTUNE_HUFFMAN=1
 
 xdelta3-Opg: $(SOURCES)
-	$(CC) -pg -g -O3 -Wall -Wshadow xdelta3.c -o xdelta3-Opg -DXD3_MAIN=1 \
+	$(CC) -pg -g -O -Wall -Wshadow xdelta3.c -o xdelta3-Opg -DXD3_MAIN=1 \
 		-DSECONDARY_DJW=1 -DXD3_POSIX=1 -DXD3_USE_LARGEFILE64=1
 
 xdelta3-nosec.o: $(SOURCES)

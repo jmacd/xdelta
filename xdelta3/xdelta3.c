@@ -4024,7 +4024,6 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	{
 	  if (ret == XD3_TOOFARBACK)
 	    {
-	      // TODO: this may still be happening, or fixed by stream->srcmaxaddr?
  	      ret = XD3_INTERNAL;
 	    }
 	  return ret;

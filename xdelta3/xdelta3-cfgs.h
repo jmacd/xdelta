@@ -58,16 +58,16 @@
  ******************************************************************************************/
 #if XD3_BUILD_FAST
 #define TEMPLATE      fast
-#define LLOOK         9
-#define LSTEP         28
-#define SLOOK         5
-#define SCHAIN        1
-#define SLCHAIN       1
+#define LLOOK         11
+#define LSTEP         7
+#define SLOOK         4
+#define SCHAIN        5
+#define SLCHAIN       0
 #define SSMATCH       0
 #define TRYLAZY       0
-#define MAXLAZY       23
-#define LONGENOUGH    36
-#define PROMOTE       0
+#define MAXLAZY       50
+#define LONGENOUGH    0
+#define PROMOTE       1
 
 #include "xdelta3.c"
 
@@ -89,16 +89,16 @@
  ******************************************************************************************/
 #if XD3_BUILD_SLOW
 #define TEMPLATE      slow
-#define LLOOK         8
-#define LSTEP         3
+#define LLOOK         10
+#define LSTEP         1
 #define SLOOK         4
-#define SCHAIN        7
-#define SLCHAIN       3
+#define SCHAIN        36
+#define SLCHAIN       13
 #define SSMATCH       0
 #define TRYLAZY       1
-#define MAXLAZY       32
-#define LONGENOUGH    15
-#define PROMOTE       1
+#define MAXLAZY       512
+#define LONGENOUGH    256
+#define PROMOTE       0
 
 #include "xdelta3.c"
 

@@ -2565,7 +2565,7 @@ main_input (xd3_cmd     cmd,
 		      }
 
 		    /* Warn about bad compression due to limited instruction buffer */
-		    if (stream.i_slots_used > stream.iopt_size)
+		    if (option_verbose > 0 && stream.i_slots_used > stream.iopt_size)
 		      {
 			XPR(NT "warning: input position %"Q"u overflowed instruction buffer, "
 			    "needed %u (vs. %u)\n",
