@@ -46,7 +46,7 @@ MAX_RUN        = 1000 * 1000 * 10
 
 #
 #
-RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS/prcs/b'
+RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
@@ -578,6 +578,7 @@ def MakeBigFiles(rcsf):
         f1sz += file.AppendVersion(f1, r1)
         f2sz += file.AppendVersion(f2, r2)
 
+    print 'from %u; to %u' % (f1sz, f2sz)
     f1.close()
     f2.close()
     return (TMPDIR + "/big.1",
@@ -588,10 +589,10 @@ def BigFileRun(f1, f2):
     testcases = [
         # large_look large_step small_look small_chain small_lchain
         # ssmatch try_lazy max_lazy long_enough promote
-        ['-DC', '9,7,4,8,1,1,1,16,114,0'],
-        ['-DC', '9,6,4,8,1,1,1,16,114,0'],
-        ['-DC', '9,5,4,8,1,1,1,16,114,0'],
-        ['-DC', '9,4,4,8,1,1,1,16,114,0'],
+        ['-DC', '10,1,5,18,13,1,1,127,83,0'],
+        ['-DC', '10,1,5,18,13,1,1,127,83,1'],
+        ['-DC', '10,1,4,18,13,1,1,127,83,0'],
+        ['-DC', '10,1,4,18,13,1,1,127,83,1'],
     ]
 
     for test in testcases:
@@ -642,7 +643,7 @@ def RandomBigRun(f1, f2):
     strs = [str(x) for x in config]
 
     runner = Xdelta3Pair()
-    runner.extra = ['-DC', ','.join(strs)]
+    runner.extra = ['-I', '0', '-D', '-C', ','.join(strs)]
     result = TimeRun(runner.Runner(f1, 1, f2, 2))
 
     print 'config %s dsize %d time %.7f in %u trials' % \
@@ -664,12 +665,14 @@ def RunSpeed():
 if __name__ == "__main__":
     try:
         os.mkdir(TMPDIR)
-        #rcsf = Test()
+        rcsf = Test()
         #rcsf.PairsByDate(Xdelta3Pair())
         #RunSpeed()
         while 1:
             try:
-                RandomBigRun("/tmp/big.1", "/tmp/big.2")
+                f1, f2 = MakeBigFiles(rcsf)
+                #RandomBigRun("/tmp/big.1", "/tmp/big.2")
+                BigFileRun(f1, f2)
             except CommandError, e:
                 pass
             #end

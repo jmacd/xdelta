@@ -32,6 +32,7 @@ xdelta3_ext = Extension('xdelta3',
                                          ('PYTHON_MODULE',1),
                                          ],
                         extra_compile_args = [ '-O3',
+                                               '-g',
                                                '-funroll-loops',
                                                ])
 

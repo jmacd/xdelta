@@ -2283,14 +2283,13 @@ xd3_free_stream (xd3_stream *stream)
 {
   xd3_iopt_buflist *blist = stream->iopt_alloc;
 
-  do
+  while (blist != NULL)
     {
       xd3_iopt_buflist *tmp = blist;
       blist = blist->next;
       xd3_free (stream, tmp->buffer);
       xd3_free (stream, tmp);
     }
-  while (blist != NULL);
 
   xd3_free (stream, stream->large_table);
   xd3_free (stream, stream->small_table);
@@ -3465,7 +3464,6 @@ static int
 xd3_alloc_iopt (xd3_stream *stream, int elts)
 {
   int i;
-  xd3_iopt_buflist* next = stream->iopt_alloc;
   xd3_iopt_buflist* last = xd3_alloc (stream, sizeof (xd3_iopt_buflist), 1);
 
   if (last == NULL ||
@@ -3474,7 +3472,7 @@ xd3_alloc_iopt (xd3_stream *stream, int elts)
       return ENOMEM;
     }
 
-  last->next = next;
+  last->next = stream->iopt_alloc;
   stream->iopt_alloc = last;
 
   for (i = 0; i < elts; i += 1)
