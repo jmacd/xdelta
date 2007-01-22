@@ -4033,7 +4033,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
       onblk = min(blkoff + diff, onblk);
 
-      // TODO: is this inefficient for large_step < large_look?
+      /* Note: I experimented with rewriting this block to use LARGE_CKSUM_UPDATE()
+       * instead of recalculating the cksum every N bytes.  It seemed to make performance
+       * worse. */
       while (blkoff <= onblk)
 	{
 	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkoff, stream->smatcher.large_look);

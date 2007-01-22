@@ -30,7 +30,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0l
+REL=0m
 RELDIR = xdelta3$(REL)
 
 all: xdelta3-debug xdelta3 $(PYTGT)
