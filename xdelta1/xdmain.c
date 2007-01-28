@@ -20,7 +20,7 @@
  *
  * Author: Josh MacDonald <jmacd@CS.Berkeley.EDU>
  *
- * $Id: xdmain.c 1.22.1.5 Fri, 29 Jun 2001 06:01:08 -0700 jmacd $
+ * $Id: xdmain.c 1.22.1.7.1.1 Sat, 27 Jan 2007 17:53:47 -0800 jmacd $
  */
 
 #include <stdio.h>
@@ -193,7 +193,7 @@ struct _XdFileHandle
 };
 
 /* $Format: "static const char xdelta_version[] = \"$ReleaseVersion$\"; " $ */
-static const char xdelta_version[] = "1.1.3"; 
+static const char xdelta_version[] = "1.1.4"; 
 
 typedef struct _Command Command;
 

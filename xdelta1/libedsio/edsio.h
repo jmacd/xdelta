@@ -105,7 +105,7 @@ struct _SerialSink {
 
   /* These are setup by init.
    */
-  gboolean     (* sink_type)          (SerialSink* sink, SerialType type, guint mem_size, gboolean set_allocation);
+  gboolean     (* sink_type)          (SerialSink* sink, SerialType type, guint32 mem_size, gboolean set_allocation);
   gboolean     (* sink_close)         (SerialSink* sink);
   gboolean     (* sink_write)         (SerialSink* sink, const guint8 *ptr, guint32 len);
   void         (* sink_free)          (SerialSink* sink);
@@ -165,7 +165,7 @@ gboolean       serializeio_unserialize_generic_acceptable (SerialSource*  source
 void           serializeio_sink_init                      (SerialSink* sink,
 							   gboolean (* sink_type) (SerialSink* sink,
 										   SerialType type,
-										   guint mem_size,
+										   guint32 mem_size,
 										   gboolean set_allocation),
 							   gboolean (* sink_close) (SerialSink* sink),
 							   gboolean (* sink_write) (SerialSink* sink,

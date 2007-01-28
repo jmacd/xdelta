@@ -19,8 +19,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-EMACS=/usr/bin/xemacs
-TOP_SRCDIR=/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/projects/xdelta11/libedsio
+EMACS=/usr/bin/emacs
+TOP_SRCDIR=/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/projects/xdelta1/libedsio
 
 SCRIPT=$TMPDIR/script.$$
 

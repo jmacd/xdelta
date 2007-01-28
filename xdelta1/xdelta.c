@@ -20,7 +20,7 @@
  *
  * Author: Josh MacDonald <jmacd@CS.Berkeley.EDU>
  *
- * $Id: xdelta.c 1.4.1.50.1.2 Fri, 29 Jun 2001 06:01:08 -0700 jmacd $
+ * $Id: xdelta.c 1.4.1.50.1.3 Sun, 24 Feb 2002 11:30:34 -0800 jmacd $
  */
 
 #define G_DISABLE_ASSERT
@@ -37,7 +37,7 @@ const guint xdelta_major_version = 1;
 /* $Format: "const guint xdelta_minor_version = $ReleaseMinorVersion$;" $ */
 const guint xdelta_minor_version = 1;
 /* $Format: "const guint xdelta_micro_version = $ReleaseMicroVersion$;" $ */
-const guint xdelta_micro_version = 3;
+const guint xdelta_micro_version = 4;
 
 /* Control functions.
  */

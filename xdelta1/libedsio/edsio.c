@@ -504,7 +504,7 @@ edsio_md5_hash  (gconstpointer   v)
   guint x = 0;
   gint i, j;
 
-  for (i = 0, j = 0; i < 16; i += 1, j += 1, j %= sizeof (guint))
+  for (i = 0, j = 0; i < 16; i += 1, j += 1, j %= sizeof (guint32))
     x ^= md5[i] << (8*j);
 
   return x;

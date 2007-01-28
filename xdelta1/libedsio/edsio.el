@@ -1257,7 +1257,7 @@ replacement is as for replace-regexp."
 %s  for (i = 0; i < %s_len; i += 1)
 %s    {
 %s      print_spaces (indent_spaces);
-%s      g_print (\"%%d:\n\", i);
+%s      g_print (\"%%d:\\n\", i);
 %s%s      }
 %s}
 "

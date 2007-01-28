@@ -231,22 +231,6 @@ proptest_isset_uint (PropTest* obj, EdsioPropTestUintProperty prop)
   return edsio_property_isset ("PropTest", "uint", prop.code, obj);
 }
 
-/* EdsioUint Count
- */
-
-guint
-serializeio_count_edsiouint (guint32 val) {
-  guint size = sizeof (SerialEdsioUint);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_edsiouint_obj (SerialEdsioUint const* obj) {
-  return serializeio_count_edsiouint (obj->val);
-}
-
 /* EdsioUint Print
  */
 
@@ -329,23 +313,6 @@ unserialize_edsiouint (SerialSource *source, SerialEdsioUint** result)
   return TRUE;
 bail:
   return FALSE;
-}
-
-/* EdsioBytes Count
- */
-
-guint
-serializeio_count_edsiobytes (guint32 val_len, const guint8* val) {
-  guint size = sizeof (SerialEdsioBytes);
-  ALIGN_8 (size);
-  size += val_len;
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_edsiobytes_obj (SerialEdsioBytes const* obj) {
-  return serializeio_count_edsiobytes (obj->val_len, obj->val);
 }
 
 /* EdsioBytes Print
@@ -432,23 +399,6 @@ bail:
   return FALSE;
 }
 
-/* EdsioString Count
- */
-
-guint
-serializeio_count_edsiostring (const gchar* val) {
-  guint size = sizeof (SerialEdsioString);
-  ALIGN_8 (size);
-  size += strlen (val) + 1;
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_edsiostring_obj (SerialEdsioString const* obj) {
-  return serializeio_count_edsiostring (obj->val);
-}
-
 /* EdsioString Print
  */
 
@@ -531,23 +481,6 @@ unserialize_edsiostring (SerialSource *source, SerialEdsioString** result)
   return TRUE;
 bail:
   return FALSE;
-}
-
-/* GenericTime Count
- */
-
-guint
-serializeio_count_generictime (guint32 seconds, guint32 nanos) {
-  guint size = sizeof (SerialGenericTime);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_generictime_obj (SerialGenericTime const* obj) {
-  return serializeio_count_generictime (obj->seconds, obj->nanos);
 }
 
 /* GenericTime Print

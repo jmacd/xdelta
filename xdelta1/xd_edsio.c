@@ -66,24 +66,7 @@ xd_edsio_init (void)
   edsio_library_register (3, "xd");
   result = TRUE;
   return TRUE;
-}
-
-/* XdeltaChecksum Count
- */
-
-guint
-serializeio_count_xdeltachecksum (guint16 high, guint16 low) {
-  guint size = sizeof (SerialXdeltaChecksum);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_xdeltachecksum_obj (SerialXdeltaChecksum const* obj) {
-  return serializeio_count_xdeltachecksum (obj->high, obj->low);
-}
+};
 
 /* XdeltaChecksum Print
  */
@@ -174,31 +157,6 @@ bail:
   return FALSE;
 }
 
-/* XdeltaIndex Count
- */
-
-guint
-serializeio_count_xdeltaindex (guint32 file_len, const guint8 file_md5[16], guint32 index_len, SerialXdeltaChecksum const* index) {
-  guint size = sizeof (SerialXdeltaIndex);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  {
-    gint i;
-    for (i = 0; i < index_len; i += 1)
-      {
-        size += serializeio_count_xdeltachecksum_obj (& (index[i]));
-      }
-  }
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_xdeltaindex_obj (SerialXdeltaIndex const* obj) {
-  return serializeio_count_xdeltaindex (obj->file_len, obj->file_md5, obj->index_len, obj->index);
-}
-
 /* XdeltaIndex Print
  */
 
@@ -220,7 +178,7 @@ serializeio_print_xdeltaindex_obj (SerialXdeltaIndex* obj, guint indent_spaces) 
     for (i = 0; i < obj->index_len; i += 1)
       {
         print_spaces (indent_spaces);
-        g_print ("%d: ", i);
+        g_print ("%d:\n", i);
         print_spaces (indent_spaces);
       serializeio_print_xdeltachecksum_obj (& (obj->index[i]), indent_spaces + 2);
       print_spaces (indent_spaces);
@@ -319,27 +277,6 @@ unserialize_xdeltaindex (SerialSource *source, SerialXdeltaIndex** result)
   return TRUE;
 bail:
   return FALSE;
-}
-
-/* XdeltaSourceInfo Count
- */
-
-guint
-serializeio_count_xdeltasourceinfo (const gchar* name, const guint8 md5[16], guint32 len, gboolean isdata, gboolean sequential) {
-  guint size = sizeof (SerialXdeltaSourceInfo);
-  ALIGN_8 (size);
-  size += strlen (name) + 1;
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_xdeltasourceinfo_obj (SerialXdeltaSourceInfo const* obj) {
-  return serializeio_count_xdeltasourceinfo (obj->name, obj->md5, obj->len, obj->isdata, obj->sequential);
 }
 
 /* XdeltaSourceInfo Print
@@ -446,40 +383,6 @@ bail:
   return FALSE;
 }
 
-/* XdeltaControl Count
- */
-
-guint
-serializeio_count_xdeltacontrol (const guint8 to_md5[16], guint32 to_len, gboolean has_data, guint32 source_info_len, SerialXdeltaSourceInfo* const* source_info, guint32 inst_len, SerialXdeltaInstruction const* inst) {
-  guint size = sizeof (SerialXdeltaControl);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  {
-    gint i;
-    for (i = 0; i < source_info_len; i += 1)
-      {
-        size += serializeio_count_xdeltasourceinfo_obj ((source_info[i])) + sizeof (void*);
-      }
-  }
-  ALIGN_8 (size);
-  {
-    gint i;
-    for (i = 0; i < inst_len; i += 1)
-      {
-        size += serializeio_count_xdeltainstruction_obj (& (inst[i]));
-      }
-  }
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_xdeltacontrol_obj (SerialXdeltaControl const* obj) {
-  return serializeio_count_xdeltacontrol (obj->to_md5, obj->to_len, obj->has_data, obj->source_info_len, obj->source_info, obj->inst_len, obj->inst);
-}
-
 /* XdeltaControl Print
  */
 
@@ -504,7 +407,7 @@ serializeio_print_xdeltacontrol_obj (SerialXdeltaControl* obj, guint indent_spac
     for (i = 0; i < obj->source_info_len; i += 1)
       {
         print_spaces (indent_spaces);
-        g_print ("%d: ", i);
+        g_print ("%d:\n", i);
         print_spaces (indent_spaces);
       serializeio_print_xdeltasourceinfo_obj ((obj->source_info[i]), indent_spaces + 2);
       print_spaces (indent_spaces);
@@ -520,7 +423,7 @@ serializeio_print_xdeltacontrol_obj (SerialXdeltaControl* obj, guint indent_spac
     for (i = 0; i < obj->inst_len; i += 1)
       {
         print_spaces (indent_spaces);
-        g_print ("%d: ", i);
+        g_print ("%d:\n", i);
         print_spaces (indent_spaces);
       serializeio_print_xdeltainstruction_obj (& (obj->inst[i]), indent_spaces + 2);
       print_spaces (indent_spaces);
@@ -640,24 +543,6 @@ bail:
   return FALSE;
 }
 
-/* XdeltaInstruction Count
- */
-
-guint
-serializeio_count_xdeltainstruction (guint32 index, guint32 offset, guint32 length) {
-  guint size = sizeof (SerialXdeltaInstruction);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_xdeltainstruction_obj (SerialXdeltaInstruction const* obj) {
-  return serializeio_count_xdeltainstruction (obj->index, obj->offset, obj->length);
-}
-
 /* XdeltaInstruction Print
  */
 
@@ -750,24 +635,6 @@ unserialize_xdeltainstruction (SerialSource *source, SerialXdeltaInstruction** r
   return TRUE;
 bail:
   return FALSE;
-}
-
-/* RsyncIndexElt Count
- */
-
-guint
-serializeio_count_rsyncindexelt (const guint8 md5[16], SerialXdeltaChecksum const* cksum) {
-  guint size = sizeof (SerialRsyncIndexElt);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  size += serializeio_count_xdeltachecksum_obj (cksum) - sizeof (SerialXdeltaChecksum);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_rsyncindexelt_obj (SerialRsyncIndexElt const* obj) {
-  return serializeio_count_rsyncindexelt (obj->md5, &obj->cksum);
 }
 
 /* RsyncIndexElt Print
@@ -863,32 +730,6 @@ bail:
   return FALSE;
 }
 
-/* RsyncIndex Count
- */
-
-guint
-serializeio_count_rsyncindex (guint32 seg_len, guint32 file_len, const guint8 file_md5[16], guint32 index_len, SerialRsyncIndexElt const* index) {
-  guint size = sizeof (SerialRsyncIndex);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  {
-    gint i;
-    for (i = 0; i < index_len; i += 1)
-      {
-        size += serializeio_count_rsyncindexelt_obj (& (index[i]));
-      }
-  }
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_rsyncindex_obj (SerialRsyncIndex const* obj) {
-  return serializeio_count_rsyncindex (obj->seg_len, obj->file_len, obj->file_md5, obj->index_len, obj->index);
-}
-
 /* RsyncIndex Print
  */
 
@@ -913,7 +754,7 @@ serializeio_print_rsyncindex_obj (SerialRsyncIndex* obj, guint indent_spaces) {
     for (i = 0; i < obj->index_len; i += 1)
       {
         print_spaces (indent_spaces);
-        g_print ("%d: ", i);
+        g_print ("%d:\n", i);
         print_spaces (indent_spaces);
       serializeio_print_rsyncindexelt_obj (& (obj->index[i]), indent_spaces + 2);
       print_spaces (indent_spaces);
@@ -1016,24 +857,6 @@ bail:
   return FALSE;
 }
 
-/* Version0SourceInfo Count
- */
-
-guint
-serializeio_count_version0sourceinfo (const guint8 md5[16], const guint8 real_md5[16], guint32 length) {
-  guint size = sizeof (SerialVersion0SourceInfo);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_version0sourceinfo_obj (SerialVersion0SourceInfo const* obj) {
-  return serializeio_count_version0sourceinfo (obj->md5, obj->real_md5, obj->length);
-}
-
 /* Version0SourceInfo Print
  */
 
@@ -1128,41 +951,6 @@ bail:
   return FALSE;
 }
 
-/* Version0Control Count
- */
-
-guint
-serializeio_count_version0control (gboolean normalized, guint32 data_len, SerialVersion0SourceInfo const* to_info, guint32 source_info_len, SerialVersion0SourceInfo* const* source_info, guint32 inst_len, SerialVersion0Instruction const* inst) {
-  guint size = sizeof (SerialVersion0Control);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  size += serializeio_count_version0sourceinfo_obj (to_info) - sizeof (SerialVersion0SourceInfo);
-  ALIGN_8 (size);
-  {
-    gint i;
-    for (i = 0; i < source_info_len; i += 1)
-      {
-        size += serializeio_count_version0sourceinfo_obj ((source_info[i])) + sizeof (void*);
-      }
-  }
-  ALIGN_8 (size);
-  {
-    gint i;
-    for (i = 0; i < inst_len; i += 1)
-      {
-        size += serializeio_count_version0instruction_obj (& (inst[i]));
-      }
-  }
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_version0control_obj (SerialVersion0Control const* obj) {
-  return serializeio_count_version0control (obj->normalized, obj->data_len, &obj->to_info, obj->source_info_len, obj->source_info, obj->inst_len, obj->inst);
-}
-
 /* Version0Control Print
  */
 
@@ -1191,7 +979,7 @@ serializeio_print_version0control_obj (SerialVersion0Control* obj, guint indent_
     for (i = 0; i < obj->source_info_len; i += 1)
       {
         print_spaces (indent_spaces);
-        g_print ("%d: ", i);
+        g_print ("%d:\n", i);
         print_spaces (indent_spaces);
       serializeio_print_version0sourceinfo_obj ((obj->source_info[i]), indent_spaces + 2);
       print_spaces (indent_spaces);
@@ -1207,7 +995,7 @@ serializeio_print_version0control_obj (SerialVersion0Control* obj, guint indent_
     for (i = 0; i < obj->inst_len; i += 1)
       {
         print_spaces (indent_spaces);
-        g_print ("%d: ", i);
+        g_print ("%d:\n", i);
         print_spaces (indent_spaces);
       serializeio_print_version0instruction_obj (& (obj->inst[i]), indent_spaces + 2);
       print_spaces (indent_spaces);
@@ -1325,23 +1113,6 @@ unserialize_version0control (SerialSource *source, SerialVersion0Control** resul
   return TRUE;
 bail:
   return FALSE;
-}
-
-/* Version0Instruction Count
- */
-
-guint
-serializeio_count_version0instruction (guint32 offset, guint32 length) {
-  guint size = sizeof (SerialVersion0Instruction);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  ALIGN_8 (size);
-  return size;
-}
-
-guint
-serializeio_count_version0instruction_obj (SerialVersion0Instruction const* obj) {
-  return serializeio_count_version0instruction (obj->offset, obj->length);
 }
 
 /* Version0Instruction Print

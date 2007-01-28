@@ -1,7 +1,6 @@
-# Generated automatically from Makefile.in by configure.
-# Makefile.in generated automatically by automake 1.4 from Makefile.am
+# Makefile.in generated automatically by automake 1.4-p6 from Makefile.am
 
-# Copyright (C) 1994, 1995-8, 1999 Free Software Foundation, Inc.
+# Copyright (C) 1994, 1995-8, 1999, 2001 Free Software Foundation, Inc.
 # This Makefile.in is free software; the Free Software Foundation
 # gives unlimited permission to copy and/or distribute it,
 # with or without modifications, as long as this notice is preserved.
@@ -16,6 +15,7 @@ SHELL = /bin/sh
 
 srcdir = .
 top_srcdir = ..
+
 prefix = /usr/local
 exec_prefix = ${prefix}
 
@@ -40,15 +40,15 @@ pkgincludedir = $(includedir)/xdelta
 
 top_builddir = ..
 
-ACLOCAL = aclocal
+ACLOCAL = aclocal-1.4
 AUTOCONF = autoconf
-AUTOMAKE = automake
+AUTOMAKE = automake-1.4
 AUTOHEADER = autoheader
 
 INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL} $(AM_INSTALL_PROGRAM_FLAGS)
 INSTALL_DATA = ${INSTALL} -m 644
-INSTALL_SCRIPT = ${INSTALL_PROGRAM}
+INSTALL_SCRIPT = ${INSTALL}
 transform = s,x,x,
 
 NORMAL_INSTALL = :
@@ -57,27 +57,40 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-host_alias = i686-pc-linux-gnu
+host_alias = 
 host_triplet = i686-pc-linux-gnu
+AR = ar
 AS = @AS@
-CC = gcc
-CPP = gcc -E
+CC = gcc-4.1.1
+CPP = gcc-4.1.1 -E
+CXX = g++
+CXXCPP = g++ -E
 DLLTOOL = @DLLTOOL@
-EMACS = /usr/bin/xemacs
+ECHO = echo
+EGREP = grep -E
+EMACS = /usr/bin/emacs
+EXEEXT = 
+F77 = g77
+GCJ = @GCJ@
+GCJFLAGS = @GCJFLAGS@
 GLIB_CFLAGS = -I/usr/local/include/glib-1.2 -I/usr/local/lib/glib/include
 GLIB_CONFIG = /usr/local/bin/glib-config
 GLIB_LIBS = -L/usr/local/lib -lglib
-LD = /usr/i586-pc-linux-gnu/bin/ld
+HAVE_LIB = @HAVE_LIB@
+LIB = @LIB@
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LN_S = ln
+LTLIB = @LTLIB@
 MAINT = #
 MAKEINFO = makeinfo
-NM = /usr/bin/nm -B
 OBJDUMP = @OBJDUMP@
+OBJEXT = o
 PACKAGE = xdelta
 RANLIB = ranlib
-VERSION = 1.1.3
-top_srcdir_absolute = /mnt/polaroid/Polaroid/orbit_linux/home/jmacd/projects/xdelta11
+RC = @RC@
+STRIP = strip
+VERSION = 1.1.4
+top_srcdir_absolute = /mnt/polaroid/Polaroid/orbit_linux/home/jmacd/projects/xdelta1
 
 INCLUDES = $(GLIB_CFLAGS)
 
@@ -120,9 +133,10 @@ libedsio_la_DEPENDENCIES =
 libedsio_la_OBJECTS =  library.lo simple.lo edsio.lo edsio_edsio.lo \
 sha.lo md5c.lo fh.lo generic.lo default.lo base64.lo maketime.lo \
 partime.lo
+noinst_PROGRAMS =  edsiotest$(EXEEXT)
 PROGRAMS =  $(noinst_PROGRAMS)
 
-edsiotest_OBJECTS =  edsiotest.o
+edsiotest_OBJECTS =  edsiotest.$(OBJEXT)
 edsiotest_DEPENDENCIES =  libedsio.la
 edsiotest_LDFLAGS = 
 SCRIPTS =  $(noinst_SCRIPTS)
@@ -150,7 +164,7 @@ OBJECTS = $(libedsio_la_OBJECTS) $(edsiotest_OBJECTS)
 
 all: all-redirect
 .SUFFIXES:
-.SUFFIXES: .S .c .lo .o .s
+.SUFFIXES: .S .c .lo .o .obj .s
 $(srcdir)/Makefile.in: # Makefile.am $(top_srcdir)/configure.in $(ACLOCAL_M4) 
 	cd $(top_srcdir) && $(AUTOMAKE) --gnu libedsio/Makefile
 
@@ -186,6 +200,11 @@ uninstall-libLTLIBRARIES:
 	  $(LIBTOOL)  --mode=uninstall rm -f $(DESTDIR)$(libdir)/$$p; \
 	done
 
+# FIXME: We should only use cygpath when building on Windows,
+# and only if it is available.
+.c.obj:
+	$(COMPILE) -c `cygpath -w $<`
+
 .s.o:
 	$(COMPILE) -c $<
 
@@ -194,6 +213,7 @@ uninstall-libLTLIBRARIES:
 
 mostlyclean-compile:
 	-rm -f *.o core *.core
+	-rm -f *.$(OBJEXT)
 
 clean-compile:
 
@@ -230,8 +250,8 @@ distclean-noinstPROGRAMS:
 
 maintainer-clean-noinstPROGRAMS:
 
-edsiotest: $(edsiotest_OBJECTS) $(edsiotest_DEPENDENCIES)
-	@rm -f edsiotest
+edsiotest$(EXEEXT): $(edsiotest_OBJECTS) $(edsiotest_DEPENDENCIES)
+	@rm -f edsiotest$(EXEEXT)
 	$(LINK) $(edsiotest_LDFLAGS) $(edsiotest_OBJECTS) $(edsiotest_LDADD) $(LIBS)
 
 install-includeHEADERS: $(include_HEADERS)

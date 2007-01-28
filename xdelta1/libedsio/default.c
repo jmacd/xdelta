@@ -13,7 +13,7 @@
  */
 
 static gboolean
-sink_type_default (SerialSink* sink, SerialType type, guint len, gboolean set_allocation)
+sink_type_default (SerialSink* sink, SerialType type, guint32 len, gboolean set_allocation)
 {
   if (! sink->next_uint32 (sink, type))
     return FALSE;
@@ -104,7 +104,7 @@ void
 serializeio_sink_init (SerialSink* it,
 		       gboolean (* sink_type) (SerialSink* sink,
 					       SerialType type,
-					       guint mem_size,
+					       guint32 mem_size,
 					       gboolean set_allocation),
 		       gboolean (* sink_close) (SerialSink* sink),
 		       gboolean (* sink_write) (SerialSink* sink,
