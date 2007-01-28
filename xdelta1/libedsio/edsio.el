@@ -869,8 +869,6 @@ replacement is as for replace-regexp."
 
     (insert (format "  if (! unserialize_%s_internal (source, result)) goto bail;\n" ent-downcase))
 
-    (insert (format "  if (! serializeio_source_object_received (source)) goto bail;\n"))
-
     (insert (format "  return TRUE;\n"))
     (insert (format "bail:\n"))
     (insert (format "  return FALSE;\n"))

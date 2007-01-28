@@ -316,6 +316,8 @@ xdp_source_index_read (XdeltaSource    *xs,
   if (! ss)
     return FALSE;
 
+  /* TODO: free ss */
+
   if (! unserialize_xdeltaindex (ss, &index))
     return FALSE;
 
@@ -324,8 +326,6 @@ xdp_source_index_read (XdeltaSource    *xs,
 
   xs->ck_count = index->index_len;
   xs->cksums = index->index;
-
-  /* @@@ how to free this? */
 
   return TRUE;
 }
@@ -1418,6 +1418,8 @@ xdp_control_read (XdeltaStream    *cont_in)
 
   if (! src)
     return NULL;
+
+  /* TODO: free src */
 
   if (! serializeio_unserialize_generic_acceptable (src, ST_XdeltaControl | ST_Version0Control, & type, (void**) & cont))
     return NULL;

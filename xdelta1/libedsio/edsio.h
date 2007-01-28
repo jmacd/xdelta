@@ -28,6 +28,7 @@ typedef gint32                  SerialType;
 typedef struct _HandleFuncTable HandleFuncTable;
 typedef struct _PropTest        PropTest;
 typedef struct _FileHandle      FileHandle;
+typedef struct _AllocList       AllocList;
 
 struct _FileHandle {
   const HandleFuncTable* table;
@@ -49,7 +50,6 @@ struct _FileHandle {
 #define ALIGN_8(v) if (((v) % 8) != 0) { (v) += 8; (v) &= ~7; }
 
 /* This serves as a virtual table for I/O to the FileHandle */
-
 struct _HandleFuncTable
 {
   gssize            (* table_handle_length)       (FileHandle *fh);
@@ -67,12 +67,14 @@ struct _HandleFuncTable
   const gchar*      (* table_handle_name)         (FileHandle *fh); /* user must free */
 };
 
+struct _AllocList {
+  AllocList *next;
+  void *ptr;
+};
+  
 struct _SerialSource {
   /* Internal variables: don't touch. */
-  guint32  alloc_total;
-  guint32  alloc_pos;
-  void    *alloc_buf;
-  void    *alloc_buf_orig;
+  AllocList *alloc_list;
 
   /* These are setup by init.
    */
@@ -187,8 +189,7 @@ void           serializeio_source_init                    (SerialSource* source,
 							   void       (* sfree_func) (SerialSource* source,
 										      void*         ptr));
 
-/* These two functions are internal, don't use. */
-gboolean       serializeio_source_object_received         (SerialSource* source);
+/* This function is internal, don't use. */
 void*          serializeio_source_alloc                   (SerialSource* source,
 							   guint32       len);
 

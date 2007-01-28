@@ -1,11 +1,11 @@
 ;; -*- PRCS -*-
 (Created-By-Prcs-Version 1 3 4)
 (Project-Description "")
-(Project-Version xdelta 1.1-maint 14)
-(Parent-Version xdelta 1.1-maint 13)
-(Version-Log "")
+(Project-Version xdelta 1.1-maint 15)
+(Parent-Version xdelta 1.1-maint 14)
+(Version-Log "fixed the source allocation problem, free() was never being called and still isn't, added 2 TODOs for freeing source/control handles")
 (New-Version-Log "")
-(Checkin-Time "Sun, 28 Jan 2007 11:23:01 -0800")
+(Checkin-Time "Sun, 28 Jan 2007 12:21:11 -0800")
 (Checkin-Login jmacd)
 (Populate-Ignore ("\\.o$"
 		  "\\.deps"
@@ -60,7 +60,7 @@
   ;; Library
   (xdelta.h (xdelta/b/8_xdelta.h 1.4.1.8.1.50.1.3 744))
   (xdeltapriv.h (xdelta/c/42_xdeltapriv 1.29 744))
-  (xdelta.c (xdelta/b/14_xdelta.c 1.4.1.50.1.3 744))
+  (xdelta.c (xdelta/b/14_xdelta.c 1.4.1.50.1.4 744))
   (xd.ser (xdelta/d/7_xd.ser 1.12 744))
   (xdrsync.c (xdelta/d/44_xdrsync.c 1.2 744))
   (xdapply.c (xdelta/e/37_xdapply.c 1.1 744))
@@ -98,19 +98,19 @@
   ;; Files added by populate at Sun, 28 Jan 2007 10:01:31 -0800,
   ;; to version 1.1-maint.12(w), by jmacd:
 
-  (libedsio/fh.c (xdelta/i/9_fh.c 1.1 744))
+  (libedsio/fh.c (xdelta/i/9_fh.c 1.2 744))
   (libedsio/maketime.c (xdelta/i/10_maketime.c 1.1 744))
   (libedsio/simple.c (xdelta/i/11_simple.c 1.1 744))
   (libedsio/md5c.c (xdelta/i/12_md5c.c 1.1 744))
   (libedsio/Makefile.am (xdelta/i/13_Makefile.a 1.1 744))
   (libedsio/base64.c (xdelta/i/15_base64.c 1.1 744))
-  (libedsio/default.c (xdelta/i/16_default.c 1.1 744))
-  (libedsio/edsio.el (xdelta/i/18_edsio.el 1.1 744))
+  (libedsio/default.c (xdelta/i/16_default.c 1.2 744))
+  (libedsio/edsio.el (xdelta/i/18_edsio.el 1.2 744))
   (libedsio/edsio-comp (xdelta/i/19_edsio-comp 1.1 744))
-  (libedsio/generic.c (xdelta/i/20_generic.c 1.1 744))
+  (libedsio/generic.c (xdelta/i/20_generic.c 1.2 744))
   (libedsio/sha.c (xdelta/i/21_sha.c 1.1 744))
   (libedsio/edsio.ser (xdelta/i/22_edsio.ser 1.1 744))
-  (libedsio/edsio.h (xdelta/i/23_edsio.h 1.1 744))
+  (libedsio/edsio.h (xdelta/i/23_edsio.h 1.2 744))
   (libedsio/partime.h (xdelta/i/24_partime.h 1.1 744))
   (libedsio/library.c (xdelta/i/25_library.c 1.1 744))
   (libedsio/edsio.c (xdelta/i/26_edsio.c 1.1 744))

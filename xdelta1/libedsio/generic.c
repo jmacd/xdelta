@@ -24,8 +24,6 @@ typedef struct {
 static GArray   *ser_array;
 static gboolean  ser_array_sorted;
 
-void serializeio_source_reset_allocation (SerialSource* source);
-
 void
 serializeio_initialize_type (const char* name,
 			     guint32    val,
@@ -127,16 +125,7 @@ serializeio_unserialize_generic_internal (SerialSource *source,
   if (ent)
     {
       res = ent->unserialize_func (source, object);
-
-      if (set_allocation && res)
-	{
-	  if (! serializeio_source_object_received (source))
-	    return FALSE;
-	}
     }
-
-  if (set_allocation)
-    serializeio_source_reset_allocation (source);
 
   return res;
 }
