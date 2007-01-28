@@ -1,5 +1,5 @@
 /* -*-Mode: C;-*-
- * $Id: edsio.h 1.15.1.1 Mon, 11 Jun 2001 01:56:01 -0700 jmacd $
+ * $Id: edsio.h 1.1 Sun, 28 Jan 2007 10:02:26 -0800 jmacd $
  *
  * Copyright (C) 1998, 1999, Josh MacDonald.
  * All Rights Reserved.

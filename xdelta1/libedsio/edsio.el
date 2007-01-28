@@ -505,7 +505,7 @@ the definition file.")
  *
  * This file was AUTOMATICALLY GENERATED using:
  *
- * $Id: edsio.el 1.16 Tue, 06 Apr 1999 23:40:10 -0700 jmacd $
+ * $Id: edsio.el 1.1 Sun, 28 Jan 2007 10:02:26 -0800 jmacd $
  */
 
 ")

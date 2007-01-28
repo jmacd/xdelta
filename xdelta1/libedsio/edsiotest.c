@@ -1,5 +1,5 @@
 /* -*-Mode: C;-*-
- * $Id: edsiotest.c 1.6 Sat, 03 Apr 1999 03:23:54 -0800 jmacd $
+ * $Id: edsiotest.c 1.1 Sun, 28 Jan 2007 10:02:26 -0800 jmacd $
  *
  * Copyright (C) 1998, 1999, Josh MacDonald.
  * All Rights Reserved.

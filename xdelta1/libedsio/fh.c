@@ -1,5 +1,5 @@
 /* -*-Mode: C;-*-
- * $Id: fh.c 1.3 Wed, 31 Mar 1999 17:39:58 -0800 jmacd $
+ * $Id: fh.c 1.1 Sun, 28 Jan 2007 10:02:26 -0800 jmacd $
  *
  * Copyright (C) 1998, 1999, Josh MacDonald.
  * All Rights Reserved.

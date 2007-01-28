@@ -1,5 +1,5 @@
 /* -*-Mode: C;-*-
- * $Id: generic.c 1.3 Tue, 06 Apr 1999 23:40:10 -0700 jmacd $
+ * $Id: generic.c 1.1 Sun, 28 Jan 2007 10:02:26 -0800 jmacd $
  *
  * Copyright (C) 1998, 1999, Josh MacDonald.
  * All Rights Reserved.
