@@ -598,8 +598,13 @@ static int         xd3_selftest      (void);
 #define UINT32_OFLOW_MASK 0xfe000000U
 #define UINT64_OFLOW_MASK 0xfe00000000000000ULL
 
+#ifndef UINT32_MAX
 #define UINT32_MAX 4294967295U
+#endif
+
+#ifndef UINT64_MAX
 #define UINT64_MAX 18446744073709551615ULL
+#endif
 
 #if SIZEOF_USIZE_T == 4
 #define USIZE_T_MAX        UINT32_MAX

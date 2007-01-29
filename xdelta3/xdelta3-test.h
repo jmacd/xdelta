@@ -606,7 +606,7 @@ test_address_cache (xd3_stream *stream, int unused)
 
   for (offset = 1; offset < ADDR_CACHE_ROUNDS; offset += 1)
     {
-      usize_t addr;
+      uint32_t addr;
 
       if ((ret = xd3_decode_address (stream, offset, modes[offset], & buf, buf_max, & addr))) { return ret; }
 

@@ -46,7 +46,8 @@ MAX_RUN        = 1000 * 1000 * 10
 
 #
 #
-RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
+#RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
+RCSDIR = 'Z:/Polaroid/orbit_linux/home/jmacd/PRCS'
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 

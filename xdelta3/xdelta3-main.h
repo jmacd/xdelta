@@ -971,15 +971,15 @@ main_print_window (xd3_stream* stream)
       if ((ret = xd3_decode_instruction (stream))) { return ret; }
 
       VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, code,
-	       xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
-	       stream->dec_current1.size);
+	 xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
+	 (usize_t) stream->dec_current1.size);
 
       if (stream->dec_current1.type != XD3_NOOP)
 	{
 	  size += stream->dec_current1.size;
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-6u", stream->dec_current1.addr);
+	      VC(UT " @%-6u", (usize_t)stream->dec_current1.addr);
 	    }
 	  else
 	    {
@@ -991,12 +991,12 @@ main_print_window (xd3_stream* stream)
 	{
 	  size += stream->dec_current2.size;
 	  VC(UT "  %s %3u",
-		   xd3_rtype_to_string (stream->dec_current2.type, option_print_cpymode),
-		   stream->dec_current2.size);
+	     xd3_rtype_to_string (stream->dec_current2.type, option_print_cpymode),
+	     (usize_t)stream->dec_current2.size);
 
 	  if (stream->dec_current2.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-6u", stream->dec_current2.addr);
+	      VC(UT " @%-6u", (usize_t)stream->dec_current2.addr);
 	    }
 	}
 
@@ -1095,7 +1095,7 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if ((stream->dec_win_ind & VCD_ADLER32) != 0)
     {
-      VC(UT "VCDIFF adler32 checksum:      %08X\n", stream->dec_adler32);
+      VC(UT "VCDIFF adler32 checksum:      %08X\n", (usize_t)stream->dec_adler32);
     }
 
   if (stream->dec_del_ind != 0)
@@ -1115,16 +1115,16 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if (SRCORTGT (stream->dec_win_ind))
     {
-      VC(UT "VCDIFF copy window length:    %u\n", stream->dec_cpylen);
+      VC(UT "VCDIFF copy window length:    %u\n", (usize_t)stream->dec_cpylen);
       VC(UT "VCDIFF copy window offset:    %"Q"u\n", stream->dec_cpyoff);
     }
 
-  VC(UT "VCDIFF delta encoding length: %u\n", stream->dec_enclen);
-  VC(UT "VCDIFF target window length:  %u\n", stream->dec_tgtlen);
+  VC(UT "VCDIFF delta encoding length: %u\n", (usize_t)stream->dec_enclen);
+  VC(UT "VCDIFF target window length:  %u\n", (usize_t)stream->dec_tgtlen);
 
-  VC(UT "VCDIFF data section length:   %u\n", stream->data_sect.size);
-  VC(UT "VCDIFF inst section length:   %u\n", stream->inst_sect.size);
-  VC(UT "VCDIFF addr section length:   %u\n", stream->addr_sect.size);
+  VC(UT "VCDIFF data section length:   %u\n", (usize_t)stream->data_sect.size);
+  VC(UT "VCDIFF inst section length:   %u\n", (usize_t)stream->inst_sect.size);
+  VC(UT "VCDIFF addr section length:   %u\n", (usize_t)stream->addr_sect.size);
 
   ret = 0; 
   if ((stream->flags & XD3_JUST_HDR) != 0)

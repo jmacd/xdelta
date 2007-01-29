@@ -95,7 +95,11 @@
 typedef unsigned int    usize_t;
 typedef u_int8_t        uint8_t;
 typedef u_int16_t       uint16_t;
+
+#ifndef __uint32_t_defined  /* Note: Cygwin compat */
 typedef u_int32_t       uint32_t;
+#endif
+
 typedef u_int64_t       uint64_t;
 #else
 // CRT_SECURE_NO_DEPRECATE silences warnings about sprintf() and strerror()
@@ -462,8 +466,8 @@ struct _xd3_dinst
 struct _xd3_hinst
 {
   uint8_t     type;
-  usize_t      size;
-  usize_t      addr;
+  uint32_t    size;
+  uint32_t    addr;
 };
 
 /* used by the encoder to buffer output in sections.  list of blocks. */
@@ -534,12 +538,12 @@ struct _xd3_desect
 {
   const uint8_t *buf;
   const uint8_t *buf_max;
-  usize_t         size;
-  usize_t         pos;
+  uint32_t       size;
+  usize_t        pos;
   uint8_t       *copied1;
-  usize_t         alloc1;
+  usize_t        alloc1;
   uint8_t       *copied2;
-  usize_t         alloc2;
+  usize_t        alloc2;
 };
 
 /******************************************************************************************
@@ -714,26 +718,26 @@ struct _xd3_stream
   uint              dec_del_ind;      /* VCDIFF delta indicator */
 
   uint8_t           dec_magic[4];     /* First four bytes */
-  usize_t            dec_magicbytes;   /* Magic position. */
+  usize_t           dec_magicbytes;   /* Magic position. */
 
-  uint               dec_secondid;     /* Optional secondary compressor ID. */
+  uint              dec_secondid;     /* Optional secondary compressor ID. */
 
-  usize_t            dec_codetblsz;    /* Optional code table: length. */
+  uint32_t          dec_codetblsz;    /* Optional code table: length. */
   uint8_t          *dec_codetbl;      /* Optional code table: storage. */
-  usize_t            dec_codetblbytes; /* Optional code table: position. */
+  usize_t           dec_codetblbytes; /* Optional code table: position. */
 
-  usize_t            dec_appheadsz;    /* Optional application header: size. */
+  uint32_t          dec_appheadsz;    /* Optional application header: size. */
   uint8_t          *dec_appheader;    /* Optional application header: storage */
-  usize_t            dec_appheadbytes; /* Optional application header: position. */
+  usize_t           dec_appheadbytes; /* Optional application header: position. */
 
   usize_t            dec_cksumbytes;   /* Optional checksum: position. */
   uint8_t           dec_cksum[4];     /* Optional checksum: storage. */
   uint32_t          dec_adler32;      /* Optional checksum: value. */
 
-  usize_t            dec_cpylen;       /* length of copy window (VCD_SOURCE or VCD_TARGET) */
-  xoff_t            dec_cpyoff;       /* offset of copy window (VCD_SOURCE or VCD_TARGET)  */
-  usize_t            dec_enclen;       /* length of delta encoding */
-  usize_t            dec_tgtlen;       /* length of target window */
+  uint32_t           dec_cpylen;       /* length of copy window (VCD_SOURCE or VCD_TARGET) */
+  xoff_t             dec_cpyoff;       /* offset of copy window (VCD_SOURCE or VCD_TARGET)  */
+  uint32_t           dec_enclen;       /* length of delta encoding */
+  uint32_t           dec_tgtlen;       /* length of target window */
 
 #if USE_UINT64
   uint64_t          dec_64part;       /* part of a decoded uint64_t */

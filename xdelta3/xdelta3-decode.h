@@ -221,7 +221,6 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
       (ret = xd3_read_size (stream,
  			    & stream->inst_sect.buf,
 			      stream->inst_sect.buf_max,
-
 			    & inst->size)))
     {
       return XD3_INTERNAL;

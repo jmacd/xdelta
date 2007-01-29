@@ -465,7 +465,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
     {
       IF_DEBUG (if (first_bits != total_bits)
       {
-	P(RINT "code length overflow changed %d bits\n", total_bits - first_bits);
+	P(RINT "code length overflow changed %u bits\n", (usize_t)(total_bits - first_bits));
       });
       return total_bits;
     }
