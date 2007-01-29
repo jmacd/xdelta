@@ -701,7 +701,7 @@ test_compress_text (xd3_stream  *stream,
 
   xd3_set_appheader (stream, test_apphead, sizeof (test_apphead));
 
-  if ((ret = xd3_encode_completely (stream, test_text, sizeof (test_text),
+  if ((ret = xd3_encode_completely_stream (stream, test_text, sizeof (test_text),
 				    encoded, encoded_size, 4*sizeof (test_text)))) { goto fail; }
 
   if ((ret = xd3_close_stream (stream))) { goto fail; }
@@ -1384,7 +1384,7 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 
       if ((i % 200) == 199) { DOT (); }
 
-      if ((ret = xd3_process_completely (& estream, xd3_encode_input, 0,
+      if ((ret = xd3_process_completely_stream (& estream, xd3_encode_input, 0,
 					 encbuf, 1 << 20,
 					 delbuf, & delsize, 1 << 10)))
 	{
@@ -1392,7 +1392,7 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 	  goto fail;
 	}
 
-      if ((ret = xd3_process_completely (& dstream, xd3_decode_input, 0,
+      if ((ret = xd3_process_completely_stream (& dstream, xd3_decode_input, 0,
 					 delbuf, delsize,
 					 decbuf, & decsize, 1 << 20)))
 	{
@@ -1921,7 +1921,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   if ((ret = xd3_set_source (stream, & source))) { goto fail; }
 
   /* Decode. */
-  if ((ret = xd3_decode_completely (stream, del, delpos, rec, & recsize, IDB_TGTSZ))) { goto fail; }
+  if ((ret = xd3_decode_completely_stream (stream, del, delpos, rec, & recsize, IDB_TGTSZ))) { goto fail; }
 
   /* Check result size and data. */
   if (recsize != IDB_TGTSZ) { stream->msg = "wrong size reconstruction"; goto fail; }
@@ -2135,7 +2135,7 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
       target[tpos++] = i;
     }
 
-  if ((ret = xd3_encode_completely (stream, target, tpos,
+  if ((ret = xd3_encode_completely_stream (stream, target, tpos,
 				    delta, & delta_size, sizeof (delta))))
     {
       return ret;
@@ -2144,7 +2144,7 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
   xd3_free_stream(stream);
   if ((ret = xd3_config_stream (stream, & config))) { return ret; }
 
-  if ((ret = xd3_decode_completely (stream, delta, delta_size,
+  if ((ret = xd3_decode_completely_stream (stream, delta, delta_size,
 				    recon, & recon_size, sizeof (recon))))
     {
       return ret;

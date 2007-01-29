@@ -1204,7 +1204,7 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *cod
 
   if ((ret = xd3_set_source (& stream, & source))) { goto fail; }
 
-  if ((ret = xd3_encode_completely (& stream, code_string, CODE_TABLE_STRING_SIZE,
+  if ((ret = xd3_encode_completely_stream (& stream, code_string, CODE_TABLE_STRING_SIZE,
 				    comp_string, comp_string_size, CODE_TABLE_VCDIFF_SIZE))) { goto fail; }
 
  fail:
@@ -1400,7 +1400,7 @@ xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t si
 
   if ((ret = xd3_config_stream (& stream, NULL)) ||
       (ret = xd3_set_source (& stream, & source)) ||
-      (ret = xd3_decode_completely (& stream, data, size, code_string, & code_size, sizeof (code_string))))
+      (ret = xd3_decode_completely_stream (& stream, data, size, code_string, & code_size, sizeof (code_string))))
     {
       in_stream->msg = stream.msg;
       goto fail;
@@ -3807,7 +3807,7 @@ xd3_encode_input (xd3_stream *stream)
 /* This function invokes either encode or decode to and from in-memory arrays.  The output array
  * must be large enough to hold the output or else ENOSPC is returned. */
 static int
-xd3_process_completely (xd3_stream    *stream,
+xd3_process_completely_stream (xd3_stream    *stream,
 			int          (*func) (xd3_stream *),
 			int            close_stream,
 			const uint8_t *input,
@@ -3860,28 +3860,28 @@ xd3_process_completely (xd3_stream    *stream,
 }
 
 int
-xd3_decode_completely (xd3_stream    *stream,
+xd3_decode_completely_stream (xd3_stream    *stream,
 		       const uint8_t *input,
 		       usize_t         input_size,
 		       uint8_t       *output,
 		       usize_t        *output_size,
 		       usize_t         avail_size)
 {
-  return xd3_process_completely (stream, & xd3_decode_input, 1,
+  return xd3_process_completely_stream (stream, & xd3_decode_input, 1,
 				 input, input_size,
 				 output, output_size, avail_size);
 }
 
 #if XD3_ENCODER
 int
-xd3_encode_completely (xd3_stream    *stream,
+xd3_encode_completely_stream (xd3_stream    *stream,
 		       const uint8_t *input,
 		       usize_t         input_size,
 		       uint8_t       *output,
 		       usize_t        *output_size,
 		       usize_t         avail_size)
 {
-  return xd3_process_completely (stream, & xd3_encode_input, 1,
+  return xd3_process_completely_stream (stream, & xd3_encode_input, 1,
 				 input, input_size,
 				 output, output_size, avail_size);
 }

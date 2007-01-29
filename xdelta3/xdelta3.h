@@ -841,9 +841,10 @@ struct _xd3_stream
  *   XD3_GETSRCBLK: If the xd3_getblk() callback is NULL, this value is returned to
  *               initiate a non-blocking source read.
  *
- * For simple usage, see the xd3_process_completely() function, which underlies
- * xd3_encode_completely() and xd3_decode_completely() [xdelta3.c].  For real application
- * usage, including the application header, the see command-line utility [xdelta3-main.h].
+ * For simple usage, see the xd3_process_completely_stream() function, which underlies
+ * xd3_encode_completely_stream() and xd3_decode_completely_stream() [xdelta3.c].  For
+ * real application usage, including the application header, the see command-line utility
+ * [xdelta3-main.h].
  *
  * main_input() implements the command-line encode and decode as well as the optional
  * VCDIFF_TOOLS printhdr, printhdrs, and printdelta with a single loop [xdelta3-main.h].
@@ -881,21 +882,21 @@ int     xd3_set_source    (xd3_stream    *stream,
 
 /* This function invokes xd3_encode_input using whole-file, in-memory inputs.  The output
  * array must be large enough to hold the output or else ENOSPC is returned. */
-int     xd3_encode_completely (xd3_stream    *stream,
-			       const uint8_t *input,
-			       usize_t         input_size,
-			       uint8_t       *output,
-			       usize_t        *output_size,
-			       usize_t         avail_output);
+int     xd3_encode_completely_stream (xd3_stream    *stream,
+				      const uint8_t *input,
+				      usize_t         input_size,
+				      uint8_t       *output,
+				      usize_t        *output_size,
+				      usize_t         avail_output);
 
 /* This function invokes xd3_decode_input using whole-file, in-memory inputs.  The output
  * array must be large enough to hold the output or else ENOSPC is returned. */
-int     xd3_decode_completely (xd3_stream    *stream,
-			       const uint8_t *input,
-			       usize_t         input_size,
-			       uint8_t       *output,
-			       usize_t        *output_size,
-			       usize_t         avail_size);
+int     xd3_decode_completely_stream (xd3_stream    *stream,
+				      const uint8_t *input,
+				      usize_t         input_size,
+				      uint8_t       *output,
+				      usize_t        *output_size,
+				      usize_t         avail_size);
 
 /* This should be called before the first call to xd3_encode_input() to include
  * application-specific data in the VCDIFF header. */

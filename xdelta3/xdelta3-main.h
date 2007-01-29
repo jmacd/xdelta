@@ -257,7 +257,7 @@ static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* go through the motions, but do not open or write output */
 static const char *option_source_filename    = NULL;
 
-static int         option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
+static usize_t     option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
 static int         option_srcwinsz_set       = 0;
@@ -303,7 +303,7 @@ static int allow_fake_source = 0;
  * the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
-  /* The entry for xdelta3/1 must be 0/1 because the program_names are set there. */
+  /* The entry for xdelta3 must be 0 because the program_name is set there. */
   { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3, RD_NONEXTERNAL },
   { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
