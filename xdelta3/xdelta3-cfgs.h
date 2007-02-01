@@ -1,5 +1,5 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001 and onward.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007. Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

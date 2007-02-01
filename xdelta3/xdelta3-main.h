@@ -357,7 +357,7 @@ main_config (void)
 }
 
 static void
-reset_defaults()
+reset_defaults(void)
 {
   option_stdout = 0;
   option_force = 0;
@@ -665,15 +665,6 @@ main_file_init (main_file *xfile)
 #endif
 }
 
-static void
-main_file_cleanup (main_file *xfile)
-{
-  if (xfile->filename_copy != NULL) {
-    main_free(xfile->filename_copy);
-    xfile->filename_copy = NULL;
-  }
-}
-
 static int
 main_file_isopen (main_file *xfile)
 {
@@ -715,6 +706,19 @@ main_file_close (main_file *xfile)
 
   if (ret != 0) { XF_ERROR ("close", xfile->filename, ret = get_errno ()); }
   return ret;
+}
+
+static void
+main_file_cleanup (main_file *xfile)
+{
+  if (main_file_isopen (xfile)) {
+    main_file_close (xfile);
+  }
+
+  if (xfile->filename_copy != NULL) {
+    main_free(xfile->filename_copy);
+    xfile->filename_copy = NULL;
+  }
 }
 
 static int

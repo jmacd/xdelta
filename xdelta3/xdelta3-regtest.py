@@ -1,6 +1,6 @@
 #!/usr/bin/python2.4
 # xdelta 3 - delta compression tools and library
-# Copyright (C) 2003 and onward.  Joshua P. MacDonald
+# Copyright (C) 2003, 2006, 2007.  Joshua P. MacDonald
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -618,50 +618,158 @@ def BigFileRun(f1, f2):
     #end
     return 1
 
-def RandomBigRun(f1, f2):
-
-    input_ranges = [
-        (7, 20, 'large_look'),
-        (1, 30, 'large_step'),
-        (4, 5, 'small_look'),
-        (1, 32, 'small_chain'),
-        (1, 16, 'small_lchain'),
-        (0, 1, 'ssmatch'),
-        (0, 1, 'trylazy'),
-        (1, 128, 'max_lazy'),
-        (1, 256, 'long_enough'),
-        (0, 1, 'promote'),
-    ]
-
-    config = []
-    rand = random.Random()
-    map = {}
-
-    for input in input_ranges:
-        x = rand.randrange(input[0], input[1] + 1)
-        config.append(x)
-        map[input[2]] = x
+class RandomTestResult:
+    def __init__(self, config, runtime, compsize):
+        self.myconfig = config
+        self.runtime = runtime
+        self.compsize = compsize
     #end
 
-    if map['small_chain'] < map['small_lchain']:
+    def __str__(self):
+        return '%.4f %d [%s]' % (self.time(), self.size(), ' '.join([str(x) for x in self.config()]))
+    #end
+
+    def time(self):
+        return self.runtime
+    #end
+
+    def size(self):
+        return self.compsize
+    #end
+
+    def config(self):
+        return self.myconfig
+    #end
+#end
+
+def PosInAlist(l, e):
+    for i in range(len(l)):
+        if l[i][1] == e:
+            return i;
+        #end
+    #end
+    return -1
+#end
+
+# How many results per round
+MAX_RESULTS = 20
+
+class RandomTester:
+    def __init__(self):
+        self.results = []
+    #end
+
+    def HasEnoughResults(self):
+        return len(self.results) >= MAX_RESULTS
+    #end
+
+    def RandomBigRun(self, f1, f2):
+
+        input_ranges = [
+            (7, 9, 12, 'large_look'),
+            (1, 9, 17, 'large_step'),
+            (4, 4, 4, 'small_look'),  # Note: disabled
+            (1, 10, 100, 'small_chain'),
+            (1, 5, 50, 'small_lchain'),
+            (0, 0, 0, 'ssmatch'),     # Note: disabled
+            (1, 1, 1, 'trylazy'),     # Note: enabled
+            (1, 128, 1024, 'max_lazy'),
+            (1, 256, 2048, 'long_enough'),
+            (0, 0, 0, 'promote'),     # Note: disabled
+        ]
+
+        config = []
+        rand = random.Random()
+        map = {}
+
+        for input in input_ranges:
+            minv = input[0]
+            mean = input[1]
+            maxv = input[2]
+            name = input[3]
+            if minv == maxv:
+                val = minv
+            else:
+                val = -1
+                while val < minv or val > maxv:
+                    val = int(rand.expovariate(1.0 / mean))
+                #end
+            #end
+
+            config.append(val)
+            map[name] = val
+        #end
+
+        if map['small_chain'] < map['small_lchain']:
+            return
+
+        if map['large_look'] < map['small_look']:
+            return
+
+        strs = [str(x) for x in config]
+
+        runner = Xdelta3Pair()
+        runner.extra = ['-I', '0', '-D', '-C', ','.join(strs)]
+        result = TimeRun(runner.Runner(f1, 1, f2, 2))
+
+        print 'config %s dsize %d time %.7f in %u trials' % \
+              (' '.join(strs),
+               result.r1.dsize,
+               result.time.mean,
+               result.trials)
+
+        self.results.append(RandomTestResult(config,
+                                             result.time.mean,
+                                             result.r1.dsize))
         return
+    #end
 
-    if map['large_look'] < map['small_look']:
-        return
-    
-    strs = [str(x) for x in config]
+    def ScoreTests(self):
+        mint = float(min([test.time() for test in self.results]))
+        maxt = float(max([test.time() for test in self.results]))
+        mins = float(min([test.size() for test in self.results]))
+        maxs = float(max([test.size() for test in self.results]))
 
-    runner = Xdelta3Pair()
-    runner.extra = ['-I', '0', '-D', '-C', ','.join(strs)]
-    result = TimeRun(runner.Runner(f1, 1, f2, 2))
+        scored = []
+        timed = []
+        sized = []
 
-    print 'config %s dsize %d time %.7f in %u trials' % \
-          (' '.join(strs),
-           result.r1.dsize,
-           result.time.mean,
-           result.trials)
+        for test in self.results:
+            ntime = (test.time()) / float(maxt)
+            nsize = (test.size()) / float(maxs)
+            score = math.sqrt((maxs / mins) * ntime * ntime +
+                              (maxt / mint) * nsize * nsize)
+            scored.append((score, test))
+            timed.append((test.time(), test, score))
+            sized.append((test.size(), test, score))
+        #end
+        scored.sort()
+        timed.sort()
+        sized.sort()
+        for (score, test) in scored:
+            spos = PosInAlist(sized, test)
+            tpos = PosInAlist(timed, test)
+            print 'Score %f: %s (%d, %d)' % (score, test, spos, tpos)
+        #end
 
-    return (config, result.r1.dsize, result.time.mean)
+        scored = scored[0:MAX_RESULTS/2]
+        sized = sized[0:MAX_RESULTS/2]
+        timed = timed[0:MAX_RESULTS/2]
+
+        for (size, test, score) in sized:
+            print 'Size: %s (%f)' % (test, score)
+        #end
+
+        for (time, test, score) in timed:
+            print 'Time: %s (%f)' % (test, score)
+        #end
+
+        self.results = []
+        for (score, test) in scored:
+            self.results.append(test)
+        #end
+    #end
+#end
 
 def RunSpeed():
     for L in Decimals(MAX_RUN):
@@ -674,17 +782,18 @@ def RunSpeed():
 if __name__ == "__main__":
     try:
         os.mkdir(TMPDIR)
-        rcsf = Test()
+        #rcsf = Test()
         #rcsf.PairsByDate(Xdelta3Pair())
         #RunSpeed()
+        #f1, f2 = MakeBigFiles(rcsf)
+        f1 = '/tmp/big.1'
+        f2 = '/tmp/big.2'
+        test = RandomTester()
         while 1:
-            try:
-                f1, f2 = MakeBigFiles(rcsf)
-                #RandomBigRun("/tmp/big.1", "/tmp/big.2")
-                BigFileRun(f1, f2)
-            except CommandError, e:
-                pass
+            while not test.HasEnoughResults():
+                test.RandomBigRun(f1, f2)
             #end
+            test.ScoreTests()
         #end
     except CommandError:
         pass
