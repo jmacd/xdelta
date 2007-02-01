@@ -13,13 +13,19 @@ SOURCES = xdelta3-cfgs.h \
           xdelta3.c \
           xdelta3.h
 
-TARGETS = xdelta3 xdelta3-debug xdelta3-64 xdelta3-everything \
-	  xdelta3-Opg xdelta3-64-O xdelta3-Op xdelta3-O \
+TARGETS = xdelta3-debug \
+	  xdelta3 \
+	  xdelta3-32 \
+	  xdelta3-64 \
+	  xdelta3-everything \
+	  xdelta3-Opg \
+	  xdelta3-64-O \
+	  xdelta3-Op \
 	  xdelta3-decoder xdelta3-decoder-nomain.o \
-	  $(PYTGT) \
 	  xdelta3-nosec.o xdelta3-all.o xdelta3-fgk.o xdelta3-djw.o \
 	  xdelta3-noext xdelta3-tools xdelta3-tune \
-	  xdelta3-notools
+	  xdelta3-notools \
+	  $(PYTGT) \
 
 PYTHON = python
 PYTGT = build/lib.linux-i686-2.4/xdelta3.so
@@ -37,7 +43,12 @@ all: xdelta3-debug xdelta3 $(PYTGT)
 
 all-targets: $(TARGETS)
 
+all-targets-test: all-targets test
+
 pytgt: $(PYTGT)
+
+test:
+	./xdelta3-debug test
 
 tar:
 	tar --exclude ".svn" -czf /tmp/$(RELDIR)-tmp.tar.gz $(SOURCES) $(PYFILES) $(EXTRA)
@@ -81,8 +92,8 @@ xdelta3-decoder-nomain.o: $(SOURCES) linkxd3lib.c
 	    -o xdelta3-decoder-nomain.o
 	strip xdelta3-decoder-nomain.o
 
-xdelta3-O: $(SOURCES)
-	$(CC) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-O -DXD3_MAIN=1 -DSECONDARY_DJW=1 -DREGRESSION_TEST=1 -lm
+xdelta3-32: $(SOURCES)
+	$(CC) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-32 -DXD3_MAIN=1 -DSECONDARY_DJW=1 -DREGRESSION_TEST=1 -lm
 
 xdelta3-O++: $(SOURCES)
 	$(CXX) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-O++ -DXD3_MAIN=1 -DSECONDARY_DJW=1 -DREGRESSION_TEST=1 -lm

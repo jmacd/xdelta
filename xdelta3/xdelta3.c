@@ -763,9 +763,7 @@ static const xd3_sec_type djw_sec_type =
  * allowing to vary the distribution of single- and
  * double-instructions and change the number of near and same copy
  * modes.  More exotic tables are only possible by extending this
- * code, but a detailed experiment would need to be carried out first,
- * probably using separate code.  I would like to experiment with a
- * double-copy instruction, for example.
+ * code.  TODO: experiment with a double-copy instruction.
  *
  * For performance reasons, both the parametrized and non-parametrized
  * versions of xd3_choose_instruction remain.  The parametrized
@@ -1209,8 +1207,8 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *cod
 
   if ((ret = xd3_set_source (& stream, & source))) { goto fail; }
 
-  if ((ret = xd3_encode_completely_stream (& stream, code_string, CODE_TABLE_STRING_SIZE,
-				    comp_string, comp_string_size, CODE_TABLE_VCDIFF_SIZE))) { goto fail; }
+  if ((ret = xd3_encode_stream (& stream, code_string, CODE_TABLE_STRING_SIZE,
+				comp_string, comp_string_size, CODE_TABLE_VCDIFF_SIZE))) { goto fail; }
 
  fail:
 
@@ -1405,7 +1403,7 @@ xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t si
 
   if ((ret = xd3_config_stream (& stream, NULL)) ||
       (ret = xd3_set_source (& stream, & source)) ||
-      (ret = xd3_decode_completely_stream (& stream, data, size, code_string, & code_size, sizeof (code_string))))
+      (ret = xd3_decode_stream (& stream, data, size, code_string, & code_size, sizeof (code_string))))
     {
       in_stream->msg = stream.msg;
       goto fail;
@@ -3809,17 +3807,15 @@ xd3_encode_input (xd3_stream *stream)
  Client convenience functions
  ******************************************************************************************/
 
-/* This function invokes either encode or decode to and from in-memory arrays.  The output array
- * must be large enough to hold the output or else ENOSPC is returned. */
 static int
-xd3_process_completely_stream (xd3_stream    *stream,
-			int          (*func) (xd3_stream *),
-			int            close_stream,
-			const uint8_t *input,
-			usize_t         input_size,
-			uint8_t       *output,
-			usize_t        *output_size,
-			usize_t         avail_size)
+xd3_process_stream (xd3_stream    *stream,
+		    int          (*func) (xd3_stream *),
+		    int            close_stream,
+		    const uint8_t *input,
+		    usize_t        input_size,
+		    uint8_t       *output,
+		    usize_t       *output_size,
+		    usize_t        output_size_max)
 {
   (*output_size) = 0;
 
@@ -3842,13 +3838,17 @@ xd3_process_completely_stream (xd3_stream    *stream,
 	    stream->msg = "stream requires source input";
 	    return XD3_INTERNAL;
 	  }
-	case 0: /* there is no plain "success" return for xd3_encode/decode */
-	  XD3_ASSERT (ret != 0);
+	case 0:
+	  {
+	    /* xd3_encode_input/xd3_decode_input never return 0 */
+	    stream->msg = "invalid return: 0";
+	    return XD3_INTERNAL;
+	  }
 	default:
 	  return ret;
 	}
 
-      if (*output_size + stream->avail_out > avail_size)
+      if (*output_size + stream->avail_out > output_size_max)
 	{
 	  stream->msg = "insufficient output space";
 	  return ENOSPC;
@@ -3864,33 +3864,128 @@ xd3_process_completely_stream (xd3_stream    *stream,
   return (close_stream == 0) ? 0 : xd3_close_stream (stream);
 }
 
-int
-xd3_decode_completely_stream (xd3_stream    *stream,
-		       const uint8_t *input,
-		       usize_t         input_size,
-		       uint8_t       *output,
-		       usize_t        *output_size,
-		       usize_t         avail_size)
-{
-  return xd3_process_completely_stream (stream, & xd3_decode_input, 1,
+static int
+xd3_process_memory (int          (*func) (xd3_stream *),
+		    int            close_stream,
+		    const uint8_t *input,
+		    usize_t        input_size,
+		    const uint8_t *source,
+		    usize_t        source_size,
+		    uint8_t       *output,
+		    usize_t       *output_size,
+		    usize_t        output_size_max,
+		    int            flags) {
+  xd3_stream stream;
+  xd3_config config;
+  xd3_source src;
+  int ret;
+
+  /* TODO: for small inputs, the xd3_stream could be configured to allocate MUCH less
+   * memory.  Most of the allocations sizes are defaulted (see xdelta3.h), and assume
+   * large inputs. */
+  memset (& stream, 0, sizeof (stream));
+  memset (& config, 0, sizeof (config));
+
+  config.flags = flags;
+  config.srcwin_maxsz = source_size;
+  config.winsize = input_size;
+
+  if ((ret = xd3_config_stream (&stream, &config)) != 0)
+    {
+      goto exit;
+    }
+
+  if (source != NULL)
+    {
+      memset (& src, 0, sizeof (src));
+      src.size = source_size;
+      src.blksize = source_size;
+      src.onblk = source_size;
+      src.curblk = source;
+      src.curblkno = 0;
+
+      if ((ret = xd3_set_source (&stream, &src)) != 0)
+	{
+	  goto exit;
+	}
+    }
+
+  if ((ret = xd3_process_stream (& stream,
+				 func, 1,
 				 input, input_size,
-				 output, output_size, avail_size);
+				 output,
+				 output_size,
+				 output_size_max)) != 0)
+    {
+      goto exit;
+    }
+
+ exit:
+  xd3_free_stream(&stream);
+  return ret;
 }
+
+int
+xd3_decode_stream (xd3_stream    *stream,
+		   const uint8_t *input,
+		   usize_t         input_size,
+		   uint8_t       *output,
+		   usize_t        *output_size,
+		   usize_t         output_size_max)
+{
+  return xd3_process_stream (stream, & xd3_decode_input, 1,
+			     input, input_size,
+			     output, output_size, output_size_max);
+}
+
+int
+xd3_decode_memory (const uint8_t *input,
+		   usize_t        input_size,
+		   const uint8_t *source,
+		   usize_t        source_size,
+		   uint8_t       *output,
+		   usize_t       *output_size,
+		   usize_t        output_size_max,
+		   int            flags) {
+  return xd3_process_memory (& xd3_decode_input, 1,
+			     input, input_size,
+			     source, source_size,
+			     output, output_size, output_size_max,
+			     flags);
+}
+
 
 #if XD3_ENCODER
 int
-xd3_encode_completely_stream (xd3_stream    *stream,
-		       const uint8_t *input,
-		       usize_t         input_size,
-		       uint8_t       *output,
-		       usize_t        *output_size,
-		       usize_t         avail_size)
+xd3_encode_stream (xd3_stream    *stream,
+		   const uint8_t *input,
+		   usize_t         input_size,
+		   uint8_t       *output,
+		   usize_t        *output_size,
+		   usize_t         output_size_max)
 {
-  return xd3_process_completely_stream (stream, & xd3_encode_input, 1,
-				 input, input_size,
-				 output, output_size, avail_size);
+  return xd3_process_stream (stream, & xd3_encode_input, 1,
+			     input, input_size,
+			     output, output_size, output_size_max);
+}
+
+int
+xd3_encode_memory (const uint8_t *input,
+		   usize_t        input_size,
+		   const uint8_t *source,
+		   usize_t        source_size,
+		   uint8_t       *output,
+		   usize_t        *output_size,
+		   usize_t        output_size_max,
+		   int            flags) {
+  return xd3_process_memory (& xd3_encode_input, 1,
+			     input, input_size,
+			     source, source_size,
+			     output, output_size, output_size_max,
+			     flags);
 }
 #endif
+
 
 /******************************************************************************************
  String matching helpers
@@ -3996,7 +4091,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       stream->srcwin_cksum_pos = stream->maxsrcaddr;
     }
 
-  if (logical_input_cksum_pos < stream->srcwin_cksum_pos) 
+  if (logical_input_cksum_pos < stream->srcwin_cksum_pos)
     {
       logical_input_cksum_pos = stream->srcwin_cksum_pos;
     }
@@ -4004,7 +4099,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   /* Advance an extra srcwin_size bytes */
   logical_input_cksum_pos += stream->srcwin_size;
 
-  IF_DEBUG1 (P(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n", 
+  IF_DEBUG1 (P(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n",
 	       stream->total_in + stream->input_position,
 	       stream->srcwin_cksum_pos,
 	       logical_input_cksum_pos));
@@ -4038,6 +4133,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       diff = logical_input_cksum_pos - stream->srcwin_cksum_pos;
       onblk = min(blkoff + diff, onblk);
 
+      /* TODO: This block needs to be included in the template pass... duh.
+       */
+
       /* Note: I experimented with rewriting this block to use LARGE_CKSUM_UPDATE()
        * instead of recalculating the cksum every N bytes.  It seemed to make performance
        * worse. */
@@ -4066,7 +4164,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
 /* This function handles the 32/64bit ambiguity -- file positions are 64bit but the hash
  * table for source-offsets is 32bit. */
-static xoff_t 
+static xoff_t
 xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 {
   xoff_t scp = stream->srcwin_cksum_pos;
@@ -4179,7 +4277,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
       greedy_or_not = stream->unencoded_offset;
     }
 
-  
+
 
   /* Backward target match limit. */
   XD3_ASSERT (stream->input_position >= greedy_or_not);
@@ -4295,7 +4393,7 @@ xd3_source_extend_match (xd3_stream *stream)
 		{
 		  break;
 		}
-		
+
 	      /* could be a XD3_GETSRCBLK failure. */
 	      return ret;
 	    }
@@ -4387,7 +4485,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
       /* Correct the variables to remove match_back from the equation. */
       // IT'S A BUG!
-      
+
       usize_t target_position = stream->input_position - stream->match_back;
       usize_t match_length   = stream->match_back      + stream->match_fwd;
       xoff_t match_position  = stream->match_srcpos    - stream->match_back;
@@ -4553,6 +4651,8 @@ xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
  * structure it maintains, which is relatively more expensive than it needs to be (in
  * comparison to zlib) in order to support the PROMOTE decision, which is to prefer the
  * most recently used matching address of a certain string to aid the VCDIFF same cache.
+ *
+ * --- TODO: declare the PROMOTE experiment a failure -- remove the extra LIST --
  *
  * Weak reasoning? it's time to modularize this routine...?  Let's say the PROMOTE
  * feature supported by this slow data structure contributes around 2% improvement in

@@ -597,6 +597,11 @@ struct _xd3_source
   const char         *name;          /* its name, for debug/print purposes */
   void               *ioh;           /* opaque handle */
 
+  /* getblk sets */
+  xoff_t              curblkno;      /* current block number: client sets after getblk request */
+  usize_t             onblk;         /* number of bytes on current block: client sets, xd3 verifies */
+  const uint8_t      *curblk;        /* current block array: client sets after getblk request */
+
   /* xd3 sets */
   usize_t             srclen;        /* length of this source window */
   xoff_t              srcbase;       /* offset of this source window in the source itself */
@@ -604,11 +609,6 @@ struct _xd3_source
   usize_t             cpyoff_blocks; /* offset of copy window in blocks */
   usize_t             cpyoff_blkoff; /* offset of copy window in blocks, remainder */
   xoff_t              getblkno;      /* request block number: xd3 sets current getblk request */
-
-  /* getblk sets */
-  xoff_t              curblkno;      /* current block number: client sets after getblk request */
-  usize_t             onblk;         /* number of bytes on current block: client sets, xd3 verifies */
-  const uint8_t      *curblk;        /* current block array: client sets after getblk request */
 };
 
 /* The primary xd3_stream object, used for encoding and decoding.  You may access only two
@@ -812,11 +812,86 @@ struct _xd3_stream
  PUBLIC FUNCTIONS
  ******************************************************************************************/
 
-/* The two I/O disciplines, encode and decode, have similar stream semantics.  It is
- * recommended that applications use the same code for compression and decompression -
- * because there are only a few differences in handling encoding/decoding.
+/* This function configures an xd3_stream using the provided in-memory input buffer,
+ * source buffer, output buffer, and flags.  The output array must be large enough or else
+ * ENOSPC will be returned.  This is the simplest in-memory encoding interface. */
+int     xd3_encode_memory (const uint8_t *input,
+			   usize_t        input_size,
+			   const uint8_t *source,
+			   usize_t        source_size,
+			   uint8_t       *output,
+			   usize_t       *output_size,
+			   usize_t        avail_output,
+			   int            flags);
+
+/* The reverse of xd3_encode_memory. */
+int     xd3_decode_memory (const uint8_t *input,
+			   usize_t        input_size,
+			   const uint8_t *source,
+			   usize_t        source_size,
+			   uint8_t       *output,
+			   usize_t       *output_size,
+			   usize_t        avail_output,
+			   int            flags);
+
+/* This function encodes an in-memory input.  Everything else about the xd3_stream is
+ * configurable.  The output array must be large enough to hold the output or else ENOSPC
+ * is returned.  The source (if any) should be set using xd3_set_source() with a
+ * single-block xd3_source.  This calls the underlying non-blocking interface,
+ * xd3_encode_input(), handling the necessary input/output states.  This method be
+ * considered a reference for any application using xd3_encode_input() directly.
  *
- * See also the xd3_avail_input() and xd3_consume_output() routines, inlined below.
+ *   xd3_stream stream;
+ *   xd3_config config;
+ *   xd3_source src;
+ * 
+ *   memset (& src, 0, sizeof (src));
+ *   memset (& stream, 0, sizeof (stream));
+ *   memset (& config, 0, sizeof (config));
+ *
+ *   if (source != NULL)
+ *     {
+ *       src.size = source_size;
+ *       src.blksize = source_size;
+ *       src.curblkno = 0;
+ *       src.onblk = source_size;
+ *       src.curblk = source;
+ *       xd3_set_source(&stream, &src);
+ *     }
+ *
+ *   config.flags = flags;
+ *   config.srcwin_maxsz = source_size;
+ *   config.winsize = input_size;
+ *
+ *   ... set smatcher, appheader, encoding-table, compression-level, etc.
+ *
+ *   xd3_config_stream(&stream, &config);
+ *   xd3_encode_stream(&stream, ...);
+ *   xd3_free_stream(&stream);
+ *
+ * DO NOT USE except for testing. These methods are allocate bad buffer sizes.
+ */
+int     xd3_encode_stream (xd3_stream    *stream,
+			   const uint8_t *input,
+			   usize_t         input_size,
+			   uint8_t       *output,
+			   usize_t        *output_size,
+			   usize_t         avail_output);
+
+/* The reverse of xd3_encode_stream. */
+int     xd3_decode_stream (xd3_stream    *stream,
+			   const uint8_t *input,
+			   usize_t        input_size,
+			   uint8_t       *output,
+			   usize_t       *output_size,
+			   usize_t        avail_size);
+
+/* This is the non-blocking interface.
+ *
+ * Handling input and output states is the same for encoding or decoding using the
+ * xd3_avail_input() and xd3_consume_output() routines, inlined below.
+ *
+ * Return values:
  *
  *   XD3_INPUT:  the process requires more input: call xd3_avail_input() then repeat
  *   XD3_OUTPUT: the process has more output: read stream->next_out, stream->avail_out,
@@ -844,14 +919,6 @@ struct _xd3_stream
  *               consistent for either encoding or decoding.
  *   XD3_GETSRCBLK: If the xd3_getblk() callback is NULL, this value is returned to
  *               initiate a non-blocking source read.
- *
- * For simple usage, see the xd3_process_completely_stream() function, which underlies
- * xd3_encode_completely_stream() and xd3_decode_completely_stream() [xdelta3.c].  For
- * real application usage, including the application header, the see command-line utility
- * [xdelta3-main.h].
- *
- * main_input() implements the command-line encode and decode as well as the optional
- * VCDIFF_TOOLS printhdr, printhdrs, and printdelta with a single loop [xdelta3-main.h].
  */
 int     xd3_decode_input  (xd3_stream    *stream);
 int     xd3_encode_input  (xd3_stream    *stream);
@@ -868,7 +935,7 @@ int     xd3_config_stream (xd3_stream    *stream,
  * resources it supplied. */
 int     xd3_close_stream (xd3_stream    *stream);
 
-/* This unconditionally closes/frees the stream, future close() will succeed.*/
+/* This unconditionally closes/frees the stream, future close() will succeed. */
 void    xd3_abort_stream (xd3_stream    *stream);
 
 /* xd3_free_stream frees all memory allocated for the stream.  The application is
@@ -884,36 +951,18 @@ void    xd3_free_stream   (xd3_stream    *stream);
 int     xd3_set_source    (xd3_stream    *stream,
 			   xd3_source    *source);
 
-/* This function invokes xd3_encode_input using whole-file, in-memory inputs.  The output
- * array must be large enough to hold the output or else ENOSPC is returned. */
-int     xd3_encode_completely_stream (xd3_stream    *stream,
-				      const uint8_t *input,
-				      usize_t         input_size,
-				      uint8_t       *output,
-				      usize_t        *output_size,
-				      usize_t         avail_output);
-
-/* This function invokes xd3_decode_input using whole-file, in-memory inputs.  The output
- * array must be large enough to hold the output or else ENOSPC is returned. */
-int     xd3_decode_completely_stream (xd3_stream    *stream,
-				      const uint8_t *input,
-				      usize_t         input_size,
-				      uint8_t       *output,
-				      usize_t        *output_size,
-				      usize_t         avail_size);
-
 /* This should be called before the first call to xd3_encode_input() to include
  * application-specific data in the VCDIFF header. */
 void    xd3_set_appheader (xd3_stream    *stream,
 			   const uint8_t *data,
-			   usize_t         size);
+			   usize_t        size);
 
 /* xd3_get_appheader may be called in the decoder after XD3_GOTHEADER.  For convenience,
  * the decoder always adds a single byte padding to the end of the application header,
  * which is set to zero in case the application header is a string. */
 int     xd3_get_appheader (xd3_stream     *stream,
 			   uint8_t       **data,
-			   usize_t         *size);
+			   usize_t        *size);
 
 /* After receiving XD3_GOTHEADER, the decoder should check this function which returns 1
  * if the decoder will require source data. */

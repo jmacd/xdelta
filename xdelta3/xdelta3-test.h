@@ -670,7 +670,7 @@ static const uint8_t test_apphead[] = "header test";
 static int
 test_compress_text (xd3_stream  *stream,
 		    uint8_t     *encoded,
-		    usize_t      *encoded_size)
+		    usize_t     *encoded_size)
 {
   int ret;
   xd3_config cfg;
@@ -701,8 +701,8 @@ test_compress_text (xd3_stream  *stream,
 
   xd3_set_appheader (stream, test_apphead, sizeof (test_apphead));
 
-  if ((ret = xd3_encode_completely_stream (stream, test_text, sizeof (test_text),
-				    encoded, encoded_size, 4*sizeof (test_text)))) { goto fail; }
+  if ((ret = xd3_encode_stream (stream, test_text, sizeof (test_text),
+				encoded, encoded_size, 4*sizeof (test_text)))) { goto fail; }
 
   if ((ret = xd3_close_stream (stream))) { goto fail; }
 
@@ -1384,7 +1384,7 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 
       if ((i % 200) == 199) { DOT (); }
 
-      if ((ret = xd3_process_completely_stream (& estream, xd3_encode_input, 0,
+      if ((ret = xd3_process_stream (& estream, xd3_encode_input, 0,
 					 encbuf, 1 << 20,
 					 delbuf, & delsize, 1 << 10)))
 	{
@@ -1392,7 +1392,7 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 	  goto fail;
 	}
 
-      if ((ret = xd3_process_completely_stream (& dstream, xd3_decode_input, 0,
+      if ((ret = xd3_process_stream (& dstream, xd3_decode_input, 0,
 					 delbuf, delsize,
 					 decbuf, & decsize, 1 << 20)))
 	{
@@ -1921,7 +1921,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   if ((ret = xd3_set_source (stream, & source))) { goto fail; }
 
   /* Decode. */
-  if ((ret = xd3_decode_completely_stream (stream, del, delpos, rec, & recsize, IDB_TGTSZ))) { goto fail; }
+  if ((ret = xd3_decode_stream (stream, del, delpos, rec, & recsize, IDB_TGTSZ))) { goto fail; }
 
   /* Check result size and data. */
   if (recsize != IDB_TGTSZ) { stream->msg = "wrong size reconstruction"; goto fail; }
@@ -2135,7 +2135,7 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
       target[tpos++] = i;
     }
 
-  if ((ret = xd3_encode_completely_stream (stream, target, tpos,
+  if ((ret = xd3_encode_stream (stream, target, tpos,
 				    delta, & delta_size, sizeof (delta))))
     {
       return ret;
@@ -2144,8 +2144,8 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
   xd3_free_stream(stream);
   if ((ret = xd3_config_stream (stream, & config))) { return ret; }
 
-  if ((ret = xd3_decode_completely_stream (stream, delta, delta_size,
-				    recon, & recon_size, sizeof (recon))))
+  if ((ret = xd3_decode_stream (stream, delta, delta_size,
+				recon, & recon_size, sizeof (recon))))
     {
       return ret;
     }
@@ -2206,6 +2206,43 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
   return 0;
 }
 
+static int
+test_in_memory (xd3_stream *stream, int ignore)
+{
+  // test_text is 256 bytes
+  char ibuf[sizeof(test_text)];
+  char dbuf[sizeof(test_text)];
+  char obuf[sizeof(test_text)];
+  int size = sizeof(test_text);
+  int dsize, osize;
+  int r1, r2;
+  int eflags = SECONDARY_DJW ? XD3_SEC_DJW : 0;
+
+  memcpy(ibuf, test_text, size);
+  memset(ibuf + 128, 0, 16);
+
+  r1 = xd3_encode_memory(ibuf, size,
+			 test_text, size,
+			 dbuf, &dsize, size, eflags);
+
+  r2 = xd3_decode_memory(dbuf, dsize,
+			 test_text, size,
+			 obuf, &osize, size, 0);
+
+  if (r1 != 0 || r2 != 0 || dsize >= (size/2) || dsize < 1 ||
+      osize != size) {
+    stream->msg = "encode/decode size error";
+    return XD3_INTERNAL;
+  }
+
+  if (memcmp(obuf, ibuf, size) != 0) {
+    stream->msg = "encode/decode data error";
+    return XD3_INTERNAL;
+  }
+
+  return 0;
+}
+
 /******************************************************************************************
  TEST MAIN
  ******************************************************************************************/
@@ -2248,6 +2285,7 @@ xd3_selftest (void)
   IF_GENCODETBL (DO_TEST (choose_instruction, XD3_ALT_CODE_TABLE, 0));
   IF_GENCODETBL (DO_TEST (encode_code_table, 0, 0));
 
+  DO_TEST (in_memory, 0, 0);
   DO_TEST (identical_behavior, 0, 0);
   DO_TEST (iopt_flush_instructions, 0, 0);
   DO_TEST (source_cksum_offset, 0, 0);

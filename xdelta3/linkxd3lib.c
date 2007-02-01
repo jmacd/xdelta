@@ -27,7 +27,7 @@ int main() {
   use (xd3_set_source (& stream, & source));
   xd3_set_flags (& stream, 0);
   
-  use (xd3_decode_completely_stream (& stream, NULL, 0, NULL, NULL, 0));
+  use (xd3_decode_stream (& stream, NULL, 0, NULL, NULL, 0));
   use (xd3_decode_input (&stream));
   use (xd3_decoder_needs_source (& stream));
   use (xd3_get_appheader (& stream, NULL, NULL));
@@ -37,7 +37,7 @@ int main() {
 			     
 #if XD3_ENCODER
   use (xd3_encode_input (&stream));
-  use (xd3_encode_completely_stream (& stream, NULL, 0, NULL, NULL, 0));
+  use (xd3_encode_stream (& stream, NULL, 0, NULL, NULL, 0));
   use (xd3_set_appheader (& stream));
   use (xd3_encoder_used_source (& stream));
   use (xd3_encoder_srcbase (& stream));

@@ -46,8 +46,8 @@ MAX_RUN        = 1000 * 1000 * 10
 
 #
 #
-#RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-RCSDIR = 'Z:/Polaroid/orbit_linux/home/jmacd/PRCS'
+RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
+#RCSDIR = 'Z:/Polaroid/orbit_linux/home/jmacd/PRCS'
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
@@ -712,15 +712,17 @@ class RandomTester:
         runner.extra = ['-I', '0', '-D', '-C', ','.join(strs)]
         result = TimeRun(runner.Runner(f1, 1, f2, 2))
 
-        print 'config %s dsize %d time %.7f in %u trials' % \
-              (' '.join(strs),
-               result.r1.dsize,
-               result.time.mean,
+        tr = RandomTestResult(config,
+                              result.time.mean,
+                              result.r1.dsize)
+
+        self.results.append(tr)
+
+        print 'Trial %d: %s in %u trials' % \
+              (trial_num++,
+               tr,
                result.trials)
 
-        self.results.append(RandomTestResult(config,
-                                             result.time.mean,
-                                             result.r1.dsize))
         return
     #end
 
@@ -782,19 +784,27 @@ def RunSpeed():
 if __name__ == "__main__":
     try:
         os.mkdir(TMPDIR)
-        #rcsf = Test()
-        #rcsf.PairsByDate(Xdelta3Pair())
-        #RunSpeed()
-        #f1, f2 = MakeBigFiles(rcsf)
-        f1 = '/tmp/big.1'
-        f2 = '/tmp/big.2'
-        test = RandomTester()
+        rcsf = Test()
+
         while 1:
-            while not test.HasEnoughResults():
-                test.RandomBigRun(f1, f2)
+            f1, f2 = MakeBigFiles(rcsf)
+            #f1 = '/tmp/big.1'
+            #f2 = '/tmp/big.2'
+            test = RandomTester()
+            while 1:
+                while not test.HasEnoughResults():
+                    test.RandomBigRun(f1, f2)
+                #end
+                test.ScoreTests()
             #end
-            test.ScoreTests()
         #end
+
+        # This tests pairwise (date-ordered) performance
+        #rcsf.PairsByDate(Xdelta3Pair())
+
+        # This tests the raw speed of 0-byte inputs
+        #RunSpeed()
+
     except CommandError:
         pass
     else:
