@@ -1422,7 +1422,10 @@ xdp_control_read (XdeltaStream    *cont_in)
   /* TODO: free src */
 
   if (! serializeio_unserialize_generic_acceptable (src, ST_XdeltaControl | ST_Version0Control, & type, (void**) & cont))
-    return NULL;
+    {
+      g_warning ("patch parse error\n");
+      return NULL;
+    }
 
   if (type == ST_Version0Control)
     {
