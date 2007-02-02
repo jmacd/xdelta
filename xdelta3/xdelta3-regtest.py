@@ -47,7 +47,8 @@ MAX_RUN        = 1000 * 1000 * 10
 #
 #
 RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-#RCSDIR = 'Z:/Polaroid/orbit_linux/home/jmacd/PRCS'
+RCSDIR = '/tmp/PRCS_read_copy'
+#RCSDIR = 'G:/jmacd/PRCS'
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
@@ -619,7 +620,8 @@ def BigFileRun(f1, f2):
     return 1
 
 class RandomTestResult:
-    def __init__(self, config, runtime, compsize):
+    def __init__(self, round, config, runtime, compsize):
+        self.round = round
         self.myconfig = config
         self.runtime = runtime
         self.compsize = compsize
@@ -652,18 +654,22 @@ def PosInAlist(l, e):
 #end
 
 # How many results per round
-MAX_RESULTS = 20
+MAX_RESULTS = 500
 
 class RandomTester:
-    def __init__(self):
+    def __init__(self, old_results):
+        self.old_configs = old_results
         self.results = []
+        self.trial_num = 0
+        self.round_num = 0
+        self.random = random.Random()
     #end
 
     def HasEnoughResults(self):
         return len(self.results) >= MAX_RESULTS
     #end
 
-    def RandomBigRun(self, f1, f2):
+    def RandomConfig(self):
 
         input_ranges = [
             (7, 9, 12, 'large_look'),
@@ -679,7 +685,6 @@ class RandomTester:
         ]
 
         config = []
-        rand = random.Random()
         map = {}
 
         for input in input_ranges:
@@ -692,7 +697,7 @@ class RandomTester:
             else:
                 val = -1
                 while val < minv or val > maxv:
-                    val = int(rand.expovariate(1.0 / mean))
+                    val = int(self.random.expovariate(1.0 / mean))
                 #end
             #end
 
@@ -701,28 +706,44 @@ class RandomTester:
         #end
 
         if map['small_chain'] < map['small_lchain']:
-            return
+            return None
 
         if map['large_look'] < map['small_look']:
-            return
+            return None
 
-        strs = [str(x) for x in config]
+        return config
+
+    def RandomBigRun(self, f1, f2):
+        config = None
+        if len(self.old_configs) > 0:
+            config = self.old_configs[0]
+            self.old_configs = self.old_configs[1:]
+        #end
+
+        while config is None:
+            config = self.RandomConfig()
+        #end
 
         runner = Xdelta3Pair()
-        runner.extra = ['-I', '0', '-D', '-C', ','.join(strs)]
+        runner.extra = ['-I',
+                        '0',
+                        '-D',
+                        '-C', ','.join([str(x) for x in config])]
         result = TimeRun(runner.Runner(f1, 1, f2, 2))
 
-        tr = RandomTestResult(config,
+        tr = RandomTestResult(self.round_num,
+                              config,
                               result.time.mean,
                               result.r1.dsize)
 
         self.results.append(tr)
 
         print 'Trial %d: %s in %u trials' % \
-              (trial_num++,
+              (self.trial_num,
                tr,
                result.trials)
 
+        self.trial_num += 1
         return
     #end
 
@@ -754,7 +775,6 @@ class RandomTester:
             print 'Score %f: %s (%d, %d)' % (score, test, spos, tpos)
         #end
 
-        scored = scored[0:MAX_RESULTS/2]
         sized = sized[0:MAX_RESULTS/2]
         timed = timed[0:MAX_RESULTS/2]
 
@@ -767,9 +787,12 @@ class RandomTester:
         #end
 
         self.results = []
-        for (score, test) in scored:
-            self.results.append(test)
+        r = []
+        for (score, test) in scored[0:MAX_RESULTS/2]:
+            r.append(test.config())
         #end
+
+        return r
     #end
 #end
 
@@ -780,22 +803,25 @@ def RunSpeed():
         ReportSpeed(L,trx,'xdelta3')
         trg = TimeRun(GzipRun1(RUNFILE))
         ReportSpeed(L,trg,'gzip   ')
+    #end
+#end
 
 if __name__ == "__main__":
     try:
+        RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
         rcsf = Test()
+        configs = []
 
         while 1:
             f1, f2 = MakeBigFiles(rcsf)
             #f1 = '/tmp/big.1'
             #f2 = '/tmp/big.2'
-            test = RandomTester()
-            while 1:
-                while not test.HasEnoughResults():
-                    test.RandomBigRun(f1, f2)
-                #end
-                test.ScoreTests()
+            test = RandomTester(configs)
+            while not test.HasEnoughResults():
+                test.RandomBigRun(f1, f2)
+            #end
+            configs = test.ScoreTests()
             #end
         #end
 
@@ -808,5 +834,5 @@ if __name__ == "__main__":
     except CommandError:
         pass
     else:
-        #RunCommand(['rm', '-rf', TMPDIR])
+        RunCommand(['rm', '-rf', TMPDIR])
         pass
