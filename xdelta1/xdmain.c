@@ -639,7 +639,7 @@ file_gunzip (const char* name)
   FILE* out = fopen (new_name, FOPEN_WRITE_ARG);
   gzFile in = gzopen (name, "rb");
   guint8 buf[1024];
-  int nread;
+  int nread, ret;
 
   while ((nread = gzread (in, buf, 1024)) > 0)
     {
@@ -656,7 +656,12 @@ file_gunzip (const char* name)
       return NULL;
     }
 
-  gzclose (in);
+  ret = gzclose (in);
+  if (ret != Z_OK)
+    {
+      xd_error ("gzip input decompression failed: %s\n", name);
+      return NULL;
+    }
 
   if (fclose (out))
     {

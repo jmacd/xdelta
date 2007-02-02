@@ -1423,6 +1423,10 @@ xdp_control_read (XdeltaStream    *cont_in)
 
   if (! serializeio_unserialize_generic_acceptable (src, ST_XdeltaControl | ST_Version0Control, & type, (void**) & cont))
     {
+      /* TODO: the warning below was added in 1.1.5 after a bug report
+       * regarding an invalid delta, which would fail in patch here:
+       * It's unclear whether this is the "right" place to print the
+       * error. */
       g_warning ("patch parse error\n");
       return NULL;
     }

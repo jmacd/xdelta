@@ -54,7 +54,7 @@
 // fix that!
 //////////////////////////////////////////////////////////////////////
 
-const char* cmd_data_source      = "/zerostreet2/small-scratch-file";
+const char* cmd_data_source      = "/tmp/big.1";
 guint       cmd_size             = 1<<20;
 
 guint       cmd_warmups          = 2;
