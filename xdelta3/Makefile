@@ -34,7 +34,7 @@ PYTGT = build/lib.linux-i686-2.4/xdelta3.so
 
 PYFILES = xdelta3-regtest.py setup.py
 
-EXTRA = Makefile COPYING linkxd3lib.c badcopy.c www \
+EXTRA = Makefile COPYING linkxd3lib.c badcopy.c \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj
 
 # $Format: "REL=$Xdelta3Version$" $
