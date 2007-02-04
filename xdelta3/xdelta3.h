@@ -176,6 +176,9 @@ typedef uint32_t xoff_t;
 #ifndef XD3_BUILD_SOFT
 #define XD3_BUILD_SOFT 1
 #endif
+#ifndef XD3_BUILD_DEFAULT
+#define XD3_BUILD_DEFAULT 1
+#endif
 
 #if XD3_DEBUG
 #include <stdio.h>

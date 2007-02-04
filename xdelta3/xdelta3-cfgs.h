@@ -58,16 +58,16 @@
  ******************************************************************************************/
 #if XD3_BUILD_FAST
 #define TEMPLATE      fast
-#define LLOOK         11
-#define LSTEP         7
+#define LLOOK         9
+#define LSTEP         8
 #define SLOOK         4
 #define SCHAIN        5
-#define SLCHAIN       0
+#define SLCHAIN       1
 #define SSMATCH       0
-#define TRYLAZY       0
-#define MAXLAZY       50
-#define LONGENOUGH    0
-#define PROMOTE       1
+#define TRYLAZY       1
+#define MAXLAZY       5
+#define LONGENOUGH    4
+#define PROMOTE       0
 
 #include "xdelta3.c"
 
@@ -89,15 +89,46 @@
  ******************************************************************************************/
 #if XD3_BUILD_SLOW
 #define TEMPLATE      slow
-#define LLOOK         10
+#define LLOOK         9
 #define LSTEP         1
 #define SLOOK         4
-#define SCHAIN        36
-#define SLCHAIN       13
+#define SCHAIN        9
+#define SLCHAIN       5
 #define SSMATCH       0
 #define TRYLAZY       1
-#define MAXLAZY       512
-#define LONGENOUGH    256
+#define MAXLAZY       200
+#define LONGENOUGH    400
+#define PROMOTE       0
+
+#include "xdelta3.c"
+
+#undef  TEMPLATE
+#undef  LLOOK
+#undef  SLOOK
+#undef  LSTEP
+#undef  SCHAIN
+#undef  SLCHAIN
+#undef  SSMATCH
+#undef  TRYLAZY
+#undef  MAXLAZY
+#undef  LONGENOUGH
+#undef  PROMOTE
+#endif
+
+/******************************************************************************************
+ DEFAULT string matcher
+ ******************************************************************************************/
+#if XD3_BUILD_DEFAULT
+#define TEMPLATE      default
+#define LLOOK         9
+#define LSTEP         4
+#define SLOOK         4
+#define SCHAIN        7
+#define SLCHAIN       3
+#define SSMATCH       0
+#define TRYLAZY       1
+#define MAXLAZY       30
+#define LONGENOUGH    20
 #define PROMOTE       0
 
 #include "xdelta3.c"

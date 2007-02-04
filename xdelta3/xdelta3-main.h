@@ -245,7 +245,7 @@ static int         option_stdout             = 0;
 static int         option_force              = 0;
 static int         option_verbose            = 0;
 static int         option_quiet              = 0;
-static int         option_level              = 5;
+static int         option_level              = 6;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
 static int         option_use_secondary      = 0;
@@ -2363,6 +2363,7 @@ main_input (xd3_cmd     cmd,
 	  config.smatcher_soft.promote       = values[9];
 	}
       else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
+      else if (option_level == 6) { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
       else                        { config.smatch_cfg = XD3_SMATCH_SLOW; }
       break;
 #endif
