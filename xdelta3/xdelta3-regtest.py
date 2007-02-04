@@ -31,8 +31,6 @@ MIN_SIZE       = 0
 
 TIME_TOO_SHORT = 0.050
 
-MIN_REPS       = 1
-MAX_REPS       = 1
 SKIP_TRIALS    = 2
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
@@ -208,13 +206,12 @@ class RcsFile:
                                              self.Vstr(v),
                                              self.Verf(v+1),
                                              self.Vstr(v+1)))
-            print 'testing %s %s: ideal %.3f%%: time %.7f: in %u/%u trials' % \
+            print 'testing %s %s: ideal %.3f%%: time %.7f: in %u trials' % \
                   (os.path.basename(self.fname),
                    self.Vstr(v+1),
                    result.r1.ideal,
                    result.time.mean,
-                   result.trials,
-                   result.reps)
+                   result.trials)
             ntrials.append(result)
             
         os.remove(self.Verf(self.totrev-1))
@@ -316,15 +313,14 @@ class Bucks:
 #
 #
 class TimeRun:
-    def __init__(self,runnable,set_reps=1,reps=MIN_REPS,max_reps=MAX_REPS,\
-                 skip_trials=SKIP_TRIALS,min_trials=MIN_TRIALS,max_trials=MAX_TRIALS, \
+    def __init__(self,runnable,
+                 skip_trials=SKIP_TRIALS,min_trials=MIN_TRIALS,max_trials=MAX_TRIALS,
                  min_stddev_pct=MIN_STDDEV_PCT):
 
         min_trials = min(min_trials,max_trials)
         self.trials   = 0
         self.measured = []
         self.r1       = None
-        self.reps     = reps
         while 1:
             try:
                 os.remove(DFILE)
@@ -335,7 +331,7 @@ class TimeRun:
             start_time  = time.time()
             start_clock = time.clock()
 
-            result = runnable.Run(self.trials, self.reps)
+            result = runnable.Run(self.trials)
 
             if self.r1 == None:
                 self.r1 = result
@@ -343,15 +339,8 @@ class TimeRun:
             total_clock = (time.clock() - start_clock)
             total_time  = (time.time()  - start_time)
 
-            elap_time  = max((total_time) / self.reps,  0.000001)
-            elap_clock = max((total_clock) / self.reps, 0.000001)
-
-            #print 'trial: %d' % self.trials
-            if set_reps and runnable.canrep and total_time < TIME_TOO_SHORT and self.reps < max_reps:
-                self.reps = max(self.reps+1,int(self.reps * TIME_TOO_SHORT / total_time))
-                self.reps = min(self.reps,max_reps)
-                #print 'continue: need more reps: %d' % self.reps
-                continue
+            elap_time  = max((total_time),  0.000001)
+            elap_clock = max((total_clock), 0.000001)
 
             self.trials = self.trials + 1
 
@@ -478,29 +467,37 @@ class Xdelta3Pair:
         self.newv = newv        
         return self
 
-    def Run(self,trial,reps):
-        RunXdelta3(['-P',
-                    '%d' % reps] +
-                   self.extra + 
-                   [self.encode_args,
-                    self.presrc,
-                    self.old,
-                    self.new,
-                    DFILE])
-        if trial > 0:
-            return None
-        self.dinfo = Xdelta3Info(self.new,DFILE)
-        if self.dinfo.extcomp:
-            raise SkipRcsException('ext comp')
-        RunXdelta3([self.decode_args,
-                    self.presrc,
-                    self.old,
-                    DFILE,
-                    RFILE])
-        RunCommand(('cmp',
-                    self.new,
-                    RFILE))
-        return self.dinfo
+    def Run(self,trial):
+
+        # TODO: move '-S djw' somewhere else
+        encode_args =  self.extra + \
+                       [ '-S', 'djw' ] + \
+                      [self.encode_args,
+                       self.presrc,
+                       self.old,
+                       self.new,
+                       DFILE]
+
+        decode_args = [self.decode_args,
+                       self.presrc,
+                       self.old,
+                       DFILE,
+                       RFILE]
+        try:
+            RunXdelta3(encode_args)
+            if trial > 0:
+                return None
+            self.dinfo = Xdelta3Info(self.new,DFILE)
+            if self.dinfo.extcomp:
+                raise SkipRcsException('ext comp')
+            RunXdelta3(decode_args)
+            RunCommand(('cmp',
+                        self.new,
+                        RFILE))
+            return self.dinfo
+        except CommandError:
+            print 'encode args: %s' % ' '.join(encode_args)
+            print 'decode args: %s' % ' '.join(decode_args)
 
 def Test():
     rcsf = RcsFinder()
@@ -529,15 +526,10 @@ def Decimals(max):
     return l
 
 class Xdelta3Run1:
-    def __init__(self,file,reps=0):
+    def __init__(self,file):
         self.file = file
-        self.reps = reps
-        self.canrep = 1
-    def Run(self,trial,reps):
-        if self.reps:
-            assert(reps == 1)
-            reps = self.reps
-        RunXdelta3(['-P', '%d' % reps, '-efq', self.file, DFILE])
+    def Run(self,trial):
+        RunXdelta3(['-efq', self.file, DFILE])
         if trial > 0:
             return None
         return Xdelta3Info(self.file,DFILE)
@@ -546,8 +538,7 @@ class GzipRun1:
     def __init__(self,file):
         self.file = file
         self.canrep = 0
-    def Run(self,trial,reps):
-        assert(reps == 1)
+    def Run(self,trial):
         RunCommandIO(['gzip', '-cf'], self.file, DFILE)
         if trial > 0:
             return None
@@ -560,8 +551,8 @@ def SetFileSize(F,L):
     os.close(fd)
 
 def ReportSpeed(L,tr,desc):
-    print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %ux%u trials' % \
-          (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials, tr.reps)
+    print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %u trials' % \
+          (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials)
 
 def MakeBigFiles(rcsf):
     rand = random.Random()
@@ -585,39 +576,6 @@ def MakeBigFiles(rcsf):
     f2.close()
     return (TMPDIR + "/big.1",
             TMPDIR + "/big.2")
-
-def BigFileRun(f1, f2):
-                   
-    testcases = [
-        # large_look large_step small_look small_chain small_lchain
-        # ssmatch try_lazy max_lazy long_enough promote
-#         ['-DC', '10,1,4,36,13,0,1,512,256,0'],
-#         ['-DC', '10,1,4,36,13,0,1,256,128,0'],
-#         ['-DC', '10,1,4,36,13,0,1,128,64,0'],
-#         ['-DC', '10,1,4,36,13,0,1,64,32,0'],
-
-        ['-DC', '11,7,4,2,1,0,0,110,178,1'],
-        ['-DC', '11,7,4,3,1,0,0,110,178,1'],
-        ['-DC', '11,7,4,4,1,0,0,110,178,1'],
-        ['-DC', '11,7,4,5,1,0,0,110,178,1'],
-        ['-DC', '11,7,4,2,1,0,0,110,100,1'],
-        ['-DC', '11,7,4,2,1,0,0,110,50,1'],
-        ['-DC', '11,7,4,2,1,0,0,110,25,1'],
-    ]
-
-    for test in testcases:
-        runner = Xdelta3Pair()
-        runner.extra = test
-        result = TimeRun(runner.Runner(f1, 1, f2, 2))
-
-        print 'test %s dsize %d: time %.7f: in %u/%u trials' % \
-              (test,
-               result.r1.dsize,
-               result.time.mean,
-               result.trials,
-               result.reps)
-    #end
-    return 1
 
 class RandomTestResult:
     def __init__(self, round, config, runtime, compsize):
@@ -672,15 +630,15 @@ class RandomTester:
     def RandomConfig(self):
 
         input_ranges = [
-            (7, 9, 12, 'large_look'),
-            (1, 9, 17, 'large_step'),
+            (9, 9, 9, 'large_look'),
+            (1, 4.5, 8, 'large_step'),
             (4, 4, 4, 'small_look'),  # Note: disabled
-            (1, 10, 100, 'small_chain'),
-            (1, 5, 50, 'small_lchain'),
+            (1, 10, 30, 'small_chain'),
+            (1, 3.5, 6, 'small_lchain'),
             (0, 0, 0, 'ssmatch'),     # Note: disabled
             (1, 1, 1, 'trylazy'),     # Note: enabled
-            (1, 128, 1024, 'max_lazy'),
-            (1, 256, 2048, 'long_enough'),
+            (1, 128, 256, 'max_lazy'),
+            (1, 256, 512, 'long_enough'),
             (0, 0, 0, 'promote'),     # Note: disabled
         ]
 
@@ -697,7 +655,7 @@ class RandomTester:
             else:
                 val = -1
                 while val < minv or val > maxv:
-                    val = int(self.random.expovariate(1.0 / mean))
+                    val = int(self.random.expovariate(1.0 / mean) + 0.5)
                 #end
             #end
 
@@ -758,10 +716,14 @@ class RandomTester:
         sized = []
 
         for test in self.results:
+
+            # This scores ellipse has x-major (time) and y-minor (size)
             ntime = (test.time()) / float(maxt)
             nsize = (test.size()) / float(maxs)
-            score = math.sqrt((maxs / mins) * ntime * ntime +
-                              (maxt / mint) * nsize * nsize)
+
+            wntime = ntime * (maxs / mins)
+            wnsize = nsize * (maxt / mint)
+            score = math.sqrt(wntime * wntime + wnsize * wnsize)
             scored.append((score, test))
             timed.append((test.time(), test, score))
             sized.append((test.size(), test, score))
