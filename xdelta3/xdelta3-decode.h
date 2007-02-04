@@ -112,24 +112,11 @@ xd3_decode_allocate (xd3_stream  *stream,
 
   if (*copied1 == NULL)
     {
-#if SECONDARY_ANY
-      /* Borrow from the secondary compressor's allocation. */
-      if (copied2 != NULL && *copied2 != NULL && *alloc2 < size)
-	{
-	  *copied1 = *copied2;
-	  *alloc1  = *alloc2;
-	  *copied2 = NULL;
-	  *alloc2  = 0;
-	}
-      else
-#endif
-	{
-	  *alloc1 = xd3_round_blksize (size, XD3_ALLOCSIZE);
+      *alloc1 = xd3_round_blksize (size, XD3_ALLOCSIZE);
 
-	  if ((*copied1 = xd3_alloc (stream, *alloc1, 1)) == NULL)
-	    {
-	      return ENOMEM;
-	    }
+      if ((*copied1 = xd3_alloc (stream, *alloc1, 1)) == NULL)
+	{
+	  return ENOMEM;
 	}
     }
 

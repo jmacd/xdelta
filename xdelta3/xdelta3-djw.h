@@ -926,7 +926,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
 
 	  /* Due to the single-code granularity of this distribution, it may be that we
 	   * can't generate a distribution for each group.  In that case subtract one
-	   * gropu and try again.  If (inefficient), we're testing group behavior, so
+	   * group and try again.  If (inefficient), we're testing group behavior, so
 	   * don't mess things up. */
 	  if (goal == 0 && !cfg->inefficient)
 	    {
@@ -1321,8 +1321,6 @@ djw_decode_symbol (xd3_stream     *stream,
 
 	  if (bstate->cur_byte & bstate->cur_mask) { code |= 1; }
 
-	  IF_DEBUG1 (P(RINT "%u", (bstate->cur_byte & bstate->cur_mask) && 1));
-
 	  bstate->cur_mask <<= 1;
 
 	  if (bits >= min_clen && code <= limit[bits]) { goto done; }
@@ -1349,7 +1347,7 @@ djw_decode_symbol (xd3_stream     *stream,
 
       if (offset <= max_sym)
 	{
-	  IF_DEBUG1 (P(RINT " (%u) ", bits));
+	  IF_DEBUG2 (P(RINT "(j) %u ", code));
 	  *sym = inorder[offset];
 	  return 0;
 	}

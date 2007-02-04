@@ -15,6 +15,8 @@ SOURCES = xdelta3-cfgs.h \
 
 TARGETS = xdelta3-debug \
 	  xdelta3 \
+	  xdelta3-debug2 \
+	  xdelta3-debug3 \
 	  xdelta3-32 \
 	  xdelta3-64 \
 	  xdelta3-everything \
@@ -76,6 +78,14 @@ xdelta3: $(SOURCES)
 xdelta3-debug: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=1 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
+
+xdelta3-debug2: $(SOURCES)
+	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug2 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
+		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=2 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
+
+xdelta3-debug3: $(SOURCES)
+	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug3 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
+		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=3 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
 
 $(PYTGT): $(SOURCES)
 	$(PYTHON) setup.py install --verbose --compile --force

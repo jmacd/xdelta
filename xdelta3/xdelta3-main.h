@@ -468,6 +468,10 @@ get_errno (void)
 const char* 
 xd3_mainerror(int err_num) {
 #ifndef _WIN32
+	const char* x = xd3_strerror (err_num);
+	if (x != NULL) {
+		return x;
+	}
 	return strerror(err_num);
 #else
 	static char err_buf[256];

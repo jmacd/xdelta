@@ -533,6 +533,11 @@ IF_BUILD_SLOW(static const xd3_smatcher    __smatcher_slow;)
 #else
 #define IF_DEBUG1(x)
 #endif
+#if XD3_DEBUG > 2
+#define IF_DEBUG2(x) x
+#else
+#define IF_DEBUG2(x)
+#endif
 #if REGRESSION_TEST
 #define IF_REGRESSION(x) x
 #else

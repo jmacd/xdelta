@@ -92,8 +92,6 @@ static INLINE int xd3_decode_bits     (xd3_stream     *stream,
 	      value |= vmask;
 	    }
 
-	  IF_DEBUG1 (P(RINT "[dbits] %u", (bits->cur_byte & bits->cur_mask) && 1));
-
 	  bits->cur_mask <<= 1;
 
 	  if (vmask == 1) { goto done; }
@@ -114,34 +112,9 @@ static INLINE int xd3_decode_bits     (xd3_stream     *stream,
 
  done:
 
+  IF_DEBUG2 (P(RINT "(d) %u ", value));
+
   (*valuep) = value;
-  return 0;
-}
-
-static INLINE int xd3_decode_bit     (xd3_stream     *stream,
-				      bit_state      *bits,
-				      const uint8_t **input,
-				      const uint8_t  *input_max,
-				      usize_t         *valuep)
-{
-  if (bits->cur_mask == 0x100)
-    {
-      if (*input == input_max)
-	{
-	  stream->msg = "secondary decoder end of input";
-	  return XD3_INTERNAL;
-	}
-
-      bits->cur_byte = *(*input)++;
-      bits->cur_mask = 1;
-    }
-
-  *valuep = (bits->cur_byte & bits->cur_mask) && 1;
-
-  IF_DEBUG1 (P(RINT "[dbit] %u", (bits->cur_byte & bits->cur_mask) && 1));
-
-  bits->cur_mask <<= 1;
-
   return 0;
 }
 
@@ -243,8 +216,6 @@ static INLINE int xd3_encode_bit       (xd3_stream      *stream,
       bits->cur_byte |= bits->cur_mask;
     }
 
-  IF_DEBUG1 (P(RINT "[ebit] %u", bit && 1));
-
   /* OPT: Might help to buffer more than 8 bits at once. */
   if (bits->cur_mask == 0x80)
     {
@@ -288,6 +259,8 @@ static INLINE int xd3_encode_bits      (xd3_stream      *stream,
       if ((ret = xd3_encode_bit (stream, output, bits, value & mask))) { return ret; }
     }
   while (mask != 1);
+
+  IF_DEBUG2 (P(RINT "(e) %u ", value));
 
   return 0;
 }
