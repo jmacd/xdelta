@@ -43,6 +43,7 @@ static char   TEST_DELTA_FILE[TESTFILESIZE];
 static char   TEST_RECON_FILE[TESTFILESIZE];
 static char   TEST_RECON2_FILE[TESTFILESIZE];
 static char   TEST_COPY_FILE[TESTFILESIZE];
+static char   TEST_NOPERM_FILE[TESTFILESIZE];
 
 static int test_exponential_dist (usize_t mean, usize_t max);
 
@@ -139,6 +140,7 @@ test_setup (void)
   sprintf (TEST_RECON_FILE, "/tmp/xdtest.recon.%d", x);
   sprintf (TEST_RECON2_FILE, "/tmp/xdtest.recon2.%d", x);
   sprintf (TEST_COPY_FILE, "/tmp/xdtest.copy.%d", x);
+  sprintf (TEST_NOPERM_FILE, "/tmp/xdtest.noperm.%d", x);
   return 0;
 }
 
@@ -169,6 +171,7 @@ test_cleanup (void)
   test_unlink (TEST_RECON_FILE);
   test_unlink (TEST_RECON2_FILE);
   test_unlink (TEST_COPY_FILE);
+  test_unlink (TEST_NOPERM_FILE);
 }
 
 static int
@@ -1814,23 +1817,27 @@ test_no_output (xd3_stream *stream, int ignore)
 {
   int ret;
   char buf[TESTBUFSIZE];
-
+  
   test_setup ();
+
+  sprintf (buf, "touch %s && chmod 0000 %s", TEST_NOPERM_FILE, TEST_NOPERM_FILE);
+  if ((ret = do_cmd (stream, buf))) { return ret; }
+
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
   /* Try no_output encode w/out unwritable output file */
-  sprintf (buf, "%s -e %s /dont_run_xdelta3_test_as_root ", program_name, TEST_TARGET_FILE);
+  sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_NOPERM_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
-  sprintf (buf, "%s -J -e %s /dont_run_xdelta3_test_as_root", program_name, TEST_TARGET_FILE);
+  sprintf (buf, "%s -J -e %s %s", program_name, TEST_TARGET_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Now really write the delta to test decode no-output */
   sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  sprintf (buf, "%s -d %s /dont_run_xdelta3_test_as_root ", program_name, TEST_DELTA_FILE);
+  sprintf (buf, "%s -d %s %s", program_name, TEST_DELTA_FILE, TEST_NOPERM_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
-  sprintf (buf, "%s -J -d %s /dont_run_xdelta3_test_as_root", program_name, TEST_DELTA_FILE);
+  sprintf (buf, "%s -J -d %s %s", program_name, TEST_DELTA_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup ();
   return 0;
