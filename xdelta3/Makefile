@@ -1,6 +1,8 @@
 # xdelta 3 - delta compression tools and library
 # Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
 
+CC=gcc-4.1.1
+
 SOURCES = xdelta3-cfgs.h \
           xdelta3-decode.h \
           xdelta3-djw.h \
@@ -17,6 +19,8 @@ TARGETS = xdelta3-debug \
 	  xdelta3 \
 	  xdelta3-debug2 \
 	  xdelta3-debug3 \
+	  xdelta3.o \
+	  xdelta3module.so \
 	  xdelta3-32 \
 	  xdelta3-64 \
 	  xdelta3-everything \
@@ -24,7 +28,7 @@ TARGETS = xdelta3-debug \
 	  xdelta3-64-O \
 	  xdelta3-Op \
 	  xdelta3-decoder xdelta3-decoder-nomain.o \
-	  xdelta3-nosec.o xdelta3-all.o xdelta3-fgk.o xdelta3-djw.o \
+	  xdelta3-nosec.o xdelta3-all.o xdelta3-fgk.o \
 	  xdelta3-noext xdelta3-tools xdelta3-tune \
 	  xdelta3-notools \
 	  $(PYTGT) \
@@ -90,6 +94,27 @@ xdelta3-debug3: $(SOURCES)
 $(PYTGT): $(SOURCES)
 	$(PYTHON) setup.py install --verbose --compile --force
 
+xdelta3_wrap.c xdelta3.py: xdelta3.swig
+	swig -python xdelta3.swig
+
+xdelta3.o: $(SOURCES)
+	$(CC) -O3 -Wall -Wshadow -c xdelta3.c -DSECONDARY_DJW=1 -o xdelta3.o
+
+xdelta3_wrap.o: xdelta3_wrap.c
+	$(CC) -DXD3_DEBUG=0 \
+	      -DXD3_USE_LARGEFILE64=1 \
+              -DSECONDARY_DJW=1 \
+              -DXD3_MAIN=0 \
+	      -DHAVE_CONFIG_H \
+	      -I/usr/include/python2.4 \
+	      -I/usr/lib/python2.4/config \
+	      -fpic \
+	      -c xdelta3_wrap.c
+
+xdelta3module.so: xdelta3_wrap.o xdelta3.o
+	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so
+	cp -f xdelta3module.so /usr/lib/python2.4/site-packages/xdelta3module.so
+
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \
 	    -DXD3_ENCODER=0 -DXD3_MAIN=1 -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 \
@@ -145,9 +170,6 @@ xdelta3-all.o: $(SOURCES)
 
 xdelta3-fgk.o: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=1 -DSECONDARY_DJW=0 -o xdelta3-fgk.o
-
-xdelta3-djw.o: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=0 -DSECONDARY_DJW=1 -o xdelta3-djw.o
 
 xdelta3-noext: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c -DXD3_MAIN=1 -DEXTERNAL_COMPRESSION=0 -o xdelta3-noext

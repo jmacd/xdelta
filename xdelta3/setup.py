@@ -31,7 +31,7 @@ if is_cygwin:
     extcomp = 0
 #end
 
-xdelta3_ext = Extension('xdelta3',
+xdelta3_ext = Extension('xdelta3main',
                         ['xdelta3.c'],
                         define_macros = [
                                          ('PYTHON_MODULE',1),
@@ -56,6 +56,6 @@ REL='0n'
 
 # This provides xdelta3.main(), which calls the xdelta3 command-line main()
 # from python.
-setup(name='xdelta3',
+setup(name='xdelta3main',
       version=REL,
       ext_modules=[xdelta3_ext])

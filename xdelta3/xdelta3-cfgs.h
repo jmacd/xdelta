@@ -61,12 +61,12 @@
 #define LLOOK         9
 #define LSTEP         8
 #define SLOOK         4
-#define SCHAIN        5
+#define SCHAIN        4
 #define SLCHAIN       1
 #define SSMATCH       0
 #define TRYLAZY       1
-#define MAXLAZY       5
-#define LONGENOUGH    4
+#define MAXLAZY       18
+#define LONGENOUGH    35
 #define PROMOTE       0
 
 #include "xdelta3.c"

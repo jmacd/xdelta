@@ -71,16 +71,17 @@ PyObject *xdelta3_main_cmdline (PyObject *self, PyObject *args)
     }
   return result;
 }
+
 static PyMethodDef xdelta3_methods[] = {
   { "main", xdelta3_main_cmdline, METH_VARARGS, "xdelta3 main()" },
   { NULL, NULL }
 };
 
-DL_EXPORT(void) initxdelta3 (void)
+DL_EXPORT(void) initxdelta3main (void)
 {
   PyObject *m, *d;
-  m = Py_InitModule ("xdelta3", xdelta3_methods);
+  m = Py_InitModule ("xdelta3main", xdelta3_methods);
   d = PyModule_GetDict (m);
-  pyxd3_error = PyErr_NewException ("xdelta3.error", NULL, NULL);
+  pyxd3_error = PyErr_NewException ("xdelta3main.error", NULL, NULL);
   PyDict_SetItemString (d, "error", pyxd3_error);
 }

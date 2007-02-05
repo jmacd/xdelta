@@ -2217,11 +2217,11 @@ static int
 test_in_memory (xd3_stream *stream, int ignore)
 {
   // test_text is 256 bytes
-  char ibuf[sizeof(test_text)];
-  char dbuf[sizeof(test_text)];
-  char obuf[sizeof(test_text)];
-  int size = sizeof(test_text);
-  int dsize, osize;
+  uint8_t ibuf[sizeof(test_text)];
+  uint8_t dbuf[sizeof(test_text)];
+  uint8_t obuf[sizeof(test_text)];
+  usize_t size = sizeof(test_text);
+  usize_t dsize, osize;
   int r1, r2;
   int eflags = SECONDARY_DJW ? XD3_SEC_DJW : 0;
 

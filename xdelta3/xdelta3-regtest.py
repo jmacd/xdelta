@@ -24,7 +24,7 @@
 # TODO: Test IOPT (1.5 vs. greedy)
 
 import os, sys, math, re, time, types, array, random
-import xdelta3
+import xdelta3main
 
 HIST_SIZE      = 10   # the number of buckets
 MIN_SIZE       = 0
@@ -42,9 +42,45 @@ MAX_TRIALS     = 15
 MIN_STDDEV_PCT = 1.5 # stop
 MAX_RUN        = 1000 * 1000 * 10
 
+# How many results per round
+MAX_RESULTS = 100
+KEEP_P = (0.3)
+FAST_P = (0.0)
+SLOW_P = (0.0)
+FILE_P = (0.50)
+
+CONFIG_ORDER = [ 'large_look',
+                 'large_step',
+                 'small_look',
+                 'small_chain',
+                 'small_lchain',
+                 'ssmatch',
+                 'trylazy',
+                 'max_lazy',
+                 'long_enough',
+                 'promote' ]
+
+def INPUT_SPEC(rand):
+    return {
+    'large_look' : lambda d: rand.choice([9]),
+    'large_step' : lambda d: rand.choice([4, 5]),
+
+    'small_chain'  : lambda d: rand.randrange(4, 65, 4),
+    'small_lchain' : lambda d: rand.randrange(1, 17, 1),
+
+    'max_lazy'     : lambda d: rand.choice([18]),
+    'long_enough'  : lambda d: rand.choice([35]),
+
+    'small_look'   : lambda d: 4,
+    'promote'      : lambda d: 0,
+    'trylazy'      : lambda d: 1,
+    'ssmatch'      : lambda d: 0,
+    }
+
+
 #
 #
-RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
+#RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
 RCSDIR = '/tmp/PRCS_read_copy'
 #RCSDIR = 'G:/jmacd/PRCS'
 
@@ -60,6 +96,9 @@ BAR_STATE  = 1
 REV_STATE  = 2
 DATE_STATE = 3
 
+# 
+IGNORE_FILENAME  = re.compile('.*\\.(gif|jpg).*')
+
 # rcs output
 RE_TOTREV  = re.compile('total revisions: (\\d+)')
 RE_BAR     = re.compile('----------------------------')
@@ -68,6 +107,22 @@ RE_DATE    = re.compile('date: ([^;]+);.*')
 # xdelta output
 RE_HDRSZ   = re.compile('VCDIFF header size: +(\\d+)')
 RE_EXTCOMP = re.compile('XDELTA ext comp.*')
+
+# Testwide defaults
+testwide_encode_args = [
+
+    # secondary compression on or off
+    #'-S', 'djw',
+
+    # do not measure instruction buffer effects
+    '-I', '0',
+
+    # do not attempt external decompression
+    '-D'
+    ]
+
+def c2s(c):
+    return ' '.join(['%02d' % x for x in c])
 
 #
 # exceptions
@@ -92,8 +147,8 @@ class RcsVersion:
         self.vstr = vstr
     def __cmp__(self,other):
         return cmp(self.date, other.date)
-    def Print(self):
-        print '%s %s' % (self.vstr, self.date)
+    def __str__(self):
+        return str(self.vstr)
 #
 # one rcsfile
 class RcsFile:
@@ -201,7 +256,7 @@ class RcsFile:
             if os.stat(self.Verf(v)).st_size < MIN_SIZE or \
                os.stat(self.Verf(v+1)).st_size < MIN_SIZE:
                 continue
-            
+
             result = TimeRun(runnable.Runner(self.Verf(v),
                                              self.Vstr(v),
                                              self.Verf(v+1),
@@ -213,7 +268,7 @@ class RcsFile:
                    result.time.mean,
                    result.trials)
             ntrials.append(result)
-            
+
         os.remove(self.Verf(self.totrev-1))
         os.remove(self.Verf(self.totrev-2))
         return ntrials
@@ -412,7 +467,7 @@ class StatList:
 def RunCommand(args):
     #print "run command", args
     p = os.spawnvp(os.P_WAIT, args[0], args)
-    if p != 0: 
+    if p != 0:
         raise CommandError(args, 'exited %d' % p)
 
 def RunCommandIO(args,infn,outfn):
@@ -431,7 +486,7 @@ def RunCommandIO(args,infn,outfn):
 def RunXdelta3(args):
     try:
         #print 'RUN', args
-        xdelta3.main(args)
+        xdelta3main.main(args)
     except Exception, e:
         raise CommandError(args, "xdelta3.main exception")
 
@@ -439,7 +494,7 @@ class GzipInfo:
     def __init__(self,target,delta):
         self.tgtsize = os.stat(target).st_size
         self.dsize   = os.stat(delta).st_size
-        
+
 class Xdelta3Info:
     def __init__(self,target,delta):
         self.extcomp = 0  # TODO: I removed some code that called printhdr
@@ -464,14 +519,13 @@ class Xdelta3Pair:
         self.old = old
         self.oldv = oldv
         self.new = new
-        self.newv = newv        
+        self.newv = newv
         return self
 
     def Run(self,trial):
 
-        # TODO: move '-S djw' somewhere else
         encode_args =  self.extra + \
-                       [ '-S', 'djw' ] + \
+                       testwide_encode_args + \
                       [self.encode_args,
                        self.presrc,
                        self.old,
@@ -498,6 +552,7 @@ class Xdelta3Pair:
         except CommandError:
             print 'encode args: %s' % ' '.join(encode_args)
             print 'decode args: %s' % ' '.join(decode_args)
+            raise CommandError("Run failed")
 
 def Test():
     rcsf = RcsFinder()
@@ -529,7 +584,8 @@ class Xdelta3Run1:
     def __init__(self,file):
         self.file = file
     def Run(self,trial):
-        RunXdelta3(['-efq', self.file, DFILE])
+        RunXdelta3(testwide_encode_args +
+                   ['-efq', self.file, DFILE])
         if trial > 0:
             return None
         return Xdelta3Info(self.file,DFILE)
@@ -554,39 +610,23 @@ def ReportSpeed(L,tr,desc):
     print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %u trials' % \
           (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials)
 
-def MakeBigFiles(rcsf):
-    rand = random.Random()
-    f1 = open(TMPDIR + "/big.1", "w")
-    f2 = open(TMPDIR + "/big.2", "w")
-    f1sz = 0
-    f2sz = 0
-    for file in rcsf.rcsfiles:
-        if file.versions < 2:
-            continue
-        r1 = 0
-        r2 = 0
-        while r1 == r2:
-            r1 = rand.randint(0, len(file.versions) - 1)
-            r2 = rand.randint(0, len(file.versions) - 1)
-        f1sz += file.AppendVersion(f1, r1)
-        f2sz += file.AppendVersion(f2, r2)
-
-    print 'from %u; to %u' % (f1sz, f2sz)
-    f1.close()
-    f2.close()
-    return (TMPDIR + "/big.1",
-            TMPDIR + "/big.2")
-
 class RandomTestResult:
     def __init__(self, round, config, runtime, compsize):
         self.round = round
         self.myconfig = config
         self.runtime = runtime
         self.compsize = compsize
+        self.score = None
+        self.time_pos = None
+        self.size_pos = None
+        self.score_pos = None
     #end
 
     def __str__(self):
-        return '%.4f %d [%s]' % (self.time(), self.size(), ' '.join([str(x) for x in self.config()]))
+        return 'time %.6f%s size %d%s << %s >>' % (
+            self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
+            self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
+            c2s(self.config()))
     #end
 
     def time(self):
@@ -600,10 +640,14 @@ class RandomTestResult:
     def config(self):
         return self.myconfig
     #end
+
+    def score(self):
+        return self.score
+    #end
 #end
 
 def PosInAlist(l, e):
-    for i in range(len(l)):
+    for i in range(0, len(l)):
         if l[i][1] == e:
             return i;
         #end
@@ -611,16 +655,22 @@ def PosInAlist(l, e):
     return -1
 #end
 
-# How many results per round
-MAX_RESULTS = 500
+test_totals = {}
 
 class RandomTester:
     def __init__(self, old_results):
         self.old_configs = old_results
+
+        # these get reset each round so we don't test the same config twice
         self.results = []
+
         self.trial_num = 0
         self.round_num = 0
         self.random = random.Random()
+    #end
+
+    def Reset(self):
+        self.results = []
     #end
 
     def HasEnoughResults(self):
@@ -629,38 +679,14 @@ class RandomTester:
 
     def RandomConfig(self):
 
-        input_ranges = [
-            (9, 9, 9, 'large_look'),
-            (1, 4.5, 8, 'large_step'),
-            (4, 4, 4, 'small_look'),  # Note: disabled
-            (1, 10, 30, 'small_chain'),
-            (1, 3.5, 6, 'small_lchain'),
-            (0, 0, 0, 'ssmatch'),     # Note: disabled
-            (1, 1, 1, 'trylazy'),     # Note: enabled
-            (1, 128, 256, 'max_lazy'),
-            (1, 256, 512, 'long_enough'),
-            (0, 0, 0, 'promote'),     # Note: disabled
-        ]
-
         config = []
         map = {}
 
-        for input in input_ranges:
-            minv = input[0]
-            mean = input[1]
-            maxv = input[2]
-            name = input[3]
-            if minv == maxv:
-                val = minv
-            else:
-                val = -1
-                while val < minv or val > maxv:
-                    val = int(self.random.expovariate(1.0 / mean) + 0.5)
-                #end
-            #end
+        for key in CONFIG_ORDER:
+
+            val = map[key] = (INPUT_SPEC(self.random)[key])(map)
 
             config.append(val)
-            map[name] = val
         #end
 
         if map['small_chain'] < map['small_lchain']:
@@ -669,7 +695,42 @@ class RandomTester:
         if map['large_look'] < map['small_look']:
             return None
 
+        for r in self.results:
+            if c2s(r.config()) == c2s(config):
+                return None
+            #end
+        #end
+
         return config
+
+    def MakeBigFiles(self, rcsf):
+        f1 = open(TMPDIR + "/big.1", "w")
+        f2 = open(TMPDIR + "/big.2", "w")
+        population = []
+        for file in rcsf.rcsfiles:
+            if len(file.versions) < 2:
+                continue
+            population.append(file)
+        #end
+        f1sz = 0
+        f2sz = 0
+        fcount = int(len(population) * FILE_P)
+        assert fcount > 0
+        for file in self.random.sample(population, fcount):
+            m = IGNORE_FILENAME.match(file.fname)
+            if m != None:
+                continue
+            #end
+            r1, r2 = self.random.sample(xrange(0, len(file.versions)), 2)
+            f1sz += file.AppendVersion(f1, r1)
+            f2sz += file.AppendVersion(f2, r2)
+        #end
+
+        print 'from %u; to %u' % (f1sz, f2sz)
+        f1.close()
+        f2.close()
+        return (TMPDIR + "/big.1",
+                TMPDIR + "/big.2")
 
     def RandomBigRun(self, f1, f2):
         config = None
@@ -683,10 +744,7 @@ class RandomTester:
         #end
 
         runner = Xdelta3Pair()
-        runner.extra = ['-I',
-                        '0',
-                        '-D',
-                        '-C', ','.join([str(x) for x in config])]
+        runner.extra = [ '-C', ','.join([str(x) for x in config]) ]
         result = TimeRun(runner.Runner(f1, 1, f2, 2))
 
         tr = RandomTestResult(self.round_num,
@@ -696,7 +754,7 @@ class RandomTester:
 
         self.results.append(tr)
 
-        print 'Trial %d: %s in %u trials' % \
+        print 'Test %d: %s in %u trials' % \
               (self.trial_num,
                tr,
                result.trials)
@@ -706,54 +764,111 @@ class RandomTester:
     #end
 
     def ScoreTests(self):
-        mint = float(min([test.time() for test in self.results]))
-        maxt = float(max([test.time() for test in self.results]))
-        mins = float(min([test.size() for test in self.results]))
-        maxs = float(max([test.size() for test in self.results]))
-
         scored = []
         timed = []
         sized = []
 
+        t_min = float(min([test.time() for test in self.results]))
+        t_max = float(max([test.time() for test in self.results]))
+        s_min = float(min([test.size() for test in self.results]))
+        s_max = float(max([test.size() for test in self.results]))
+
+        # These are the major axes of an ellipse, after normalizing for the
+        # mininum values.  Time should be major, size should be minor.
+        time_major = (t_max / t_min)
+        size_minor = (s_max / s_min)
+
+        # Dimensions of the rectangular region bounding the results.
+        t_rect = time_major - 1.0
+        s_rect = size_minor - 1.0
+
+        assert(time_major >= size_minor)
+
+        rect_ratio = s_rect / t_rect
+
+        assert(rect_ratio <= 1.000001)
+
         for test in self.results:
 
-            # This scores ellipse has x-major (time) and y-minor (size)
-            ntime = (test.time()) / float(maxt)
-            nsize = (test.size()) / float(maxs)
+            # Transform the major min/max region linearly to normalize the
+            # min-max variation in time (major) and size (minor).
 
-            wntime = ntime * (maxs / mins)
-            wnsize = nsize * (maxt / mint)
-            score = math.sqrt(wntime * wntime + wnsize * wnsize)
-            scored.append((score, test))
-            timed.append((test.time(), test, score))
-            sized.append((test.size(), test, score))
+            s_norm = test.size() / s_min
+            t_norm = 1.0 + rect_ratio * (test.time() / t_min - 1.0)
+
+            assert t_norm >= 1.0
+            assert t_norm <= size_minor + 0.000001
+
+            # Projects the coords onto a min-unit circle.  Use the
+            # root-mean-square.  Smaller scores are better, 1.0 is the minimum.
+            test.score = math.sqrt(t_norm * t_norm / 2.0 + s_norm * s_norm / 2.0)
+
+            scored.append((test.score, test))
+            timed.append((test.time(), test))
+            sized.append((test.size(), test))
         #end
+
         scored.sort()
         timed.sort()
         sized.sort()
-        for (score, test) in scored:
-            spos = PosInAlist(sized, test)
-            tpos = PosInAlist(timed, test)
-            print 'Score %f: %s (%d, %d)' % (score, test, spos, tpos)
+
+        best_by_size = []
+        best_by_time = []
+
+        print 'Worst: %s' % scored[len(scored)-1][1]
+        scored = [x[1] for x in scored[0:int(MAX_RESULTS * KEEP_P)]]
+
+        for fast in [x[1] for x in timed[0:int(MAX_RESULTS * FAST_P)]]:
+            if fast in scored:
+                continue
+            print 'Carry fast: %s' % (fast)
+            scored.append(fast)
         #end
 
-        sized = sized[0:MAX_RESULTS/2]
-        timed = timed[0:MAX_RESULTS/2]
-
-        for (size, test, score) in sized:
-            print 'Size: %s (%f)' % (test, score)
+        for slow in [x[1] for x in sized[0:int(MAX_RESULTS * SLOW_P)]]:
+            if slow in scored:
+                continue
+            print 'Carry slow: %s' % (slow)
+            scored.append(slow)
         #end
 
-        for (time, test, score) in timed:
-            print 'Time: %s (%f)' % (test, score)
+        # Do not carry slow. It causes bad compressors to perpetuate extra
+        # weight.
+        for test in scored:
+            test.size_pos = PosInAlist(sized, test)
+            test.time_pos = PosInAlist(timed, test)
         #end
 
-        self.results = []
         r = []
-        for (score, test) in scored[0:MAX_RESULTS/2]:
+        pos = 0
+        for test in scored:
+            pos += 1
+            test.score_pos = pos
+            c = c2s(test.config())
+            if not test_totals.has_key(c):
+                test_totals[c] = [test]
+            else:
+                test_totals[c].append(test)
+            #end
+            s = 0.0
             r.append(test.config())
+            all_r = test_totals[c]
+            for t in all_r:
+                s += float(t.score_pos)
+            #end
+            if len(all_r) == 1:
+                stars = ''
+            elif len(all_r) >= 10:
+                stars = ' ***'
+            elif len(all_r) >= int(1/KEEP_P):
+                stars = ' **'
+            else:
+                stars = ' *'
+            print 'Score: %0.6f %s (%.1f%s%s)' % \
+                  (test.score, test, s / len(all_r), stars, (len(all_r) > 2) and (' in %d' % len(all_r)) or "")
         #end
 
+        
         return r
     #end
 #end
@@ -776,14 +891,15 @@ if __name__ == "__main__":
         configs = []
 
         while 1:
-            f1, f2 = MakeBigFiles(rcsf)
             #f1 = '/tmp/big.1'
             #f2 = '/tmp/big.2'
             test = RandomTester(configs)
+            f1, f2 = test.MakeBigFiles(rcsf)
             while not test.HasEnoughResults():
                 test.RandomBigRun(f1, f2)
             #end
             configs = test.ScoreTests()
+            test.Reset()
             #end
         #end
 
