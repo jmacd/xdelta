@@ -44,10 +44,10 @@ MAX_RUN        = 1000 * 1000 * 10
 
 # How many results per round
 MAX_RESULTS = 100
-KEEP_P = (0.3)
+KEEP_P = (0.5)
 FAST_P = (0.0)
 SLOW_P = (0.0)
-FILE_P = (0.50)
+FILE_P = (0.30)
 
 CONFIG_ORDER = [ 'large_look',
                  'large_step',
@@ -62,16 +62,16 @@ CONFIG_ORDER = [ 'large_look',
 
 def INPUT_SPEC(rand):
     return {
-    'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([4, 5]),
+    'large_look' : lambda d: rand.choice([9, 11, 13, 15]),
+    'large_step' : lambda d: rand.choice([11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 ]),
 
-    'small_chain'  : lambda d: rand.randrange(4, 65, 4),
-    'small_lchain' : lambda d: rand.randrange(1, 17, 1),
+    'small_chain'  : lambda d: rand.choice([1]),
+    'small_lchain' : lambda d: rand.choice([1]),
 
-    'max_lazy'     : lambda d: rand.choice([18]),
-    'long_enough'  : lambda d: rand.choice([35]),
+    'max_lazy'     : lambda d: rand.choice([9, 13, 18]),
+    'long_enough'  : lambda d: rand.choice([9, 13, 18]),
 
-    'small_look'   : lambda d: 4,
+    'small_look'   : lambda d: rand.choice([4]),
     'promote'      : lambda d: 0,
     'trylazy'      : lambda d: 1,
     'ssmatch'      : lambda d: 0,
@@ -782,11 +782,7 @@ class RandomTester:
         t_rect = time_major - 1.0
         s_rect = size_minor - 1.0
 
-        assert(time_major >= size_minor)
-
         rect_ratio = s_rect / t_rect
-
-        assert(rect_ratio <= 1.000001)
 
         for test in self.results:
 
@@ -851,6 +847,7 @@ class RandomTester:
                 test_totals[c].append(test)
             #end
             s = 0.0
+            self.results.append(test)
             r.append(test.config())
             all_r = test_totals[c]
             for t in all_r:
@@ -867,7 +864,6 @@ class RandomTester:
             print 'Score: %0.6f %s (%.1f%s%s)' % \
                   (test.score, test, s / len(all_r), stars, (len(all_r) > 2) and (' in %d' % len(all_r)) or "")
         #end
-
         
         return r
     #end
@@ -887,19 +883,27 @@ if __name__ == "__main__":
     try:
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
-        rcsf = Test()
+        #rcsf = Test()
         configs = []
 
         while 1:
             #f1 = '/tmp/big.1'
             #f2 = '/tmp/big.2'
             test = RandomTester(configs)
-            f1, f2 = test.MakeBigFiles(rcsf)
+            #f1, f2 = test.MakeBigFiles(rcsf)
             while not test.HasEnoughResults():
+                f1 = '/tmp/WESNOTH_tmp/wesnoth-1.1.12.tar'
+                f2 = '/tmp/WESNOTH_tmp/wesnoth-1.1.13.tar'
+                #f1 = '/tmp/big.1'
+                #f2 = '/tmp/big.2'
                 test.RandomBigRun(f1, f2)
             #end
             configs = test.ScoreTests()
-            test.Reset()
+
+            #test.Reset()
+            test.results = test.results[0:len(configs)]
+            configs = []
+            #break
             #end
         #end
 

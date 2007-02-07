@@ -38,11 +38,11 @@ PYTGT = build/lib.linux-i686-2.4/xdelta3.so
 
 PYFILES = xdelta3-regtest.py setup.py
 
-EXTRA = Makefile COPYING linkxd3lib.c badcopy.c \
+EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0n
+REL=0o
 RELDIR = xdelta3$(REL)
 
 all: xdelta3-debug xdelta3 $(PYTGT)
@@ -113,7 +113,6 @@ xdelta3_wrap.o: xdelta3_wrap.c
 
 xdelta3module.so: xdelta3_wrap.o xdelta3.o
 	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so
-	cp -f xdelta3module.so /usr/lib/python2.4/site-packages/xdelta3module.so
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \
