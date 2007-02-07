@@ -249,7 +249,6 @@ static int         option_stdout             = 0;
 static int         option_force              = 0;
 static int         option_verbose            = 0;
 static int         option_quiet              = 0;
-static int         option_level              = 6;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
 static int         option_use_secondary      = 0;
@@ -261,6 +260,7 @@ static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* do not open or write output */
 static const char *option_source_filename    = NULL;
 
+static int         option_level              = XD3_DEFAULT_LEVEL;
 static usize_t     option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
@@ -335,6 +335,7 @@ main_config (void)
 {
   main_version ();
 
+  /* TODO: This needs cleaning up */
   P(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
   P(RINT "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
   P(RINT "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
@@ -344,6 +345,7 @@ main_config (void)
   P(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
   P(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
   P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
+  P(RINT "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
   P(RINT "XD3_DEFAULT_CKSUM_SIZE=%d\n", XD3_DEFAULT_CKSUM_ADVANCE);
   P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
   P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
@@ -367,7 +369,6 @@ reset_defaults(void)
   option_force = 0;
   option_verbose = 0;
   option_quiet = 0;
-  option_level = 5;
   option_use_appheader = 1;
   option_appheader = NULL;
   option_use_secondary = 0;
@@ -378,8 +379,6 @@ reset_defaults(void)
   option_no_compress = 0;
   option_no_output = 0;
   option_source_filename = NULL;
-  option_winsize = XD3_DEFAULT_WINSIZE;
-  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
   option_srcwinsz_set = 0;
   option_profile_cnt = 0;
 #if EXTERNAL_COMPRESSION
@@ -399,10 +398,13 @@ reset_defaults(void)
   lru_misses = 0;
   lru_filled = 0;
   allow_fake_source = 0;
-  option_winsize = XD3_DEFAULT_WINSIZE;
-  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
   option_srcwinsz_set = 0;
   option_smatch_config = NULL;
+  option_level = XD3_DEFAULT_LEVEL;
+  option_winsize = XD3_DEFAULT_WINSIZE;
+  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
+  option_winsize = XD3_DEFAULT_WINSIZE;
+  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
 }
 
 static void*
@@ -639,7 +641,8 @@ main_atou (const char* arg, usize_t *xo, usize_t low, usize_t high, char which)
 #define XOPEN_POSIX  (xfile->mode == XO_READ ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC)
 #define XOPEN_MODE   (xfile->mode == XO_READ ? 0 : 0666)
 
-#define XF_ERROR(op, name, ret) XPR(NT "file %s failed: %s: %s: %s\n", (op), XOPEN_OPNAME, (name), xd3_mainerror (ret))
+#define XF_ERROR(op, name, ret) \
+  XPR(NT "file %s failed: %s: %s: %s\n", (op), XOPEN_OPNAME, (name), xd3_mainerror (ret))
 
 #if XD3_STDIO
 #define XFNO(f) fileno(f->file)
@@ -970,6 +973,21 @@ main_file_seek (main_file *xfile, xoff_t pos)
  ******************************************************************************************/
 
 #if VCDIFF_TOOLS
+
+/* The following macros let VCDIFF printing something printf-like with
+ * main_file_write(), e.g.,:
+ * 
+ *   VC(UT "trying to be portable: %d\n", x)VE;
+ */
+#define SNPRINTF_BUFSIZE 1024
+#define VC do { if (((ret = snprintf
+#define UT (char*)xfile->snprintf_buf, SNPRINTF_BUFSIZE,
+#define VE ) >= SNPRINTF_BUFSIZE			       \
+  && (ret = main_print_overflow(ret)) != 0)		       \
+  || (ret = main_file_write(xfile, xfile->snprintf_buf,        \
+			    ret, "print")) != 0)	       \
+  { return ret; } } while (0)
+
 #ifdef WIN32
 /* According to the internet, Windows vsnprintf() differs from most Unix
  * implementations regarding the terminating 0 when the boundary condition
@@ -986,15 +1004,6 @@ snprintf (char *str, int n, char *fmt, ...)
   return ret;
 }
 #endif
-
-#define SNPRINTF_BUFSIZE XD3_ALLOCSIZE
-#define VC do { if (((ret = snprintf
-#define UT xfile->snprintf_buf, SNPRINTF_BUFSIZE,
-#define VE ) >= SNPRINTF_BUFSIZE			\
-  && (ret = main_print_overflow(ret)) != 0)		\
-  || (ret = main_file_write(xfile, xfile->snprintf_buf, \
-			    ret, "print")) != 0)	\
-  { return ret; } } while (0)
 
 static int
 main_print_overflow (int x)
@@ -1075,7 +1084,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 static int
 main_print_vcdiff_file (main_file *xfile, main_file *file, const char *type)
 {
-  int ret;  /* Used by VC macro */
+  int ret;  /* Used by above macros */
   if (file->filename)
     {
       VC(UT "XDELTA filename (%s):     %s\n", type, file->filename)VE;
@@ -2276,7 +2285,7 @@ main_getblk_func (xd3_stream *stream,
 
   main_blklru_list_push_back (& lru_list, blru);
 
-  if (option_verbose > 2)
+  if (option_verbose > 3)
     {
       if (blru->blkno != -1LL)
 	{
@@ -2420,9 +2429,18 @@ main_input (xd3_cmd     cmd,
 	  config.smatcher_soft.long_enough   = values[8];
 	  config.smatcher_soft.promote       = values[9];
 	}
-      else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
-      else if (option_level == 6) { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
-      else                        { config.smatch_cfg = XD3_SMATCH_SLOW; }
+      else
+	{
+	  if (option_verbose > 1)
+	    {
+	      XPR(NT "compression level: %d\n", option_level);
+	    }
+	  if (option_level == 0) { stream_flags |= XD3_NOCOMPRESS; }
+	  else if (option_level == 1) { config.smatch_cfg = XD3_SMATCH_FASTEST; }
+	  else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
+	  else if (option_level == 6) { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
+	  else                        { config.smatch_cfg = XD3_SMATCH_SLOW; }
+	}
       break;
 #endif
     case CMD_DECODE:
@@ -2622,25 +2640,26 @@ main_input (xd3_cmd     cmd,
 	  {
 	    if (IS_ENCODE (cmd) || cmd == CMD_DECODE)
 	      {
-		if (! option_quiet && IS_ENCODE (cmd))
+		if (! option_quiet && IS_ENCODE (cmd) && main_file_isopen (sfile))
 		  {
 		    /* Warn when no source copies are found */
-		    if (main_file_isopen (sfile) && ! xd3_encoder_used_source (& stream))
+		    if (! xd3_encoder_used_source (& stream))
 		      {
 			XPR(NT "warning: input position %"Q"u no source copies\n",
 			    stream.current_window * option_winsize);
 		      }
-
-		    /* Warn about bad compression due to limited instruction buffer */
-		    if (option_verbose > 0 && stream.i_slots_used > stream.iopt_size)
+		    
+		    /* Limited instruction buffer size affects source copies */
+		    if (stream.i_slots_used > stream.iopt_size)
 		      {
 			XPR(NT "warning: input position %"Q"u overflowed instruction buffer, "
 			    "needed %u (vs. %u)\n",
-			    stream.current_window * option_winsize, stream.i_slots_used, stream.iopt_size);
+			    stream.current_window * option_winsize,
+			    stream.i_slots_used, stream.iopt_size);
 		      }
 		  }
 
-		if (option_verbose)
+		if (option_verbose > 0)
 		  {
 		    char rrateavg[32], wrateavg[32], tm[32];
 		    char rdb[32], wdb[32];

@@ -468,6 +468,11 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #else
 #define IF_BUILD_FAST(x)
 #endif
+#if XD3_BUILD_FASTEST
+#define IF_BUILD_FASTEST(x) x
+#else
+#define IF_BUILD_FASTEST(x)
+#endif
 #if XD3_BUILD_SOFT
 #define IF_BUILD_SOFT(x) x
 #else
@@ -482,6 +487,7 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 IF_BUILD_SOFT(static const xd3_smatcher    __smatcher_soft;)
 IF_BUILD_FAST(static const xd3_smatcher    __smatcher_fast;)
 IF_BUILD_SLOW(static const xd3_smatcher    __smatcher_slow;)
+IF_BUILD_FASTEST(static const xd3_smatcher    __smatcher_fastest;)
 IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 
 #if XD3_DEBUG
@@ -2524,6 +2530,9 @@ xd3_config_stream(xd3_stream *stream,
 		    break;)
       IF_BUILD_SLOW(case XD3_SMATCH_SLOW:
 		    *smatcher = __smatcher_slow;
+		    break;)
+      IF_BUILD_FASTEST(case XD3_SMATCH_FASTEST:
+		    *smatcher = __smatcher_fastest;
 		    break;)
       IF_BUILD_FAST(case XD3_SMATCH_FAST:
 		    *smatcher = __smatcher_fast;
