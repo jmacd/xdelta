@@ -31,10 +31,13 @@
  */
 
 /* TODO list:
- * 1. do exact gzip-like filename, stdout handling.  make a .xz extension, refuse
+ * 1. do exact gzip-like filename, stdout handling.  make a .vcdiff extension, refuse
  *    to encode to stdout without -cf, etc.
  * 2. Allow the user to add a comment string to the app header without disturbing the default
  *    behavior.
+ * 3. "Source file must be seekable" is not actually true for encoding, given current
+ *    behavior.  Allow non-seekable sources?  It would in theory let you use a fifo for
+ *    the source.
  */
 
 /* On error handling and printing:
@@ -116,6 +119,9 @@ const char* xd3_mainerror(int err_num);
 #       define S_ISREG(m) 1
 //#   endif
 #endif /* !S_ISREG */
+
+// For standard input/output handles
+static STARTUPINFO winStartupInfo;
 #endif
 
 /******************************************************************************************
@@ -252,7 +258,7 @@ static int         option_use_checksum       = 1;
 static int         option_use_altcodetable   = 0;
 static char*       option_smatch_config      = NULL;
 static int         option_no_compress        = 0;
-static int         option_no_output          = 0; /* go through the motions, but do not open or write output */
+static int         option_no_output          = 0; /* do not open or write output */
 static const char *option_source_filename    = NULL;
 
 static usize_t     option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
@@ -638,20 +644,17 @@ main_atou (const char* arg, usize_t *xo, usize_t low, usize_t high, char which)
 #if XD3_STDIO
 #define XFNO(f) fileno(f->file)
 #define XSTDOUT_XF(f) { (f)->file = stdout; (f)->filename = "/dev/stdout"; }
-#define XSTDERR_XF(f) { (f)->file = stderr; (f)->filename = "/dev/stderr"; }
 #define XSTDIN_XF(f)  { (f)->file = stdin;  (f)->filename = "/dev/stdin"; }
 
 #elif XD3_POSIX
 #define XFNO(f) f->file
 #define XSTDOUT_XF(f) { (f)->file = STDOUT_FILENO; (f)->filename = "/dev/stdout"; }
-#define XSTDERR_XF(f) { (f)->file = STDERR_FILENO; (f)->filename = "/dev/stderr"; }
 #define XSTDIN_XF(f)  { (f)->file = STDIN_FILENO;  (f)->filename = "/dev/stdin"; }
 
 #elif XD3_WIN32
 #define XFNO(f) -1
-#define XSTDOUT_XF(f) { (f)->file = INVALID_HANDLE_VALUE; (f)->filename = "/dev/stdout"; }
-#define XSTDERR_XF(f) { (f)->file = INVALID_HANDLE_VALUE; (f)->filename = "/dev/stderr"; }
-#define XSTDIN_XF(f)  { (f)->file = INVALID_HANDLE_VALUE;  (f)->filename = "/dev/stdin"; }
+#define XSTDOUT_XF(f) { (f)->file = winStartupInfo.hStdOutput; (f)->filename = "(stdout)"; }
+#define XSTDIN_XF(f)  { (f)->file = winStartupInfo.hStdInput;  (f)->filename = "(stdin)"; }
 #endif
 
 static void
@@ -967,6 +970,23 @@ main_file_seek (main_file *xfile, xoff_t pos)
  ******************************************************************************************/
 
 #if VCDIFF_TOOLS
+#ifdef WIN32
+/* According to the internet, Windows vsnprintf() differs from most Unix
+ * implementations regarding the terminating 0 when the boundary condition
+ * is met. It doesn't matter here, we don't rely on the trailing 0. */
+#include <stdarg.h>
+int
+snprintf (char *str, int n, char *fmt, ...)
+{
+  va_list a;
+  int ret;
+  va_start (a, fmt);
+  ret = vsnprintf (str, n, fmt, a);
+  va_end (a);
+  return ret;
+}
+#endif
+
 #define SNPRINTF_BUFSIZE XD3_ALLOCSIZE
 #define VC do { if (((ret = snprintf
 #define UT xfile->snprintf_buf, SNPRINTF_BUFSIZE,
@@ -2791,6 +2811,10 @@ main (int argc, char **argv)
   char **orig_argv = argv;
   int ret;
 
+#ifdef _WIN32
+  GetStartupInfo(&winStartupInfo);
+#endif
+
   main_file_init (& ifile);
   main_file_init (& ofile);
   main_file_init (& sfile);
@@ -3051,24 +3075,6 @@ main (int argc, char **argv)
       XPR(NT "too many filenames: %s ...\n", argv[2]);
       ret = EXIT_FAILURE;
       goto cleanup;
-    }
-
-  if (option_verbose > 1)
-    {
-      int l = 1;
-      int i;
-      char buf[1024];
-      for (i = 0; i < orig_argc; i += 1)
-	{
-	  l += strlen (orig_argv[i]) + 1;
-	}
-      buf[0] = 0;
-      for (i = 0; i < orig_argc; i += 1)
-	{
-	  strcat (buf, orig_argv[i]);
-	  strcat (buf, " ");
-	}
-      XPR(NT "command line: %s\n", buf);
     }
 
   ifile.flags    = RD_FIRST;
