@@ -3043,7 +3043,7 @@ main (int argc, char **argv)
 	  break;
 	case 'D':
 #if EXTERNAL_COMPRESSION == 0
-	  if (! option_quiet)
+	  if (option_verbose > 0)
 	    {
 	      XPR(NT "warning: -D option ignored, "
 		       "external compression support was not compiled\n");
@@ -3054,7 +3054,7 @@ main (int argc, char **argv)
 	  break;
 	case 'R':
 #if EXTERNAL_COMPRESSION == 0
-	  if (! option_quiet)
+	  if (option_verbose > 0)
 	    {
 	      XPR(NT "warning: -R option ignored, "
 		       "external compression support was not compiled\n");
