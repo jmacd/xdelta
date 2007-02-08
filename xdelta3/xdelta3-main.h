@@ -2810,6 +2810,55 @@ main_cleanup (void)
   XD3_ASSERT (main_mallocs == 0);
 }
 
+static void
+setup_environment (int argc,
+		   char **argv,
+		   int *argc_out,
+		   char ***argv_out,
+		   char ***argv_free,
+		   char **env_free)
+{
+  int n, i, i0;
+  char *p, *v = getenv("XDELTA");
+  if (v == NULL) {
+    (*argc_out) = argc;
+    (*argv_out) = argv;
+    return;
+  }
+  *env_free = main_malloc(strlen(v) + 1);
+  strcpy(*env_free, v);
+
+  /* Space needed for new argv: count spaces */
+  n = argc + 1;
+  for (p = *env_free; *p != 0; ) {
+    if (*p++ == ' ') {
+      n++;
+    }
+  }
+
+  (*argc_out) = n;
+  (*argv_out) = main_malloc(sizeof(char*) * (n + 1));
+  (*argv_out)[0] = argv[0];
+  (*argv_out)[n] = NULL;
+
+  i = 1;
+  for (p = *env_free; *p != 0; ) {
+    (*argv_out)[i++] = p;
+    while (*p != ' ' && *p != 0) {
+      p++;
+    }
+    if (*p == ' ') {
+      *p++ = 0;
+    }
+  }
+
+  for (i0 = 1; i0 < argc; i0++) {
+    (*argv_out)[i++] = argv[i0];
+  }
+
+  XD3_ASSERT (i == n);
+}
+
 int
 #if PYTHON_MODULE || SWIG_MODULE
 xd3_main_cmdline (int argc, char **argv)
@@ -2826,8 +2875,10 @@ main (int argc, char **argv)
   char *my_optarg;
   char *my_optstr;
   char *sfilename;
-  int orig_argc = argc;
-  char **orig_argv = argv;
+  int env_argc;
+  char **env_argv;
+  char **free_argv = NULL;  /* malloced */
+  char *free_value = NULL;  /* malloced */
   int ret;
 
 #ifdef _WIN32
@@ -2842,11 +2893,12 @@ main (int argc, char **argv)
 
  go:  /* Go. */
   cmd = CMD_NONE;
+  setup_environment(argc, argv, &env_argc, &env_argv, &free_argv, &free_value);
   sfilename = NULL;
   my_optind = 1;
-  argv = orig_argv;
-  argc = orig_argc;
-  program_name = argv[0];
+  argv = env_argv;
+  argc = env_argc;
+  program_name = env_argv[0];
   extcomp_types[0].recomp_cmdname = program_name;
   extcomp_types[0].decomp_cmdname = program_name;
  takearg:
@@ -3176,6 +3228,9 @@ main (int argc, char **argv)
   main_file_cleanup (& sfile);
 
   main_cleanup ();
+
+  main_free (free_argv);
+  main_free (free_value);
 
   if (--option_profile_cnt > 0 && ret == EXIT_SUCCESS) { goto go; }
 
