@@ -33,7 +33,9 @@ TARGETS = xdelta3-debug \
 	  $(PYTGT) \
 
 PYTHON = python
+
 PYTGT = build/lib.linux-i686-2.4/xdelta3.so
+#PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
 
 PYFILES = xdelta3-regtest.py setup.py
 
@@ -41,12 +43,8 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
 	xdelta3.py xdelta3_wrap.c
 
-# $Format: "REL=$Xdelta3Version$" $
-REL=0o
-RELDIR = xdelta3$(REL)
-
-#SWIGTGT = xdelta3module.so
-SWIGTGT = xdelta3module.dll
+SWIGTGT = xdelta3module.so
+#SWIGTGT = xdelta3module.dll
 
 SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
@@ -54,6 +52,10 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DVCDIFF_TOOLS=1 \
               -DSWIG_MODULE=1 \
 	      -O3
+
+# $Format: "REL=$Xdelta3Version$" $
+REL=0o
+RELDIR = xdelta3$(REL)
 
 all: xdelta3-debug xdelta3 $(PYTGT) $(SWIGTGT)
 
@@ -119,10 +121,12 @@ xdelta3_wrap.o: xdelta3_wrap.c
 	      -fpic \
 	      -c -g xdelta3_wrap.c
 
-$(SWIGTGT): xdelta3_wrap.o xdelta3.o
-#	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
+xdelta3module.dll: xdelta3_wrap.o xdelta3.o
 	gcc -shared -Wl,--enable-auto-image-base xdelta3.o xdelta3_wrap.o -L/usr/lib/python2.4/config -lpython2.4 -o xdelta3module.dll
 	cp $(SWIGTGT) /usr/lib/python2.4/site-packages
+
+xdelta3module.so: xdelta3_wrap.o xdelta3.o
+	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \
