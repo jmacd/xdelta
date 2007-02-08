@@ -2823,9 +2823,12 @@ setup_environment (int argc,
   if (v == NULL) {
     (*argc_out) = argc;
     (*argv_out) = argv;
+    (*argv_free) = NULL;
+    (*env_free) = NULL;
     return;
   }
-  *env_free = main_malloc(strlen(v) + 1);
+
+  (*env_free) = main_malloc(strlen(v) + 1);
   strcpy(*env_free, v);
 
   /* Space needed for new argv: count spaces */
@@ -2837,7 +2840,8 @@ setup_environment (int argc,
   }
 
   (*argc_out) = n;
-  (*argv_out) = main_malloc(sizeof(char*) * (n + 1));
+  (*argv_free) = main_malloc(sizeof(char*) * (n + 1));
+  (*argv_out) = (*argv_free);
   (*argv_out)[0] = argv[0];
   (*argv_out)[n] = NULL;
 
@@ -2877,8 +2881,8 @@ main (int argc, char **argv)
   char *sfilename;
   int env_argc;
   char **env_argv;
-  char **free_argv = NULL;  /* malloced */
-  char *free_value = NULL;  /* malloced */
+  char **free_argv;  /* malloced */
+  char *free_value;  /* malloced */
   int ret;
 
 #ifdef _WIN32
@@ -2892,8 +2896,10 @@ main (int argc, char **argv)
   reset_defaults();
 
  go:  /* Go. */
-  cmd = CMD_NONE;
+  free_argv = NULL;
+  free_value = NULL;
   setup_environment(argc, argv, &env_argc, &env_argv, &free_argv, &free_value);
+  cmd = CMD_NONE;
   sfilename = NULL;
   my_optind = 1;
   argv = env_argv;
@@ -3227,10 +3233,10 @@ main (int argc, char **argv)
   main_file_cleanup (& ofile);
   main_file_cleanup (& sfile);
 
-  main_cleanup ();
-
   main_free (free_argv);
   main_free (free_value);
+
+  main_cleanup ();
 
   if (--option_profile_cnt > 0 && ret == EXIT_SUCCESS) { goto go; }
 
