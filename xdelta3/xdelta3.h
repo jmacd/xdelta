@@ -171,6 +171,10 @@ typedef uint32_t xoff_t;
 #define PYTHON_MODULE 0
 #endif
 
+#ifndef SWIG_MODULE
+#define SWIG_MODULE 0
+#endif
+
 /* There are three string matching functions supplied: one fast, one slow (default), and
  * one soft-configurable.  To disable any of these, use the following definitions. */
 #ifndef XD3_BUILD_SLOW
@@ -303,6 +307,7 @@ typedef enum {
   XD3_TOOFARBACK = -17709, /* (encoder only) may be returned by getblk() if the block is too old */
   XD3_INTERNAL   = -17710, /* internal error */
   XD3_INVALID    = -17711, /* invalid config */
+  XD3_INVALID_INPUT = -17712, /* invalid input/decoder error */
 
 } xd3_rvalues;
 

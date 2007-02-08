@@ -1,8 +1,6 @@
 # xdelta 3 - delta compression tools and library
 # Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
 
-CC=gcc-4.1.1
-
 SOURCES = xdelta3-cfgs.h \
           xdelta3-decode.h \
           xdelta3-djw.h \
@@ -20,6 +18,7 @@ TARGETS = xdelta3-debug \
 	  xdelta3-debug2 \
 	  xdelta3-debug3 \
 	  xdelta3.o \
+	  xdelta3_wrap.o \
 	  xdelta3module.so \
 	  xdelta3-32 \
 	  xdelta3-64 \
@@ -39,11 +38,19 @@ PYTGT = build/lib.linux-i686-2.4/xdelta3.so
 PYFILES = xdelta3-regtest.py setup.py
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
-        draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj
+        draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
+	xdelta3.py xdelta3_wrap.c
 
 # $Format: "REL=$Xdelta3Version$" $
 REL=0o
 RELDIR = xdelta3$(REL)
+
+SWIG_FLAGS = -DXD3_DEBUG=0 \
+	      -DXD3_USE_LARGEFILE64=1 \
+              -DSECONDARY_DJW=1 \
+	      -DVCDIFF_TOOLS=1 \
+              -DSWIG_MODULE=1 \
+	      -O3
 
 all: xdelta3-debug xdelta3 $(PYTGT)
 
@@ -98,21 +105,18 @@ xdelta3_wrap.c xdelta3.py: xdelta3.swig
 	swig -python xdelta3.swig
 
 xdelta3.o: $(SOURCES)
-	$(CC) -O3 -Wall -Wshadow -c xdelta3.c -DSECONDARY_DJW=1 -o xdelta3.o
+	$(CC) -g -Wall -Wshadow -c xdelta3.c $(SWIG_FLAGS) -o xdelta3.o
 
 xdelta3_wrap.o: xdelta3_wrap.c
-	$(CC) -DXD3_DEBUG=0 \
-	      -DXD3_USE_LARGEFILE64=1 \
-              -DSECONDARY_DJW=1 \
-              -DXD3_MAIN=0 \
-	      -DHAVE_CONFIG_H \
+	$(CC) $(SWIG_FLAGS) \
+              -DHAVE_CONFIG_H \
 	      -I/usr/include/python2.4 \
 	      -I/usr/lib/python2.4/config \
 	      -fpic \
-	      -c xdelta3_wrap.c
+	      -c -g xdelta3_wrap.c
 
 xdelta3module.so: xdelta3_wrap.o xdelta3.o
-	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so
+	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \

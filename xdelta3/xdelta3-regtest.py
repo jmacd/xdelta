@@ -25,6 +25,7 @@
 
 import os, sys, math, re, time, types, array, random
 import xdelta3main
+import xdelta3
 
 HIST_SIZE      = 10   # the number of buckets
 MIN_SIZE       = 0
@@ -497,10 +498,28 @@ class GzipInfo:
 
 class Xdelta3Info:
     def __init__(self,target,delta):
+        # TODO: bug is fixed 
         self.extcomp = 0  # TODO: I removed some code that called printhdr
         self.hdrsize = 0  # to compute these, but printhdr uses stdout (now)
         self.tgtsize = os.stat(target).st_size
         self.dsize   = os.stat(delta).st_size
+        if self.tgtsize > 0:
+            self.ideal = 100.0 * self.dsize / self.tgtsize;
+        else:
+            self.ideal = 0.0
+
+class Xdelta3ModInfo:
+    def __init__(self,target,delta):
+        #tmp = open(DFILE, 'w')
+        #tmp.write(patch)
+        #tmp.close()
+        #r3 = xdelta3.xd3_main_cmdline(['xdelta3', 'printhdr', DFILE, RFILE])
+        #if r3 != 0:
+        #    raise CommandError('memory', 'print failed: %s' % r3)
+        #hdr = open(RFILE, 'r').read()
+        #print hdr
+        self.tgtsize = len(target)
+        self.dsize   = len(delta)
         if self.tgtsize > 0:
             self.ideal = 100.0 * self.dsize / self.tgtsize;
         else:
@@ -585,10 +604,26 @@ class Xdelta3Run1:
         self.file = file
     def Run(self,trial):
         RunXdelta3(testwide_encode_args +
-                   ['-efq', self.file, DFILE])
+                   ['-efqW', str(1<<20), self.file, DFILE])
         if trial > 0:
             return None
         return Xdelta3Info(self.file,DFILE)
+
+class Xdelta3Mod1:
+    def __init__(self,file):
+        self.data = open(file, 'r').read()
+    def Run(self,trial):
+        r1, patch = xdelta3.xd3_encode_memory(self.data, None, 1000000, 1<<10)
+        if r1 != 0:
+            raise CommandError('memory', 'encode failed: %s' % r1)
+        if trial > 0:
+            return None
+        r2, data1 = xdelta3.xd3_decode_memory(patch, None, len(self.data))
+        if r2 != 0:
+            raise CommandError('memory', 'decode failed: %s' % r1)
+        if self.data != data1:
+            raise CommandError('memory', 'bad output: %s' % self.data, data1)
+        return Xdelta3ModInfo(self.data,patch)
 
 class GzipRun1:
     def __init__(self,file):
@@ -608,7 +643,8 @@ def SetFileSize(F,L):
 
 def ReportSpeed(L,tr,desc):
     print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %u trials' % \
-          (desc, L, tr.r1.dsize, tr.time.mean * 1000.0, ((L+tr.r1.dsize) / tr.time.mean), tr.trials)
+          (desc, L, tr.r1.dsize, tr.time.mean * 1000.0,
+           ((L+tr.r1.dsize) / tr.time.mean), tr.trials)
 
 class RandomTestResult:
     def __init__(self, round, config, runtime, compsize):
@@ -870,10 +906,13 @@ class RandomTester:
 #end
 
 def RunSpeed():
+    # TODO: Start testing window sizes
     for L in Decimals(MAX_RUN):
         SetFileSize(RUNFILE, L)
         trx = TimeRun(Xdelta3Run1(RUNFILE))
         ReportSpeed(L,trx,'xdelta3')
+        trm = TimeRun(Xdelta3Mod1(RUNFILE))
+        ReportSpeed(L,trm,'module ')
         trg = TimeRun(GzipRun1(RUNFILE))
         ReportSpeed(L,trg,'gzip   ')
     #end
@@ -886,7 +925,14 @@ if __name__ == "__main__":
         #rcsf = Test()
         configs = []
 
-        while 1:
+        # This tests pairwise (date-ordered) performance
+        #rcsf.PairsByDate(Xdelta3Pair())
+
+        # This tests the raw speed of 0-byte inputs
+        RunSpeed()
+
+
+        while 0:
             #f1 = '/tmp/big.1'
             #f2 = '/tmp/big.2'
             test = RandomTester(configs)
@@ -906,12 +952,6 @@ if __name__ == "__main__":
             #break
             #end
         #end
-
-        # This tests pairwise (date-ordered) performance
-        #rcsf.PairsByDate(Xdelta3Pair())
-
-        # This tests the raw speed of 0-byte inputs
-        #RunSpeed()
 
     except CommandError:
         pass

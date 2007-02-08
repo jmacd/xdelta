@@ -380,7 +380,8 @@ test_read_integer_error (xd3_stream *stream, int trunto, const char *msg)
   inp = buf->base;
   max = buf->base + buf->next - trunto;
 
-  if ((ret = xd3_read_uint32_t (stream, & inp, max, & rval)) != XD3_INTERNAL || !MSG_IS (msg))
+  if ((ret = xd3_read_uint32_t (stream, & inp, max, & rval)) != XD3_INVALID_INPUT ||
+      !MSG_IS (msg))
     {
       ret = XD3_INTERNAL;
     }
@@ -1387,17 +1388,17 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 
       if ((i % 200) == 199) { DOT (); }
 
-      if ((ret = xd3_process_stream (& estream, xd3_encode_input, 0,
-					 encbuf, 1 << 20,
-					 delbuf, & delsize, 1 << 10)))
+      if ((ret = xd3_process_stream (1, & estream, xd3_encode_input, 0,
+				     encbuf, 1 << 20,
+				     delbuf, & delsize, 1 << 10)))
 	{
 	  in_stream->msg = estream.msg;
 	  goto fail;
 	}
 
-      if ((ret = xd3_process_stream (& dstream, xd3_decode_input, 0,
-					 delbuf, delsize,
-					 decbuf, & decsize, 1 << 20)))
+      if ((ret = xd3_process_stream (0, & dstream, xd3_decode_input, 0,
+				     delbuf, delsize,
+				     decbuf, & decsize, 1 << 20)))
 	{
 	  in_stream->msg = dstream.msg;
 	  goto fail;

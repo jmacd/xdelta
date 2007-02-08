@@ -740,7 +740,7 @@ static const xd3_sec_type djw_sec_type =
 #include "xdelta3-cfgs.h"
 #undef __XDELTA3_C_TEMPLATE_PASS__
 
-#if XD3_MAIN || PYTHON_MODULE
+#if XD3_MAIN || PYTHON_MODULE || SWIG_MODULE
 #include "xdelta3-main.h"
 #endif
 
@@ -1856,7 +1856,7 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (PART & OFLOW)                                                \
 	{                                                              \
 	  stream->msg = "overflow in decode_integer";                  \
-	  return XD3_INTERNAL;                                         \
+	  return XD3_INVALID_INPUT;                                         \
 	}                                                              \
                                                                        \
       PART = (PART << 7) | (next & 127);                               \
@@ -1882,13 +1882,13 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (inp == max)                                                  \
 	{                                                              \
 	  stream->msg = "end-of-input in read_integer";                \
-	  return XD3_INTERNAL;                                         \
+	  return XD3_INVALID_INPUT;                                         \
 	}                                                              \
                                                                        \
       if (val & OFLOW)                                                 \
 	{                                                              \
 	  stream->msg = "overflow in read_intger";                     \
-	  return XD3_INTERNAL;                                         \
+	  return XD3_INVALID_INPUT;                                         \
 	}                                                              \
                                                                        \
       next = (*inp++);                                                 \
@@ -2126,7 +2126,7 @@ xd3_decode_address (xd3_stream *stream, usize_t here, uint mode, const uint8_t *
       if (*inpp == max)
 	{
 	  stream->msg = "address underflow";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       mode -= same_start;
@@ -3829,7 +3829,8 @@ xd3_encode_input (xd3_stream *stream)
  ******************************************************************************************/
 
 static int
-xd3_process_stream (xd3_stream    *stream,
+xd3_process_stream (int            is_encode,
+		    xd3_stream    *stream,
 		    int          (*func) (xd3_stream *),
 		    int            close_stream,
 		    const uint8_t *input,
@@ -3838,11 +3839,15 @@ xd3_process_stream (xd3_stream    *stream,
 		    usize_t       *output_size,
 		    usize_t        output_size_max)
 {
+  usize_t ipos = 0;
+  usize_t n = min(stream->winsize, input_size);
+
   (*output_size) = 0;
 
-  stream->flags |= XD3_FLUSH;
+  stream->flags |= XD3_FLUSH; 
 
-  xd3_avail_input (stream, input, input_size);
+  xd3_avail_input (stream, input + ipos, n);
+  ipos += n;
 
   for (;;)
     {
@@ -3850,7 +3855,15 @@ xd3_process_stream (xd3_stream    *stream,
       switch((ret = func (stream)))
 	{
 	case XD3_OUTPUT: { /* memcpy below */ break; }
-	case XD3_INPUT: { /* this means EOF */ goto done; }
+	case XD3_INPUT: {
+	  n = min(stream->winsize, input_size - ipos);
+	  if (n == 0) {
+	    goto done;
+	  }
+	  xd3_avail_input (stream, input + ipos, n);
+	  ipos += n;
+	  continue;
+	}
 	case XD3_GOTHEADER: { /* ignore */ continue; }
 	case XD3_WINSTART: { /* ignore */ continue; }
 	case XD3_WINFINISH: { /* ignore */ continue; }
@@ -3886,7 +3899,8 @@ xd3_process_stream (xd3_stream    *stream,
 }
 
 static int
-xd3_process_memory (int          (*func) (xd3_stream *),
+xd3_process_memory (int            is_encode,
+		    int          (*func) (xd3_stream *),
 		    int            close_stream,
 		    const uint8_t *input,
 		    usize_t        input_size,
@@ -3901,6 +3915,11 @@ xd3_process_memory (int          (*func) (xd3_stream *),
   xd3_source src;
   int ret;
 
+  if (input == NULL || output == NULL) {
+    stream.msg = "invalid input/output buffer";
+    return XD3_INTERNAL;
+  }
+
   /* TODO: for small inputs, the xd3_stream could be configured to allocate MUCH less
    * memory.  Most of the allocations sizes are defaulted (see xdelta3.h), and assume
    * large inputs. */
@@ -3908,8 +3927,13 @@ xd3_process_memory (int          (*func) (xd3_stream *),
   memset (& config, 0, sizeof (config));
 
   config.flags = flags;
-  config.srcwin_maxsz = source_size;
-  config.winsize = input_size;
+
+  if (is_encode)
+    {
+      /* TODO: for large inputs, limit window size ... */
+      config.srcwin_maxsz = source_size;
+      config.winsize = min(input_size, (usize_t) (1<<20));
+    }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)
     {
@@ -3931,7 +3955,8 @@ xd3_process_memory (int          (*func) (xd3_stream *),
 	}
     }
 
-  if ((ret = xd3_process_stream (& stream,
+  if ((ret = xd3_process_stream (is_encode,
+				 & stream,
 				 func, 1,
 				 input, input_size,
 				 output,
@@ -3949,12 +3974,12 @@ xd3_process_memory (int          (*func) (xd3_stream *),
 int
 xd3_decode_stream (xd3_stream    *stream,
 		   const uint8_t *input,
-		   usize_t         input_size,
+		   usize_t        input_size,
 		   uint8_t       *output,
-		   usize_t        *output_size,
-		   usize_t         output_size_max)
+		   usize_t       *output_size,
+		   usize_t        output_size_max)
 {
-  return xd3_process_stream (stream, & xd3_decode_input, 1,
+  return xd3_process_stream (0, stream, & xd3_decode_input, 1,
 			     input, input_size,
 			     output, output_size, output_size_max);
 }
@@ -3968,7 +3993,7 @@ xd3_decode_memory (const uint8_t *input,
 		   usize_t       *output_size,
 		   usize_t        output_size_max,
 		   int            flags) {
-  return xd3_process_memory (& xd3_decode_input, 1,
+  return xd3_process_memory (0, & xd3_decode_input, 1,
 			     input, input_size,
 			     source, source_size,
 			     output, output_size, output_size_max,
@@ -3985,7 +4010,7 @@ xd3_encode_stream (xd3_stream    *stream,
 		   usize_t        *output_size,
 		   usize_t         output_size_max)
 {
-  return xd3_process_stream (stream, & xd3_encode_input, 1,
+  return xd3_process_stream (1, stream, & xd3_encode_input, 1,
 			     input, input_size,
 			     output, output_size, output_size_max);
 }
@@ -3999,7 +4024,7 @@ xd3_encode_memory (const uint8_t *input,
 		   usize_t        *output_size,
 		   usize_t        output_size_max,
 		   int            flags) {
-  return xd3_process_memory (& xd3_encode_input, 1,
+  return xd3_process_memory (1, & xd3_encode_input, 1,
 			     input, input_size,
 			     source, source_size,
 			     output, output_size, output_size_max,

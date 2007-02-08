@@ -1,11 +1,11 @@
 ;; -*- Prcs -*-
 (Created-By-Prcs-Version 1 3 4)
 (Project-Description "")
-(Project-Version xdelta3 0 14)
-(Parent-Version xdelta3 0 13)
-(Version-Log "add FASTEST, update DEFAULT compression levels")
+(Project-Version xdelta3 0 17)
+(Parent-Version xdelta3 0 16)
+(Version-Log "check None inputs")
 (New-Version-Log "")
-(Checkin-Time "Wed, 07 Feb 2007 03:07:16 -0800")
+(Checkin-Time "Wed, 07 Feb 2007 18:22:25 -0800")
 (Checkin-Login jmacd)
 (Populate-Ignore ())
 (Project-Keywords
@@ -15,19 +15,19 @@
   (COPYING (xdelta3/b/29_COPYING 1.1 644))
 
   (xdelta3-cfgs.h (xdelta3/9_xdelta3-cf 1.5 744))
-  (xdelta3-decode.h (xdelta3/b/30_xdelta3-de 1.4 744))
+  (xdelta3-decode.h (xdelta3/b/30_xdelta3-de 1.5 744))
   (xdelta3-djw.h (xdelta3/8_xdelta3-dj 1.5 744))
   (xdelta3-fgk.h (xdelta3/7_xdelta3-fg 1.3 744))
   (xdelta3-list.h (xdelta3/6_xdelta3-li 1.3 644))
-  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.9 744))
+  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.10 744))
   (xdelta3-python.h (xdelta3/4_xdelta3-py 1.4 744))
-  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.8 744))
+  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.10 744))
   (xdelta3-second.h (xdelta3/3_xdelta3-se 1.4 744))
-  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.8 744))
-  (xdelta3.c (xdelta3/16_xdelta3.c 1.8 744))
-  (xdelta3.h (xdelta3/1_xdelta3.h 1.7 744))
+  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.10 744))
+  (xdelta3.c (xdelta3/16_xdelta3.c 1.10 744))
+  (xdelta3.h (xdelta3/1_xdelta3.h 1.8 744))
 
-  (Makefile (xdelta3/0_Makefile 1.7 744))
+  (Makefile (xdelta3/0_Makefile 1.8 744))
   (setup.py (xdelta3/11_setup.py 1.4 744))
 
   (draft-korn-vcdiff.txt (xdelta3/b/22_draft-korn 1.1 644))
@@ -40,8 +40,13 @@
   (badcopy.vcproj (xdelta3/b/32_badcopy.vc 1.1 744))
   (xdelta3.vcproj (xdelta3/b/33_xdelta3.vc 1.2 744))
 
-  (xdelta3.swig (xdelta3/b/27_xdelta3.sw 1.1 744))
+  (xdelta3.swig (xdelta3/b/27_xdelta3.sw 1.2 744))
 
+
+;; Files added by populate at Wed, 07 Feb 2007 13:33:45 -0800,
+;; to version 0.14(w), by jmacd:
+
+  (xdelta3-test.py (xdelta3/b/28_xdelta3-te 1.2 744))
 )
 (Merge-Parents)
 (New-Merge-Parents)

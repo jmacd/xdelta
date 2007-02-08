@@ -2811,7 +2811,7 @@ main_cleanup (void)
 }
 
 int
-#if PYTHON_MODULE
+#if PYTHON_MODULE || SWIG_MODULE
 xd3_main_cmdline (int argc, char **argv)
 #else
 main (int argc, char **argv)

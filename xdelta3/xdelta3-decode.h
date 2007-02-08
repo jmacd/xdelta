@@ -58,7 +58,7 @@ xd3_decode_setup_buffers (xd3_stream *stream)
       if (stream->dec_cpyoff < stream->dec_laststart)
 	{
 	  stream->msg = "unsupported VCD_TARGET offset";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       /* See if the two windows are the same.  This indicates the first time VCD_TARGET is
@@ -210,7 +210,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 			      stream->inst_sect.buf_max,
 			    & inst->size)))
     {
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   /* For copy instructions, read address. */
@@ -240,7 +240,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
       if (inst->addr >= stream->dec_position)
 	{
 	  stream->msg = "address too large";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       /* Check: a VCD_TARGET or VCD_SOURCE copy cannot exceed the remaining buffer space
@@ -248,7 +248,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
       if (inst->addr < stream->dec_cpylen && inst->addr + inst->size > stream->dec_cpylen)
 	{
 	  stream->msg = "size too large";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
     }
   else
@@ -280,7 +280,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
   if (stream->dec_position + inst->size > stream->dec_maxpos)
     {
       stream->msg = "size too large";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   stream->dec_position += inst->size;
@@ -297,7 +297,7 @@ xd3_decode_instruction (xd3_stream *stream)
   if (stream->inst_sect.buf == stream->inst_sect.buf_max)
     {
       stream->msg = "instruction underflow";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   inst = &stream->code_table[*stream->inst_sect.buf++];
@@ -338,7 +338,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (stream->data_sect.buf == stream->data_sect.buf_max)
 	  {
 	    stream->msg = "data underflow";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	/* TUNE: Probably want to eliminate memset/memcpy here */
@@ -357,7 +357,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (stream->data_sect.buf + take > stream->data_sect.buf_max)
 	  {
 	    stream->msg = "data underflow";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	memcpy (stream->next_out + stream->avail_out,
@@ -426,7 +426,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) && (blkoff + take > source->onblk))
 		  {
 		    stream->msg = "source file too short";
-		    return XD3_INTERNAL;
+		    return XD3_INVALID_INPUT;
 
 		  }
 
@@ -549,7 +549,7 @@ xd3_decode_sections (xd3_stream *stream)
     {
     default:
       stream->msg = "internal error";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
 
     case DEC_DATA:
       if ((ret = xd3_decode_section (stream, & stream->data_sect, DEC_INST, copy))) { return ret; }
@@ -625,19 +625,19 @@ xd3_decode_emit (xd3_stream *stream)
     {
       IF_DEBUG1 (P(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n", stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   if (stream->data_sect.buf != stream->data_sect.buf_max)
     {
       stream->msg = "extra data section";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   if (stream->addr_sect.buf != stream->addr_sect.buf_max)
     {
       stream->msg = "extra address section";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   /* OPT: Should cksum computation be combined with the above loop? */
@@ -649,7 +649,7 @@ xd3_decode_emit (xd3_stream *stream)
       if (a32 != stream->dec_adler32)
 	{
 	  stream->msg = "target window checksum mismatch";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
     }
 
@@ -665,7 +665,7 @@ xd3_decode_input (xd3_stream *stream)
   if (stream->enc_state != 0)
     {
       stream->msg = "encoder/decoder transition";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
 #define BYTE_CASE(expr,x,nstate)                                               \
@@ -703,13 +703,13 @@ xd3_decode_input (xd3_stream *stream)
 	    stream->dec_magic[2] != VCDIFF_MAGIC3)
 	  {
 	    stream->msg = "not a VCDIFF input";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	if (stream->dec_magic[3] != 0)
 	  {
 	    stream->msg = "VCDIFF input version > 0 is not supported";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	stream->dec_state = DEC_HDRIND;
@@ -721,7 +721,7 @@ xd3_decode_input (xd3_stream *stream)
 	if ((stream->dec_hdr_ind & VCD_INVHDR) != 0)
 	  {
 	    stream->msg = "unrecognized header indicator bits set";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	stream->dec_state = DEC_SECONDID;
@@ -741,7 +741,7 @@ xd3_decode_input (xd3_stream *stream)
 	      DJW_CASE (stream);
 	    default:
 	      stream->msg = "unknown secondary compressor ID";
-	      return XD3_INTERNAL;
+	      return XD3_INVALID_INPUT;
 	    }
 	}
 
@@ -828,7 +828,7 @@ xd3_decode_input (xd3_stream *stream)
 	if (XOFF_T_OVERFLOW (stream->dec_winstart, stream->dec_tgtlen))
 	  {
 	    stream->msg = "decoder file offset overflow";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	stream->dec_winstart += stream->dec_tgtlen;
@@ -836,7 +836,7 @@ xd3_decode_input (xd3_stream *stream)
 	if ((stream->dec_win_ind & VCD_INVWIN) != 0)
 	  {
 	    stream->msg = "unrecognized window indicator bits set";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
 
 	if ((ret = xd3_decode_init_window (stream))) { return ret; }
@@ -863,7 +863,7 @@ xd3_decode_input (xd3_stream *stream)
       if (XOFF_T_OVERFLOW (stream->dec_cpyoff, stream->dec_cpylen))
 	{
 	  stream->msg = "decoder copy window overflows a file offset";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       /* Check copy window bounds: VCD_TARGET window may not exceed current position. */
@@ -871,7 +871,7 @@ xd3_decode_input (xd3_stream *stream)
 	  (stream->dec_cpyoff + (xoff_t) stream->dec_cpylen > stream->dec_winstart))
 	{
 	  stream->msg = "VCD_TARGET window out of bounds";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
     case DEC_ENCLEN:
@@ -887,14 +887,14 @@ xd3_decode_input (xd3_stream *stream)
       if (USIZE_T_OVERFLOW (stream->dec_cpylen, stream->dec_tgtlen))
 	{
 	  stream->msg = "decoder target window overflows a usize_t";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       /* Check for malicious files. */
       if (stream->dec_tgtlen > XD3_HARDMAXWINSIZE)
 	{
 	  stream->msg = "hard window size exceeded";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       stream->dec_maxpos = stream->dec_cpylen + stream->dec_tgtlen;
@@ -906,14 +906,14 @@ xd3_decode_input (xd3_stream *stream)
       if ((stream->dec_del_ind & VCD_INVDEL) != 0)
 	{
 	  stream->msg = "unrecognized delta indicator bits set";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       /* Delta indicator is only used with secondary compression. */
       if ((stream->dec_del_ind != 0) && (stream->sec_type == NULL))
 	{
 	  stream->msg = "invalid delta indicator bits set";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       /* Section lengths */
@@ -954,7 +954,7 @@ xd3_decode_input (xd3_stream *stream)
 	if (stream->dec_enclen != enclen_check)
 	  {
 	    stream->msg = "incorrect encoding length (redundent)";
-	    return XD3_INTERNAL;
+	    return XD3_INVALID_INPUT;
 	  }
       }
 
@@ -980,7 +980,7 @@ xd3_decode_input (xd3_stream *stream)
 	  if (src == NULL)
 	    {
 	      stream->msg = "source input required";
-	      return XD3_INTERNAL;
+	      return XD3_INVALID_INPUT;
 	    }
 
 	  src->cpyoff_blocks = stream->dec_cpyoff / src->blksize;
@@ -1023,7 +1023,7 @@ xd3_decode_input (xd3_stream *stream)
 
     default:
       stream->msg = "invalid state";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 }
 

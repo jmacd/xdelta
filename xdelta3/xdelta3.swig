@@ -1,7 +1,10 @@
 %module xdelta3
 %import cstring.i
+%import argcargv.i
 %{
 #include "xdelta3.h"
+
+int xd3_main_cmdline (int ARGC, char **ARGV);
 
 #undef SWIG_init
 #undef SWIG_name
@@ -13,23 +16,54 @@
 
 %cstring_input_binary(const char *input, unsigned int input_size);
 %cstring_input_binary(const char *source, unsigned int source_size);
-%cstring_output_withsize(char *output_buf, unsigned int avail_output);
 
-int     xd3_encode_memory (const char *input,
-			   unsigned int input_size,
-			   const char *source,
-			   unsigned int source_size,
-			   char               *output_buf,
-			   unsigned int       *OUTPUT,
-			   unsigned int        avail_output,
-			   int            flags);
+%define %max_output_withsize(TYPEMAP, SIZE, MAXSIZE)
+%typemap(in) MAXSIZE (unsigned int alloc_size) {
+  $1 = alloc_size = PyInt_AsLong(obj2);
+}
+%typemap(in,numinputs=0) (TYPEMAP, SIZE) {
+}
+%typemap(check) (TYPEMAP, SIZE) {
+  // alloc_size input is #7th position in xd3_xxcode_memory()
+  $1 = malloc(alloc_size7);
+  $2 = &alloc_size7;
+}
+%typemap(argout,fragment="t_output_helper") (TYPEMAP, SIZE) {
+  if (result == 0) {
+    PyObject *o;
+    // alloc_size7 now carries actual size
+    o = PyString_FromStringAndSize($1,alloc_size7);
+    $result = t_output_helper($result,o);
+  } else {
+    $result = t_output_helper($result,Py_None);
+  }
+  free($1);
+}
+%typemap(default) int flags {
+  $1 = 0;
+}
+%enddef
 
-int     xd3_decode_memory (const char         *input,
-			   unsigned int        input_size,
-			   const char         *source,
-			   unsigned int        source_size,
-			   char               *output_buf,
-			   unsigned int       *OUTPUT,
-			   unsigned int        avail_output,
-			   int                 flags);
+%max_output_withsize(char *output_buf, unsigned int *output_size, unsigned int max_output);
 
+int     xd3_encode_memory (const char   *input,
+			   unsigned int  input_size,
+			   const char   *source,
+			   unsigned int  source_size,
+			   char         *output_buf,
+			   unsigned int *output_size,
+			   unsigned int  max_output,
+			   int           flags);
+
+int     xd3_decode_memory (const char   *input,
+			   unsigned int  input_size,
+			   const char   *source,
+			   unsigned int  source_size,
+			   char         *output_buf,
+			   unsigned int *output_size,
+			   unsigned int  max_output,
+			   int           flags);
+
+
+
+int xd3_main_cmdline (int ARGC, char **ARGV);
