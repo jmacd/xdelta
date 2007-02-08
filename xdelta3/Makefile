@@ -45,6 +45,9 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 REL=0o
 RELDIR = xdelta3$(REL)
 
+#SWIGTGT = xdelta3module.so
+SWIGTGT = xdelta3module.dll
+
 SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
               -DSECONDARY_DJW=1 \
@@ -52,13 +55,14 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
               -DSWIG_MODULE=1 \
 	      -O3
 
-all: xdelta3-debug xdelta3 $(PYTGT)
+all: xdelta3-debug xdelta3 $(PYTGT) $(SWIGTGT)
 
 all-targets: $(TARGETS)
 
 all-targets-test: all-targets test
 
 pytgt: $(PYTGT)
+swigtgt: $(SWIGTGT)
 
 test:
 	./xdelta3-debug test
@@ -115,8 +119,10 @@ xdelta3_wrap.o: xdelta3_wrap.c
 	      -fpic \
 	      -c -g xdelta3_wrap.c
 
-xdelta3module.so: xdelta3_wrap.o xdelta3.o
-	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
+$(SWIGTGT): xdelta3_wrap.o xdelta3.o
+#	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
+	gcc -shared -Wl,--enable-auto-image-base xdelta3.o xdelta3_wrap.o -L/usr/lib/python2.4/config -lpython2.4 -o xdelta3module.dll
+	cp $(SWIGTGT) /usr/lib/python2.4/site-packages
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow xdelta3.c \
