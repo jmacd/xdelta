@@ -1596,6 +1596,22 @@ delta_command (gint argc, gchar** argv)
     return 2;
 
 #if 0
+  {
+    guint32 pos = 0;
+    gint i, l = cont->inst_len;
+
+    for (i = 0; i < l; i += 1)
+      {
+	XdeltaInstruction *inst = cont->inst + i;
+	if (inst->index == 0) {
+	  inst->index = 999999999;
+	  inst->offset = 999999999;
+	} else {
+	  inst->index = pos;
+	}
+	pos += inst->length;
+      }
+  }
   serializeio_print_xdeltacontrol_obj (cont, 0);
 #endif
 
