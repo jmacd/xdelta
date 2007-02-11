@@ -346,7 +346,6 @@ main_config (void)
   P(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
   P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
   P(RINT "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
-  P(RINT "XD3_DEFAULT_CKSUM_SIZE=%d\n", XD3_DEFAULT_CKSUM_ADVANCE);
   P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
   P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
   P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
@@ -742,7 +741,13 @@ main_file_open (main_file *xfile, const char* name, int mode)
 
   xfile->mode = mode;
 
+  XD3_ASSERT (name != NULL);
   XD3_ASSERT (! main_file_isopen (xfile));
+  if (name[0] == 0)
+    {
+      XPR(NT "invalid file name: empty string\n");
+      return XD3_INVALID;
+    }
 
 #if XD3_STDIO
   xfile->file = fopen (name, XOPEN_STDIO);
@@ -1840,6 +1845,12 @@ main_get_appheader_params (main_file *file, char **parsed, int output, const cha
 
       if (other->filename != NULL) {
 	/* Take directory from the other file, if it has one. */
+	/* TODO: This results in nonsense names like /dev/foo.tar.gz
+	 * and probably the filename-default logic interferes with
+	 * multi-file operation and the standard file extension?
+	 * Possibly the name header is bad, should be off by default.
+	 * Possibly we just want to remember external/compression
+	 * settings. */
 	char *last_slash = strrchr(other->filename, '/');
 
 	if (last_slash != NULL) {
@@ -2029,17 +2040,25 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       sfile->nread = 0;
       source->size = UINT64_MAX;
     }
-  else if ((ret = main_file_open (sfile, sfile->filename, XO_READ)) ||
-	   (ret = main_file_stat (sfile, & source->size, 1)))
+  else
     {
-      goto error;
+      if (option_verbose)
+	{
+	  XPR(NT "source file: %s\n", sfile->filename);
+	}
+
+      if ((ret = main_file_open (sfile, sfile->filename, XO_READ)) ||
+	  (ret = main_file_stat (sfile, & source->size, 1)))
+	{
+	  goto error;
+	}
     }
 
   source->name     = sfile->filename;
   source->ioh      = sfile;
   source->curblkno = (xoff_t) -1;
   source->curblk   = NULL;
-
+  
 #if EXTERNAL_COMPRESSION
   if (option_decompress_inputs)
     {
@@ -2650,7 +2669,7 @@ main_input (xd3_cmd     cmd,
 		      }
 		    
 		    /* Limited instruction buffer size affects source copies */
-		    if (stream.i_slots_used > stream.iopt_size)
+		    if (option_verbose > 1 && stream.i_slots_used > stream.iopt_size)
 		      {
 			XPR(NT "warning: input position %"Q"u overflowed instruction buffer, "
 			    "needed %u (vs. %u)\n",
@@ -2831,7 +2850,7 @@ setup_environment (int argc,
   (*env_free) = main_malloc(strlen(v) + 1);
   strcpy(*env_free, v);
 
-  /* Space needed for new argv: count spaces */
+  /* Space needed for extra args, at least # of spaces */
   n = argc + 1;
   for (p = *env_free; *p != 0; ) {
     if (*p++ == ' ') {
@@ -2839,7 +2858,6 @@ setup_environment (int argc,
     }
   }
 
-  (*argc_out) = n;
   (*argv_free) = main_malloc(sizeof(char*) * (n + 1));
   (*argv_out) = (*argv_free);
   (*argv_out)[0] = argv[0];
@@ -2851,7 +2869,7 @@ setup_environment (int argc,
     while (*p != ' ' && *p != 0) {
       p++;
     }
-    if (*p == ' ') {
+    while (*p == ' ') {
       *p++ = 0;
     }
   }
@@ -2860,7 +2878,11 @@ setup_environment (int argc,
     (*argv_out)[i++] = argv[i0];
   }
 
-  XD3_ASSERT (i == n);
+  /* Counting spaces is an upper bound, argv stays NULL terminated. */
+  (*argc_out) = i;
+  while (i <= n) {
+    (*argv_out)[i++] = NULL;
+  }
 }
 
 int
@@ -2881,8 +2903,8 @@ main (int argc, char **argv)
   char *sfilename;
   int env_argc;
   char **env_argv;
-  char **free_argv;  /* malloced */
-  char *free_value;  /* malloced */
+  char **free_argv;  /* malloc() in setup_environment() */
+  char *free_value;  /* malloc() in setup_environment() */
   int ret;
 
 #ifdef _WIN32
@@ -3248,7 +3270,7 @@ main (int argc, char **argv)
 static int
 main_help (void)
 {
-  /* TODO: update www/xdelta3-cmdline.html */
+  /* Note: update wiki when command-line features change */
   main_version ();
   P(RINT "usage: xdelta3 [command/options] [input [output]]\n");
   P(RINT "special command names:\n");
@@ -3296,5 +3318,9 @@ main_help (void)
   P(RINT "   -P           repeat count (for profiling)\n");
   P(RINT "   -T           use alternate code table\n");
 #endif
+  P(RINT "the XDELTA environment variable may contain extra args:\n");
+  P(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
+  P(RINT "   tar --use-compress-program=xdelta3 \\\n");
+  P(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y/\n");
   return EXIT_FAILURE;
 }

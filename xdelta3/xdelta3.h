@@ -38,11 +38,6 @@
 #define XD3_DEFAULT_WINSIZE (1U << 18)
 #endif
 
-/* This is a unit of how far to advance the checksum position in one go. */
-#ifndef XD3_DEFAULT_CKSUM_ADVANCE
-#define XD3_DEFAULT_CKSUM_ADVANCE (1U << 14)
-#endif
-
 /* Default total size of the source window used in xdelta3-main.h */
 #ifndef XD3_DEFAULT_SRCWINSZ
 #define XD3_DEFAULT_SRCWINSZ (1U << 26)
@@ -583,7 +578,6 @@ struct _xd3_config
   usize_t             winsize;       /* The encoder window size. */
   usize_t             sprevsz;       /* How far back small string matching goes */
   usize_t             iopt_size;     /* entries in the instruction-optimizing buffer */
-  usize_t             srcwin_size;   /* Initial size of the source-window lookahead */
   usize_t             srcwin_maxsz;  /* srcwin_size grows by a factor of 2 when no matches are found */
 
   xd3_getblk_func   *getblk;        /* The three callbacks. */
@@ -657,7 +651,6 @@ struct _xd3_stream
   usize_t           sprevmask;        /* small string, previous window size mask */
   uint              iopt_size;
   uint              iopt_unlimited;
-  uint              srcwin_size;
   uint              srcwin_maxsz;
 
   /* general configuration */
@@ -693,7 +686,7 @@ struct _xd3_stream
 				       * match in the buffer. */
 
   // SRCWIN
-  // these variables plus srcwin_size, srcwin_maxsz above (set by config)
+  // these variables plus srcwin_maxsz above (set by config)
   int                srcwin_decided;    /* boolean: true if the srclen,srcbase have been decided. */
   xoff_t             srcwin_cksum_pos;  /* Source checksum position */
 

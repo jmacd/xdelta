@@ -85,6 +85,8 @@ def INPUT_SPEC(rand):
 RCSDIR = '/tmp/PRCS_read_copy'
 #RCSDIR = 'G:/jmacd/PRCS'
 
+SAMPLEDIR = "C:/sample_data/WESNOTH_tmp/tar'
+
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
 RUNFILE = os.path.join(TMPDIR, 'run')
