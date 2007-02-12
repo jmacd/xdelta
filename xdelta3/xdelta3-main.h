@@ -1998,7 +1998,7 @@ main_open_output (xd3_stream *stream, main_file *ofile)
 	  return ret;
 	}
 
-      if (option_verbose > 1) { XPR(NT "open output: %s\n", ofile->filename); }
+      if (option_verbose > 1) { XPR(NT "output file: %s\n", ofile->filename); }
     }
 
 #if EXTERNAL_COMPRESSION
