@@ -51,6 +51,7 @@ PyObject *xdelta3_main_cmdline (PyObject *self, PyObject *args)
       PyObject *s;
       if ((s = PyList_GetItem (o, i-1)) == NULL) { goto cleanup; }
       ps = PyString_AsString (s);
+      /* TODO: ps is NULL if s is not a string, crashes the interpreter */
       argv[i] = ps;
     }
 

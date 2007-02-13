@@ -16,12 +16,9 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-# TODO: Test IOPT (1.5 vs. greedy)
-
 # TODO: Start testing window sizes
-
-# TODO: Note: xd3_encode_memory is underperforming the command-line
-#   at run-speed tests (due to excess memory allocation?). Fix.
+# TODO: Test 1.5 vs. greedy
+# TODO: Compare w/ bsdiff and generate more summary
 
 import os, sys, math, re, time, types, array, random
 import xdelta3main
@@ -36,15 +33,13 @@ SKIP_TRIALS    = 2
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
 
-#SKIP_TRIALS    = 0
-#MIN_TRIALS     = 1
-#MAX_TRIALS     = 1
+MIN_STDDEV_PCT = 1.5
 
-MIN_STDDEV_PCT = 1.5 # stop
+MIN_RUN        = 1000 * 1000 * 1
 MAX_RUN        = 1000 * 1000 * 10
 
 # How many results per round
-MAX_RESULTS = 100
+MAX_RESULTS = 10
 KEEP_P = (0.5)
 FAST_P = (0.0)
 SLOW_P = (0.0)
@@ -82,15 +77,15 @@ def INPUT_SPEC(rand):
 #
 #
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-RCSDIR = '/tmp/PRCS_read_copy'
-#RCSDIR = 'G:/jmacd/PRCS'
+#RCSDIR = '/tmp/PRCS_read_copy'
 
-SAMPLEDIR = "C:/sample_data/WESNOTH_tmp/tar"
+RCSDIR = 'G:/jmacd/PRCS/prcs/b'
+
+SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
 RUNFILE = os.path.join(TMPDIR, 'run')
-HFILE   = os.path.join(TMPDIR, 'hdr')
 DFILE   = os.path.join(TMPDIR, 'output')
 RFILE   = os.path.join(TMPDIR, 'recon')
 
@@ -99,7 +94,7 @@ BAR_STATE  = 1
 REV_STATE  = 2
 DATE_STATE = 3
 
-# 
+#
 IGNORE_FILENAME  = re.compile('.*\\.(gif|jpg).*')
 
 # rcs output
@@ -126,320 +121,12 @@ testwide_encode_args = [
 
 def c2s(c):
     return ' '.join(['%02d' % x for x in c])
+#end
 
-#
-# exceptions
-class SkipRcsException:
-    def __init__(self,reason):
-        self.reason = reason
-class NotEnoughVersions:
-    def __init__(self):
-        pass
-class CommandError:
-    def __init__(self,cmd,str):
-        if type(cmd) is types.TupleType or \
-           type(cmd) is types.ListType:
-            cmd = reduce(lambda x,y: '%s %s' % (x,y),cmd)
-        print 'command was: ',cmd
-        print 'command failed: ',str
-        print 'have fun debugging'
-#
-# one version
-class RcsVersion:
-    def __init__(self,vstr):
-        self.vstr = vstr
-    def __cmp__(self,other):
-        return cmp(self.date, other.date)
-    def __str__(self):
-        return str(self.vstr)
-#
-# one rcsfile
-class RcsFile:
-
-    def __init__(self, fname):
-        self.fname    = fname
-        self.versions = []
-        self.state    = HEAD_STATE
-
-    def SetTotRev(self,s):
-        self.totrev = int(s)
-
-    def Rev(self,s):
-        self.rev = RcsVersion(s)
-        if len(self.versions) >= self.totrev:
-            raise SkipRcsException('too many versions (in log messages)')
-        self.versions.append(self.rev)
-
-    def Date(self,s):
-        self.rev.date = s
-
-    def Match(self, line, state, rx, gp, newstate, f):
-        if state == self.state:
-            m = rx.match(line)
-            if m:
-                if f:
-                    f(m.group(gp))
-                self.state = newstate
-                return 1
-        return None
-
-    def Sum1Rlog(self):
-        f = os.popen('rlog '+self.fname, "r")
-        l = f.readline()
-        while l:
-            if self.Match(l, HEAD_STATE, RE_TOTREV, 1, BAR_STATE, self.SetTotRev):
-                pass
-            elif self.Match(l, BAR_STATE, RE_BAR, 1, REV_STATE, None):
-                pass
-            elif self.Match(l, REV_STATE, RE_REV, 1, DATE_STATE, self.Rev):
-                pass
-            elif self.Match(l, DATE_STATE, RE_DATE, 1, BAR_STATE, self.Date):
-                pass
-            l = f.readline()
-        c = f.close()
-        if c != None:
-            raise c
-        #print '%s versions %d' % (self.fname, len(self.versions))
-        #for v in self.versions:
-        #    v.Print()
-
-    def Sum1(self):
-        st = os.stat(self.fname)
-        self.rcssize = st.st_size
-        self.Sum1Rlog()
-        if self.totrev != len(self.versions):
-            raise SkipRcsException('wrong version count')
-        self.versions.sort()
-
-    def Checkout(self,n):
-        v      = self.versions[n]
-        out    = open(self.Verf(n), "w")
-        cmd    = 'co -ko -p%s %s' % (v.vstr, self.fname)
-        total  = 0
-        (inf,
-         stream,
-         err)  = os.popen3(cmd, "r")
-        inf.close()
-        buf    = stream.read()
-        while buf:
-            total = total + len(buf)
-            out.write(buf)
-            buf = stream.read()
-        v.vsize = total
-        estr = ''
-        buf = err.read()
-        while buf:
-            estr = estr + buf
-            buf = err.read()
-        if stream.close():
-            raise CommandError(cmd, 'checkout failed: %s\n%s\n%s' % (v.vstr, self.fname, estr))
-        out.close()
-        err.close()
-
-    def Vdate(self,n):
-        return self.versions[n].date
-
-    def Vstr(self,n):
-        return self.versions[n].vstr
-
-    def Verf(self,n):
-        return os.path.join(TMPDIR, 'input.%d' % n)
-
-    def PairsByDate(self,runnable):
-        if self.totrev < 2:
-            raise NotEnoughVersions()
-        self.Checkout(0)
-        ntrials = []
-        if self.totrev < 2:
-            return vtrials
-        for v in range(0,self.totrev-1):
-            if v > 1:
-                os.remove(self.Verf(v-1))
-            self.Checkout(v+1)
-            if os.stat(self.Verf(v)).st_size < MIN_SIZE or \
-               os.stat(self.Verf(v+1)).st_size < MIN_SIZE:
-                continue
-
-            runnable.SetInputs(self.Verf(v),
-                               self.Vstr(v),
-                               self.Verf(v+1),
-                               self.Vstr(v+1))
-            result = TimedTest(runnable)
-            print 'testing %s %s: ratio %.3f%%: time %.7f: in %u trials' % \
-                  (os.path.basename(self.fname),
-                   self.Vstr(v+1),
-                   result.r1.ratio,
-                   result.time.mean,
-                   result.trials)
-            ntrials.append(result)
-
-        os.remove(self.Verf(self.totrev-1))
-        os.remove(self.Verf(self.totrev-2))
-        return ntrials
-
-    def AppendVersion(self, f, n):
-        self.Checkout(n)
-        rf = open(self.Verf(n), "r")
-        data = rf.read()
-        f.write(data)
-        rf.close()
-        return len(data)
-
-#
-# This class recursively scans a directory for rcsfiles
-class RcsFinder:
-    def __init__(self):
-        self.subdirs  = []
-        self.rcsfiles = []
-        self.others   = []
-        self.skipped  = []
-
-    def Scan1(self,dir):
-        dents = os.listdir(dir)
-        subdirs  = []
-        rcsfiles = []
-        others   = []
-        for dent in dents:
-            full = os.path.join(dir, dent)
-            if os.path.isdir(full):
-                subdirs.append(full)
-            elif dent[len(dent)-2:] == ",v":
-                rcsfiles.append(RcsFile(full))
-            else:
-                others.append(full)
-        self.subdirs  = self.subdirs  + subdirs
-        self.rcsfiles = self.rcsfiles + rcsfiles
-        self.others   = self.others   + others
-        return subdirs
-
-    def Crawl(self, dir):
-        subdirs = [dir]
-        while subdirs:
-            s1 = self.Scan1(subdirs[0])
-            subdirs = subdirs[1:] + s1
-
-    def Summarize(self):
-        good = []
-        for rf in self.rcsfiles:
-            try:
-                rf.Sum1()
-                if rf.totrev < 2:
-                    raise SkipRcsException('too few versions (< 2)')
-            except SkipRcsException, e:
-                #print 'skipping file %s: %s' % (rf.fname, e.reason)
-                self.skipped.append(rf)
-            else:
-                good.append(rf)
-        self.rcsfiles = good
-
-    def PairsByDate(self,runnable):
-        allvtrials = []
-        good = []
-        for rf in self.rcsfiles:
-            print 'testing %s on %s with %d versions' % (runnable.type, rf.fname, rf.totrev)
-            try:
-                allvtrials.append(rf.PairsByDate(runnable))
-            except SkipRcsException:
-                print 'file %s has compressed versions: skipping' % (rf.fname)
-            except NotEnoughVersions:
-                print 'testing %s on %s: not enough versions' % (runnable.type, rf.fname)
-            else:
-                good.append(rf)
-        self.rcsfiles = good
-        return allvtrials
-#
-#
-class Bucks:
-    def __init__(self,low,high):
-        self.low    = low
-        self.high   = high
-        self.spread = high - low
-        self.bucks  = []
-        for i in range(0,HIST_SIZE):
-            self.bucks.append([low+(self.spread * (i+0.0) / float(HIST_SIZE)),
-                               low+(self.spread * (i+0.5) / float(HIST_SIZE)),
-                               low+(self.spread * (i+1.0) / float(HIST_SIZE)),
-                               0])
-    def Add(self, x):
-        assert(x>=self.low)
-        assert(x<self.high)
-        t = self.bucks[int((x-self.low)/float(self.spread)*HIST_SIZE)]
-        t[3] = t[3] + 1
-    def Print(self, f):
-        for i in self.bucks:
-            # gnuplot -persist "plot %s using 2:4
-            f.write("%.1f %.1f %.1f %d\n" % (i[0],i[1],i[2],i[3]))
-#
-#
-class TimedTest:
-    def __init__(self,runnable,
-                 skip_trials=SKIP_TRIALS,
-                 min_trials=MIN_TRIALS,
-                 max_trials=MAX_TRIALS,
-                 min_stddev_pct=MIN_STDDEV_PCT):
-
-        min_trials = min(min_trials,max_trials)
-        self.trials   = 0
-        self.measured = []
-        self.r1       = None
-        while 1:
-            try:
-                os.remove(DFILE)
-                os.remove(RFILE)
-            except OSError:
-                pass
-
-            start_time  = time.time()
-            start_clock = time.clock()
-
-            result = runnable.Run(self.trials)
-
-            if self.r1 == None:
-                self.r1 = result
-
-            total_clock = (time.clock() - start_clock)
-            total_time  = (time.time()  - start_time)
-
-            elap_time  = max((total_time),  0.000001)
-            elap_clock = max((total_clock), 0.000001)
-
-            self.trials = self.trials + 1
-
-            # skip some of the first trials
-            if self.trials > skip_trials:
-                self.measured.append((elap_clock,elap_time))
-                #print 'measurement total: %.1f ms' % (total_time * 1000.0)
-
-            # at least so many
-            if self.trials < (skip_trials + min_trials):
-                #print 'continue: need more trials: %d' % self.trials
-                continue
-
-            # compute %variance
-            done = 0
-            if skip_trials + min_trials <= 2:
-                done = 1
-                self.measured = self.measured + self.measured;
-
-            self.time = StatList([x[1] for x in self.measured], 'elap time')
-            sp = float(self.time.s) / float(self.time.mean)
-
-            # what if MAX_TRIALS is exceeded?
-            too_many = (self.trials-skip_trials) >= max_trials
-            good     = (100.0 * sp) < min_stddev_pct
-            if done or too_many or good:
-                self.trials = self.trials - skip_trials
-                if not done and not good:
-                    #print 'too many trials: %d' % self.trials
-                    pass
-                self.clock  = StatList([x[0] for x in self.measured], 'elap clock')
-                return
-#
-#
-#
 def SumList(l):
     return reduce(lambda x,y: x+y, l)
-#
+#end
+
 # returns (total, mean, stddev, q2 (median),
 #          (q3-q1)/2 ("semi-interquartile range"), max-min (spread))
 class StatList:
@@ -457,24 +144,20 @@ class StatList:
         self.q2     = l[int(self.cnt/2.0+0.5)]
         self.q3     = l[min(self.cnt-1,int((3.0*self.cnt)/4.0+0.5))]
         self.q4     = l[self.cnt-1]+1
-        self.hf     = "./%s.hist" % desc
         self.siqr   = (self.q3-self.q1)/2.0;
         self.spread = (self.q4-self.q0)
         self.str    = '%s %d; mean %d; sdev %d; q2 %d; .5(q3-q1) %.1f; spread %d' % \
                       (desc, self.total, self.mean, self.s, self.q2, self.siqr, self.spread)
-        if hist:
-            f = open(self.hf, "w")
-            self.bucks = Bucks(self.q0,self.q4)
-            for i in l:
-                self.bucks.Add(i)
-            self.bucks.Print(f)
-            f.close()
+    #end
+#end
 
-def RunCommand(args):
-    #print "run command", args
+def RunCommand(args, ok = [0]):
+    #print 'run command %s' % (' '.join(args))
     p = os.spawnvp(os.P_WAIT, args[0], args)
-    if p != 0:
+    if p not in ok:
         raise CommandError(args, 'exited %d' % p)
+    #end
+#end
 
 def RunCommandIO(args,infn,outfn):
     p = os.fork()
@@ -487,97 +170,561 @@ def RunCommandIO(args,infn,outfn):
         o = os.WEXITSTATUS(s[1])
         if not os.WIFEXITED(s[1]) or o != 0:
             raise CommandError(args, 'exited %d' % o)
+        #end
+    #end
+#end
 
-def RunXdelta3(args):
-    try:
-        xdelta3main.main(args)
-    except Exception, e:
-        raise CommandError(args, "xdelta3.main exception")
+class TimedTest:
+    def __init__(self, target, source, runnable,
+                 skip_trials = SKIP_TRIALS,
+                 min_trials = MIN_TRIALS,
+                 max_trials = MAX_TRIALS,
+                 min_stddev_pct = MIN_STDDEV_PCT):
+        self.target = target
+        self.source = source
+        self.runnable = runnable
 
-class GzipInfo:
-    def __init__(self,target,delta):
-        self.tgtsize = os.stat(target).st_size
-        self.dsize   = os.stat(delta).st_size
+        self.skip_trials = skip_trials
+        self.min_trials = min(min_trials, max_trials)
+        self.max_trials = max_trials
+        self.min_stddev_pct = min_stddev_pct
 
-class Xdelta3Info:
-    def __init__(self,target,delta):
-        self.tgtsize = os.stat(target).st_size
-        self.dsize   = os.stat(delta).st_size
-        if self.tgtsize > 0:
-            self.ratio = 100.0 * self.dsize / self.tgtsize;
-        else:
-            self.ratio = 0.0
+        self.encode_time = self.DoTest(DFILE,
+                                       lambda x: x.Encode(self.target, self.source, DFILE))
+        self.encode_size = runnable.EncodeSize(DFILE)
+        self.decode_time = self.DoTest(RFILE,
+                                       lambda x: x.Decode(DFILE, self.source, RFILE))
 
-class Xdelta3ModInfo:
-    def __init__(self,target,delta):
-        #tmp = open(DFILE, 'w')
-        #tmp.write(patch)
-        #tmp.close()
-        #r3 = xdelta3.xd3_main_cmdline(['xdelta3', 'printhdr', DFILE, RFILE])
-        #if r3 != 0:
-        #    raise CommandError('memory', 'print failed: %s' % r3)
-        #hdr = open(RFILE, 'r').read()
-        #print hdr
-        self.tgtsize = len(target)
-        self.dsize   = len(delta)
-        if self.tgtsize > 0:
-            self.ratio = 100.0 * self.dsize / self.tgtsize;
-        else:
-            self.ratio = 0.0
+        # verify
+        runnable.Verify(self.target, RFILE)
+    #end
 
-class Xdelta3Pair:
+    def DoTest(self, fname, func):
+        trials   = 0
+        measured = []
+
+        while 1:
+            try:
+                os.remove(fname)
+            except OSError:
+                pass
+
+            start_time  = time.time()
+            start_clock = time.clock()
+
+            func(self.runnable)
+
+            total_clock = (time.clock() - start_clock)
+            total_time  = (time.time() - start_time)
+
+            elap_time  = max(total_time,  0.0000001)
+            elap_clock = max(total_clock, 0.0000001)
+
+            trials = trials + 1
+
+            # skip some of the first trials
+            if trials > self.skip_trials:
+                measured.append((elap_clock, elap_time))
+                #print 'measurement total: %.1f ms' % (total_time * 1000.0)
+
+            # at least so many
+            if trials < (self.skip_trials + self.min_trials):
+                #print 'continue: need more trials: %d' % trials
+                continue
+
+            # compute %variance
+            done = 0
+            if self.skip_trials + self.min_trials <= 2:
+                measured = measured + measured;
+                done = 1
+            #end
+
+            time_stat = StatList([x[1] for x in measured], 'elap time')
+            sp = float(time_stat.s) / float(time_stat.mean)
+
+            # what if MAX_TRIALS is exceeded?
+            too_many = (trials - self.skip_trials) >= self.max_trials
+            good = (100.0 * sp) < self.min_stddev_pct
+            if done or too_many or good:
+                trials = trials - self.skip_trials
+                if not done and not good:
+                    #print 'too many trials: %d' % trials
+                    pass
+                #clock = StatList([x[0] for x in measured], 'elap clock')
+                return time_stat
+            #end
+        #end
+    #end
+#end
+
+def Decimals(start, end):
+    l = []
+    step = start
+    while 1:
+        r = range(step, step * 10, step)
+        l = l + r
+        if step * 10 >= end:
+            l.append(step * 10)
+            break
+        step = step * 10
+    return l
+#end
+
+# This tests the raw speed of 0-byte inputs
+def RunSpeedTest():
+    for L in Decimals(MIN_RUN, MAX_RUN):
+        SetFileSize(RUNFILE, L)
+
+        trx = TimedTest(RUNFILE, None, Xdelta3Runner(['-W', str(1<<20)]))
+        ReportSpeed(L, trx, '1MB ')
+
+        trx = TimedTest(RUNFILE, None, Xdelta3Runner(['-W', str(1<<19)]))
+        ReportSpeed(L, trx, '512k')
+
+        trx = TimedTest(RUNFILE, None, Xdelta3Runner(['-W', str(1<<18)]))
+        ReportSpeed(L, trx, '256k')
+
+        trm = TimedTest(RUNFILE, None, Xdelta3Mod1(RUNFILE))
+        ReportSpeed(L, trm, 'swig')
+
+        trg = TimedTest(RUNFILE, None, GzipRun1())
+        ReportSpeed(L,trg,'gzip')
+    #end
+#end
+
+def SetFileSize(F,L):
+    fd = os.open(F, os.O_CREAT | os.O_WRONLY)
+    os.ftruncate(fd,L)
+    assert os.fstat(fd).st_size == L
+    os.close(fd)
+#end
+
+def ReportSpeed(L,tr,desc):
+    print '%s run length %u: size %u: time %.3f ms: decode %.3f ms' % \
+          (desc, L,
+           tr.encode_size,
+           tr.encode_time.mean * 1000.0,
+           tr.decode_time.mean * 1000.0)
+#end
+
+class Xdelta3RunClass:
     def __init__(self, extra):
-        self.type        = 'xdelta3'
-        self.decode_args = '-dqf'
-        self.encode_args = '-eqf'
-        self.extra       = extra
-        self.presrc      = '-s'
-        self.canrep      = 1
+        self.extra = extra
+    #end
 
-    def SetInputs(self,old,oldv,new,newv):
-        self.old = old
-        self.oldv = oldv
-        self.new = new
-        self.newv = newv
-        return self
+    def __str__(self):
+        return 'xdelta3'
+    #end
 
-    def Run(self,trial):
+    def New(self):
+        return Xdelta3Runner(self.extra)
+    #end
+#end
 
-        encode_args =  self.extra + \
-                       testwide_encode_args + \
-                      [self.encode_args,
-                       self.presrc,
-                       self.old,
-                       self.new,
-                       DFILE]
+class Xdelta3Runner:
+    def __init__(self, extra):
+        self.extra = extra
+    #end
 
-        decode_args = [self.decode_args,
-                       self.presrc,
-                       self.old,
-                       DFILE,
-                       RFILE]
+    def Encode(self, target, source, output):
+        args = (testwide_encode_args +
+                self.extra +
+                ['-eqf'])
+        if source:
+            args.append('-s')
+            args.append(source)
+        #end
+        args = args + [target, output]
+        self.Main(args)
+    #end
+
+    def Decode(self, input, source, output):
+        args = ['-dqf']
+        if source:
+            args.append('-s')
+            args.append(source)
+        #end
+        args = args + [input, output]
+        self.Main(args)
+    #end
+
+    def Verify(self, target, recon):
+        RunCommand(('cmp', target, recon))
+    #end
+
+    def EncodeSize(self, output):
+        return os.stat(output).st_size
+    #end
+
+    def Main(self, args):
         try:
-            RunXdelta3(encode_args)
-            if trial > 0:
-                return None
-            self.dinfo = Xdelta3Info(self.new,DFILE)
-            if self.dinfo.extcomp:
-                raise SkipRcsException('ext comp')
-            RunXdelta3(decode_args)
-            RunCommand(('cmp',
-                        self.new,
-                        RFILE))
-            return self.dinfo
-        except CommandError:
-            print 'encode args: %s' % ' '.join(encode_args)
-            print 'decode args: %s' % ' '.join(decode_args)
-            raise CommandError("Run failed")
+            xdelta3main.main(args)
+        except Exception, e:
+            raise CommandError(args, "xdelta3.main exception")
+        #end
+    #end
+#end
 
-def Test():
+class Xdelta3Mod1:
+    def __init__(self, file):
+        self.target_data = open(file, 'r').read()
+    #end
+
+    def Encode(self, ignore1, ignore2, ignore3):
+        r1, encoded = xdelta3.xd3_encode_memory(self.target_data, None, 1000000, 1<<10)
+        if r1 != 0:
+            raise CommandError('memory', 'encode failed: %s' % r1)
+        #end
+        self.encoded = encoded
+    #end
+
+    def Decode(self, ignore1, ignore2, ignore3):
+        r2, data1 = xdelta3.xd3_decode_memory(self.encoded, None, len(self.target_data))
+        if r2 != 0:
+            raise CommandError('memory', 'decode failed: %s' % r1)
+        #end
+        self.decoded = data1
+    #end
+
+    def Verify(self, ignore1, ignore2):
+        if self.target_data != self.decoded:
+            raise CommandError('memory', 'bad decode')
+        #end
+    #end
+
+    def EncodeSize(self, ignore1):
+        return len(self.encoded)
+    #end
+#end
+
+class GzipRun1:
+    def Encode(self, target, source, output):
+        assert source == None
+        RunCommandIO(['gzip', '-cf'], target, output)
+    #end
+
+    def Decode(self, input, source, output):
+        assert source == None
+        RunCommandIO(['gzip', '-dcf'], input, output)
+    #end
+
+    def Verify(self, target, recon):
+        RunCommand(('cmp', target, recon))
+    #end
+
+    def EncodeSize(self, output):
+        return os.stat(output).st_size
+    #end
+#end
+
+class Xdelta1RunClass:
+    def __str__(self):
+        return 'xdelta1'
+    #end
+
+    def New(self):
+        return Xdelta1Runner()
+    #end
+#end
+
+class Xdelta1Runner:
+    def Encode(self, target, source, output):
+        assert source != None
+        args = ['xdelta1', 'delta', '-q', source, target, output]
+        RunCommand(args, [0, 1])
+    #end
+
+    def Decode(self, input, source, output):
+        assert source != None
+        args = ['xdelta1', 'patch', '-q', input, source, output]
+        # Note: for dumb historical reasons, xdelta1 returns 1 or 0
+        RunCommand(args)
+    #end
+
+    def Verify(self, target, recon):
+        RunCommand(('cmp', target, recon))
+    #end
+
+    def EncodeSize(self, output):
+        return os.stat(output).st_size
+    #end
+#end
+
+# TODO: cleanup below this line
+
+# exceptions
+class SkipRcsException:
+    def __init__(self,reason):
+        self.reason = reason
+    #end
+#end
+
+class NotEnoughVersions:
+    def __init__(self):
+        pass
+    #end
+#end
+
+class CommandError:
+    def __init__(self,cmd,str):
+        if type(cmd) is types.TupleType or \
+           type(cmd) is types.ListType:
+            cmd = reduce(lambda x,y: '%s %s' % (x,y),cmd)
+        #end
+        print 'command was: ',cmd
+        print 'command failed: ',str
+        print 'have fun debugging'
+    #end
+#end
+
+class RcsVersion:
+    def __init__(self,vstr):
+        self.vstr = vstr
+    #end
+    def __cmp__(self,other):
+        return cmp(self.date, other.date)
+    #end
+    def __str__(self):
+        return str(self.vstr)
+    #end
+#end
+
+class RcsFile:
+
+    def __init__(self, fname):
+        self.fname    = fname
+        self.versions = []
+        self.state    = HEAD_STATE
+    #end
+
+    def SetTotRev(self,s):
+        self.totrev = int(s)
+    #end
+
+    def Rev(self,s):
+        self.rev = RcsVersion(s)
+        if len(self.versions) >= self.totrev:
+            raise SkipRcsException('too many versions (in log messages)')
+        #end
+        self.versions.append(self.rev)
+    #end
+
+    def Date(self,s):
+        self.rev.date = s
+    #end
+
+    def Match(self, line, state, rx, gp, newstate, f):
+        if state == self.state:
+            m = rx.match(line)
+            if m:
+                if f:
+                    f(m.group(gp))
+                #end
+                self.state = newstate
+                return 1
+            #end
+        #end
+        return None
+    #end
+
+    def Sum1Rlog(self):
+        f = os.popen('rlog '+self.fname, "r")
+        l = f.readline()
+        while l:
+            if self.Match(l, HEAD_STATE, RE_TOTREV, 1, BAR_STATE, self.SetTotRev):
+                pass
+            elif self.Match(l, BAR_STATE, RE_BAR, 1, REV_STATE, None):
+                pass
+            elif self.Match(l, REV_STATE, RE_REV, 1, DATE_STATE, self.Rev):
+                pass
+            elif self.Match(l, DATE_STATE, RE_DATE, 1, BAR_STATE, self.Date):
+                pass
+            #end
+            l = f.readline()
+        #end
+        c = f.close()
+        if c != None:
+            raise c
+        #end
+    #end
+
+    def Sum1(self):
+        st = os.stat(self.fname)
+        self.rcssize = st.st_size
+        self.Sum1Rlog()
+        if self.totrev != len(self.versions):
+            raise SkipRcsException('wrong version count')
+        #end
+        self.versions.sort()
+    #end
+
+    def Checkout(self,n):
+        v      = self.versions[n]
+        out    = open(self.Verf(n), "w")
+        cmd    = 'co -ko -p%s %s' % (v.vstr, self.fname)
+        total  = 0
+        (inf,
+         stream,
+         err)  = os.popen3(cmd, "r")
+        inf.close()
+        buf    = stream.read()
+        while buf:
+            total = total + len(buf)
+            out.write(buf)
+            buf = stream.read()
+        #end
+        v.vsize = total
+        estr = ''
+        buf = err.read()
+        while buf:
+            estr = estr + buf
+            buf = err.read()
+        #end
+        if stream.close():
+            raise CommandError(cmd, 'checkout failed: %s\n%s\n%s' % (v.vstr, self.fname, estr))
+        #end
+        out.close()
+        err.close()
+    #end
+
+    def Vdate(self,n):
+        return self.versions[n].date
+    #end
+
+    def Vstr(self,n):
+        return self.versions[n].vstr
+    #end
+
+    def Verf(self,n):
+        return os.path.join(TMPDIR, 'input.%d' % n)
+    #end
+
+    def FilePairsByDate(self, runclass):
+        if self.totrev < 2:
+            raise NotEnoughVersions()
+        #end
+        self.Checkout(0)
+        ntrials = []
+        if self.totrev < 2:
+            return vtrials
+        #end
+        for v in range(0,self.totrev-1):
+            if v > 1:
+                os.remove(self.Verf(v-1))
+            #end
+            self.Checkout(v+1)
+            if os.stat(self.Verf(v)).st_size < MIN_SIZE or \
+               os.stat(self.Verf(v+1)).st_size < MIN_SIZE:
+                continue
+            #end
+
+            result = TimedTest(self.Verf(v+1),
+                               self.Verf(v),
+                               runclass.New())
+
+            target_size = os.stat(self.Verf(v+1)).st_size
+
+            print '%s %s %s: %.2f%% encode %.3f ms: decode %.3f ms' % \
+                  (runclass,
+                   os.path.basename(self.fname),
+                   self.Vstr(v+1),
+                   target_size > 0 and (100.0 * result.encode_size / target_size) or 0,
+                   result.encode_time.mean * 1000.0,
+                   result.decode_time.mean * 1000.0)
+            ntrials.append(result)
+        #end
+
+        os.remove(self.Verf(self.totrev-1))
+        os.remove(self.Verf(self.totrev-2))
+        return ntrials
+    #end
+
+    def AppendVersion(self, f, n):
+        self.Checkout(n)
+        rf = open(self.Verf(n), "r")
+        data = rf.read()
+        f.write(data)
+        rf.close()
+        return len(data)
+    #end
+
+class RcsFinder:
+    def __init__(self):
+        self.subdirs  = []
+        self.rcsfiles = []
+        self.others   = []
+        self.skipped  = []
+    #end
+
+    def Scan1(self,dir):
+        dents = os.listdir(dir)
+        subdirs  = []
+        rcsfiles = []
+        others   = []
+        for dent in dents:
+            full = os.path.join(dir, dent)
+            if os.path.isdir(full):
+                subdirs.append(full)
+            elif dent[len(dent)-2:] == ",v":
+                rcsfiles.append(RcsFile(full))
+            else:
+                others.append(full)
+            #end
+        #end
+        self.subdirs  = self.subdirs  + subdirs
+        self.rcsfiles = self.rcsfiles + rcsfiles
+        self.others   = self.others   + others
+        return subdirs
+    #end
+
+    def Crawl(self, dir):
+        subdirs = [dir]
+        while subdirs:
+            s1 = self.Scan1(subdirs[0])
+            subdirs = subdirs[1:] + s1
+        #end
+    #end
+
+    def Summarize(self):
+        good = []
+        for rf in self.rcsfiles:
+            try:
+                rf.Sum1()
+                if rf.totrev < 2:
+                    raise SkipRcsException('too few versions (< 2)')
+                #end
+            except SkipRcsException, e:
+                #print 'skipping file %s: %s' % (rf.fname, e.reason)
+                self.skipped.append(rf)
+            else:
+                good.append(rf)
+            #end
+        self.rcsfiles = good
+    #end
+
+    def AllPairsByDate(self,runclass):
+        results = []
+        good = []
+        for rf in self.rcsfiles:
+            try:
+                results = results + rf.FilePairsByDate(runclass)
+            except SkipRcsException:
+                print 'file %s has compressed versions: skipping' % (rf.fname)
+            except NotEnoughVersions:
+                print 'testing %s on %s: not enough versions' % (runclass, rf.fname)
+            else:
+                good.append(rf)
+            #end
+        self.rcsfiles = good
+        return results
+    #end
+
+def GetTestRcsFiles():
     rcsf = RcsFinder()
     rcsf.Crawl(RCSDIR)
     if len(rcsf.rcsfiles) == 0:
-        sys.exit(1)
+        raise CommandError('', 'no RCS files')
+    #end
     rcsf.Summarize()
     print "rcsfiles: rcsfiles %d; subdirs %d; others %d; skipped %d" % (len(rcsf.rcsfiles),
                                                                         len(rcsf.subdirs),
@@ -586,66 +733,11 @@ def Test():
     print StatList([x.rcssize for x in rcsf.rcsfiles], "rcssize", 1).str
     print StatList([x.totrev for x in rcsf.rcsfiles], "totrev", 1).str
     return rcsf
+#end
 
-def Decimals(max):
-    l = [0]
-    step = 1
-    while 1:
-        r = range(step, step * 10, step)
-        l = l + r
-        if step * 10 >= max:
-            l.append(step * 10)
-            break
-        step = step * 10
-    return l
+# TODO: cleanup below this line
 
-class Xdelta3Run1:
-    def __init__(self,file):
-        self.file = file
-    def Run(self,trial):
-        RunXdelta3(testwide_encode_args +
-                   ['-efqW', str(1<<20), self.file, DFILE])
-        if trial > 0:
-            return None
-        return Xdelta3Info(self.file,DFILE)
-
-class Xdelta3Mod1:
-    def __init__(self,file):
-        self.data = open(file, 'r').read()
-    def Run(self,trial):
-        r1, patch = xdelta3.xd3_encode_memory(self.data, None, 1000000, 1<<10)
-        if r1 != 0:
-            raise CommandError('memory', 'encode failed: %s' % r1)
-        if trial > 0:
-            return None
-        r2, data1 = xdelta3.xd3_decode_memory(patch, None, len(self.data))
-        if r2 != 0:
-            raise CommandError('memory', 'decode failed: %s' % r1)
-        if self.data != data1:
-            raise CommandError('memory', 'bad output: %s' % self.data, data1)
-        return Xdelta3ModInfo(self.data,patch)
-
-class GzipRun1:
-    def __init__(self,file):
-        self.file = file
-        self.canrep = 0
-    def Run(self,trial):
-        RunCommandIO(['gzip', '-cf'], self.file, DFILE)
-        if trial > 0:
-            return None
-        return GzipInfo(self.file,DFILE)
-
-def SetFileSize(F,L):
-    fd = os.open(F, os.O_CREAT | os.O_WRONLY)
-    os.ftruncate(fd,L)
-    assert(os.fstat(fd).st_size == L)
-    os.close(fd)
-
-def ReportSpeed(L,tr,desc):
-    print '%s 0-run length %u: dsize %u: time %.3f ms: encode %.0f B/sec: in %u trials' % \
-          (desc, L, tr.r1.dsize, tr.time.mean * 1000.0,
-           ((L+tr.r1.dsize) / tr.time.mean), tr.trials)
-
+#
 class RandomTestResult:
     def __init__(self, round, config, runtime, compsize):
         self.round = round
@@ -762,7 +854,7 @@ class RandomTester:
             f2sz += file.AppendVersion(f2, r2)
         #end
 
-        print 'from %u; to %u' % (f1sz, f2sz)
+        print 'source %u bytes; target %u bytes' % (f1sz, f2sz)
         f1.close()
         f2.close()
         return (TMPDIR + "/big.1",
@@ -779,22 +871,17 @@ class RandomTester:
             config = self.RandomConfig()
         #end
 
-        runner = Xdelta3Pair([ '-C', ','.join([str(x) for x in config]) ])
-        runner.SetInputs(f1, 1, f2, 2)
-        result = TimedTest(runner)
+        args = [ '-C', ','.join([str(x) for x in config]) ]
+        result = TimedTest(f2, f1, Xdelta3Runner(args))
 
         tr = RandomTestResult(self.round_num,
                               config,
-                              result.time.mean,
-                              result.r1.dsize)
+                              result.encode_time.mean,
+                              result.encode_size)
 
         self.results.append(tr)
 
-        print 'Test %d: %s in %u trials' % \
-              (self.trial_num,
-               tr,
-               result.trials)
-
+        print 'Test %d: %s' % (self.trial_num, tr)
         self.trial_num += 1
         return
     #end
@@ -902,22 +989,74 @@ class RandomTester:
                    (len(all_r) > 2) and
                    (' in %d' % len(all_r)) or "")
         #end
-        
+
         return r
     #end
 #end
 
-# This tests the raw speed of 0-byte inputs
-def RunSpeed():
-    for L in Decimals(MAX_RUN):
-        SetFileSize(RUNFILE, L)
-        trx = TimedTest(Xdelta3Run1(RUNFILE))
-        ReportSpeed(L,trx,'xdelta3')
-        trm = TimedTest(Xdelta3Mod1(RUNFILE))
-        ReportSpeed(L,trm,'module ')
-        trg = TimedTest(GzipRun1(RUNFILE))
-        ReportSpeed(L,trg,'gzip   ')
+def RunRandomRcsTest(rcsf):
+    configs = []
+    while 1:
+        test = RandomTester(configs)
+        f1, f2 = test.MakeBigFiles(rcsf)
+        while not test.HasEnoughResults():
+            test.RandomFileTest(f1, f2)
+        #end
+        configs = test.ScoreTests()
+        test.Reset()
     #end
+#end
+
+def RunSampleTest(d, files):
+    # TODO: consolidate w/ the above
+    print 'testing %s with %d files' % (d, len(files))
+    configs = []
+    while len(files) > 1:
+        test = RandomTester(configs)
+        f1 = files[0]
+        f2 = files[1]
+        while not test.HasEnoughResults():
+            test.RandomFileTest(f1, f2)
+        #end
+        configs = test.ScoreTests()
+        test.Reset()
+        files = files[1:]
+    #end
+#end
+
+def RunSampleDataTest():
+    dirs = [SAMPLEDIR]
+    while dirs:
+        d = dirs[0]
+        dirs = dirs[1:]
+        l = os.listdir(d)
+        files = []
+        for e in l:
+            p = os.path.join(d, e)
+            if os.path.isdir(p):
+                dirs.append(p)
+            else:
+                files.append(p)
+            #end
+        #end
+        if files:
+            files.sort()
+            RunSampleTest(d, files)
+        #end
+    #end
+#end
+
+def ReportPairs(name, results):
+    encode_time = 0
+    decode_time = 0
+    encode_size = 0
+    for r in results:
+        encode_time += r.encode_time.mean
+        decode_time += r.decode_time.mean
+        encode_size += r.encode_size
+    #end
+    print '%s rcs: encode %.2f s: decode %.2f s: size %d' % \
+          (name, encode_time, decode_time, encode_size)
 #end
 
 if __name__ == "__main__":
@@ -925,34 +1064,21 @@ if __name__ == "__main__":
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
 
-        RunSpeed()
+        #RunSpeedTest()
 
-        # This tests pairwise (date-ordered) performance
-        #rcsf = Test()
-        #rcsf.PairsByDate(Xdelta3Pair([]))
+        rcsf = GetTestRcsFiles()
 
-        configs = []
+        x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
+        ReportPairs('xd3  -9', x3r)
 
-        while 0:
-            #f1 = '/tmp/big.1'
-            #f2 = '/tmp/big.2'
-            test = RandomTester(configs)
-            #f1, f2 = test.MakeBigFiles(rcsf)
-            while not test.HasEnoughResults():
-                f1 = '/tmp/WESNOTH_tmp/wesnoth-1.1.12.tar'
-                f2 = '/tmp/WESNOTH_tmp/wesnoth-1.1.13.tar'
-                #f1 = '/tmp/big.1'
-                #f2 = '/tmp/big.2'
-                test.RandomFileTest(f1, f2)
-            #end
-            configs = test.ScoreTests()
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass([]))
+        #ReportPairs('xdelta3', x3r)
 
-            #test.Reset()
-            test.results = test.results[0:len(configs)]
-            configs = []
-            #break
-            #end
-        #end
+        #x1r = rcsf.AllPairsByDate(Xdelta1RunClass())
+        #ReportPairs('xdelta1', x1r)
+
+        #RunRandomRcsTest(rcsf)
+        #RunSampleDataTest()
 
     except CommandError:
         pass
