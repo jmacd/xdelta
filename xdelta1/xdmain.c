@@ -39,7 +39,7 @@
 #ifndef WINHACK
 #include <unistd.h>
 #include <sys/mman.h>
-#define O_BINARY 0
+// #define O_BINARY 0
 
 #else /* WINHACK */
 
@@ -260,6 +260,7 @@ help ()
   xd_error ("  -h, --help         Print this summary\n");
   xd_error ("  -n, --noverify     Disable automatic MD5 verification\n");
   xd_error ("  -p, --pristine     Disable automatic GZIP decompression\n");
+  xd_error ("  -q, --quiet        Do not print warnings\n");
   xd_error ("  -m, --maxmem=SIZE  Set the buffer size limit, e.g. 640K, 16M\n");
   xd_error ("  -[0-9]             ZLIB compress level: 0=none, 1=fast, 6=default, 9=best\n");
   xd_error ("  -s=BLOCK_SIZE      Sets block size (power of 2), minimum match length\n");
@@ -1527,7 +1528,6 @@ delta_command (gint argc, gchar** argv)
       xd_error ("using block size: %d bytes\n", xdp_blocksize ());
     }
 
-
   if (! (from = open_read_seek_handle (argv[0], &from_is_compressed, TRUE)))
     return 2;
 
@@ -1647,7 +1647,10 @@ delta_command (gint argc, gchar** argv)
 
   xdp_generator_free (gen);
 
-  return control_offset != header_offset;
+  /* Note: prior to 1.1.5:
+   * return control_offset != header_offset;
+   */
+  return 0;
 }
 
 static XdeltaPatch*

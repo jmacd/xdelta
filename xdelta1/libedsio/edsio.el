@@ -1017,7 +1017,7 @@ replacement is as for replace-regexp."
 	 (format "%s{
 %s  gint i;
 %s  if (! (* source->next_uint) (source, &%s_len)) goto bail;
-%s  if (! (%s = serializeio_source_alloc (source, sizeof (%s) * %s_len))) goto bail;
+%s  if ((%s_len > 0) && ! (%s = serializeio_source_alloc (source, sizeof (%s) * %s_len))) goto bail;
 %s  for (i = 0; i < %s_len; i += 1)
 %s    {
 %s%s      }
@@ -1027,6 +1027,7 @@ replacement is as for replace-regexp."
 		 prefix prefix
 		 name
 		 prefix
+		 name
 		 name
 		 (field-ctype (cadr field))
 		 name
