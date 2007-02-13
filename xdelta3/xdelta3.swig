@@ -64,6 +64,30 @@ int     xd3_decode_memory (const char   *input,
 			   unsigned int  max_output,
 			   int           flags);
 
+int     xd3_main_cmdline (int ARGC, char **ARGV);
 
-
-int xd3_main_cmdline (int ARGC, char **ARGV);
+/* Is this the right way? */
+enum {
+  /*XD3_JUST_HDR,*/
+  /*XD3_SKIP_WINDOW,*/
+  /*XD3_SKIP_EMIT,*/
+  /*XD3_FLUSH,*/
+  XD3_SEC_DJW,
+  XD3_SEC_FGK,
+  /*XD3_SEC_TYPE,*/
+  XD3_SEC_NODATA,
+  XD3_SEC_NOINST,
+  XD3_SEC_NOADDR,
+  /*XD3_SEC_OTHER,*/
+  XD3_ADLER32,
+  XD3_ADLER32_NOVER,
+  XD3_ALT_CODE_TABLE,
+  XD3_NOCOMPRESS,
+  XD3_BEGREEDY,
+  XD3_COMPLEVEL_SHIFT,
+  XD3_COMPLEVEL_MASK,
+  XD3_COMPLEVEL_1,
+  XD3_COMPLEVEL_3,
+  XD3_COMPLEVEL_6,
+  XD3_COMPLEVEL_9,
+};

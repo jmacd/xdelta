@@ -333,17 +333,27 @@ typedef enum
 				    * only search the source, not the target. */
   XD3_BEGREEDY       = (1 << 14),  /* disable the "1.5-pass algorithm", instead use
 				    * greedy matching.  Greedy is off by default. */
+
+  /* 4 bits to set the compression level the same as the command-line
+   * setting -1 through -9 (-0 corresponds to the XD3_NOCOMPRESS flag,
+   * and is independent of compression level).  This is for
+   * convenience, especially with xd3_encode_memory(). */
+
+  XD3_COMPLEVEL_SHIFT = 20,  /* 20 - 24 */
+  XD3_COMPLEVEL_MASK = (0xF << XD3_COMPLEVEL_SHIFT),
+  XD3_COMPLEVEL_1 = (1 << XD3_COMPLEVEL_SHIFT),
+  XD3_COMPLEVEL_3 = (3 << XD3_COMPLEVEL_SHIFT),
+  XD3_COMPLEVEL_6 = (6 << XD3_COMPLEVEL_SHIFT),
+  XD3_COMPLEVEL_9 = (9 << XD3_COMPLEVEL_SHIFT),
+
 } xd3_flags;
 
-/* The values of this enumeration are set in xd3_config using the smatch_cfg variable.  It
- * can be set to slow, fast, soft, or default.  The fast and slow setting uses preset,
- * hardcoded parameters and the soft setting is accompanied by user-supplied parameters.
- * If the user supplies 'default' the code selects one of the available string matchers.
- * Due to compile-time settings (see XD3_SLOW_SMATCHER, XD3_FAST_SMATCHER,
- * XD3_SOFT_SMATCHER variables), not all options may be available. */
+/* The values of this enumeration are set in xd3_config using the
+ * smatch_cfg variable.  It can be set to default, slow, fast, etc.,
+ * and soft. */
 typedef enum
 {
-  XD3_SMATCH_DEFAULT = 0,
+  XD3_SMATCH_DEFAULT = 0, /* Flags may contain XD3_COMPLEVEL bits, else default. */
   XD3_SMATCH_SLOW    = 1,
   XD3_SMATCH_FAST    = 2,
   XD3_SMATCH_FASTEST = 3,

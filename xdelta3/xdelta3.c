@@ -94,7 +94,7 @@
    challenge.  Search in this file for "black magic", a heuristic.
 
    3. STREAM ALIGNMENT.  Stream alignment is needed to compress large
-   inputs in constant space. TODO: redocument
+   inputs in constant space.  See xd3_srcwin_move_point().
 
    4. WINDOW SELECTION.  When the IOPT buffer flushes, in the first call
    to xd3_iopt_finish_encoding containing any kind of copy instruction,
@@ -779,7 +779,7 @@ static const xd3_sec_type djw_sec_type =
  * allowing to vary the distribution of single- and
  * double-instructions and change the number of near and same copy
  * modes.  More exotic tables are only possible by extending this
- * code.  TODO: experiment with a double-copy instruction.
+ * code.
  *
  * For performance reasons, both the parametrized and non-parametrized
  * versions of xd3_choose_instruction remain.  The parametrized
@@ -2543,6 +2543,28 @@ xd3_config_stream(xd3_stream *stream,
       return XD3_INTERNAL;
     }
 
+  if (config->smatch_cfg == XD3_SMATCH_DEFAULT &&
+      (stream->flags & XD3_COMPLEVEL_MASK) != 0)
+    {
+      int level = (stream->flags & XD3_COMPLEVEL_MASK) >> XD3_COMPLEVEL_SHIFT;
+
+      switch (level)
+	{
+	case 1: case 2:
+	  IF_BUILD_FASTEST(*smatcher = __smatcher_fastest;
+			   break;)
+	case 3: case 4: case 5:
+	  IF_BUILD_FAST(*smatcher = __smatcher_fast;
+			break;)
+	case 6:
+	  IF_BUILD_DEFAULT(*smatcher = __smatcher_default;
+			   break;)
+	default:
+	  IF_BUILD_SLOW(*smatcher = __smatcher_slow;
+			break;)
+	}
+    }
+
   return 0;
 }
 
@@ -3520,7 +3542,7 @@ xd3_encode_init (xd3_stream *stream)
    * first call to string_match--that way identical or short inputs require no table
    * allocation. */
 
-  // TODO: experiments have to be done!!!
+  /* TODO: need to experiment w/ XD3_DEFAULT_SPREVSZ and large has functions */
   if (large_comp)
     {
       usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_step);
@@ -3532,8 +3554,7 @@ xd3_encode_init (xd3_stream *stream)
 
   if (small_comp)
     {
-      /* Hard-coded, keeps table small because small matches become inefficient.
-       * TODO: verify this stuff. */
+      /* Hard-coded, keeps table small because small matches become inefficient. */
       usize_t hash_values = min(stream->winsize, XD3_DEFAULT_SPREVSZ);
 
       xd3_size_hashtable (stream,
@@ -3931,7 +3952,7 @@ xd3_process_memory (int            is_encode,
 
   if (is_encode)
     {
-      /* TODO: for large inputs, limit window size ... */
+      /* TODO: for large inputs, limit window size, need to select a default ... */
       config.srcwin_maxsz = source_size;
       config.winsize = min(input_size, (usize_t) (1<<20));
     }
@@ -4117,7 +4138,8 @@ xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
     return low;
   }
 
-  // This should not be >= because srcwin_cksum_pos is the next position to index
+  /* This should not be >= because srcwin_cksum_pos is the next
+   * position to index. */
   if (low > sr) {
     return (--s0 << 32) | low;
   }
@@ -4564,8 +4586,6 @@ xd3_source_extend_match (xd3_stream *stream)
       usize_t total  = stream->match_fwd + stream->match_back;
 
       /* Correct the variables to remove match_back from the equation. */
-      // IT'S A BUG!
-
       usize_t target_position = stream->input_position - stream->match_back;
       usize_t match_length   = stream->match_back      + stream->match_fwd;
       xoff_t match_position  = stream->match_srcpos    - stream->match_back;
@@ -4589,13 +4609,13 @@ xd3_source_extend_match (xd3_stream *stream)
 
       if (match_end > stream->match_maxaddr)
 	{
-	  // Note: per-window
+	  /* Note: per-window */
 	  stream->match_maxaddr = match_end;
 	}
 
       if (match_end > stream->maxsrcaddr)
 	{
-	  // Note: across windows
+	  /* Note: across windows */
 	  stream->maxsrcaddr = match_end;
 	}
 
@@ -4927,7 +4947,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   int            run_l;
   int            ret;
   usize_t         match_length;
-  usize_t         match_offset;  // Note: "may be unused" warnings are bogus (due to min_match test)
+  usize_t         match_offset;  /* "may be unused" warnings are bogus (due to min_match test) */
   usize_t         next_move_point;
 
   /* If there will be no compression due to settings or short input, skip it entirely. */

@@ -33,7 +33,7 @@ assert len(patch) < len(source)
 
 print 'encode: adler32 ...'
 result, patch_adler32 = xdelta3.xd3_encode_memory(target, source, 50,
-                                                  1<<10)
+                                                  xdelta3.XD3_ADLER32)
 
 assert result == 0
 assert len(patch_adler32) < len(source)
@@ -41,7 +41,7 @@ assert len(patch_adler32) > len(patch)
 
 print 'encode: secondary ...'
 result, patch_djw = xdelta3.xd3_encode_memory(target, source, 50,
-                                                  1<<5)
+                                              xdelta3.XD3_SEC_DJW)
 
 assert result == 0
 # secondary compression doesn't help
@@ -111,7 +111,7 @@ for corrupt_pos in range(len(patch_adler32)):
     # without adler32 verification, the error may be in the data section which
     # in this case is 6 bytes 'target'
     result, corrupt = xdelta3.xd3_decode_memory(input, source, len(target),
-                                                1<<11)
+                                                xdelta3.XD3_ADLER32_NOVER)
     if result == 0:
         noverify_count = noverify_count + 1
         #print "got %s" % corrupt
@@ -124,6 +124,22 @@ result, target2 = xdelta3.xd3_decode_memory(zdata, None, len(target))
 
 assert result == 0
 assert target == target2
+
+# Test compression level setting via flags.  assumes a 9 byte checksum
+# and that level 9 steps 2, level 1 steps 15:
+#         01234567890123456789012345678901
+# level 1 only indexes 2 checksums "abcdefghi" and "ABCDEFGHI"
+# outputs 43 vs. 23 bytes
+print 'encode: compression level ...'
+
+source = '_la_la_abcdefghi_la_la_ABCDEFGHI'
+target = 'la_la_ABCDEFGH__la_la_abcdefgh__'
+
+result1, level1 = xdelta3.xd3_encode_memory(target, source, 50, xdelta3.XD3_COMPLEVEL_1)
+result9, level9 = xdelta3.xd3_encode_memory(target, source, 50, xdelta3.XD3_COMPLEVEL_9)
+
+assert result1 == 0 and result9 == 0
+assert len(level1) > len(level9)
 
 #
 #

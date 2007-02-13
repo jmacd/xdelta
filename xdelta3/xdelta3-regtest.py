@@ -16,12 +16,12 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-# Under construction.
-
-# TODO: This is really part test, part performance evaluation suite, and
-# really incomplete.
-
 # TODO: Test IOPT (1.5 vs. greedy)
+
+# TODO: Start testing window sizes
+
+# TODO: Note: xd3_encode_memory is underperforming the command-line
+#   at run-speed tests (due to excess memory allocation?). Fix.
 
 import os, sys, math, re, time, types, array, random
 import xdelta3main
@@ -85,7 +85,7 @@ def INPUT_SPEC(rand):
 RCSDIR = '/tmp/PRCS_read_copy'
 #RCSDIR = 'G:/jmacd/PRCS'
 
-SAMPLEDIR = "C:/sample_data/WESNOTH_tmp/tar'
+SAMPLEDIR = "C:/sample_data/WESNOTH_tmp/tar"
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
@@ -260,14 +260,15 @@ class RcsFile:
                os.stat(self.Verf(v+1)).st_size < MIN_SIZE:
                 continue
 
-            result = TimeRun(runnable.Runner(self.Verf(v),
-                                             self.Vstr(v),
-                                             self.Verf(v+1),
-                                             self.Vstr(v+1)))
-            print 'testing %s %s: ideal %.3f%%: time %.7f: in %u trials' % \
+            runnable.SetInputs(self.Verf(v),
+                               self.Vstr(v),
+                               self.Verf(v+1),
+                               self.Vstr(v+1))
+            result = TimedTest(runnable)
+            print 'testing %s %s: ratio %.3f%%: time %.7f: in %u trials' % \
                   (os.path.basename(self.fname),
                    self.Vstr(v+1),
-                   result.r1.ideal,
+                   result.r1.ratio,
                    result.time.mean,
                    result.trials)
             ntrials.append(result)
@@ -370,9 +371,11 @@ class Bucks:
             f.write("%.1f %.1f %.1f %d\n" % (i[0],i[1],i[2],i[3]))
 #
 #
-class TimeRun:
+class TimedTest:
     def __init__(self,runnable,
-                 skip_trials=SKIP_TRIALS,min_trials=MIN_TRIALS,max_trials=MAX_TRIALS,
+                 skip_trials=SKIP_TRIALS,
+                 min_trials=MIN_TRIALS,
+                 max_trials=MAX_TRIALS,
                  min_stddev_pct=MIN_STDDEV_PCT):
 
         min_trials = min(min_trials,max_trials)
@@ -474,7 +477,6 @@ def RunCommand(args):
         raise CommandError(args, 'exited %d' % p)
 
 def RunCommandIO(args,infn,outfn):
-    #print "run command io", args
     p = os.fork()
     if p == 0:
         os.dup2(os.open(infn,os.O_RDONLY),0)
@@ -488,7 +490,6 @@ def RunCommandIO(args,infn,outfn):
 
 def RunXdelta3(args):
     try:
-        #print 'RUN', args
         xdelta3main.main(args)
     except Exception, e:
         raise CommandError(args, "xdelta3.main exception")
@@ -500,15 +501,12 @@ class GzipInfo:
 
 class Xdelta3Info:
     def __init__(self,target,delta):
-        # TODO: bug is fixed 
-        self.extcomp = 0  # TODO: I removed some code that called printhdr
-        self.hdrsize = 0  # to compute these, but printhdr uses stdout (now)
         self.tgtsize = os.stat(target).st_size
         self.dsize   = os.stat(delta).st_size
         if self.tgtsize > 0:
-            self.ideal = 100.0 * self.dsize / self.tgtsize;
+            self.ratio = 100.0 * self.dsize / self.tgtsize;
         else:
-            self.ideal = 0.0
+            self.ratio = 0.0
 
 class Xdelta3ModInfo:
     def __init__(self,target,delta):
@@ -523,20 +521,20 @@ class Xdelta3ModInfo:
         self.tgtsize = len(target)
         self.dsize   = len(delta)
         if self.tgtsize > 0:
-            self.ideal = 100.0 * self.dsize / self.tgtsize;
+            self.ratio = 100.0 * self.dsize / self.tgtsize;
         else:
-            self.ideal = 0.0
+            self.ratio = 0.0
 
 class Xdelta3Pair:
-    def __init__(self):
+    def __init__(self, extra):
         self.type        = 'xdelta3'
         self.decode_args = '-dqf'
         self.encode_args = '-eqf'
-        self.extra       = []
+        self.extra       = extra
         self.presrc      = '-s'
         self.canrep      = 1
 
-    def Runner(self,old,oldv,new,newv):
+    def SetInputs(self,old,oldv,new,newv):
         self.old = old
         self.oldv = oldv
         self.new = new
@@ -770,7 +768,7 @@ class RandomTester:
         return (TMPDIR + "/big.1",
                 TMPDIR + "/big.2")
 
-    def RandomBigRun(self, f1, f2):
+    def RandomFileTest(self, f1, f2):
         config = None
         if len(self.old_configs) > 0:
             config = self.old_configs[0]
@@ -781,9 +779,9 @@ class RandomTester:
             config = self.RandomConfig()
         #end
 
-        runner = Xdelta3Pair()
-        runner.extra = [ '-C', ','.join([str(x) for x in config]) ]
-        result = TimeRun(runner.Runner(f1, 1, f2, 2))
+        runner = Xdelta3Pair([ '-C', ','.join([str(x) for x in config]) ])
+        runner.SetInputs(f1, 1, f2, 2)
+        result = TimedTest(runner)
 
         tr = RandomTestResult(self.round_num,
                               config,
@@ -900,22 +898,24 @@ class RandomTester:
             else:
                 stars = ' *'
             print 'Score: %0.6f %s (%.1f%s%s)' % \
-                  (test.score, test, s / len(all_r), stars, (len(all_r) > 2) and (' in %d' % len(all_r)) or "")
+                  (test.score, test, s / len(all_r), stars,
+                   (len(all_r) > 2) and
+                   (' in %d' % len(all_r)) or "")
         #end
         
         return r
     #end
 #end
 
+# This tests the raw speed of 0-byte inputs
 def RunSpeed():
-    # TODO: Start testing window sizes
     for L in Decimals(MAX_RUN):
         SetFileSize(RUNFILE, L)
-        trx = TimeRun(Xdelta3Run1(RUNFILE))
+        trx = TimedTest(Xdelta3Run1(RUNFILE))
         ReportSpeed(L,trx,'xdelta3')
-        trm = TimeRun(Xdelta3Mod1(RUNFILE))
+        trm = TimedTest(Xdelta3Mod1(RUNFILE))
         ReportSpeed(L,trm,'module ')
-        trg = TimeRun(GzipRun1(RUNFILE))
+        trg = TimedTest(GzipRun1(RUNFILE))
         ReportSpeed(L,trg,'gzip   ')
     #end
 #end
@@ -924,15 +924,14 @@ if __name__ == "__main__":
     try:
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
-        #rcsf = Test()
-        configs = []
 
-        # This tests pairwise (date-ordered) performance
-        #rcsf.PairsByDate(Xdelta3Pair())
-
-        # This tests the raw speed of 0-byte inputs
         RunSpeed()
 
+        # This tests pairwise (date-ordered) performance
+        #rcsf = Test()
+        #rcsf.PairsByDate(Xdelta3Pair([]))
+
+        configs = []
 
         while 0:
             #f1 = '/tmp/big.1'
@@ -944,7 +943,7 @@ if __name__ == "__main__":
                 f2 = '/tmp/WESNOTH_tmp/wesnoth-1.1.13.tar'
                 #f1 = '/tmp/big.1'
                 #f2 = '/tmp/big.2'
-                test.RandomBigRun(f1, f2)
+                test.RandomFileTest(f1, f2)
             #end
             configs = test.ScoreTests()
 

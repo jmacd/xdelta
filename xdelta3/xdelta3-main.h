@@ -2454,7 +2454,11 @@ main_input (xd3_cmd     cmd,
 	    {
 	      XPR(NT "compression level: %d\n", option_level);
 	    }
-	  if (option_level == 0) { stream_flags |= XD3_NOCOMPRESS; }
+	  if (option_level == 0)
+	    {
+	      stream_flags |= XD3_NOCOMPRESS;
+	      config.smatch_cfg = XD3_SMATCH_FASTEST;
+	    }
 	  else if (option_level == 1) { config.smatch_cfg = XD3_SMATCH_FASTEST; }
 	  else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
 	  else if (option_level == 6) { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
