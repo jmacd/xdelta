@@ -911,8 +911,15 @@ xd3_real_encode_huff (xd3_stream   *stream,
 				  DJW_SECTORSZ_BITS, (sector_size/DJW_SECTORSZ_MULT)-1))) { goto failure; }
 
       /* Dynamic allocation. */
-      if (gbest     == NULL) { gbest     = xd3_alloc (stream, gbest_max, 1); }
-      if (gbest_mtf == NULL) { gbest_mtf = xd3_alloc (stream, gbest_max, 1); }
+      if (gbest == NULL)
+	{
+	  if ((gbest = xd3_alloc (stream, gbest_max, 1)) == NULL) { ret = ENOMEM; goto failure; }
+	}
+
+      if (gbest_mtf == NULL)
+	{
+	  if ((gbest_mtf = xd3_alloc (stream, gbest_max, 1)) == NULL) { ret = ENOMEM; goto failure; }
+	}
 
       /* OPT: Some of the inner loops can be optimized, as shown in bzip2 */
 
@@ -1005,6 +1012,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
 	      if (gcost[gp] < best) { best = gcost[gp]; winner = gp; }
 	    }
 
+	  XD3_ASSERT(gbest_no < gbest_max);
 	  gbest[gbest_no++] = winner;
 	  IF_DEBUG1 (gcount[winner] += 1);
 

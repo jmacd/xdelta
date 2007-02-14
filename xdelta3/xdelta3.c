@@ -2357,7 +2357,7 @@ xd3_free_stream (xd3_stream *stream)
   memset (stream, 0, sizeof (xd3_stream));
 }
 
-#if (VCDIFF_TOOLS)
+#if (XD3_DEBUG > 1 || VCDIFF_TOOLS)
 static const char*
 xd3_rtype_to_string (xd3_rtype type, int print_mode)
 {
@@ -2424,7 +2424,7 @@ xd3_config_stream(xd3_stream *stream,
     }
   else
     {
-      stream->iopt_size = XD3_DEFAULT_IOPT_SIZE;
+      stream->iopt_size = config->iopt_size;
     }
 
   stream->getblk    = config->getblk;
@@ -3133,10 +3133,12 @@ xd3_iopt_get_slot (xd3_stream *stream, xd3_rinst** iptr)
       if (stream->iopt_unlimited)
 	{
 	  int elts = XD3_ALLOCSIZE / sizeof(xd3_rinst);
+
 	  if ((ret = xd3_alloc_iopt (stream, elts)))
 	    {
 	      return ret;
 	    }
+
 	  stream->iopt_size += elts;
 	}
       else
