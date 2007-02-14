@@ -2357,7 +2357,7 @@ xd3_free_stream (xd3_stream *stream)
   memset (stream, 0, sizeof (xd3_stream));
 }
 
-#if (XD3_DEBUG || VCDIFF_TOOLS)
+#if (VCDIFF_TOOLS)
 static const char*
 xd3_rtype_to_string (xd3_rtype type, int print_mode)
 {
@@ -4124,6 +4124,7 @@ xd3_string_match_init (xd3_stream *stream)
   return 0;
 }
 
+#if XD3_USE_LARGEFILE64
 /* This function handles the 32/64bit ambiguity -- file positions are 64bit but the hash
  * table for source-offsets is 32bit. */
 static xoff_t
@@ -4146,6 +4147,13 @@ xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 
   return (s0 << 32) | low;
 }
+#else
+static xoff_t
+xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
+{
+  return (xoff_t) low;
+}
+#endif
 
 /* This function sets up the stream->src fields srcbase, srclen.  The call is delayed
  * until these values are needed to encode a copy address.  At this point the decision has

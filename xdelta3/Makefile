@@ -70,7 +70,7 @@ test:
 	./xdelta3-debug test
 
 tar:
-	tar --exclude ".svn" -czf /tmp/$(RELDIR)-tmp.tar.gz $(SOURCES) $(PYFILES) $(EXTRA)
+	tar --exclude ".svn" -czf /tmp/$(RELDIR)-tmp.tar.gz $(SOURCES) $(EXTRA)
 	rm -rf /tmp/$(RELDIR)
 	mkdir /tmp/$(RELDIR)
 	(cd /tmp/$(RELDIR) && tar -xzf ../$(RELDIR)-tmp.tar.gz)
