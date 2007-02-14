@@ -68,6 +68,7 @@ process_page (int            is_encode,
   config->srcwin_maxsz = PAGE_SIZE;
   config->iopt_size = IOPT_SIZE;
   config->alloc = &process_alloc;
+  config->opaque = (void*) ctx;
 
   src->size = PAGE_SIZE;
   src->blksize = PAGE_SIZE;
@@ -154,6 +155,7 @@ int main()
   for (level = 1; level < 10; level = (level == 1 ? 3 : level + 3))
     {
       int lflag = level << XD3_COMPLEVEL_SHIFT;
+
       for (stride = 0; stride <= PAGE_SIZE; stride += PAGE_SIZE / 64)
 	{
 	  if ((ret = test(stride, lflag)) ||
