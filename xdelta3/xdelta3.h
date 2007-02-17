@@ -51,10 +51,9 @@
 
 /* The XD3_HARDMAXWINSIZE parameter is a safety mechanism to protect decoders against
  * malicious files.  The decoder will never decode a window larger than this.  If the file
- * specifies VCD_TARGET the decoder may require two buffers of this size.  Rationale for
- * choosing 22-bits as a maximum: this means that in the worst case, any VCDIFF address
- * without a copy window will require 3 bytes to encode (7 bits per byte, HERE and SAME
- * modes making every address within half the window away. */
+ * specifies VCD_TARGET the decoder may require two buffers of this size.
+ *
+ * 8-16MB is reasonable, probably don't need to go larger.
 #ifndef XD3_HARDMAXWINSIZE
 #define XD3_HARDMAXWINSIZE (1U<<24)
 #endif
@@ -64,7 +63,7 @@
  * seekable, they are decompressed to a temporary file location and the user may not wish
  * for this. */
 #ifndef XD3_NODECOMPRESSSIZE
-#define XD3_NODECOMPRESSSIZE (1U<<24)
+#define XD3_NODECOMPRESSSIZE (1U<<28)
 #endif
 
 /* The IOPT_SIZE value sets the size of a buffer used to batch overlapping copy

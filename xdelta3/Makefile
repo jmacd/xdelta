@@ -48,6 +48,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 
 SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
+	      -DGENERIC_ENCODE_TABLES=1 \
               -DSECONDARY_DJW=1 \
 	      -DVCDIFF_TOOLS=1 \
               -DSWIG_MODULE=1 \
@@ -105,7 +106,7 @@ xdelta3-debug3: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug3 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=3 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
 
-$(PYTGT): $(SOURCES)
+$(PYTGT): $(SOURCES) setup.py
 	$(PYTHON) setup.py install --verbose --compile --force
 
 xdelta3_wrap.c xdelta3.py: xdelta3.swig

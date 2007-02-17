@@ -16,7 +16,6 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-# TODO: Start testing window sizes
 # TODO: Test 1.5 vs. greedy
 # TODO: Compare w/ bsdiff and generate more summary
 
@@ -39,11 +38,14 @@ MIN_RUN        = 1000 * 1000 * 1
 MAX_RUN        = 1000 * 1000 * 10
 
 # How many results per round
-MAX_RESULTS = 10
-KEEP_P = (0.5)
+MAX_RESULTS = 6
+KEEP_P = (1.0)
 FAST_P = (0.0)
 SLOW_P = (0.0)
 FILE_P = (0.30)
+
+# the first 10 args go to -C
+SOFT_CONFIG_CNT = 10
 
 CONFIG_ORDER = [ 'large_look',
                  'large_step',
@@ -54,23 +56,36 @@ CONFIG_ORDER = [ 'large_look',
                  'trylazy',
                  'max_lazy',
                  'long_enough',
-                 'promote' ]
+                 'promote',
+                 'winsize',
+                 'srcwinsize',
+                 ]
+
+CONFIG_ARGMAP = {
+    'winsize' : '-W',
+    'srcwinsize' : '-B',
+    }
 
 def INPUT_SPEC(rand):
     return {
-    'large_look' : lambda d: rand.choice([9, 11, 13, 15]),
-    'large_step' : lambda d: rand.choice([11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24 ]),
+    'large_look' : lambda d: rand.choice([9]),
+    'large_step' : lambda d: rand.choice([15]),
 
     'small_chain'  : lambda d: rand.choice([1]),
     'small_lchain' : lambda d: rand.choice([1]),
 
-    'max_lazy'     : lambda d: rand.choice([9, 13, 18]),
-    'long_enough'  : lambda d: rand.choice([9, 13, 18]),
+    'max_lazy'     : lambda d: rand.choice([18]),
+    'long_enough'  : lambda d: rand.choice([18]),
 
     'small_look'   : lambda d: rand.choice([4]),
     'promote'      : lambda d: 0,
     'trylazy'      : lambda d: 1,
     'ssmatch'      : lambda d: 0,
+
+    'winsize' :    lambda d: rand.choice(
+        [x * (1<<20) for x in [1, 4, 8, 16, 32, 64]]),
+
+    'srcwinsize' : lambda d: 1<<26,
     }
 
 
@@ -313,7 +328,7 @@ class Xdelta3RunClass:
     #end
 
     def __str__(self):
-        return 'xdelta3'
+        return ' '.join(self.extra)
     #end
 
     def New(self):
@@ -624,13 +639,15 @@ class RcsFile:
 
             target_size = os.stat(self.Verf(v+1)).st_size
 
-            print '%s %s %s: %.2f%% encode %.3f ms: decode %.3f ms' % \
+            if 0:
+                print '%s %s %s: %.2f%% encode %.3f ms: decode %.3f ms' % \
                   (runclass,
                    os.path.basename(self.fname),
                    self.Vstr(v+1),
                    target_size > 0 and (100.0 * result.encode_size / target_size) or 0,
                    result.encode_time.mean * 1000.0,
                    result.decode_time.mean * 1000.0)
+            #end
             ntrials.append(result)
         #end
 
@@ -716,8 +733,22 @@ class RcsFinder:
                 good.append(rf)
             #end
         self.rcsfiles = good
+        ReportPairs(runclass, results)
         return results
     #end
+
+def ReportPairs(name, results):
+    encode_time = 0
+    decode_time = 0
+    encode_size = 0
+    for r in results:
+        encode_time += r.encode_time.mean
+        decode_time += r.decode_time.mean
+        encode_size += r.encode_size
+    #end
+    print '%s rcs: encode %.2f s: decode %.2f s: size %d' % \
+          (name, encode_time, decode_time, encode_size)
+#end
 
 def GetTestRcsFiles():
     rcsf = RcsFinder()
@@ -831,6 +862,17 @@ class RandomTester:
 
         return config
 
+    def ConfigToArgs(self, config):
+        args = [ '-C',
+                 ','.join([str(x) for x in config[0:SOFT_CONFIG_CNT]])]
+        for i in range(SOFT_CONFIG_CNT, len(CONFIG_ORDER)):
+            key = CONFIG_ARGMAP[CONFIG_ORDER[i]]
+            val = config[i]
+            args.append('%s=%s' % (key, val))
+        #end
+        return args
+    #end
+
     def MakeBigFiles(self, rcsf):
         f1 = open(TMPDIR + "/big.1", "w")
         f2 = open(TMPDIR + "/big.2", "w")
@@ -871,7 +913,7 @@ class RandomTester:
             config = self.RandomConfig()
         #end
 
-        args = [ '-C', ','.join([str(x) for x in config]) ]
+        args = self.ConfigToArgs(config)
         result = TimedTest(f2, f1, Xdelta3Runner(args))
 
         tr = RandomTestResult(self.round_num,
@@ -935,6 +977,19 @@ class RandomTester:
         best_by_time = []
 
         print 'Worst: %s' % scored[len(scored)-1][1]
+
+        pos = 0
+        for (score, test) in scored:
+            pos += 1
+            test.score_pos = pos
+            c = c2s(test.config())
+            if not test_totals.has_key(c):
+                test_totals[c] = [test]
+            else:
+                test_totals[c].append(test)
+            #end
+        #end
+
         scored = [x[1] for x in scored[0:int(MAX_RESULTS * KEEP_P)]]
 
         for fast in [x[1] for x in timed[0:int(MAX_RESULTS * FAST_P)]]:
@@ -959,16 +1014,8 @@ class RandomTester:
         #end
 
         r = []
-        pos = 0
         for test in scored:
-            pos += 1
-            test.score_pos = pos
             c = c2s(test.config())
-            if not test_totals.has_key(c):
-                test_totals[c] = [test]
-            else:
-                test_totals[c].append(test)
-            #end
             s = 0.0
             self.results.append(test)
             r.append(test.config())
@@ -1046,19 +1093,6 @@ def RunSampleDataTest():
     #end
 #end
 
-def ReportPairs(name, results):
-    encode_time = 0
-    decode_time = 0
-    encode_size = 0
-    for r in results:
-        encode_time += r.encode_time.mean
-        decode_time += r.decode_time.mean
-        encode_size += r.encode_size
-    #end
-    print '%s rcs: encode %.2f s: decode %.2f s: size %d' % \
-          (name, encode_time, decode_time, encode_size)
-#end
-
 if __name__ == "__main__":
     try:
         RunCommand(['rm', '-rf', TMPDIR])
@@ -1066,10 +1100,11 @@ if __name__ == "__main__":
 
         #RunSpeedTest()
 
-        rcsf = GetTestRcsFiles()
+        #rcsf = GetTestRcsFiles()
 
-        x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
-        ReportPairs('xd3  -9', x3r)
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9']))
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-T']))
 
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass([]))
         #ReportPairs('xdelta3', x3r)
@@ -1078,7 +1113,7 @@ if __name__ == "__main__":
         #ReportPairs('xdelta1', x1r)
 
         #RunRandomRcsTest(rcsf)
-        #RunSampleDataTest()
+        RunSampleDataTest()
 
     except CommandError:
         pass

@@ -400,7 +400,6 @@ reset_defaults(void)
   option_srcwinsz_set = 0;
   option_smatch_config = NULL;
   option_level = XD3_DEFAULT_LEVEL;
-  option_winsize = XD3_DEFAULT_WINSIZE;
   option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
   option_winsize = XD3_DEFAULT_WINSIZE;
   option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
@@ -2668,15 +2667,16 @@ main_input (xd3_cmd     cmd,
 		    /* Warn when no source copies are found */
 		    if (! xd3_encoder_used_source (& stream))
 		      {
-			XPR(NT "warning: input position %"Q"u no source copies\n",
-			    stream.current_window * option_winsize);
+			XPR(NT "warning: input window %"Q"u..%"Q"u has no source copies\n",
+			    stream.current_window * option_winsize,
+			    (stream.current_window+1) * option_winsize);
 		      }
 		    
 		    /* Limited instruction buffer size affects source copies */
 		    if (option_verbose > 1 && stream.i_slots_used > stream.iopt_size)
 		      {
 			XPR(NT "warning: input position %"Q"u overflowed instruction buffer, "
-			    "needed %u (vs. %u)\n",
+			    "needed %u (vs. %u), consider raising -I\n",
 			    stream.current_window * option_winsize,
 			    stream.i_slots_used, stream.iopt_size);
 		      }
