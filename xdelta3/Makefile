@@ -44,6 +44,7 @@ PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
 	xdelta3-regtest.py xdelta3-test.py setup.py \
+	examples/Makefile examples/small_page_test.c \
 	xdelta3.py xdelta3_wrap.c
 
 SWIG_FLAGS = -DXD3_DEBUG=0 \

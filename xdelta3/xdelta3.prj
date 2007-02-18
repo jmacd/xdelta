@@ -1,11 +1,11 @@
 ;; -*- Prcs -*-
 (Created-By-Prcs-Version 1 3 4)
 (Project-Description "")
-(Project-Version xdelta3 0 30)
-(Parent-Version xdelta3 0 29)
-(Version-Log "pre 3.0p, fixes python unittest")
+(Project-Version xdelta3 0 31)
+(Parent-Version xdelta3 0 30)
+(Version-Log "3.0p release")
 (New-Version-Log "")
-(Checkin-Time "Sun, 18 Feb 2007 04:03:26 -0800")
+(Checkin-Time "Sun, 18 Feb 2007 04:06:56 -0800")
 (Checkin-Login jmacd)
 (Populate-Ignore ("\\.svn"))
 (Project-Keywords
