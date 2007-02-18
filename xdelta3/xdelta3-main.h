@@ -2197,12 +2197,12 @@ static void
 main_set_winsize (main_file *ifile) {
   xoff_t file_size;
 
-  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
-
   if (main_file_stat (ifile, &file_size, 0) == 0)
     {
       option_winsize = (usize_t) min(file_size, (xoff_t) option_winsize);
     }
+
+  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
 
   if (option_verbose > 1)
     {

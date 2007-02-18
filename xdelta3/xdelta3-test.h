@@ -50,7 +50,7 @@ static int test_exponential_dist (usize_t mean, usize_t max);
 #define CHECK(cond) if (!(cond)) { P(RINT "check failure: " #cond); abort(); }
 
 /* Use a fixed soft config so that test values are fixed.  See also test_compress_text(). */
-static const char* test_softcfg_str = "-C64,64,4,128,16,0,1,8,128,0";
+static const char* test_softcfg_str = "-C64,64,4,128,16,8,128";
 
 /******************************************************************************************
  TEST HELPERS
@@ -1770,7 +1770,7 @@ test_force_behavior (xd3_stream *stream, int ignore)
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* Force it, should succeed. */
-  sprintf (buf, "%s -ef %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -f -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup();
   return 0;

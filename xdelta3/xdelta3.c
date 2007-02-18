@@ -3908,8 +3908,15 @@ xd3_process_memory (int            is_encode,
     {
       config.srcwin_maxsz = source_size;
       config.winsize = min(input_size, (usize_t) (1<<20));
-      config.sprevsz = min(input_size, XD3_DEFAULT_SPREVSZ);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
+      config.iopt_size = max(config.iopt_size, 128U);
+
+      config.sprevsz = XD3_DEFAULT_SPREVSZ;
+
+      while (config.sprevsz / 2 > input_size)
+	{
+	  config.sprevsz /=  2;
+	}
     }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)

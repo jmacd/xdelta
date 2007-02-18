@@ -78,6 +78,7 @@ CONFIG_ORDER = [ 'large_look',
                  'sprevsz',
                  'iopt',
                  'djw',
+                 'altcode',
                  ]
 
 CONFIG_ARGMAP = {
@@ -86,7 +87,8 @@ CONFIG_ARGMAP = {
     'sprevsz'    : '-P',
     'iopt'       : '-I',
     'nocompress' : '-N',
-    'djw'        : '-Sdjw'
+    'djw'        : '-Sdjw',
+    'altcode'    : '-T',
     }
 
 def INPUT_SPEC(rand):
@@ -96,15 +98,18 @@ def INPUT_SPEC(rand):
 
     # -C 1,2,3,4,5,6,7
     'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([3, 15]),
-    'small_chain'  : lambda d: rand.choice([1, 2]),
+    'large_step' : lambda d: rand.choice([15]),
+    'small_chain'  : lambda d: rand.choice([1]),
     'small_lchain' : lambda d: rand.choice([1]),
     'max_lazy'     : lambda d: rand.choice([18]),
     'long_enough'  : lambda d: rand.choice([18]),
-    'small_look'   : lambda d: rand.choice([4]),
+    'small_look'   : lambda d: rand.choice([4, 5]),
 
     # -N
     'nocompress'   : lambda d: rand.choice(['false']),
+
+    # -T
+    'altcode'      : lambda d: rand.choice(['false', 'true']),
 
     # -S djw
     'djw'          : lambda d: rand.choice(['false']),

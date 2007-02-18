@@ -56,7 +56,7 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -O3
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0o
+REL=0p
 RELDIR = xdelta3$(REL)
 
 all: xdelta3-debug xdelta3 $(PYTGT) $(SWIGTGT)
