@@ -61,12 +61,7 @@
    copies within the TARGET.  Small matching, which is more expensive,
    usually dominates the large STRING-MATCH costs in this code - the
    more exhaustive the search, the better the results.  Either of the
-   two string-matching mechanisms may be disabled.  Currently, large
-   checksums are only performed in the source file, if present, and
-   small checksums are performed only in the left-over target input.
-   However, small matches are possible in the source file too, with a
-   range of possibilities.  [I've seen a paper on this subject, but
-   I lost it.]
+   two string-matching mechanisms may be disabled.
 
    2. INSTRUCTION SELECTION.  The IOPT buffer here represents a queue
    used to store overlapping copy instructions.  There are two possible
@@ -486,11 +481,9 @@ IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 #define SMALL_HASH_DEBUG2(s,inp)                                  \
   XD3_ASSERT (debug_hval == xd3_checksum_hash (& (s)->small_hash, \
 	 xd3_scksum ((inp), (s)->smatcher.small_look)))
-#define SMALL_HASH_STATS(x) x
 #else
 #define SMALL_HASH_DEBUG1(s,inp)
 #define SMALL_HASH_DEBUG2(s,inp)
-#define SMALL_HASH_STATS(x)
 #endif /* XD3_DEBUG */
 
 /* Update the run-length state */
@@ -1169,6 +1162,7 @@ static usize_t  __alternate_code_table_compressed_size;
 int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *code_table,
 				     uint8_t *comp_string, usize_t *comp_string_size)
 {
+  /* TODO: use xd3_encode_memory() */
   uint8_t dflt_string[CODE_TABLE_STRING_SIZE];
   uint8_t code_string[CODE_TABLE_STRING_SIZE];
   xd3_stream stream;
@@ -1194,11 +1188,8 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *cod
   config.smatcher_soft.small_look    = 4;
   config.smatcher_soft.small_chain   = CODE_TABLE_STRING_SIZE;
   config.smatcher_soft.small_lchain  = CODE_TABLE_STRING_SIZE;
-  config.smatcher_soft.ssmatch       = 1;
-  config.smatcher_soft.try_lazy      = 1;
   config.smatcher_soft.max_lazy      = CODE_TABLE_STRING_SIZE;
   config.smatcher_soft.long_enough   = CODE_TABLE_STRING_SIZE;
-  config.smatcher_soft.promote       = 1;
 
   if ((ret = xd3_config_stream (& stream, & config))) { goto fail; }
 
@@ -2503,11 +2494,7 @@ xd3_config_stream(xd3_stream *stream,
 	smatcher->name = __smatcher_soft.name;
 	if (smatcher->large_look  < MIN_MATCH ||
 	    smatcher->large_step  < 1         ||
-	    smatcher->small_look  < MIN_MATCH ||
-	    smatcher->small_chain < 1         ||
-	    smatcher->large_look  < smatcher->small_look ||
-	    smatcher->small_chain < smatcher->small_lchain ||
-	    (smatcher->small_lchain == 0 && smatcher->try_lazy))
+	    smatcher->small_look  < MIN_MATCH)
 	  {
 	    stream->msg = "invalid soft string-match config";
 	    return XD3_INVALID;
@@ -3581,22 +3568,6 @@ xd3_encode_init (xd3_stream *stream)
   return ENOMEM;
 }
 
-#if XD3_DEBUG
-static int
-xd3_check_sprevlist (xd3_stream *stream)
-{
-  int i;
-  for (i = 0; i < stream->sprevsz; i += 1)
-    {
-      xd3_slist *l = & stream->small_prev[i];
-
-      XD3_ASSERT (l->prev->next == l);
-      XD3_ASSERT (l->next->prev == l);
-    }
-  return 1;
-}
-#endif
-
 /* Called after the ENC_POSTOUT state, this puts the output buffers back into separate
  * lists and re-initializes some variables.  (The output lists were spliced together
  * during the ENC_FLUSH state.) */
@@ -3605,8 +3576,6 @@ xd3_encode_reset (xd3_stream *stream)
 {
   int i;
   xd3_output *olist;
-
-  XD3_ASSERT (stream->small_prev == NULL || xd3_check_sprevlist (stream));
 
   IF_DEBUG (stream->n_emit = 0);
   stream->avail_in     = 0;
@@ -3930,9 +3899,6 @@ xd3_process_memory (int            is_encode,
     return XD3_INTERNAL;
   }
 
-  /* TODO: for small inputs, the xd3_stream could be configured to allocate MUCH less
-   * memory.  Most of the allocations sizes are defaulted (see xdelta3.h), and assume
-   * large inputs. */
   memset (& stream, 0, sizeof (stream));
   memset (& config, 0, sizeof (config));
 
@@ -3940,9 +3906,10 @@ xd3_process_memory (int            is_encode,
 
   if (is_encode)
     {
-      /* TODO: for large inputs, limit window size, need to select a default ... */
       config.srcwin_maxsz = source_size;
       config.winsize = min(input_size, (usize_t) (1<<20));
+      config.sprevsz = min(input_size, XD3_DEFAULT_SPREVSZ);
+      config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
     }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)
@@ -4056,6 +4023,14 @@ xd3_string_match_init (xd3_stream *stream)
   const int DO_SMALL = ! (stream->flags & XD3_NOCOMPRESS);
   const int DO_LARGE = (stream->src != NULL);
 
+  if (DO_LARGE && stream->large_table == NULL)
+    {
+      if ((stream->large_table = xd3_alloc0 (stream, stream->large_hash.size, sizeof (usize_t))) == NULL)
+	{
+	  return ENOMEM;
+	}
+    }
+
   if (DO_SMALL)
     {
       /* Subsequent calls can return immediately after checking reset. */
@@ -4063,7 +4038,7 @@ xd3_string_match_init (xd3_stream *stream)
 	{
 	  /* The target hash table is reinitialized once per window. */
 	  /* TODO: This would not have to be reinitialized if absolute offsets
-	   * were being stored. */
+	   * were being stored, as we would do for VCD_TARGET encoding. */
 	  if (stream->small_reset)
 	    {
 	      stream->small_reset = 0;
@@ -4081,31 +4056,15 @@ xd3_string_match_init (xd3_stream *stream)
 	}
 
       /* If there is a previous table needed. */
-      if (stream->smatcher.small_chain > 1)
+      if (stream->smatcher.small_lchain > 1 ||
+	  stream->smatcher.small_chain > 1)
 	{
-	  xd3_slist *p, *m;
-
 	  if ((stream->small_prev = xd3_alloc (stream,
 					       stream->sprevsz,
 					       sizeof (xd3_slist))) == NULL)
 	    {
 	      return ENOMEM;
 	    }
-
-	  /* Initialize circular lists. */
-	  for (p = stream->small_prev, m = stream->small_prev + stream->sprevsz; p != m; p += 1)
-	    {
-	      p->next = p;
-	      p->prev = p;
-	    }
-	}
-    }
-
-  if (DO_LARGE && stream->large_table == NULL)
-    {
-      if ((stream->large_table = xd3_alloc0 (stream, stream->large_hash.size, sizeof (usize_t))) == NULL)
-	{
-	  return ENOMEM;
 	}
     }
 
@@ -4648,67 +4607,22 @@ xd3_source_extend_match (xd3_stream *stream)
   return 0;
 }
 
-/* Update the small hash.  Values in the small_table are offset by HASH_CKOFFSET (1) to
- * distinguish empty buckets the zero offset.  This maintains the previous linked lists.
- * If owrite is true then this entry is replacing the existing record, otherwise it is
- * merely being called to promote the existing record in the hash bucket (for the same
- * address cache). */
+/* Update the small hash.  Values in the small_table are offset by
+ * HASH_CKOFFSET (1) to distinguish empty buckets from real offsets. */
 static void
-xd3_scksum_insert (xd3_stream *stream, usize_t inx, usize_t scksum, usize_t pos)
+xd3_scksum_insert (xd3_stream *stream,
+		   usize_t inx,
+		   usize_t scksum,
+		   usize_t pos)
 {
-  /* If we are maintaining previous links. */
+  /* If we are maintaining previous duplicates. */
   if (stream->small_prev)
     {
-      usize_t     last_pos = stream->small_table[inx];
+      usize_t    last_pos = stream->small_table[inx];
       xd3_slist *pos_list = & stream->small_prev[pos & stream->sprevmask];
-      xd3_slist *prev     = pos_list->prev;
-      xd3_slist *next     = pos_list->next;
 
-      /* Assert link structure, update pos, cksum */
-      XD3_ASSERT (prev->next == pos_list);
-      XD3_ASSERT (next->prev == pos_list);
-      pos_list->pos = pos;
-      pos_list->scksum = scksum;
-
-      /* Subtract HASH_CKOFFSET and test for a previous offset. */
-      if (last_pos-- != 0)
-	{
-	  xd3_slist *last_list = & stream->small_prev[last_pos & stream->sprevmask];
-	  xd3_slist *last_next;
-
-	  /* Verify existing entry. */
-	  SMALL_HASH_DEBUG1 (stream, stream->next_in + last_pos);
-	  SMALL_HASH_DEBUG2 (stream, stream->next_in + pos);
-
-	  /* The two positions (mod sprevsz) may have the same checksum, making the old
-	   * and new entries the same.  That is why the removal step is not before the
-	   * above if-stmt. */
-	  if (last_list != pos_list)
-	    {
-	      /* Remove current position from any list it may belong to. */
-	      next->prev = prev;
-	      prev->next = next;
-
-	      /* The ordinary case, add current position to last_list. */
-	      last_next = last_list->next;
-
-	      pos_list->next = last_next;
-	      pos_list->prev = last_list;
-
-	      last_next->prev = pos_list;
-	      last_list->next = pos_list;
-	    }
-	}
-      else
-	{
-	  /* Remove current position from any list it may belong to. */
-	  next->prev = prev;
-	  prev->next = next;
-
-	  /* Re-initialize current position. */
-	  pos_list->next = pos_list;
-	  pos_list->prev = pos_list;
-	}
+      /* Note last_pos is offset by HASH_CKOFFSET. */
+      pos_list->last_pos = last_pos;
     }
 
   /* Enter the new position into the hash bucket. */
@@ -4736,62 +4650,42 @@ xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
 }
 #endif /* XD3_DEBUG */
 
-/* When the hash table indicates a possible small string match, it calls this routine to
- * find the best match.  The first matching position is taken from the small_table,
- * HASH_CKOFFSET is subtracted to get the actual position.  After checking that match, if
- * previous linked lists are in use (because stream->smatcher.small_chain > 1), previous matches
- * are tested searching for the longest match.  If (stream->min_match > MIN_MATCH) then a lazy
- * match is in effect.
+/* When the hash table indicates a possible small string match, it
+ * calls this routine to find the best match.  The first matching
+ * position is taken from the small_table, HASH_CKOFFSET is subtracted
+ * to get the actual position.  After checking that match, if previous
+ * linked lists are in use (because stream->smatcher.small_chain > 1),
+ * previous matches are tested searching for the longest match.  If
+ * (stream->min_match > MIN_MATCH) then a lazy match is in effect.
  *
- * OPT: This is by far the most expensive function.  The slowdown is in part due to the data
- * structure it maintains, which is relatively more expensive than it needs to be (in
- * comparison to zlib) in order to support the PROMOTE decision, which is to prefer the
- * most recently used matching address of a certain string to aid the VCDIFF same cache.
- *
- * --- TODO: declare the PROMOTE experiment a failure -- remove the extra LIST --
- *
- * Weak reasoning? it's time to modularize this routine...?  Let's say the PROMOTE
- * feature supported by this slow data structure contributes around 2% improvement in
- * compressed size, is there a better code table that doesn't use the SAME address cache,
- * for which the speedup-discount could produce a better encoding?
+ * TODO: This is the second most-expensive function, after
+ * xd3_srcwin_move_point().
  */
-static /*inline*/ usize_t
-xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_offset)
+static usize_t
+xd3_smatch (xd3_stream *stream,
+	    usize_t base,
+	    usize_t scksum,
+	    usize_t *match_offset)
 {
   usize_t         cmp_len;
   usize_t         match_length = 0;
   usize_t         chain        = (stream->min_match == MIN_MATCH ?
 				  stream->smatcher.small_chain :
 				  stream->smatcher.small_lchain);
-  xd3_slist     *current      = NULL;
-  xd3_slist     *first        = NULL;
   const uint8_t *inp_max      = stream->next_in + stream->avail_in;
   const uint8_t *inp;
   const uint8_t *ref;
 
-  SMALL_HASH_STATS  (usize_t search_cnt = 0);
   SMALL_HASH_DEBUG1 (stream, stream->next_in + stream->input_position);
-  SMALL_HASH_STATS  (stream->sh_searches += 1);
 
   XD3_ASSERT (stream->min_match + stream->input_position <= stream->avail_in);
 
   base -= HASH_CKOFFSET;
 
-  /* Initialize the chain. */
-  if (stream->small_prev != NULL)
-    {
-      first = current = & stream->small_prev[base & stream->sprevmask];
-
-      /* Check if current->pos is correct. */
-      if (current->pos != base) { goto done; }
-    }
-
  again:
 
-  SMALL_HASH_STATS (search_cnt += 1);
-
-  /* For small matches, we can always go to the end-of-input because the matching position
-   * must be less than the input position. */
+  /* For small matches, we can always go to the end-of-input because
+   * the matching position must be less than the input position. */
   XD3_ASSERT (base < stream->input_position);
 
   ref = stream->next_in + base;
@@ -4809,7 +4703,8 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
   cmp_len = inp - (stream->next_in + stream->input_position);
 
   /* Verify correctness */
-  XD3_ASSERT (xd3_check_smatch (stream->next_in + base, stream->next_in + stream->input_position,
+  XD3_ASSERT (xd3_check_smatch (stream->next_in + base,
+				stream->next_in + stream->input_position,
 				inp_max, cmp_len));
 
   /* Update longest match */
@@ -4818,38 +4713,39 @@ xd3_smatch (xd3_stream *stream, usize_t base, usize_t scksum, usize_t *match_off
       ( match_length) = cmp_len;
       (*match_offset) = base;
 
-      /* Stop if we match the entire input or discover a long_enough match. */
+      /* Stop if we match the entire input or have a long_enough match. */
       if (inp == inp_max || cmp_len >= stream->smatcher.long_enough)
 	{
 	  goto done;
 	}
     }
 
-  /* If we have not reached the chain limit, see if there is another previous position. */
-  if (current)
+  /* If we have not reached the chain limit, see if there is another
+     previous position. */
+  while (--chain != 0)
     {
-      while (--chain != 0)
-	{
-	  /* Calculate the next base offset. */
-	  current = current->prev;
-	  base    = current->pos;
+      /* Calculate the previous offset. */
+      usize_t last_pos = stream->small_prev[base & stream->sprevmask].last_pos;
 
-	  /* Stop if the next position was the first.  Stop if the position is wrong
-	   * (because the lists are not re-initialized across input windows). Skip if the
-	   * scksum is wrong. */
-	  if (current != first && base < stream->input_position)
-	    {
-	      if (current->scksum != scksum)
-		{
-		  continue;
-		}
-	      goto again;
-	    }
+      if (last_pos == 0)
+	{
+	  break;
 	}
+
+      last_pos -= HASH_CKOFFSET;
+      base = last_pos;
+
+      /* Stop if the position is wrong (because the lists are not
+       * re-initialized across input windows). */
+      if (base < stream->input_position)
+	{
+	  goto again;
+	}
+
+      break;
     }
 
  done:
-  SMALL_HASH_STATS (stream->sh_compares += search_cnt);
   return match_length;
 }
 
@@ -4903,8 +4799,7 @@ xd3_verify_run_state (xd3_stream    *stream,
  Templates
  ******************************************************************************************/
 
-/* Template macros: less than 30 lines work.  the template parameters appear as, e.g.,
- * SLOOK, MIN_MATCH, TRYLAZY, etc. */
+/* Template macros */
 #define XD3_TEMPLATE(x)      XD3_TEMPLATE2(x,TEMPLATE)
 #define XD3_TEMPLATE2(x,n)   XD3_TEMPLATE3(x,n)
 #define XD3_TEMPLATE3(x,n)   x ## n
@@ -4918,10 +4813,9 @@ static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
   XD3_STRINGIFY(TEMPLATE),
   XD3_TEMPLATE(xd3_string_match_),
 #if SOFTCFG == 1
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+  0, 0, 0, 0, 0, 0, 0
 #else
-  LLOOK, LSTEP, SLOOK, SCHAIN, SLCHAIN, SSMATCH, TRYLAZY, MAXLAZY,
-  LONGENOUGH, PROMOTE
+  LLOOK, LSTEP, SLOOK, SCHAIN, SLCHAIN, MAXLAZY, LONGENOUGH
 #endif
 };
 
@@ -4999,13 +4893,13 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
    * checks that LEN is shorter than MAXLAZY and that there is enough leftover data to
    * consider lazy matching.  "Enough" is set to 2 since the next match will start at the
    * next offset, it must match two extra characters. */
-#define TRYLAZYLEN(LEN,POS,MAX) ((TRYLAZY && (LEN) < MAXLAZY) && ((POS) + (LEN) <= (MAX) - 2))
+#define TRYLAZYLEN(LEN,POS,MAX) ((MAXLAZY) > 0 && (LEN) < (MAXLAZY) && (POS) + (LEN) <= (MAX) - 2)
 
   /* HANDLELAZY: This statement is called each time an instruciton is emitted (three
    * cases).  If the instruction is large enough, the loop is restarted, otherwise lazy
    * matching may ensue. */
 #define HANDLELAZY(mlen) \
-  if (TRYLAZYLEN ((mlen), stream->input_position, stream->avail_in)) \
+  if (TRYLAZYLEN ((mlen), (stream->input_position), (stream->avail_in))) \
     { stream->min_match = (mlen) + LEAST_MATCH_INCR; goto updateone; } \
   else \
     { stream->input_position += (mlen); goto restartloop; }
@@ -5104,13 +4998,6 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  /* Insert a hash for this string. */
 	  xd3_scksum_insert (stream, sinx, scksum, stream->input_position);
 
-	  /* Promote the previous match address to head of the hash bucket.  This is
-	   * intended to improve the same cache hit rate. */
-	  if (match_length != 0 && PROMOTE)
-	    {
-	      xd3_scksum_insert (stream, sinx, scksum, match_offset);
-	    }
-
 	  /* Maybe output a COPY instruction */
 	  if (unlikely (match_length >= stream->min_match))
 	    {
@@ -5132,67 +5019,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 					/* address */ match_offset,
 					/* is_source */ 0))) { return ret; }
 
-	      /* SSMATCH option: search small matches: continue the incremental checksum
-	       * through the matched material.  Only if not lazy matching.  */
-	      if (SSMATCH && !TRYLAZYLEN (match_length, stream->input_position, stream->avail_in))
-		{
-		  usize_t avail = stream->avail_in - SLOOK - stream->input_position;
-		  usize_t ml_m1 = match_length - 1;
-		  usize_t right;
-		  int    aincr;
-
-		  IF_DEBUG (usize_t nposi = stream->input_position + match_length);
-
-		  /* Avail is the last offset we can compute an incremental cksum.  If the
-		   * match length exceeds that offset then we are finished performing
-		   * incremental updates after this step.  */
-		  if (ml_m1 < avail)
-		    {
-		      right = ml_m1;
-		      aincr = 1;
-		    }
-		  else
-		    {
-		      right = avail;
-		      aincr = 0;
-		    }
-
-		  /* Compute incremental checksums within the match. */
-		  while (right > 0)
-		    {
-		      SMALL_CKSUM_UPDATE (scksum, inp, SLOOK);
-		      if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in)) {
-			LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK);
-		      }
-
-		      inp    += 1;
-		      stream->input_position += 1;
-		      right  -= 1;
-		      sinx = xd3_checksum_hash (& stream->small_hash, scksum);
-
-		      IF_DEBUG (xd3_verify_small_state (stream, inp, scksum));
-
-		      xd3_scksum_insert (stream, sinx, scksum, stream->input_position);
-		    }
-
-		  if (aincr)
-		    {
-		      /* Keep searching... */
-		      if (DO_RUN) { run_l = xd3_comprun (inp+1, SLOOK-1, & run_c); }
-		      XD3_ASSERT (nposi == stream->input_position + 1);
-		      XD3_ASSERT (stream->input_position + SLOOK < stream->avail_in);
-		      stream->min_match = MIN_MATCH;
-		      goto updatesure;
-		    }
-		  else
-		    {
-		      /* Not enough input for another match. */
-		      XD3_ASSERT (stream->input_position + SLOOK >= stream->avail_in);
-		      goto loopnomore;
-		    }
-		}
-
-	      /* Else case: copy instruction, but no SSMATCH. */
+	      /* Copy instruction. */
 	      HANDLELAZY (match_length);
 	    }
 	}
@@ -5212,8 +5039,6 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	{
 	  goto loopnomore;
 	}
-
-    updatesure:
 
       /* Compute next RUN, CKSUM */
       if (DO_RUN)   { NEXTRUN (inp[SLOOK]); }

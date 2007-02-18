@@ -71,7 +71,7 @@
  * larger this buffer, the longer a forced xd3_srcwin_setup() decision is held off.
  * Setting this value to 0 causes an unlimited buffer to be used. */
 #ifndef XD3_DEFAULT_IOPT_SIZE
-#define XD3_DEFAULT_IOPT_SIZE    (1U<<12)
+#define XD3_DEFAULT_IOPT_SIZE    (1U<<15)
 #endif
 
 /* The maximum distance backward to search for small matches */
@@ -529,11 +529,8 @@ struct _xd3_smatcher
   uint               small_look;
   uint               small_chain;
   uint               small_lchain;
-  uint               ssmatch;
-  uint               try_lazy;
   uint               max_lazy;
   uint               long_enough;
-  uint               promote;
 };
 
 /* hash table size & power-of-two hash function. */
@@ -544,13 +541,10 @@ struct _xd3_hash_cfg
   usize_t           mask;
 };
 
-/* a hash-chain link in the small match table, embedded with position and checksum */
+/* the sprev list */
 struct _xd3_slist
 {
-  xd3_slist *next;
-  xd3_slist *prev;
-  usize_t     pos;
-  usize_t     scksum;
+  usize_t     last_pos;
 };
 
 /* a decoder section (data, inst, or addr).  there is an optimization to avoid copying
@@ -815,9 +809,6 @@ struct _xd3_stream
   usize_t           i_slots_used;
 
 #if XD3_DEBUG
-  usize_t            sh_searches;
-  usize_t            sh_compares;
-
   usize_t            large_ckcnt;
 
   /* memory usage */

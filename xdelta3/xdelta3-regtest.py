@@ -16,13 +16,21 @@
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-# TODO: Test 1.5 vs. greedy
-# TODO: Compare w/ bsdiff and generate more summary
+# TODO: test 1.5 vs. greedy
+# TODO: generate a graph
 
 import os, sys, math, re, time, types, array, random
 import xdelta3main
 import xdelta3
 
+#RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
+RCSDIR = '/tmp/PRCS_read_copy/prcs'
+SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
+
+#RCSDIR = 'G:/jmacd/PRCS/prcs/b'
+#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+
+#
 MIN_SIZE       = 0
 
 TIME_TOO_SHORT = 0.050
@@ -32,7 +40,7 @@ MIN_TRIALS     = 3
 MAX_TRIALS     = 15
 
 # 10 = fast 1.5 = slow
-MIN_STDDEV_PCT = 10
+MIN_STDDEV_PCT = 1.5
 
 # How many results per round
 MAX_RESULTS = 4
@@ -48,73 +56,76 @@ MIN_RUN = 1000 * 1000 * 1
 MAX_RUN = 1000 * 1000 * 10
 
 # Testwide defaults
-ALL_ARGS = [ '-f' ]
+ALL_ARGS = [
+    # -v
+    ]
 
-# The first 10 args go to -C
-SOFT_CONFIG_CNT = 10
+# The first 7 args go to -C
+SOFT_CONFIG_CNT = 7
 
 CONFIG_ORDER = [ 'large_look',
                  'large_step',
                  'small_look',
                  'small_chain',
                  'small_lchain',
-                 'ssmatch',
-                 'trylazy',
                  'max_lazy',
                  'long_enough',
-                 'promote',
+
+                 # > SOFT_CONFIG_CNT
+                 'nocompress',
                  'winsize',
                  'srcwinsize',
                  'sprevsz',
                  'iopt',
-
-                 # TODO: nocompress, djw (boolean flags)
+                 'djw',
                  ]
 
 CONFIG_ARGMAP = {
-    'winsize' : '-W',
+    'winsize'    : '-W',
     'srcwinsize' : '-B',
-    'sprevsz' : '-P',
-    'iopt' : '-I',
+    'sprevsz'    : '-P',
+    'iopt'       : '-I',
+    'nocompress' : '-N',
+    'djw'        : '-Sdjw'
     }
 
 def INPUT_SPEC(rand):
     return {
-    # computational costs
+
+    # Time/space costs.
+
+    # -C 1,2,3,4,5,6,7
     'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([15]),
-
-    'small_chain'  : lambda d: rand.choice([1]),
+    'large_step' : lambda d: rand.choice([3, 15]),
+    'small_chain'  : lambda d: rand.choice([1, 2]),
     'small_lchain' : lambda d: rand.choice([1]),
-
     'max_lazy'     : lambda d: rand.choice([18]),
     'long_enough'  : lambda d: rand.choice([18]),
-
     'small_look'   : lambda d: rand.choice([4]),
-    'ssmatch'      : lambda d: rand.choice([0]),
 
-    'promote'      : lambda d: rand.choice([0]),
+    # -N
+    'nocompress'   : lambda d: rand.choice(['false']),
 
-    'trylazy'      : lambda d: rand.choice([1]),
+    # -S djw
+    'djw'          : lambda d: rand.choice(['false']),
 
-    # memory costs
-    'iopt'         : lambda d: 0,  # unlimited
+    # Mmemory costs.
 
+    # -W
     'winsize'      : lambda d: 8 * (1<<20),
+
+    # -B
     'srcwinsize'   : lambda d: 64 * (1<<20),
 
-    'sprevsz'      : lambda d: 1 * (1<<18), # only powers of two
-    }
+    # -I 0 is unlimited
+    'iopt'         : lambda d: 0,
+
+    # -P only powers of two
+    'sprevsz'      : lambda d: rand.choice([x * (1<<16) for x in [4]]),
+  }
+#end
 
 #
-#
-#RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-RCSDIR = '/tmp/PRCS_read_copy/prcs'
-SAMPLEDIR = "/tmp/WESNOTH_tmp/tar"
-
-#RCSDIR = 'G:/jmacd/PRCS/prcs/b'
-#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
-
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
 RUNFILE = os.path.join(TMPDIR, 'run')
@@ -139,7 +150,7 @@ RE_HDRSZ   = re.compile('VCDIFF header size: +(\\d+)')
 RE_EXTCOMP = re.compile('XDELTA ext comp.*')
 
 def c2s(c):
-    return ' '.join(['%02d' % x for x in c])
+    return ' '.join(['%s' % x for x in c])
 #end
 
 def SumList(l):
@@ -470,8 +481,6 @@ class Xdelta1Runner:
     #end
 #end
 
-# TODO: cleanup below this line
-
 # exceptions
 class SkipRcsException:
     def __init__(self,reason):
@@ -771,14 +780,13 @@ def GetTestRcsFiles():
     return rcsf
 #end
 
-# TODO: cleanup below this line
-
 #
 class RandomTestResult:
-    def __init__(self, round, config, runtime, compsize):
+    def __init__(self, round, config, runtime, compsize, decodetime):
         self.round = round
         self.myconfig = config
         self.runtime = runtime
+        self.decodetime = decodetime
         self.compsize = compsize
         self.score = None
         self.time_pos = None
@@ -787,10 +795,11 @@ class RandomTestResult:
     #end
 
     def __str__(self):
-        return 'time %.6f%s size %d%s << %s >>' % (
+        return 'time %.6f%s size %d%s << %s >> %.6f' % (
             self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
             self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
-            c2s(self.config()))
+            c2s(self.config()),
+            self.decodetime)
     #end
 
     def time(self):
@@ -853,12 +862,6 @@ class RandomTester:
             config.append(val)
         #end
 
-        if map['small_chain'] < map['small_lchain']:
-            return None
-
-        if map['large_look'] < map['small_look']:
-            return None
-
         for r in self.results:
             if c2s(r.config()) == c2s(config):
                 return None
@@ -873,7 +876,13 @@ class RandomTester:
         for i in range(SOFT_CONFIG_CNT, len(CONFIG_ORDER)):
             key = CONFIG_ARGMAP[CONFIG_ORDER[i]]
             val = config[i]
-            args.append('%s=%s' % (key, val))
+            if val == 'true' or val == 'false':
+                if val == 'true':
+                    args.append('%s' % key)
+                #end
+            else:
+                args.append('%s=%s' % (key, val))
+            #end
         #end
         return args
     #end
@@ -924,7 +933,8 @@ class RandomTester:
         tr = RandomTestResult(self.round_num,
                               config,
                               result.encode_time.mean,
-                              result.encode_size)
+                              result.encode_size,
+                              result.decode_time.mean)
 
         self.results.append(tr)
 
@@ -1060,7 +1070,6 @@ def RunRandomRcsTest(rcsf):
 #end
 
 def RunSampleTest(d, files):
-    # TODO: consolidate w/ the above
     print 'testing %s with %d files' % (d, len(files))
     configs = []
     while len(files) > 1:
@@ -1106,6 +1115,11 @@ if __name__ == "__main__":
         #RunSpeedTest()
 
         #rcsf = GetTestRcsFiles()
+        #RunRandomRcsTest(rcsf)
+
+        RunSampleDataTest()
+
+        # Other
 
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
@@ -1116,9 +1130,6 @@ if __name__ == "__main__":
 
         #x1r = rcsf.AllPairsByDate(Xdelta1RunClass())
         #ReportPairs('xdelta1', x1r)
-
-        #RunRandomRcsTest(rcsf)
-        RunSampleDataTest()
 
     except CommandError:
         pass

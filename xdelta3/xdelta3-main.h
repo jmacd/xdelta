@@ -84,7 +84,7 @@ const char* xd3_mainerror(int err_num);
 #define PRINTHDR_SPECIAL -4378291
 
 /* The number of soft-config variables.  */
-#define XD3_SOFTCFG_VARCNT 10
+#define XD3_SOFTCFG_VARCNT 7
 
 /* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an error message
  * from the library. */
@@ -338,7 +338,6 @@ main_config (void)
 {
   main_version ();
 
-  /* TODO: This needs cleaning up */
   P(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
   P(RINT "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
   P(RINT "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
@@ -367,7 +366,6 @@ main_config (void)
 static void
 reset_defaults(void)
 {
-  // TODO: this is dumb, use an object
   option_stdout = 0;
   option_force = 0;
   option_verbose = 0;
@@ -720,20 +718,22 @@ main_file_close (main_file *xfile)
 static void
 main_file_cleanup (main_file *xfile)
 {
-  /* TODO: inconsistent code style here */
-  if (main_file_isopen (xfile)) {
-    main_file_close (xfile);
-  }
+  if (main_file_isopen (xfile))
+    {
+      main_file_close (xfile);
+    }
 
-  if (xfile->snprintf_buf != NULL) {
-    main_free(xfile->snprintf_buf);
-    xfile->snprintf_buf = NULL;
-  }
+  if (xfile->snprintf_buf != NULL)
+    {
+      main_free(xfile->snprintf_buf);
+      xfile->snprintf_buf = NULL;
+    }
 
-  if (xfile->filename_copy != NULL) {
-    main_free(xfile->filename_copy);
-    xfile->filename_copy = NULL;
-  }
+  if (xfile->filename_copy != NULL)
+    {
+      main_free(xfile->filename_copy);
+      xfile->filename_copy = NULL;
+    }
 }
 
 static int
@@ -795,7 +795,6 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
   } else {
       *size = li.QuadPart;
   }
-  // TODO: check err_ifnoseek
 #else
   struct stat sbuf;
   if (fstat (XFNO (xfile), & sbuf) < 0)
@@ -2457,11 +2456,8 @@ main_input (xd3_cmd     cmd,
 	  config.smatcher_soft.small_look    = values[2];
 	  config.smatcher_soft.small_chain   = values[3];
 	  config.smatcher_soft.small_lchain  = values[4];
-	  config.smatcher_soft.ssmatch       = values[5];
-	  config.smatcher_soft.try_lazy      = values[6];
-	  config.smatcher_soft.max_lazy      = values[7];
-	  config.smatcher_soft.long_enough   = values[8];
-	  config.smatcher_soft.promote       = values[9];
+	  config.smatcher_soft.max_lazy      = values[5];
+	  config.smatcher_soft.long_enough   = values[6];
 	}
       else
 	{
@@ -2604,7 +2600,7 @@ main_input (xd3_cmd     cmd,
 		  }
 
 		/* Check if we have no source name and need one. */
-		/* TODO: this doesn't fire due to cpyblocks_ calculation check */
+		/* TODO: this doesn't fire due to cpyblocks_ calculation check? */
 		if (need_src && ! recv_src)
 		  {
 		    XPR(NT "input requires a source file, use -s\n");

@@ -12,10 +12,6 @@
 // SPACE_MAX of 32K is sufficient for most inputs with XD3_COMPLEVEL_1
 // XD3_COMPLEVEL_9 requires about 4x more space than XD3_COMPLEVEL_1
 
-// TODO: experimental PROMOTE code in the encoder is using 16 bytes
-// per entry in a table, where 4 bytes are sufficient w/o this
-// (unimpressive) feature. Remove PROMOTE code.
-
 #include "xdelta3.h"
 #include "xdelta3.c"
 

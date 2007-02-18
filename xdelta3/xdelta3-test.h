@@ -693,11 +693,8 @@ test_compress_text (xd3_stream  *stream,
   cfg.smatcher_soft.small_look = 4;
   cfg.smatcher_soft.small_chain = 128;
   cfg.smatcher_soft.small_lchain = 16;
-  cfg.smatcher_soft.ssmatch = 0;
-  cfg.smatcher_soft.try_lazy = 1;
   cfg.smatcher_soft.max_lazy = 8;
   cfg.smatcher_soft.long_enough = 128;
-  cfg.smatcher_soft.promote = 0;
   
   xd3_config_stream (stream, & cfg);
 
@@ -1959,9 +1956,7 @@ typedef struct _string_match_test string_match_test;
 typedef enum
 {
   SM_NONE    = 0,
-  SM_SSMATCH = (1 << 0),
   SM_LAZY    = (1 << 1),
-  SM_PROMOTE = (1 << 2),
 } string_match_flags;
 
 struct _string_match_test
@@ -1985,7 +1980,7 @@ static const string_match_test match_tests[] =
 
   /* simple promotion: the third copy address depends on promotion */
   { "ABCDEF_ABCDEF^ABCDEF", SM_NONE,    "C7/6@0 C14/6@7" },
-  { "ABCDEF_ABCDEF^ABCDEF", SM_PROMOTE, "C7/6@0 C14/6@0" },
+  /* { "ABCDEF_ABCDEF^ABCDEF", SM_PROMOTE, "C7/6@0 C14/6@0" }, forgotten */
 
   /* simple lazy: there is a better copy starting with "23 X" than "123 " */
   { "123 23 XYZ 123 XYZ", SM_NONE, "C11/4@0" },
@@ -2018,7 +2013,7 @@ static const string_match_test match_tests[] =
 
   /* ssmatch test */
   { "ABCDE___ABCDE*** BCDE***", SM_NONE, "C8/5@0 C17/4@1" },
-  { "ABCDE___ABCDE*** BCDE***", SM_SSMATCH, "C8/5@0 C17/7@9" },
+  /*{ "ABCDE___ABCDE*** BCDE***", SM_SSMATCH, "C8/5@0 C17/7@9" }, forgotten */
 };
 
 static int
@@ -2043,11 +2038,8 @@ test_string_matching (xd3_stream *stream, int ignore)
       config.smatcher_soft.small_look   = 4;
       config.smatcher_soft.small_chain  = 10;
       config.smatcher_soft.small_lchain = 10;
-      config.smatcher_soft.max_lazy     = 10;
+      config.smatcher_soft.max_lazy     = (test->flags & SM_LAZY) ? 10 : 0;
       config.smatcher_soft.long_enough  = 10;
-      config.smatcher_soft.ssmatch      = (test->flags & SM_SSMATCH) && 1;
-      config.smatcher_soft.try_lazy     = (test->flags & SM_LAZY) && 1;
-      config.smatcher_soft.promote      = (test->flags & SM_PROMOTE) && 1;
 
       if ((ret = xd3_config_stream (stream, & config))) { return ret; }
       if ((ret = xd3_encode_init (stream))) { return ret; }
@@ -2122,11 +2114,8 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
   config.smatcher_soft.small_look    = 4;
   config.smatcher_soft.small_chain   = 128;
   config.smatcher_soft.small_lchain  = 16;
-  config.smatcher_soft.ssmatch       = 0;
-  config.smatcher_soft.try_lazy      = 1;
   config.smatcher_soft.max_lazy      = 8;
   config.smatcher_soft.long_enough   = 128;
-  config.smatcher_soft.promote       = 0;
 
   if ((ret = xd3_config_stream (stream, & config))) { return ret; }
 

@@ -28,11 +28,8 @@
 #define SLOOK         stream->smatcher.small_look
 #define SCHAIN        stream->smatcher.small_chain
 #define SLCHAIN       stream->smatcher.small_lchain
-#define SSMATCH       stream->smatcher.ssmatch
-#define TRYLAZY       stream->smatcher.try_lazy
 #define MAXLAZY       stream->smatcher.max_lazy
 #define LONGENOUGH    stream->smatcher.long_enough
-#define PROMOTE       stream->smatcher.promote
 
 #define SOFTCFG 1
 #include "xdelta3.c"
@@ -44,11 +41,8 @@
 #undef  LSTEP
 #undef  SCHAIN
 #undef  SLCHAIN
-#undef  SSMATCH
-#undef  TRYLAZY
 #undef  MAXLAZY
 #undef  LONGENOUGH
-#undef  PROMOTE
 #endif
 
 #define SOFTCFG 0
@@ -63,11 +57,8 @@
 #define SLOOK         4
 #define SCHAIN        1
 #define SLCHAIN       1
-#define SSMATCH       0
-#define TRYLAZY       1
 #define MAXLAZY       18
 #define LONGENOUGH    18
-#define PROMOTE       0
 
 #include "xdelta3.c"
 
@@ -77,11 +68,8 @@
 #undef  LSTEP
 #undef  SCHAIN
 #undef  SLCHAIN
-#undef  SSMATCH
-#undef  TRYLAZY
 #undef  MAXLAZY
 #undef  LONGENOUGH
-#undef  PROMOTE
 #endif
 
 /******************************************************************************************
@@ -94,11 +82,8 @@
 #define SLOOK         4
 #define SCHAIN        4
 #define SLCHAIN       1
-#define SSMATCH       0
-#define TRYLAZY       1
 #define MAXLAZY       18
 #define LONGENOUGH    35
-#define PROMOTE       0
 
 #include "xdelta3.c"
 
@@ -108,11 +93,8 @@
 #undef  LSTEP
 #undef  SCHAIN
 #undef  SLCHAIN
-#undef  SSMATCH
-#undef  TRYLAZY
 #undef  MAXLAZY
 #undef  LONGENOUGH
-#undef  PROMOTE
 #endif
 
 /******************************************************************************************
@@ -125,11 +107,8 @@
 #define SLOOK         4
 #define SCHAIN        44
 #define SLCHAIN       13
-#define SSMATCH       0
-#define TRYLAZY       1
 #define MAXLAZY       90
 #define LONGENOUGH    70
-#define PROMOTE       0
 
 #include "xdelta3.c"
 
@@ -139,11 +118,8 @@
 #undef  LSTEP
 #undef  SCHAIN
 #undef  SLCHAIN
-#undef  SSMATCH
-#undef  TRYLAZY
 #undef  MAXLAZY
 #undef  LONGENOUGH
-#undef  PROMOTE
 #endif
 
 /******************************************************************************************
@@ -156,11 +132,8 @@
 #define SLOOK         4
 #define SCHAIN        8
 #define SLCHAIN       2
-#define SSMATCH       0
-#define TRYLAZY       1
 #define MAXLAZY       36
 #define LONGENOUGH    70
-#define PROMOTE       0
 
 #include "xdelta3.c"
 
@@ -170,9 +143,6 @@
 #undef  LSTEP
 #undef  SCHAIN
 #undef  SLCHAIN
-#undef  SSMATCH
-#undef  TRYLAZY
 #undef  MAXLAZY
 #undef  LONGENOUGH
-#undef  PROMOTE
 #endif
