@@ -109,6 +109,7 @@ typedef u_int64_t       uint64_t;
 #include <windows.h>
 #define inline
 typedef unsigned int   uint;
+typedef signed int     ssize_t;
 typedef unsigned int   usize_t;
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
