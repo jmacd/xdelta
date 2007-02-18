@@ -22,14 +22,8 @@ from distutils.util import get_platform
 # External compression support works on Windows/Cygwin, but not from
 # within the Python module. It's something to do with fork() and
 # exec() support.
-platform  = get_platform()
-is_cygwin = platform.startswith('cygwin')
-extcomp   = 1
-
-if is_cygwin:
-    print 'Note: not compiling external compression support for Python/Cygwin'
-    extcomp = 0
-#end
+#platform  = get_platform()
+#is_cygwin = platform.startswith('cygwin')
 
 xdelta3_ext = Extension('xdelta3main',
                         ['xdelta3.c'],
@@ -41,7 +35,9 @@ xdelta3_ext = Extension('xdelta3main',
                                          ('XD3_POSIX',1),
                                          ('XD3_USE_LARGEFILE64',1),
 
-                                         ('EXTERNAL_COMPRESSION',extcomp),
+                                         # the fork/exec stuff doesn't
+                                         # work inside python.
+                                         ('EXTERNAL_COMPRESSION',0),
 
                                          ('REGRESSION_TEST',0),
                                          ('SECONDARY_FGK',0),

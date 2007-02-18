@@ -101,18 +101,7 @@
    the parameters of the source window must be decided: the offset into
    the source and the length of the window.  Since the IOPT buffer is
    finite, the program may be forced to fix these values before knowing
-   the best offset/length.  XD3_DEFAULT_SRCBACK limits the length, but a
-   smaller length is preferred because all target copies are addressed
-   after source copies in the VCDIFF address space.  Picking too large a
-   source window means larger address encoding.
-
-   If the IOPT buffer is filling easily, perhaps the target window is
-   too large.  In any case, a decision is made (though an alternative is
-   to emit the sub-window right away, to reduce the winsize
-   automatically - not implemented, another alternative is to grow the
-   IOPT buffer, it is after all bounded in size by winsize.)
-
-   The algorithm is in xd3_srcwin_setup.
+   the best offset/length.
 
    5. SECONDARY COMPRESSION.  VCDIFF supports a secondary encoding to
    be applied to the individual sections of the data format, which are
@@ -126,9 +115,9 @@
    case of a semi-adaptive scheme published by D.J. Wheeler and first
    widely used in bzip2 (by Julian Seward).  This is a very
    interesting algorithm, originally published in nearly cryptic form
-   by D.J. Wheeler. !!!NOTE!!! Because these are not standardized, the
-   -S option (no secondary compression) remains on by default.
-     ftp://ftp.cl.cam.ac.uk/users/djw3/bred3.{c,ps}
+   by D.J. Wheeler. !!!NOTE!!! Because these are not standardized,
+   secondary compression remains off by default.
+   ftp://ftp.cl.cam.ac.uk/users/djw3/bred3.{c,ps}
    --------------------------------------------------------------------
 
 			    Other Features
@@ -3543,8 +3532,6 @@ xd3_encode_init (xd3_stream *stream)
   /* Memory allocations for checksum tables are delayed until xd3_string_match_init in the
    * first call to string_match--that way identical or short inputs require no table
    * allocation. */
-
-  /* TODO: need to experiment w/ XD3_DEFAULT_SPREVSZ and large has functions */
   if (large_comp)
     {
       usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_step);
@@ -3556,8 +3543,7 @@ xd3_encode_init (xd3_stream *stream)
 
   if (small_comp)
     {
-      /* Hard-coded, keeps table small because small matches become inefficient. */
-      usize_t hash_values = min(stream->winsize, XD3_DEFAULT_SPREVSZ);
+      usize_t hash_values = min(stream->winsize, stream->sprevsz);
 
       xd3_size_hashtable (stream,
 			  hash_values,

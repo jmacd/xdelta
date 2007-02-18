@@ -23,7 +23,6 @@ import os, sys, math, re, time, types, array, random
 import xdelta3main
 import xdelta3
 
-HIST_SIZE      = 10   # the number of buckets
 MIN_SIZE       = 0
 
 TIME_TOO_SHORT = 0.050
@@ -32,19 +31,26 @@ SKIP_TRIALS    = 2
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
 
-MIN_STDDEV_PCT = 1.5
-
-MIN_RUN        = 1000 * 1000 * 1
-MAX_RUN        = 1000 * 1000 * 10
+# 10 = fast 1.5 = slow
+MIN_STDDEV_PCT = 10
 
 # How many results per round
-MAX_RESULTS = 6
+MAX_RESULTS = 4
 KEEP_P = (1.0)
 FAST_P = (0.0)
 SLOW_P = (0.0)
+
+# For RCS testing, what percent to select
 FILE_P = (0.30)
 
-# the first 10 args go to -C
+# For run-speed tests
+MIN_RUN = 1000 * 1000 * 1
+MAX_RUN = 1000 * 1000 * 10
+
+# Testwide defaults
+ALL_ARGS = [ '-f' ]
+
+# The first 10 args go to -C
 SOFT_CONFIG_CNT = 10
 
 CONFIG_ORDER = [ 'large_look',
@@ -59,15 +65,22 @@ CONFIG_ORDER = [ 'large_look',
                  'promote',
                  'winsize',
                  'srcwinsize',
+                 'sprevsz',
+                 'iopt',
+
+                 # TODO: nocompress, djw (boolean flags)
                  ]
 
 CONFIG_ARGMAP = {
     'winsize' : '-W',
     'srcwinsize' : '-B',
+    'sprevsz' : '-P',
+    'iopt' : '-I',
     }
 
 def INPUT_SPEC(rand):
     return {
+    # computational costs
     'large_look' : lambda d: rand.choice([9]),
     'large_step' : lambda d: rand.choice([15]),
 
@@ -78,25 +91,29 @@ def INPUT_SPEC(rand):
     'long_enough'  : lambda d: rand.choice([18]),
 
     'small_look'   : lambda d: rand.choice([4]),
-    'promote'      : lambda d: 0,
-    'trylazy'      : lambda d: 1,
-    'ssmatch'      : lambda d: 0,
+    'ssmatch'      : lambda d: rand.choice([0]),
 
-    'winsize' :    lambda d: rand.choice(
-        [x * (1<<20) for x in [1, 4, 8, 16, 32, 64]]),
+    'promote'      : lambda d: rand.choice([0]),
 
-    'srcwinsize' : lambda d: 1<<26,
+    'trylazy'      : lambda d: rand.choice([1]),
+
+    # memory costs
+    'iopt'         : lambda d: 0,  # unlimited
+
+    'winsize'      : lambda d: 8 * (1<<20),
+    'srcwinsize'   : lambda d: 64 * (1<<20),
+
+    'sprevsz'      : lambda d: 1 * (1<<18), # only powers of two
     }
-
 
 #
 #
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-#RCSDIR = '/tmp/PRCS_read_copy'
+RCSDIR = '/tmp/PRCS_read_copy/prcs'
+SAMPLEDIR = "/tmp/WESNOTH_tmp/tar"
 
-RCSDIR = 'G:/jmacd/PRCS/prcs/b'
-
-SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+#RCSDIR = 'G:/jmacd/PRCS/prcs/b'
+#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 
@@ -120,19 +137,6 @@ RE_DATE    = re.compile('date: ([^;]+);.*')
 # xdelta output
 RE_HDRSZ   = re.compile('VCDIFF header size: +(\\d+)')
 RE_EXTCOMP = re.compile('XDELTA ext comp.*')
-
-# Testwide defaults
-testwide_encode_args = [
-
-    # secondary compression on or off
-    #'-S', 'djw',
-
-    # do not measure instruction buffer effects
-    '-I', '0',
-
-    # do not attempt external decompression
-    '-D'
-    ]
 
 def c2s(c):
     return ' '.join(['%02d' % x for x in c])
@@ -342,9 +346,9 @@ class Xdelta3Runner:
     #end
 
     def Encode(self, target, source, output):
-        args = (testwide_encode_args +
+        args = (ALL_ARGS +
                 self.extra +
-                ['-eqf'])
+                ['-e'])
         if source:
             args.append('-s')
             args.append(source)
@@ -354,7 +358,8 @@ class Xdelta3Runner:
     #end
 
     def Decode(self, input, source, output):
-        args = ['-dqf']
+        args = (ALL_ARGS +
+                ['-d'])
         if source:
             args.append('-s')
             args.append(source)

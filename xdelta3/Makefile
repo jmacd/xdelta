@@ -36,10 +36,10 @@ TARGETS = xdelta3-debug \
 PYTHON = python
 
 SWIGTGT = xdelta3module.so
-SWIGTGT = xdelta3module.dll
+#SWIGTGT = xdelta3module.dll
 
-PYTGT = build/lib.linux-i686-2.4/xdelta3.so
-PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
+PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
+#PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
@@ -47,6 +47,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	xdelta3.py xdelta3_wrap.c
 
 SWIG_FLAGS = -DXD3_DEBUG=0 \
+	      -DEXTERNAL_COMPRESSION=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
 	      -DGENERIC_ENCODE_TABLES=1 \
               -DSECONDARY_DJW=1 \
@@ -81,7 +82,7 @@ tar:
 
 clean:
 	rm -f $(TARGETS)
-	rm -rf build Debug Release core *.stackdump *.exe \
+	rm -rf build Debug Release core cifs* *.stackdump *.exe \
 		xdelta3.ncb xdelta3.suo xdelta3.sln
 
 xdelta3: $(SOURCES)

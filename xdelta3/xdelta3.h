@@ -35,7 +35,7 @@
  * automatically buffer the input, otherwise the input buffer is used directly.
  */
 #ifndef XD3_DEFAULT_WINSIZE
-#define XD3_DEFAULT_WINSIZE (1U << 18)
+#define XD3_DEFAULT_WINSIZE (1U << 23)
 #endif
 
 /* Default total size of the source window used in xdelta3-main.h */
@@ -53,7 +53,7 @@
  * malicious files.  The decoder will never decode a window larger than this.  If the file
  * specifies VCD_TARGET the decoder may require two buffers of this size.
  *
- * 8-16MB is reasonable, probably don't need to go larger.
+ * 8-16MB is reasonable, probably don't need to go larger. */
 #ifndef XD3_HARDMAXWINSIZE
 #define XD3_HARDMAXWINSIZE (1U<<24)
 #endif
@@ -76,7 +76,7 @@
 
 /* The maximum distance backward to search for small matches */
 #ifndef XD3_DEFAULT_SPREVSZ
-#define XD3_DEFAULT_SPREVSZ (1U << 16)
+#define XD3_DEFAULT_SPREVSZ (1U<<18)
 #endif
 
 /* The default compression level

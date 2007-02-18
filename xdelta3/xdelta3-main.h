@@ -244,6 +244,10 @@ struct _main_blklru
 /* ... represented as a list (no cache index). */
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
+// TODO:
+// struct _main_state
+// {
+
 /* Program options: various command line flags and options. */
 static int         option_stdout             = 0;
 static int         option_force              = 0;
@@ -264,10 +268,7 @@ static int         option_level              = XD3_DEFAULT_LEVEL;
 static usize_t     option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
 static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
-static int         option_srcwinsz_set       = 0;
-
-/* This controls the number of times main repeats itself, only for profiling. */
-static int option_profile_cnt = 0;
+static usize_t     option_sprevsz            = XD3_DEFAULT_SPREVSZ;
 
 /* These variables are supressed to avoid their use w/o support.  main() warns
  * appropriately. */
@@ -317,6 +318,8 @@ static main_extcomp extcomp_types[] =
   /*{ "lzma",     "-cf",   "lzma",       "-dcf",   "M", "]\000",        2, 0 },*/
 };
 
+// };
+
 static void main_get_appheader (xd3_stream *stream, main_file *ifile,
 				main_file *output, main_file *sfile);
 
@@ -345,18 +348,18 @@ main_config (void)
   P(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
   P(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
   P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
+  P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
+  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
+  P(RINT "XD3_STDIO=%d\n", XD3_STDIO);
+  P(RINT "XD3_WIN32=%d\n", XD3_WIN32);
+  P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
   P(RINT "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
   P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
   P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
   P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
   P(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
-  P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
   P(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
   P(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
-  P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
-  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
-  P(RINT "XD3_STDIO=%d\n", XD3_STDIO);
-  P(RINT "XD3_WIN32=%d\n", XD3_WIN32);
 
   return EXIT_SUCCESS;
 }
@@ -364,29 +367,19 @@ main_config (void)
 static void
 reset_defaults(void)
 {
+  // TODO: this is dumb, use an object
   option_stdout = 0;
   option_force = 0;
   option_verbose = 0;
   option_quiet = 0;
-  option_use_appheader = 1;
   option_appheader = NULL;
   option_use_secondary = 0;
   option_secondary = NULL;
-  option_use_checksum = 1;
   option_use_altcodetable = 0;
   option_smatch_config = NULL;
   option_no_compress = 0;
   option_no_output = 0;
   option_source_filename = NULL;
-  option_srcwinsz_set = 0;
-  option_profile_cnt = 0;
-#if EXTERNAL_COMPRESSION
-  option_decompress_inputs  = 1;
-  option_recompress_outputs = 1;
-#endif
-#if VCDIFF_TOOLS
-  option_print_cpymode = 1;
-#endif
   program_name = NULL;
   appheader_used = NULL;
   main_bdata = NULL;
@@ -397,12 +390,22 @@ reset_defaults(void)
   lru_misses = 0;
   lru_filled = 0;
   allow_fake_source = 0;
-  option_srcwinsz_set = 0;
   option_smatch_config = NULL;
+
+  option_use_appheader = 1;
+  option_use_checksum = 1;
+#if EXTERNAL_COMPRESSION
+  option_decompress_inputs  = 1;
+  option_recompress_outputs = 1;
+#endif
+#if VCDIFF_TOOLS
+  option_print_cpymode = 1;
+#endif
   option_level = XD3_DEFAULT_LEVEL;
-  option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
+  option_iopt_size = XD3_DEFAULT_IOPT_SIZE;
   option_winsize = XD3_DEFAULT_WINSIZE;
   option_srcwinsz = XD3_DEFAULT_SRCWINSZ;
+  option_sprevsz = XD3_DEFAULT_SPREVSZ;
 }
 
 static void*
@@ -2041,11 +2044,6 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
     }
   else
     {
-      if (option_verbose)
-	{
-	  XPR(NT "source file: %s\n", sfile->filename);
-	}
-
       if ((ret = main_file_open (sfile, sfile->filename, XO_READ)) ||
 	  (ret = main_file_stat (sfile, & source->size, 1)))
 	{
@@ -2140,14 +2138,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
     }
   else
     {
-      /* Minimum size check */
       option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
-
-      if (!option_srcwinsz_set)
-	{
-	  /* If the flag was not set, scale srcwinsz up to 64MB. */
-	  option_srcwinsz = min((xoff_t) XD3_DEFAULT_SRCWINSZ, source->size);
-	}
 
       source->blksize = (option_srcwinsz / LRU_SIZE);
       lru_size = LRU_SIZE;
@@ -2155,6 +2146,19 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
 
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
+
+  if (option_verbose)
+    {
+      static char buf[32];
+      
+      XPR(NT "source %s winsize %s size %"Q"u\n",
+	  sfile->filename, main_format_bcnt(option_srcwinsz, buf), source->size);
+    }
+
+  if (option_verbose > 1)
+    {
+      XPR(NT "source block size: %u\n", source->blksize);
+    }
 
   if ((lru = main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
     {
@@ -2175,13 +2179,6 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       main_blklru_list_push_back (& lru_free, & lru[i]);
     }
 
-  if (option_verbose > 1)
-    {
-      XPR(NT "source window size: %u\n", option_srcwinsz);
-      XPR(NT "source block size: %u\n", source->blksize);
-      XPR(NT "source file: %s: %"Q"u bytes\n", sfile->realname, source->size);
-    }
-
   if (stream && (ret = xd3_set_source (stream, source)))
     {
       XPR(NT XD3_LIB_ERRMSG (stream, ret));
@@ -2195,6 +2192,23 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
     }
 
   return ret;
+}
+
+static void
+main_set_winsize (main_file *ifile) {
+  xoff_t file_size;
+
+  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
+
+  if (main_file_stat (ifile, &file_size, 0) == 0)
+    {
+      option_winsize = (usize_t) min(file_size, (xoff_t) option_winsize);
+    }
+
+  if (option_verbose > 1)
+    {
+      XPR(NT "input window size: %u\n", option_winsize);
+    }
 }
 
 /******************************************************************************************
@@ -2362,9 +2376,11 @@ main_input (xd3_cmd     cmd,
   config.sec_addr.ngroups = 1;
   config.sec_inst.ngroups = 1;
   config.iopt_size = option_iopt_size;
+  config.sprevsz = option_sprevsz;
 
-  /* TODO: eliminate static variables. */
   do_not_lru = 0;
+
+  start_time = get_millisecs_now ();
 
   /* main_input setup. */
   switch ((int) cmd)
@@ -2477,12 +2493,7 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 
-  start_time = get_millisecs_now ();
-
-  if (option_verbose > 1)
-    {
-      XPR(NT "input buffer size: %u\n", option_winsize);
-    }
+  main_set_winsize (ifile);
 
   if ((main_bdata = main_malloc (option_winsize)) == NULL)
     {
@@ -2498,8 +2509,6 @@ main_input (xd3_cmd     cmd,
 	  return EXIT_FAILURE;
 	}
     }
-
-  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
 
   config.winsize = option_winsize;
   config.srcwin_maxsz = option_srcwinsz;
@@ -2682,7 +2691,7 @@ main_input (xd3_cmd     cmd,
 		      }
 		  }
 
-		if (option_verbose > 0)
+		if (option_verbose)
 		  {
 		    char rrateavg[32], wrateavg[32], tm[32];
 		    char rdb[32], wdb[32];
@@ -2789,9 +2798,10 @@ done:
     {
       char tm[32];
       long end_time = get_millisecs_now ();
-      XPR(NT "command finished in %s\n", main_format_millis (end_time - start_time, tm));
-      XPR(NT "input bytes:  %"Q"u\n",  ifile->nread);
-      XPR(NT "output bytes: %"Q"u\n", ofile->nwrite);
+      XPR(NT "finished in %s; input %"Q"u output %"Q"u bytes  (%0.2f%%)\n",
+	  main_format_millis (end_time - start_time, tm),
+	  ifile->nread, ofile->nwrite,
+	  100.0 * ofile->nwrite / ifile->nread);
     }
 
   return EXIT_SUCCESS;
@@ -2900,7 +2910,7 @@ main (int argc, char **argv)
   main_file ifile;
   main_file ofile;
   main_file sfile;
-  static char *flags = "0123456789cdefhnqvDJNORTVs:B:C:E:F:I:L:O:P:M:W:A::S::";
+  static const char *flags = "0123456789cdefhnqvDJNORTVs:B:C:E:F:I:L:O:M:P:W:A::S::";
   int my_optind;
   char *my_optarg;
   char *my_optstr;
@@ -2921,7 +2931,6 @@ main (int argc, char **argv)
 
   reset_defaults();
 
- go:  /* Go. */
   free_argv = NULL;
   free_value = NULL;
   setup_environment(argc, argv, &env_argc, &env_argv, &free_argv, &free_value);
@@ -3077,22 +3086,6 @@ main (int argc, char **argv)
 	  XPR(NT "encoder support not compiled\n");
 	  return EXIT_FAILURE;
 #endif
-	case 'P':
-	  /* only set profile count once, since... */
-	  if (option_profile_cnt == 0)
-	    {
-	      if ((ret = main_atou(my_optarg, (usize_t*) & option_profile_cnt, 0, 0, 'P')))
-		{
-		  goto exit;
-		}
-
-	      if (option_profile_cnt <= 0)
-		{
-		  ret = EXIT_SUCCESS;
-		  goto exit;
-		}
-	    }
-	  break;
 
 	case 'n': option_use_checksum = 0; break;
 	case 'N': option_no_compress = 1; break;
@@ -3104,7 +3097,6 @@ main (int argc, char **argv)
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
 	          else { option_appheader = (uint8_t*) my_optarg; } break;
 	case 'B':
-	  option_srcwinsz_set = 1;
 	  if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_MINSRCWINSZ,
 				0, 'B')))
 	    {
@@ -3114,6 +3106,13 @@ main (int argc, char **argv)
 	case 'I':
 	  if ((ret = main_atou (my_optarg, & option_iopt_size, 0,
 				0, 'I')))
+	    {
+	      goto exit;
+	    }
+	  break;
+	case 'P':
+	  if ((ret = main_atou (my_optarg, & option_sprevsz, 0,
+				0, 'P')))
 	    {
 	      goto exit;
 	    }
@@ -3264,8 +3263,6 @@ main (int argc, char **argv)
 
   main_cleanup ();
 
-  if (--option_profile_cnt > 0 && ret == EXIT_SUCCESS) { goto go; }
-
   fflush (stdout);
   fflush (stderr);
   return ret;
@@ -3304,6 +3301,7 @@ main_help (void)
   P(RINT "memory options:\n");
   P(RINT "   -B bytes     source window size\n");
   P(RINT "   -W bytes     input window size\n");
+  P(RINT "   -P size      compression duplicates window\n");
   P(RINT "   -I size      instruction buffer size (0 = unlimited)\n");
 
   P(RINT "compression options:\n");
@@ -3322,9 +3320,11 @@ main_help (void)
   P(RINT "   -P           repeat count (for profiling)\n");
   P(RINT "   -T           use alternate code table\n");
 #endif
+
   P(RINT "the XDELTA environment variable may contain extra args:\n");
   P(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
   P(RINT "   tar --use-compress-program=xdelta3 \\\n");
   P(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y/\n");
   return EXIT_FAILURE;
 }
+
