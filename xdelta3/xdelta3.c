@@ -3907,7 +3907,7 @@ xd3_process_memory (int            is_encode,
   if (is_encode)
     {
       config.srcwin_maxsz = source_size;
-      config.winsize = min(input_size, (usize_t) (1<<20));
+      config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
       config.iopt_size = max(config.iopt_size, 128U);
 

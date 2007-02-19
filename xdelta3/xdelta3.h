@@ -102,9 +102,6 @@ typedef u_int32_t       uint32_t;
 
 typedef u_int64_t       uint64_t;
 #else
-// CRT_SECURE_NO_DEPRECATE silences warnings about sprintf() and strerror()
-#define _CRT_SECURE_NO_DEPRECATE 1
-#define _CRT_SECURE_COPP_OVERLOAD_STANDARD_NAMES 1
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #define inline

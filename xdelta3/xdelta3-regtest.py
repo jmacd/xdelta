@@ -24,7 +24,7 @@ import xdelta3main
 import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-RCSDIR = '/tmp/PRCS_read_copy/prcs'
+RCSDIR = '/tmp/PRCS_read_copy'
 SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
 #RCSDIR = 'G:/jmacd/PRCS/prcs/b'
@@ -39,12 +39,14 @@ SKIP_TRIALS    = 2
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
 
+SKIP_DECODE = 1
+
 # 10 = fast 1.5 = slow
 MIN_STDDEV_PCT = 1.5
 
 # How many results per round
-MAX_RESULTS = 4
-KEEP_P = (1.0)
+MAX_RESULTS = 400
+KEEP_P = (0.5)
 FAST_P = (0.0)
 SLOW_P = (0.0)
 
@@ -98,18 +100,18 @@ def INPUT_SPEC(rand):
 
     # -C 1,2,3,4,5,6,7
     'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([15]),
-    'small_chain'  : lambda d: rand.choice([1]),
-    'small_lchain' : lambda d: rand.choice([1]),
-    'max_lazy'     : lambda d: rand.choice([18]),
-    'long_enough'  : lambda d: rand.choice([18]),
-    'small_look'   : lambda d: rand.choice([4, 5]),
+    'large_step' : lambda d: rand.choice([2, 3, 8, 15]),
+    'small_chain'  : lambda d: rand.choice([40, 10, 4, 1]),
+    'small_lchain' : lambda d: rand.choice([x for x in [10, 4, 2, 1] if x <= d['small_chain']]),
+    'max_lazy'     : lambda d: rand.choice([9, 18, 27, 36, 72, 108]),
+    'long_enough'  : lambda d: rand.choice([9, 18, 27, 36, 72, 108]),
+    'small_look'   : lambda d: rand.choice([4]),
 
     # -N
     'nocompress'   : lambda d: rand.choice(['false']),
 
     # -T
-    'altcode'      : lambda d: rand.choice(['false', 'true']),
+    'altcode'      : lambda d: rand.choice(['false']),
 
     # -S djw
     'djw'          : lambda d: rand.choice(['false']),
@@ -165,7 +167,7 @@ def SumList(l):
 # returns (total, mean, stddev, q2 (median),
 #          (q3-q1)/2 ("semi-interquartile range"), max-min (spread))
 class StatList:
-    def __init__(self,l,desc,hist=0):
+    def __init__(self,l,desc):
         cnt = len(l)
         assert(cnt > 1)
         l.sort()
@@ -227,8 +229,15 @@ class TimedTest:
         self.encode_time = self.DoTest(DFILE,
                                        lambda x: x.Encode(self.target, self.source, DFILE))
         self.encode_size = runnable.EncodeSize(DFILE)
+
+        if SKIP_DECODE:
+            self.decode_time = StatList([1, 1], 'not decoded')
+            return
+        #end
+
         self.decode_time = self.DoTest(RFILE,
-                                       lambda x: x.Decode(DFILE, self.source, RFILE))
+                                       lambda x: x.Decode(DFILE, self.source, RFILE),
+                                       )
 
         # verify
         runnable.Verify(self.target, RFILE)
@@ -658,15 +667,6 @@ class RcsFile:
 
             target_size = os.stat(self.Verf(v+1)).st_size
 
-            if 0:
-                print '%s %s %s: %.2f%% encode %.3f ms: decode %.3f ms' % \
-                  (runclass,
-                   os.path.basename(self.fname),
-                   self.Vstr(v+1),
-                   target_size > 0 and (100.0 * result.encode_size / target_size) or 0,
-                   result.encode_time.mean * 1000.0,
-                   result.decode_time.mean * 1000.0)
-            #end
             ntrials.append(result)
         #end
 
@@ -780,8 +780,8 @@ def GetTestRcsFiles():
                                                                         len(rcsf.subdirs),
                                                                         len(rcsf.others),
                                                                         len(rcsf.skipped))
-    print StatList([x.rcssize for x in rcsf.rcsfiles], "rcssize", 1).str
-    print StatList([x.totrev for x in rcsf.rcsfiles], "totrev", 1).str
+    print StatList([x.rcssize for x in rcsf.rcsfiles], "rcssize").str
+    print StatList([x.totrev for x in rcsf.rcsfiles], "totrev").str
     return rcsf
 #end
 
@@ -800,11 +800,15 @@ class RandomTestResult:
     #end
 
     def __str__(self):
-        return 'time %.6f%s size %d%s << %s >> %.6f' % (
+        decodestr = ''
+        if not SKIP_DECODE:
+            decodestr = ' %.6f' % self.decodetime
+        #end
+        return 'time %.6f%s size %d%s << %s >>%s' % (
             self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
             self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
             c2s(self.config()),
-            self.decodetime)
+            decodestr)
     #end
 
     def time(self):
