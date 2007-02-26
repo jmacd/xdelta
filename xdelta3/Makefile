@@ -35,11 +35,11 @@ TARGETS = xdelta3-debug \
 
 PYTHON = python
 
-SWIGTGT = xdelta3module.so
-#SWIGTGT = xdelta3module.dll
+#SWIGTGT = xdelta3module.so
+SWIGTGT = xdelta3module.dll
 
-PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
-#PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
+#PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
+PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
