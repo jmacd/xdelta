@@ -27,7 +27,7 @@ import xdelta3
 #RCSDIR = '/tmp/PRCS_read_copy'
 #SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
-RCSDIR = 'G:/jmacd/PRCS/prcs'
+RCSDIR = 'G:/jmacd/PRCS/prcs/b'
 SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 #
@@ -45,8 +45,8 @@ SKIP_DECODE = 1
 MIN_STDDEV_PCT = 1.5
 
 # How many results per round
-MAX_RESULTS = 100
-TEST_ROUNDS = 20
+MAX_RESULTS = 10
+TEST_ROUNDS = 50
 KEEP_P = (0.5)
 
 # For RCS testing, what percent to select
@@ -876,7 +876,7 @@ def ConfigToArgs(config):
 #
 class RandomTest:
     def __init__(self, tnum, tinput, config):
-        self.tinput = tinput[2]
+        self.mytinput = tinput[2]
         self.myconfig = config
         self.tnum = tnum
 
@@ -920,6 +920,10 @@ class RandomTest:
 
     def score(self):
         return self.score
+    #end
+
+    def tinput(self):
+        return self.mytinput
     #end
 #end
 
@@ -984,20 +988,47 @@ def RunTestLoop(rand, generator, rounds):
             tests.append(RandomTest(x, tinput, configs[x]))
         #end
         results = ScoreTests(tests)
-        GraphResults(rnum, results)
+        GraphResults('expt%d' % rnum, results)
+        GraphSummary('sum%d' % rnum, results)
 
         # re-test some fraction
         configs = [r.config() for r in results[0:int(MAX_RESULTS * KEEP_P)]]
     #end
 #end
 
-def GraphResults(rnum, results):
-    f = open("data-%d.in" % rnum, "w")
+def GraphResults(desc, results):
+    f = open("data-%s.csv" % desc, "w")
     for r in results:
         f.write("%0.9f\t%d\t# %s\n" % (r.time(), r.size(), r))
     #end
     f.close()
-    os.system("./plot.sh data-%d.in round-%d.jpg" % (rnum, rnum))
+    os.system("./plot.sh data-%s.csv plot-%s.jpg" % (desc, desc))
+#end
+
+def GraphSummary(desc, results):
+    results_by_input = {}
+    this_tinput = results[0].tinput()
+
+    # all test results in this set share at least the current tinput.
+    # find the set of all tinputs
+    for rtest in results:
+        s = c2s(rtest.config())
+        all = test_state_xxx[s]
+
+        print '%s have %d results for %s' % (desc, len(all), s)
+
+        for atest in all:
+            if not results_by_input.has_key(atest.tinput()):
+                results_by_input[atest.tinput()] = [atest]
+            else:
+                results_by_input[atest.tinput()].append(atest)
+            #end
+        #end
+    #end
+
+    for testkey, rlist in results_by_input.items():
+        
+    #end
 #end
 
 # TODO: cleanup
@@ -1104,3 +1135,5 @@ if __name__ == "__main__":
     else:
         RunCommand(['rm', '-rf', TMPDIR])
         pass
+    #end
+#end
