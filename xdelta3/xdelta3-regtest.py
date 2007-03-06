@@ -17,18 +17,17 @@
 #  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 # TODO: test 1.5 vs. greedy
-# TODO: generate a graph
 
 import os, sys, math, re, time, types, array, random
 import xdelta3main
 import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-#RCSDIR = '/tmp/PRCS_read_copy'
-#SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
+RCSDIR = '/tmp/PRCS_read_copy/prcs'
+SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
-RCSDIR = 'G:/jmacd/PRCS/prcs/b'
-SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+#RCSDIR = 'G:/jmacd/PRCS/prcs/b'
+#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 #
 MIN_SIZE       = 0
@@ -45,8 +44,8 @@ SKIP_DECODE = 1
 MIN_STDDEV_PCT = 1.5
 
 # How many results per round
-MAX_RESULTS = 10
-TEST_ROUNDS = 50
+MAX_RESULTS = 40
+TEST_ROUNDS = 500
 KEEP_P = (0.5)
 
 # For RCS testing, what percent to select
@@ -155,7 +154,7 @@ RE_DATE    = re.compile('date: ([^;]+);.*')
 RE_HDRSZ   = re.compile('VCDIFF header size: +(\\d+)')
 RE_EXTCOMP = re.compile('XDELTA ext comp.*')
 
-def c2s(c):
+def c2str(c):
     return ' '.join(['%s' % x for x in c])
 #end
 
@@ -689,6 +688,7 @@ class RcsFinder:
         self.rcsfiles = []
         self.others   = []
         self.skipped  = []
+        self.biground = 0
     #end
 
     def Scan1(self,dir):
@@ -777,7 +777,6 @@ class RcsFinder:
                 continue
             population.append(file)
         #end
-        testkey = ''
         f1sz = 0
         f2sz = 0
         fcount = int(len(population) * FILE_P)
@@ -790,8 +789,10 @@ class RcsFinder:
             r1, r2 = rand.sample(xrange(0, len(file.versions)), 2)
             f1sz += file.AppendVersion(f1, r1)
             f2sz += file.AppendVersion(f2, r2)
-            testkey = testkey + '%s,%s,%s ' % (file.fname, file.Vstr(r1), file.Vstr(r2))
+            #m.update('%s,%s,%s ' % (file.fname[len(RCSDIR):], file.Vstr(r1), file.Vstr(r2)))
         #end
+        testkey = 'rcs%d' % self.biground
+        self.biground = self.biground + 1
 
         print 'source %u bytes; target %u bytes; %s' % (f1sz, f2sz, testkey)
         f1.close()
@@ -875,23 +876,28 @@ def ConfigToArgs(config):
 
 #
 class RandomTest:
-    def __init__(self, tnum, tinput, config):
+    def __init__(self, tnum, tinput, config, syntuple = None):
         self.mytinput = tinput[2]
         self.myconfig = config
         self.tnum = tnum
 
-        args = ConfigToArgs(config)
-        result = TimedTest(tinput[1], tinput[0], Xdelta3Runner(args))
+        if syntuple:
+            self.runtime = syntuple[0]
+            self.compsize = syntuple[1]
+            self.decodetime = None
+        else:
+            args = ConfigToArgs(config)
+            result = TimedTest(tinput[1], tinput[0], Xdelta3Runner(args))
 
-        self.runtime = result.encode_time.mean
-        self.decodetime = result.decode_time.mean
-        self.compsize = result.encode_size
+            self.runtime = result.encode_time.mean
+            self.compsize = result.encode_size
+            self.decodetime = result.decode_time.mean
+        #end
+
         self.score = None
         self.time_pos = None
         self.size_pos = None
         self.score_pos = None
-
-        print 'Test %d: %s' % (tnum, self)
     #end
 
     def __str__(self):
@@ -902,7 +908,7 @@ class RandomTest:
         return 'time %.6f%s size %d%s << %s >>%s' % (
             self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
             self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
-            c2s(self.config()),
+            c2str(self.config()),
             decodestr)
     #end
 
@@ -938,10 +944,10 @@ def PosInAlist(l, e):
 
 # Generates a set of num_results test configurations, given the list of
 # retest-configs.
-def RandomTestConfigs(rand, inputs, num_results):
+def RandomTestConfigs(rand, input_configs, num_results):
 
-    outputs = inputs[:]
-    have_set = dict([(c2s(i), i) for i in inputs])
+    outputs = input_configs[:]
+    have_set = dict([(c,c) for c in input_configs])
 
     # Compute a random configuration
     def RandomConfig():
@@ -951,20 +957,17 @@ def RandomTestConfigs(rand, inputs, num_results):
             val = cmap[key] = (INPUT_SPEC(rand)[key])(cmap)
             config.append(val)
         #end
-        return config
+        return tuple(config)
     #end
 
     while len(outputs) < num_results:
         newc = None
         for i in xrange(10):
             c = RandomConfig()
-            s = c2s(c)
-            if have_set.has_key(s):
-                print 'continue with %s' % c
+            if have_set.has_key(c):
                 continue
             #end
-            print 'added %s' % c
-            have_set[s] = c
+            have_set[c] = c
             newc = c
             break
         if newc is None:
@@ -982,10 +985,11 @@ def RunTestLoop(rand, generator, rounds):
     for rnum in xrange(rounds):
         configs = RandomTestConfigs(rand, configs, MAX_RESULTS)
         tinput = generator(rand)
-        print 'running test %s' % tinput[2]
         tests = []
         for x in xrange(len(configs)):
-            tests.append(RandomTest(x, tinput, configs[x]))
+            t = RandomTest(x, tinput, configs[x])
+            print 'Test %d: %s' % (x, t)
+            tests.append(t)
         #end
         results = ScoreTests(tests)
         GraphResults('expt%d' % rnum, results)
@@ -996,43 +1000,8 @@ def RunTestLoop(rand, generator, rounds):
     #end
 #end
 
-def GraphResults(desc, results):
-    f = open("data-%s.csv" % desc, "w")
-    for r in results:
-        f.write("%0.9f\t%d\t# %s\n" % (r.time(), r.size(), r))
-    #end
-    f.close()
-    os.system("./plot.sh data-%s.csv plot-%s.jpg" % (desc, desc))
-#end
-
-def GraphSummary(desc, results):
-    results_by_input = {}
-    this_tinput = results[0].tinput()
-
-    # all test results in this set share at least the current tinput.
-    # find the set of all tinputs
-    for rtest in results:
-        s = c2s(rtest.config())
-        all = test_state_xxx[s]
-
-        print '%s have %d results for %s' % (desc, len(all), s)
-
-        for atest in all:
-            if not results_by_input.has_key(atest.tinput()):
-                results_by_input[atest.tinput()] = [atest]
-            else:
-                results_by_input[atest.tinput()].append(atest)
-            #end
-        #end
-    #end
-
-    for testkey, rlist in results_by_input.items():
-        
-    #end
-#end
-
 # TODO: cleanup
-test_state_xxx = {}
+test_all_config_results = {}
 
 def ScoreTests(results):
     scored = []
@@ -1063,17 +1032,15 @@ def ScoreTests(results):
     best_by_size = []
     best_by_time = []
 
-    print 'Worst: %s' % scored[len(scored)-1][1]
-
     pos = 0
     for (score, test) in scored:
         pos += 1
         test.score_pos = pos
-        c = c2s(test.config())
-        if not test_state_xxx.has_key(c):
-            test_state_xxx[c] = [test]
+        c = test.config()
+        if not test_all_config_results.has_key(c):
+            test_all_config_results[c] = [test]
         else:
-            test_state_xxx[c].append(test)
+            test_all_config_results[c].append(test)
         #end
     #end
 
@@ -1085,9 +1052,9 @@ def ScoreTests(results):
     #end
 
     for test in scored:
-        c = c2s(test.config())
+        c = test.config()
         s = 0.0
-        all_r = test_state_xxx[c]
+        all_r = test_all_config_results[c]
         for t in all_r:
             s += float(t.score_pos)
         #end
@@ -1106,6 +1073,132 @@ def ScoreTests(results):
     #end
 
     return scored
+#end
+
+def GraphResults(desc, results):
+    f = open("data-%s.csv" % desc, "w")
+    for r in results:
+        f.write("%0.9f\t%d\t# %s\n" % (r.time(), r.size(), r))
+    #end
+    f.close()
+    os.system("./plot.sh data-%s.csv plot-%s.jpg" % (desc, desc))
+#end
+
+def GraphSummary(desc, results_ignore):
+    test_population = 0
+    config_ordered = []
+
+    # drops duplicate test/config pairs (TODO: don't retest them)
+    for config, cresults in test_all_config_results.items():
+        input_config_map = {}
+        uniq = []
+        for test in cresults:
+            assert test.config() == config
+            test_population += 1
+            key = test.tinput()
+            if not input_config_map.has_key(key):
+                input_config_map[key] = {}
+            #end
+            if input_config_map[key].has_key(config):
+                print 'skipping repeat test %s vs. %s' % (input_config_map[key][config], test)
+                continue
+            #end
+            input_config_map[key][config] = test
+            uniq.append(test)
+        #end
+        config_ordered.append(uniq)
+    #end
+
+    # sort configs descending by number of tests
+    config_ordered.sort(lambda x, y: len(y) - len(x))
+
+    print 'population: %d: %d configs max %d results' % \
+          (test_population,
+           len(config_ordered),
+           len(config_ordered[0]))
+
+    if config_ordered[0] == 1:
+        return
+    #end
+
+    # a map from test-key to test-list w/ various configs
+    input_set = {}
+    osize = len(config_ordered)
+
+    for i in xrange(len(config_ordered)):
+        config = config_ordered[i][0].config()
+        config_tests = config_ordered[i]
+
+        print '%s has %d tested inputs' % (config, len(config_tests))
+
+        if len(input_set) == 0:
+            input_set = dict([(t.tinput(), [t]) for t in config_tests])
+            continue
+        #end
+
+        # a map from test-key to test-list w/ various configs
+        update_set = {}
+        for r in config_tests:
+            t = r.tinput()
+            if input_set.has_key(t):
+                update_set[t] = input_set[t] + [r]
+            else:
+                #print 'config %s does not have test %s' % (config, t)
+                pass
+            #end
+        #end
+
+        if len(update_set) <= 1:
+            break
+        #end
+
+        input_set = update_set
+
+        # continue if there are more w/ the same number of inputs
+        if i < (len(config_ordered) - 1) and \
+           len(config_ordered[i + 1]) == len(config_tests):
+            print 'b %s' % i
+            continue
+        #end
+
+        # synthesize results for multi-test inputs
+        config_num = None
+
+        # map of config to sum(various test-keys)
+        smap = {}
+        for (key, tests) in input_set.items():
+            if config_num == None:
+                config_num = len(tests)
+                smap = dict([(r.config(),
+                              (r.time(),
+                               r.size()))
+                             for r in tests])
+            else:
+                assert config_num == len(tests)
+                smap = dict([(r.config(),
+                              (smap[r.config()][0] + r.time(),
+                               smap[r.config()][1] + r.size()))
+                             for r in tests])
+            #end
+        #end
+
+        if config_num == 1:
+            print 'c %s' % smap
+            continue
+        #end
+
+        summary = '%s-%d' % (desc, len(input_set))
+        print "what?", osize, len(input_set), input_set
+        assert len(input_set) < osize
+        osize = len(input_set)
+
+        print 'generate %s w/ %d configs' % (summary, config_num)
+        syn = [RandomTest(0, (None, None, summary), config,
+                          syntuple = (smap[config][0], smap[config][1]))
+               for config in smap.keys()]
+        syn = ScoreTests(syn)
+        GraphResults(summary, syn)
+    #end
 #end
 
 if __name__ == "__main__":

@@ -2,11 +2,15 @@
 
 G=/usr/bin/gnuplot
 
+D=./output_dir
+
 I=$1
-O=$2
+O=$D/$2
 
 $G > $O <<EOF
-set terminal jpeg
+
+#set terminal jpeg
+set terminal png
 
 f(x) = 1331000 + 30000 * (1 / (x - 2.45))
 
@@ -14,6 +18,8 @@ f(x) = 1331000 + 30000 * (1 / (x - 2.45))
 # plot sin(x), cos(x)
 # , f(x)
 
-plot "$I" using 1:2, f(x)
+plot "$I" using 1:2
 
 EOF
+
+mv "$I" "$D"
