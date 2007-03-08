@@ -44,7 +44,7 @@ SKIP_DECODE = 1
 MIN_STDDEV_PCT = 1.5
 
 # How many results per round
-MAX_RESULTS = 40
+MAX_RESULTS = 100
 TEST_ROUNDS = 500
 KEEP_P = (0.5)
 
@@ -98,7 +98,7 @@ def INPUT_SPEC(rand):
 
     # -C 1,2,3,4,5,6,7
     'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([2, 3, 8, 15]),
+    'large_step' : lambda d: rand.choice([3, 5, 7, 8, 15]),
     'small_chain'  : lambda d: rand.choice([40, 10, 4, 1]),
     'small_lchain' : lambda d: rand.choice([x for x in [10, 4, 2, 1] if x <= d['small_chain']]),
     'max_lazy'     : lambda d: rand.choice([9, 18, 27, 36, 72, 108]),
@@ -106,7 +106,7 @@ def INPUT_SPEC(rand):
     'small_look'   : lambda d: rand.choice([4]),
 
     # -N
-    'nocompress'   : lambda d: rand.choice(['false']),
+    'nocompress'   : lambda d: rand.choice(['true']),
 
     # -T
     'altcode'      : lambda d: rand.choice(['false']),
@@ -794,7 +794,7 @@ class RcsFinder:
         testkey = 'rcs%d' % self.biground
         self.biground = self.biground + 1
 
-        print 'source %u bytes; target %u bytes; %s' % (f1sz, f2sz, testkey)
+        print '%s; source %u bytes; target %u bytes' % (testkey, f1sz, f2sz)
         f1.close()
         f2.close()
         return (TMPDIR + "/big.1",
@@ -881,7 +881,7 @@ class RandomTest:
         self.myconfig = config
         self.tnum = tnum
 
-        if syntuple:
+        if syntuple != None:
             self.runtime = syntuple[0]
             self.compsize = syntuple[1]
             self.decodetime = None
@@ -988,10 +988,20 @@ def RunTestLoop(rand, generator, rounds):
         tests = []
         for x in xrange(len(configs)):
             t = RandomTest(x, tinput, configs[x])
-            print 'Test %d: %s' % (x, t)
+            print 'Round %d test %d: %s' % (rnum, x, t)
             tests.append(t)
         #end
         results = ScoreTests(tests)
+
+        for r in results:
+            c = r.config()
+            if not test_all_config_results.has_key(c):
+                test_all_config_results[c] = [r]
+            else:
+                test_all_config_results[c].append(r)
+            #end
+        #end
+
         GraphResults('expt%d' % rnum, results)
         GraphSummary('sum%d' % rnum, results)
 
@@ -1036,12 +1046,6 @@ def ScoreTests(results):
     for (score, test) in scored:
         pos += 1
         test.score_pos = pos
-        c = test.config()
-        if not test_all_config_results.has_key(c):
-            test_all_config_results[c] = [test]
-        else:
-            test_all_config_results[c].append(test)
-        #end
     #end
 
     scored = [x[1] for x in scored]
@@ -1054,22 +1058,7 @@ def ScoreTests(results):
     for test in scored:
         c = test.config()
         s = 0.0
-        all_r = test_all_config_results[c]
-        for t in all_r:
-            s += float(t.score_pos)
-        #end
-        if len(all_r) == 1:
-            stars = ''
-        elif len(all_r) >= 10:
-            stars = ' ***'
-        elif len(all_r) >= int(1/KEEP_P):
-            stars = ' **'
-        else:
-            stars = ' *'
-        print 'Score: %0.6f %s (%.1f%s%s)' % \
-              (test.score, test, s / len(all_r), stars,
-               (len(all_r) > 2) and
-               (' in %d' % len(all_r)) or "")
+        print 'H-Score: %0.9f %s' % (test.score, test)
     #end
 
     return scored
@@ -1112,7 +1101,7 @@ def GraphSummary(desc, results_ignore):
     # sort configs descending by number of tests
     config_ordered.sort(lambda x, y: len(y) - len(x))
 
-    print 'population: %d: %d configs max %d results' % \
+    print 'population %d: %d configs %d results' % \
           (test_population,
            len(config_ordered),
            len(config_ordered[0]))
@@ -1129,7 +1118,7 @@ def GraphSummary(desc, results_ignore):
         config = config_ordered[i][0].config()
         config_tests = config_ordered[i]
 
-        print '%s has %d tested inputs' % (config, len(config_tests))
+        #print '%s has %d tested inputs' % (config, len(config_tests))
 
         if len(input_set) == 0:
             input_set = dict([(t.tinput(), [t]) for t in config_tests])
@@ -1157,7 +1146,6 @@ def GraphSummary(desc, results_ignore):
         # continue if there are more w/ the same number of inputs
         if i < (len(config_ordered) - 1) and \
            len(config_ordered[i + 1]) == len(config_tests):
-            print 'b %s' % i
             continue
         #end
 
@@ -1168,12 +1156,14 @@ def GraphSummary(desc, results_ignore):
         smap = {}
         for (key, tests) in input_set.items():
             if config_num == None:
+                # config_num should be the same in all elements
                 config_num = len(tests)
                 smap = dict([(r.config(),
                               (r.time(),
                                r.size()))
                              for r in tests])
             else:
+                # compuate the per-config sum of time/size
                 assert config_num == len(tests)
                 smap = dict([(r.config(),
                               (smap[r.config()][0] + r.time(),
@@ -1183,13 +1173,14 @@ def GraphSummary(desc, results_ignore):
         #end
 
         if config_num == 1:
-            print 'c %s' % smap
             continue
         #end
 
+        if len(input_set) == osize:
+            break
+        #end
+
         summary = '%s-%d' % (desc, len(input_set))
-        print "what?", osize, len(input_set), input_set
-        assert len(input_set) < osize
         osize = len(input_set)
 
         print 'generate %s w/ %d configs' % (summary, config_num)
@@ -1197,6 +1188,8 @@ def GraphSummary(desc, results_ignore):
                           syntuple = (smap[config][0], smap[config][1]))
                for config in smap.keys()]
         syn = ScoreTests(syn)
+        #print 'smap is %s' % (smap,)
+        #print 'syn is %s' % (' and '.join([str(x) for x in syn]))
         GraphResults(summary, syn)
     #end
 #end
