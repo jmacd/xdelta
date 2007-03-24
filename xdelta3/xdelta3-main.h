@@ -329,7 +329,7 @@ static int
 main_version (void)
 {
   /* $Format: "  DP(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
-  DP(RINT "VERSION=3.0o\n");
+  DP(RINT "VERSION=3.0q\n");
   return EXIT_SUCCESS;
 }
 

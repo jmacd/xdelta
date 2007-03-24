@@ -1,33 +1,33 @@
 ;; -*- Prcs -*-
 (Created-By-Prcs-Version 1 3 4)
 (Project-Description "")
-(Project-Version xdelta3 0 31)
-(Parent-Version xdelta3 0 30)
-(Version-Log "3.0p release")
+(Project-Version xdelta3 0 32)
+(Parent-Version xdelta3 0 31)
+(Version-Log "version 3.0q")
 (New-Version-Log "")
-(Checkin-Time "Sun, 18 Feb 2007 04:06:56 -0800")
+(Checkin-Time "Sat, 24 Mar 2007 06:11:54 -0800")
 (Checkin-Login jmacd)
 (Populate-Ignore ("\\.svn"))
 (Project-Keywords
- (Xdelta3Version "0p")
+ (Xdelta3Version "0q")
  )
 (Files
   (COPYING (xdelta3/b/29_COPYING 1.1 744))
 
   (xdelta3-cfgs.h (xdelta3/9_xdelta3-cf 1.8 744))
-  (xdelta3-decode.h (xdelta3/b/30_xdelta3-de 1.5 744))
-  (xdelta3-djw.h (xdelta3/8_xdelta3-dj 1.6 744))
+  (xdelta3-decode.h (xdelta3/b/30_xdelta3-de 1.6 744))
+  (xdelta3-djw.h (xdelta3/8_xdelta3-dj 1.7 744))
   (xdelta3-fgk.h (xdelta3/7_xdelta3-fg 1.3 744))
   (xdelta3-list.h (xdelta3/6_xdelta3-li 1.3 744))
-  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.18 744))
+  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.19 744))
   (xdelta3-python.h (xdelta3/4_xdelta3-py 1.5 744))
-  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.18 744))
-  (xdelta3-second.h (xdelta3/3_xdelta3-se 1.4 744))
-  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.14 744))
-  (xdelta3.c (xdelta3/16_xdelta3.c 1.17 744))
-  (xdelta3.h (xdelta3/1_xdelta3.h 1.14 744))
+  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.19 744))
+  (xdelta3-second.h (xdelta3/3_xdelta3-se 1.5 744))
+  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.15 744))
+  (xdelta3.c (xdelta3/16_xdelta3.c 1.18 744))
+  (xdelta3.h (xdelta3/1_xdelta3.h 1.15 744))
 
-  (Makefile (xdelta3/0_Makefile 1.11 744))
+  (Makefile (xdelta3/0_Makefile 1.12 744))
   (setup.py (xdelta3/11_setup.py 1.5 744))
 
   (draft-korn-vcdiff.txt (xdelta3/b/22_draft-korn 1.1 744))
@@ -38,7 +38,7 @@
 
   (README (xdelta3/b/31_README 1.1 744))
   (badcopy.vcproj (xdelta3/b/32_badcopy.vc 1.1 744))
-  (xdelta3.vcproj (xdelta3/b/33_xdelta3.vc 1.2 744))
+  (xdelta3.vcproj (xdelta3/b/33_xdelta3.vc 1.3 744))
 
   (xdelta3.swig (xdelta3/b/27_xdelta3.sw 1.3 744))
 
@@ -46,6 +46,8 @@
 
   (examples/Makefile (xdelta3/b/34_Makefile 1.1 744))
   (examples/small_page_test.c (xdelta3/b/35_small_page 1.2 744))
+
+  (plot.sh (xdelta3/b/36_plot.sh 1.1 744))
 )
 (Merge-Parents)
 (New-Merge-Parents)
