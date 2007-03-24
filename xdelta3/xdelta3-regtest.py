@@ -23,7 +23,7 @@ import xdelta3main
 import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-RCSDIR = '/tmp/PRCS_read_copy/prcs'
+RCSDIR = '/tmp/PRCS_read_copy'
 SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
 #RCSDIR = 'G:/jmacd/PRCS/prcs/b'
@@ -44,7 +44,7 @@ SKIP_DECODE = 1
 MIN_STDDEV_PCT = 1.5
 
 # How many results per round
-MAX_RESULTS = 100
+MAX_RESULTS = 500
 TEST_ROUNDS = 500
 KEEP_P = (0.5)
 

@@ -328,8 +328,8 @@ static int main_help (void);
 static int
 main_version (void)
 {
-  /* $Format: "  P(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
-  P(RINT "VERSION=3.0o\n");
+  /* $Format: "  DP(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
+  DP(RINT "VERSION=3.0o\n");
   return EXIT_SUCCESS;
 }
 
@@ -338,27 +338,27 @@ main_config (void)
 {
   main_version ();
 
-  P(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
-  P(RINT "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
-  P(RINT "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
-  P(RINT "REGRESSION_TEST=%d\n", REGRESSION_TEST);
-  P(RINT "SECONDARY_DJW=%d\n", SECONDARY_DJW);
-  P(RINT "SECONDARY_FGK=%d\n", SECONDARY_FGK);
-  P(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
-  P(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
-  P(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
-  P(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
-  P(RINT "XD3_POSIX=%d\n", XD3_POSIX);
-  P(RINT "XD3_STDIO=%d\n", XD3_STDIO);
-  P(RINT "XD3_WIN32=%d\n", XD3_WIN32);
-  P(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
-  P(RINT "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
-  P(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
-  P(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
-  P(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
-  P(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
-  P(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
-  P(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
+  DP(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
+  DP(RINT "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
+  DP(RINT "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
+  DP(RINT "REGRESSION_TEST=%d\n", REGRESSION_TEST);
+  DP(RINT "SECONDARY_DJW=%d\n", SECONDARY_DJW);
+  DP(RINT "SECONDARY_FGK=%d\n", SECONDARY_FGK);
+  DP(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
+  DP(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
+  DP(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
+  DP(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
+  DP(RINT "XD3_POSIX=%d\n", XD3_POSIX);
+  DP(RINT "XD3_STDIO=%d\n", XD3_STDIO);
+  DP(RINT "XD3_WIN32=%d\n", XD3_WIN32);
+  DP(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
+  DP(RINT "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
+  DP(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
+  DP(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
+  DP(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
+  DP(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
+  DP(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
+  DP(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
 
   return EXIT_SUCCESS;
 }
@@ -3269,58 +3269,58 @@ main_help (void)
 {
   /* Note: update wiki when command-line features change */
   main_version ();
-  P(RINT "usage: xdelta3 [command/options] [input [output]]\n");
-  P(RINT "special command names:\n");
-  P(RINT "    config      prints xdelta3 configuration\n");
-  P(RINT "    decode      decompress the input\n");
-  P(RINT "    encode      compress the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
+  DP(RINT "usage: xdelta3 [command/options] [input [output]]\n");
+  DP(RINT "special command names:\n");
+  DP(RINT "    config      prints xdelta3 configuration\n");
+  DP(RINT "    decode      decompress the input\n");
+  DP(RINT "    encode      compress the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
 #if REGRESSION_TEST
-  P(RINT "    test        run the builtin tests\n");
+  DP(RINT "    test        run the builtin tests\n");
 #endif
 #if VCDIFF_TOOLS
-  P(RINT "special commands for VCDIFF inputs:\n");
-  P(RINT "    printdelta  print information about the entire delta\n");
-  P(RINT "    printhdr    print information about the first window\n");
-  P(RINT "    printhdrs   print information about all windows\n");
+  DP(RINT "special commands for VCDIFF inputs:\n");
+  DP(RINT "    printdelta  print information about the entire delta\n");
+  DP(RINT "    printhdr    print information about the first window\n");
+  DP(RINT "    printhdrs   print information about all windows\n");
 #endif
-  P(RINT "standard options:\n");
-  P(RINT "   -0 .. -9     compression level\n");
-  P(RINT "   -c           use stdout\n");
-  P(RINT "   -d           decompress\n");
-  P(RINT "   -e           compress%s\n", XD3_ENCODER ? "" : " [Not compiled]");
-  P(RINT "   -f           force overwrite\n");
-  P(RINT "   -h           show help\n");
-  P(RINT "   -q           be quiet\n");
-  P(RINT "   -v           be verbose (max 2)\n");
-  P(RINT "   -V           show version\n");
+  DP(RINT "standard options:\n");
+  DP(RINT "   -0 .. -9     compression level\n");
+  DP(RINT "   -c           use stdout\n");
+  DP(RINT "   -d           decompress\n");
+  DP(RINT "   -e           compress%s\n", XD3_ENCODER ? "" : " [Not compiled]");
+  DP(RINT "   -f           force overwrite\n");
+  DP(RINT "   -h           show help\n");
+  DP(RINT "   -q           be quiet\n");
+  DP(RINT "   -v           be verbose (max 2)\n");
+  DP(RINT "   -V           show version\n");
 
-  P(RINT "memory options:\n");
-  P(RINT "   -B bytes     source window size\n");
-  P(RINT "   -W bytes     input window size\n");
-  P(RINT "   -P size      compression duplicates window\n");
-  P(RINT "   -I size      instruction buffer size (0 = unlimited)\n");
+  DP(RINT "memory options:\n");
+  DP(RINT "   -B bytes     source window size\n");
+  DP(RINT "   -W bytes     input window size\n");
+  DP(RINT "   -P size      compression duplicates window\n");
+  DP(RINT "   -I size      instruction buffer size (0 = unlimited)\n");
 
-  P(RINT "compression options:\n");
-  P(RINT "   -s source    source file to copy from (if any)\n");
-  P(RINT "   -S [djw|fgk] enable/disable secondary compression\n");
-  P(RINT "   -N           disable small string-matching compression\n");
-  P(RINT "   -D           disable external decompression (encode/decode)\n");
-  P(RINT "   -R           disable external recompression (decode)\n");
-  P(RINT "   -n           disable checksum (encode/decode)\n");
-  P(RINT "   -C           soft config (encode, undocumented)\n");
-  P(RINT "   -A [apphead] disable/provide application header (encode)\n");
+  DP(RINT "compression options:\n");
+  DP(RINT "   -s source    source file to copy from (if any)\n");
+  DP(RINT "   -S [djw|fgk] enable/disable secondary compression\n");
+  DP(RINT "   -N           disable small string-matching compression\n");
+  DP(RINT "   -D           disable external decompression (encode/decode)\n");
+  DP(RINT "   -R           disable external recompression (decode)\n");
+  DP(RINT "   -n           disable checksum (encode/decode)\n");
+  DP(RINT "   -C           soft config (encode, undocumented)\n");
+  DP(RINT "   -A [apphead] disable/provide application header (encode)\n");
 
 #if XD3_DEBUG > 0
-  P(RINT "developer options:\n");
-  P(RINT "   -J           disable output (check/compute only)\n");
-  P(RINT "   -P           repeat count (for profiling)\n");
-  P(RINT "   -T           use alternate code table\n");
+  DP(RINT "developer options:\n");
+  DP(RINT "   -J           disable output (check/compute only)\n");
+  DP(RINT "   -P           repeat count (for profiling)\n");
+  DP(RINT "   -T           use alternate code table\n");
 #endif
 
-  P(RINT "the XDELTA environment variable may contain extra args:\n");
-  P(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
-  P(RINT "   tar --use-compress-program=xdelta3 \\\n");
-  P(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y/\n");
+  DP(RINT "the XDELTA environment variable may contain extra args:\n");
+  DP(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
+  DP(RINT "   tar --use-compress-program=xdelta3 \\\n");
+  DP(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y/\n");
   return EXIT_FAILURE;
 }
 

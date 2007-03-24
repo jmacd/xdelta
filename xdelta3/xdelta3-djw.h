@@ -465,7 +465,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
     {
       IF_DEBUG (if (first_bits != total_bits)
       {
-	P(RINT "code length overflow changed %u bits\n", (usize_t)(total_bits - first_bits));
+	DP(RINT "code length overflow changed %u bits\n", (usize_t)(total_bits - first_bits));
       });
       return total_bits;
     }
@@ -586,9 +586,9 @@ djw_count_freqs (djw_weight *freq, xd3_output *input)
     }
 
   IF_DEBUG1 ({int i;
-  P(RINT "freqs: ");
-  for (i = 0; i < ALPHABET_SIZE; i += 1) { P(RINT "%u ", freq[i]); }
-  P(RINT "\n");});
+  DP(RINT "freqs: ");
+  for (i = 0; i < ALPHABET_SIZE; i += 1) { DP(RINT "%u ", freq[i]); }
+  DP(RINT "\n");});
 
   return size;
 }
@@ -937,7 +937,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
 	   * don't mess things up. */
 	  if (goal == 0 && !cfg->inefficient)
 	    {
-	      IF_DEBUG1 (P(RINT "too many groups (%u), dropping one\n", groups));
+	      IF_DEBUG1 (DP(RINT "too many groups (%u), dropping one\n", groups));
 	      groups -= 1;
 	      goto regroup;
 	    }
@@ -950,7 +950,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
 	      sum += real_freq[sym2++];
 	    }
 
-	  IF_DEBUG1(P(RINT "group %u has symbols %u..%u (%u non-zero) (%u/%u = %.3f)\n",
+	  IF_DEBUG1(DP(RINT "group %u has symbols %u..%u (%u non-zero) (%u/%u = %.3f)\n",
 			     gp, sym1, sym2, nz, sum, input_bytes, sum / (double)input_bytes););
 
 	  for (s = 0; s < ALPHABET_SIZE; s += 1)
@@ -1071,20 +1071,20 @@ xd3_real_encode_huff (xd3_stream   *stream,
 		  if (evolve_zero[i]) { encode_bits -= evolve_clen[gp][i]; }
 		}
 
-	      IF_DEBUG1 (P(RINT "evolve_zero reduced %u bits in group %u\n", save_total - encode_bits, gp));
+	      IF_DEBUG1 (DP(RINT "evolve_zero reduced %u bits in group %u\n", save_total - encode_bits, gp));
 	    }
 	}
 
       IF_DEBUG1(
-		P(RINT "pass %u total bits: %u group uses: ", niter, encode_bits);
-		for (gp = 0; gp < groups; gp += 1) { P(RINT "%u ", gcount[gp]); }
-		P(RINT "\n"););
+		DP(RINT "pass %u total bits: %u group uses: ", niter, encode_bits);
+		for (gp = 0; gp < groups; gp += 1) { DP(RINT "%u ", gcount[gp]); }
+		DP(RINT "\n"););
 
       /* End iteration.  (The following assertion proved invalid.) */
       /*XD3_ASSERT (niter == 1 || best_bits >= encode_bits);*/
 
       IF_DEBUG1 (if (niter > 1 && best_bits < encode_bits) {
-	P(RINT "iteration lost %u bits\n", encode_bits - best_bits); });
+	DP(RINT "iteration lost %u bits\n", encode_bits - best_bits); });
 
       if (niter == 1 || (niter < DJW_MAX_ITER && (best_bits - encode_bits) >= DJW_MIN_IMPROVEMENT))
 	{
@@ -1095,7 +1095,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
       /* Efficiency check. */
       if (encode_bits + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient) { goto nosecond; }
 
-      IF_DEBUG1 (P(RINT "djw compression: %u -> %0.3f\n", input_bytes, encode_bits / 8.0));
+      IF_DEBUG1 (DP(RINT "djw compression: %u -> %0.3f\n", input_bytes, encode_bits / 8.0));
 
       /* Encode: prefix */
       {
@@ -1355,7 +1355,7 @@ djw_decode_symbol (xd3_stream     *stream,
 
       if (offset <= max_sym)
 	{
-	  IF_DEBUG2 (P(RINT "(j) %u ", code));
+	  IF_DEBUG2 (DP(RINT "(j) %u ", code));
 	  *sym = inorder[offset];
 	  return 0;
 	}
@@ -1733,9 +1733,9 @@ xd3_encode_huff (xd3_stream   *stream,
   xd3_output *output;
   usize_t output_size;
 
-  if (hdr == 0) { hdr = 1; P(RINT "____ SECT INSZ SECTORSZ GPNO OUTSZ PREFIX SELECT ENCODE\n"); }
+  if (hdr == 0) { hdr = 1; DP(RINT "____ SECT INSZ SECTORSZ GPNO OUTSZ PREFIX SELECT ENCODE\n"); }
 
-  P(RINT "SECTION %s %u\n", sect_type, input_size);
+  DP(RINT "SECTION %s %u\n", sect_type, input_size);
 
     {
       int gp, i;
@@ -1781,14 +1781,14 @@ xd3_encode_huff (xd3_stream   *stream,
 
 	      if (1)
 		{
-		  P(RINT "COMP%s %u %u %u %u %u %u\n",
+		  DP(RINT "COMP%s %u %u %u %u %u %u\n",
 			   t12, cfg->ngroups, cfg->sector_size,
 			   output_size, tune_prefix_bits, tune_select_bits, tune_encode_bits);
 		}
 	      else
 		{
 		fail:
-		  P(RINT "COMP%s %u %u %u %u %u %u\n",
+		  DP(RINT "COMP%s %u %u %u %u %u %u\n",
 			   t12, cfg->ngroups, cfg->sector_size,
 			   input_size, 0, 0, 0);
 		}
@@ -1803,24 +1803,24 @@ xd3_encode_huff (xd3_stream   *stream,
 
       if (best_gpno > 0)
 	{
-	  P(RINT "BEST%s %u %u %u %u %u %u\n",
+	  DP(RINT "BEST%s %u %u %u %u %u %u\n",
 		   t12, best_gpno, best_sector_size,
 		   best_size, best_prefix, best_select, best_encode);
 
 #if 0
-	  P(RINT "CLEN%s ", t12);
+	  DP(RINT "CLEN%s ", t12);
 	  for (i = 1; i <= DJW_MAX_CODELEN; i += 1)
 	    {
-	      P(RINT "%u ", clen_count[i]);
+	      DP(RINT "%u ", clen_count[i]);
 	    }
-	  P(RINT "\n");
+	  DP(RINT "\n");
 
-	  P(RINT "FREQ%s ", t12);
+	  DP(RINT "FREQ%s ", t12);
 	  for (i = 0; i < DJW_TOTAL_CODES; i += 1)
 	    {
-	      P(RINT "%u ", tune_freq[i]);
+	      DP(RINT "%u ", tune_freq[i]);
 	    }
-	  P(RINT "\n");
+	  DP(RINT "\n");
 #endif
 	}
     }
@@ -1890,7 +1890,7 @@ xd3_encode_huff (xd3_stream   *stream,
 
 	if (ret != XD3_NOSECOND)
 	  {
-	    P(RINT "PART %u %u\n", parts, part_total);
+	    DP(RINT "PART %u %u\n", parts, part_total);
 	  }
       }
   }
@@ -1911,10 +1911,10 @@ xd3_encode_huff (xd3_stream   *stream,
 
     XD3_ASSERT (ret == 0);
     
-    P(RINT "FGK %u\n", output_size);
+    DP(RINT "FGK %u\n", output_size);
   }
 
-  P(RINT "END_SECTION %s %u\n", sect_type, input_size);
+  DP(RINT "END_SECTION %s %u\n", sect_type, input_size);
 
   return 0;
 }

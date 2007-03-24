@@ -190,8 +190,8 @@ typedef uint32_t xoff_t;
 #endif
 
 /* XPRINT.  Debug output and VCDIFF_TOOLS functions report to stderr.  I have used an
- * irregular style to abbreviate [fprintf(stderr, "] as [P(RINT "]. */
-#define P    fprintf
+ * irregular style to abbreviate [fprintf(stderr, "] as [DP(RINT "]. */
+#define DP   fprintf
 #define RINT stderr,
 
 typedef struct _xd3_stream             xd3_stream;
@@ -243,7 +243,7 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
 #ifndef XD3_ASSERT
 #if XD3_DEBUG
 #define XD3_ASSERT(x) \
-    do { if (! (x)) { P(RINT "%s:%d: XD3 assertion failed: %s\n", __FILE__, __LINE__, #x); \
+    do { if (! (x)) { DP(RINT "%s:%d: XD3 assertion failed: %s\n", __FILE__, __LINE__, #x); \
     abort (); } } while (0)
 #else
 #define XD3_ASSERT(x) (void)0

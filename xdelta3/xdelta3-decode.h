@@ -218,7 +218,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
     {
       IF_DEBUG1 ({
 	static int cnt = 0;
-	P(RINT "DECODE:%u: COPY at %"Q"u (winoffset %u) size %u winaddr %u\n",
+	DP(RINT "DECODE:%u: COPY at %"Q"u (winoffset %u) size %u winaddr %u\n",
 		 cnt++,
 		 stream->total_out + (stream->dec_position - stream->dec_cpylen),
 		 (stream->dec_position - stream->dec_cpylen),
@@ -257,7 +257,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (inst->type == XD3_ADD)
 	  {
 	    static int cnt;
-	    P(RINT "DECODE:%d: ADD at %"Q"u (winoffset %u) size %u\n",
+	    DP(RINT "DECODE:%d: ADD at %"Q"u (winoffset %u) size %u\n",
 		     cnt++,
 		     stream->total_out + stream->dec_position - stream->dec_cpylen,
 		     stream->dec_position - stream->dec_cpylen,
@@ -267,7 +267,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  {
 	    static int cnt;
 	    XD3_ASSERT (inst->type == XD3_RUN);
-	    P(RINT "DECODE:%d: RUN at %"Q"u (winoffset %u) size %u\n",
+	    DP(RINT "DECODE:%d: RUN at %"Q"u (winoffset %u) size %u\n",
 		     cnt++,
 		     stream->total_out + stream->dec_position - stream->dec_cpylen,
 		     stream->dec_position - stream->dec_cpylen,
@@ -623,7 +623,7 @@ xd3_decode_emit (xd3_stream *stream)
 
   if (stream->avail_out != stream->dec_tgtlen)
     {
-      IF_DEBUG1 (P(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n", stream->avail_out, stream->dec_tgtlen));
+      IF_DEBUG1 (DP(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n", stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
       return XD3_INVALID_INPUT;
     }
@@ -843,7 +843,7 @@ xd3_decode_input (xd3_stream *stream)
 
 	stream->dec_state = DEC_CPYLEN;
 
-	IF_DEBUG1 (P(RINT "--------- TARGET WINDOW %"Q"u ------------------\n", stream->current_window));
+	IF_DEBUG1 (DP(RINT "--------- TARGET WINDOW %"Q"u ------------------\n", stream->current_window));
       }
 
     case DEC_CPYLEN:
