@@ -535,12 +535,12 @@ main_format_bcnt (xoff_t r, char *buf)
 
   for (i = 0; i < SIZEOF_ARRAY(fmts); i += 1)
     {
-      if (r < 10 * 1e3 || i == (-1 + (int)SIZEOF_ARRAY(fmts)))
+      if (r <= (10 * 1024) || i == (-1 + (int)SIZEOF_ARRAY(fmts)))
   	    {
 	      sprintf (buf, "%"Q"u %s", r, fmts[i]);
 	      break;
 	    }
-      r /= 1000;
+      r /= 1024;
     }
   return buf;
 }
