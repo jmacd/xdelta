@@ -2919,6 +2919,7 @@ main (int argc, char **argv)
 
 #ifdef _WIN32
   GetStartupInfo(&winStartupInfo);
+  setvbuf(stderr, NULL, _IONBF, 0);  /* Do not buffer stderr */
 #endif
 
   main_file_init (& ifile);
