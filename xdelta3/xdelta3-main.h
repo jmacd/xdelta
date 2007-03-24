@@ -770,7 +770,7 @@ main_file_open (main_file *xfile, const char* name, int mode)
 #elif XD3_WIN32
   xfile->file = CreateFile(name,
 	  (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
-	  0,
+	  FILE_SHARE_READ,
 	  NULL,
 	  (mode == XO_READ) ? OPEN_EXISTING : (option_force ? CREATE_ALWAYS : CREATE_NEW),
 	  FILE_ATTRIBUTE_NORMAL,
