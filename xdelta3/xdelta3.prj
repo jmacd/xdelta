@@ -48,6 +48,9 @@
   (examples/small_page_test.c (xdelta3/b/35_small_page 1.2 744))
 
   (plot.sh (xdelta3/b/36_plot.sh 1.1 744))
+
+  (xdelta3.wxs ())
+  (xdelta3.wxi ())
 )
 (Merge-Parents)
 (New-Merge-Parents)

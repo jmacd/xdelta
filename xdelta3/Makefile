@@ -35,17 +35,19 @@ TARGETS = xdelta3-debug \
 
 PYTHON = python
 
-SWIGTGT = xdelta3module.so
-#SWIGTGT = xdelta3module.dll
+WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 
-PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
-#PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
+#SWIGTGT = xdelta3module.so
+SWIGTGT = xdelta3module.dll
+
+#PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
+PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
         draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
 	xdelta3-regtest.py xdelta3-test.py setup.py \
 	examples/Makefile examples/small_page_test.c \
-	xdelta3.py xdelta3_wrap.c
+	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi
 
 SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DEXTERNAL_COMPRESSION=0 \
@@ -83,10 +85,23 @@ tar:
 	+tar -tzf ./$(RELDIR).tar.gz
 	rm -rf /tmp/$(RELDIR)
 
+zip:
+	tar --exclude ".svn" -czf /tmp/$(RELDIR)-tmp.tar.gz $(SOURCES) $(EXTRA)
+	rm -rf /tmp/$(RELDIR)
+	mkdir /tmp/$(RELDIR)
+	(cd /tmp/$(RELDIR) && tar -xzf ../$(RELDIR)-tmp.tar.gz)
+	tar -czf ./$(RELDIR).tar.gz -C /tmp $(RELDIR)
+	+zip -r $(RELDIR).zip /tmp/$(RELDIR)
+	rm -rf /tmp/$(RELDIR)
+
 clean:
 	rm -f $(TARGETS)
 	rm -rf build Debug Release core cifs* *.stackdump *.exe \
-		xdelta3.ncb xdelta3.suo xdelta3.sln
+		xdelta3.ncb xdelta3.suo xdelta3.sln xdelta3.wixobj xdelta3.msi
+
+wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
+	$(WIXDIR)/candle.exe xdelta3.wxs -out xdelta3.wixobj
+	$(WIXDIR)/light.exe xdelta3.wixobj -out xdelta3.msi
 
 xdelta3: $(SOURCES)
 	$(CC) -O3 -Wall -Wshadow xdelta3.c -lm -o xdelta3 \

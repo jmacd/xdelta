@@ -3268,6 +3268,8 @@ main (int argc, char **argv)
 static int
 main_help (void)
 {
+  /* TODO: license info */
+
   /* Note: update wiki when command-line features change */
   main_version ();
   DP(RINT "usage: xdelta3 [command/options] [input [output]]\n");
