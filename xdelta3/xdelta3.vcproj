@@ -115,7 +115,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/DXD3_DEBUG=0 /DXD3_USE_LARGEFILE64=1 /DREGRESSION_TEST=1 /DSECONDARY_DJW=1 /DSECONDARY_FGK=1 /DXD3_MAIN=1 /DXD3_WIN32=1 /DEXTERNAL_COMPRESSION=0 /DXD3_STDIO=0 /DXD3_POSIX=0  /D_CRT_SECURE_NO_DEPRECATE"
 				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;"
-				RuntimeLibrary="2"
+				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="true"

@@ -96,16 +96,16 @@
                 </Directory>
               </Directory>
 
-              <Merge Id='CRT'
-                     Language='0'
-                     DiskId='1'
-src='C:\Program Files\Common Files\Merge Modules\microsoft_vc80_crt_x86.msm'
-/>
-              <Merge Id='CRT Policy'
-                     Language='0'
-                     DiskId='1'
-src='C:\Program Files\Common Files\Merge Modules\policy_8_0_Microsoft_VC80_CRT_x86.msm'
-/>
+<!--               <Merge Id='CRT' -->
+<!--                      Language='0' -->
+<!--                      DiskId='1' -->
+<!-- src='C:\Program Files\Common Files\Merge Modules\microsoft_vc80_crt_x86.msm' -->
+<!-- /> -->
+<!--               <Merge Id='CRT Policy' -->
+<!--                      Language='0' -->
+<!--                      DiskId='1' -->
+<!-- src='C:\Program Files\Common Files\Merge Modules\policy_8_0_Microsoft_VC80_CRT_x86.msm' -->
+<!-- /> -->
             </Directory>
 
             <Feature Id='Complete'
@@ -116,10 +116,10 @@ src='C:\Program Files\Common Files\Merge Modules\policy_8_0_Microsoft_VC80_CRT_x
               <ComponentRef Id='Source' />
             </Feature>
 
-            <Feature Id='CRT_WinSXS' Title='CRT WinSXS' Level='1'>
-                        <MergeRef Id='CRT' />
-                        <MergeRef Id='CRT Policy' />
-            </Feature>
+<!--             <Feature Id='CRT_WinSXS' Title='CRT WinSXS' Level='1'> -->
+<!--                         <MergeRef Id='CRT' /> -->
+<!--                         <MergeRef Id='CRT Policy' /> -->
+<!--             </Feature> -->
 
             <InstallExecuteSequence>
                         <RemoveRegistryValues/>
