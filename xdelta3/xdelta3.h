@@ -300,6 +300,7 @@ typedef enum {
   XD3_INTERNAL   = -17710, /* internal error */
   XD3_INVALID    = -17711, /* invalid config */
   XD3_INVALID_INPUT = -17712, /* invalid input/decoder error */
+  XD3_NOSECOND  = -17713, /* when secondary compression finds no improvement. */
 
 } xd3_rvalues;
 
@@ -443,11 +444,6 @@ typedef enum {
 
   DEC_ABORTED  = 24, /* xd3_abort_stream */
 } xd3_decode_state;
-
-/* An application never sees these internal codes: */  
-typedef enum {
-  XD3_NOSECOND  = -17708, /* when secondary compression finds no improvement. */
-} xd3_pvalues;
 
 /******************************************************************************************
  internal types

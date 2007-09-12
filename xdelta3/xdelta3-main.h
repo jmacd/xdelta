@@ -1308,6 +1308,7 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
 	{
 	case XD3_INPUT: {
 	  /* finished recoding one window */
+	  stream->total_out = recode_stream->total_out;
 	  return 0;
 	}
 	case XD3_OUTPUT: {
@@ -2499,15 +2500,23 @@ main_input (xd3_cmd     cmd,
 
     case CMD_RECODE:
 
+      // No source will be read
+      stream_flags |= XD3_ADLER32_NOVER;
+
       XD3_ASSERT (recode_stream == NULL);
       recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream));
 
-      xd3_config recode_config;
-      xd3_init_config(&recode_config, 0);
-
+      int recode_flags = (stream.flags & XD3_SEC_TYPE);
       // TODO: what about sec_xxxx.ngroups = 1?
-      config.alloc = main_alloc;
-      config.freef = main_free1;
+
+      xd3_config recode_config;
+      xd3_init_config(&recode_config, recode_flags);
+
+      recode_config.alloc = main_alloc;
+      recode_config.freef = main_free1;
+      recode_config.sec_data.ngroups = 1;
+      recode_config.sec_addr.ngroups = 1;
+      recode_config.sec_inst.ngroups = 1;
 
       if ((ret = xd3_config_stream (recode_stream, &recode_config)) ||
 	  (ret = xd3_encode_init_buffers (recode_stream)))
@@ -2793,7 +2802,7 @@ main_input (xd3_cmd     cmd,
 
 	case XD3_WINFINISH:
 	  {
-	    if (IS_ENCODE (cmd) || cmd == CMD_DECODE)
+	    if (IS_ENCODE (cmd) || cmd == CMD_DECODE || cmd == CMD_RECODE)
 	      {
 		if (! option_quiet && IS_ENCODE (cmd) && main_file_isopen (sfile))
 		  {
