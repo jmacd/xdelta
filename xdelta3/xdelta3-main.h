@@ -978,6 +978,22 @@ main_file_seek (main_file *xfile, xoff_t pos)
   return ret;
 }
 
+/* This function simply writes the stream output buffer, if there is any, for encode, decode and recode
+ * commands.  (The VCDIFF tools use main_print_func()). */
+static int
+main_write_output (xd3_stream* stream, main_file *ofile)
+{
+  int ret;
+
+  if (stream->avail_out > 0 &&
+      (ret = main_file_write (ofile, stream->next_out, stream->avail_out, "write failed")))
+    {
+      return ret;
+    }
+
+  return 0;
+}
+
 /******************************************************************************************
  VCDIFF TOOLS
  ******************************************************************************************/
@@ -1035,7 +1051,12 @@ main_print_window (xd3_stream* stream, main_file *xfile)
     {
       uint   code = stream->inst_sect.buf[0];
 
-      if ((ret = xd3_decode_instruction (stream))) { return ret; }
+      if ((ret = xd3_decode_instruction (stream)))
+	{
+	  XPR(NT "instruction decode error at %"Q"u: %s\n",
+	      stream->dec_winstart + size, stream->msg);
+	  return ret;
+	}
 
       VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, code,
 	 xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
@@ -1243,14 +1264,18 @@ main_recode_copy (xd3_stream* stream,
       return ret;
     }
 
-  memcpy (output->base, input->buf, input->size);
+  memcpy (output->base,
+	  /* Note: decoder advances buf, so get base of buffer with
+	   * buf_max - size */
+	  input->buf_max - input->size,
+	  input->size);
   output->next = input->size;
   return 0;
 }
 
 // Re-encode one window
 static int
-main_recode_func (xd3_stream* stream, main_file *xfile)
+main_recode_func (xd3_stream* stream, main_file *ofile)
 {
   int ret;
 
@@ -1274,8 +1299,7 @@ main_recode_func (xd3_stream* stream, main_file *xfile)
 
   // This jumps to xd3_emit_hdr()
   recode_stream->enc_state = ENC_FLUSH;
-  //recode_stream->avail_in = stream->dec_tgtlen;
-  //recode_stream->n_emit = stream->dec_tgtlen;
+  recode_stream->avail_in = stream->dec_tgtlen;
 
   // Output loop
   for (;;)
@@ -1298,16 +1322,13 @@ main_recode_func (xd3_stream* stream, main_file *xfile)
 	}
 	case XD3_GETSRCBLK:
 	case 0: {
-	    stream->msg = "invalid operation";
 	    return XD3_INTERNAL;
 	  }
 	default:
 	  return ret;
 	}
 
-      if ((ret = main_file_write(xfile,
-				 recode_stream->next_out,
-				 recode_stream->avail_out, "write failed")))
+      if ((ret = main_write_output(recode_stream, ofile)))
 	{
 	  return ret;
 	}
@@ -2050,21 +2071,6 @@ main_read_primary_input (main_file   *ifile,
 #endif
 
   return main_file_read (ifile, buf, size, nread, "input read failed");
-}
-
-/* This function simply writes the stream output buffer, if there is any.  This is used
- * for both encode and decode commands.  (The VCDIFF tools use main_print_func()). */
-static int
-main_write_output (xd3_stream* stream, main_file *ofile)
-{
-  int ret;
-
-  if (stream->avail_out > 0 && (ret = main_file_write (ofile, stream->next_out, stream->avail_out, "write failed")))
-    {
-      return ret;
-    }
-
-  return 0;
 }
 
 /* Open the main output file, sets a default file name, initiate recompression.  This

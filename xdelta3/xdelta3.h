@@ -814,8 +814,6 @@ struct _xd3_stream
   /* memory usage */
   usize_t            alloc_cnt;
   usize_t            free_cnt;
-
-  xoff_t            n_emit;
 #endif
 };
 

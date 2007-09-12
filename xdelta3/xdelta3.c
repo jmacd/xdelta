@@ -2832,8 +2832,6 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
   XD3_ASSERT (stream->unencoded_offset == inst->pos);
   stream->unencoded_offset += inst->size;
 
-  IF_DEBUG (stream->n_emit += inst->size);
-
   inst->code2 = 0;
 
   XD3_CHOOSE_INSTRUCTION (stream, stream->iout, inst);
@@ -3290,8 +3288,6 @@ xd3_emit_hdr (xd3_stream *stream)
   usize_t inst_len;
   usize_t addr_len;
 
-  XD3_ASSERT (stream->n_emit == stream->avail_in);
-
   if (stream->current_window == 0)
     {
       uint hdr_ind = 0;
@@ -3600,7 +3596,6 @@ xd3_encode_reset (xd3_stream *stream)
   int i;
   xd3_output *olist;
 
-  IF_DEBUG (stream->n_emit = 0);
   stream->avail_in     = 0;
   stream->small_reset  = 1;
   stream->i_slots_used = 0;
