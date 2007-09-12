@@ -494,9 +494,26 @@ struct _xd3_hinst
 struct _xd3_output
 {
   uint8_t    *base;
-  usize_t      next;
-  usize_t      avail;
+  usize_t     next;
+  usize_t     avail;
   xd3_output *next_page;
+};
+
+/* used by the decoder to buffer input in sections. */
+struct _xd3_desect
+{
+  const uint8_t *buf;
+  const uint8_t *buf_max;
+  uint32_t       size;
+  usize_t        pos;
+
+  /* used in xdelta3-decode.h */
+  uint8_t       *copied1;
+  usize_t        alloc1;
+
+  /* used in xdelta3-second.h */
+  uint8_t       *copied2;
+  usize_t        alloc2;
 };
 
 /* the VCDIFF address cache, see the RFC */
@@ -543,21 +560,6 @@ struct _xd3_hash_cfg
 struct _xd3_slist
 {
   usize_t     last_pos;
-};
-
-/* a decoder section (data, inst, or addr).  there is an optimization to avoid copying
- * these sections if all the input is available, related to the copied field below.
- * secondation compression uses the copied2 field. */
-struct _xd3_desect
-{
-  const uint8_t *buf;
-  const uint8_t *buf_max;
-  uint32_t       size;
-  usize_t        pos;
-  uint8_t       *copied1;
-  usize_t        alloc1;
-  uint8_t       *copied2;
-  usize_t        alloc2;
 };
 
 /******************************************************************************************

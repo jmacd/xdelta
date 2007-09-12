@@ -173,7 +173,7 @@ xd3_decode_secondary (xd3_stream      *stream,
 
   /* Decode the size, allocate the buffer. */
   if ((ret = xd3_read_size (stream, & sect->buf, sect->buf_max, & dec_size)) ||
-      (ret = xd3_decode_allocate (stream, dec_size, & sect->copied2, & sect->alloc2, NULL, NULL)))
+      (ret = xd3_decode_allocate (stream, dec_size, & sect->copied2, & sect->alloc2)))
     {
       return ret;
     }

@@ -427,15 +427,15 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 
 #define ENC_SECTS         4  /* Number of separate output sections. */
 
-#define HDR_TAIL(s)  (stream->enc_tails[0])
-#define DATA_TAIL(s) (stream->enc_tails[1])
-#define INST_TAIL(s) (stream->enc_tails[2])
-#define ADDR_TAIL(s) (stream->enc_tails[3])
+#define HDR_TAIL(s)  ((s)->enc_tails[0])
+#define DATA_TAIL(s) ((s)->enc_tails[1])
+#define INST_TAIL(s) ((s)->enc_tails[2])
+#define ADDR_TAIL(s) ((s)->enc_tails[3])
 
-#define HDR_HEAD(s)  (stream->enc_heads[0])
-#define DATA_HEAD(s) (stream->enc_heads[1])
-#define INST_HEAD(s) (stream->enc_heads[2])
-#define ADDR_HEAD(s) (stream->enc_heads[3])
+#define HDR_HEAD(s)  ((s)->enc_heads[0])
+#define DATA_HEAD(s) ((s)->enc_heads[1])
+#define INST_HEAD(s) ((s)->enc_heads[2])
+#define ADDR_HEAD(s) ((s)->enc_heads[3])
 
 #define SIZEOF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
 
@@ -577,8 +577,7 @@ static int         xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, u
 #endif /* XD3_ENCODER */
 
 static int         xd3_decode_allocate (xd3_stream  *stream, usize_t       size,
-					uint8_t    **copied1, usize_t      *alloc1,
-					uint8_t    **copied2, usize_t      *alloc2);
+					uint8_t    **copied1, usize_t      *alloc1);
 
 static void        xd3_compute_code_table_string (const xd3_dinst *code_table, uint8_t *str);
 static void*       xd3_alloc (xd3_stream *stream, usize_t      elts, usize_t      size);
@@ -1975,9 +1974,11 @@ static int
 xd3_alloc_cache (xd3_stream *stream)
 {
   if (((stream->acache.s_near > 0) &&
-       (stream->acache.near_array = xd3_alloc (stream, stream->acache.s_near, sizeof (usize_t))) == NULL) ||
+       (stream->acache.near_array =
+	xd3_alloc (stream, stream->acache.s_near, sizeof (usize_t))) == NULL) ||
       ((stream->acache.s_same > 0) &&
-       (stream->acache.same_array = xd3_alloc (stream, stream->acache.s_same * 256, sizeof (usize_t))) == NULL))
+       (stream->acache.same_array =
+	xd3_alloc (stream, stream->acache.s_same * 256, sizeof (usize_t))) == NULL))
     {
       return ENOMEM;
     }
@@ -3312,7 +3313,11 @@ xd3_emit_hdr (xd3_stream *stream)
 
       /* Secondary compressor ID */
 #if SECONDARY_ANY
-      if (use_secondary && (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->sec_type->id))) { return ret; }
+      if (use_secondary &&
+	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->sec_type->id)))
+	{
+	  return ret;
+	}
 #endif
 
       /* Compressed code table */
@@ -3321,19 +3326,26 @@ xd3_emit_hdr (xd3_stream *stream)
 	  usize_t code_table_size;
 	  const uint8_t *code_table_data;
 
-	  if ((ret = stream->comp_table_func (stream, & code_table_data, & code_table_size))) { return ret; }
+	  if ((ret = stream->comp_table_func (stream, & code_table_data, & code_table_size)))
+	    {
+	      return ret;
+	    }
 
 	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream), code_table_size + 2)) ||
 	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->code_table_desc->near_modes)) ||
 	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->code_table_desc->same_modes)) ||
-	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), code_table_data, code_table_size))) { return ret; }
+	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), code_table_data, code_table_size)))
+	    {
+	      return ret;
+	    }
 	}
 
       /* Application header */
       if (use_appheader)
 	{
 	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream), stream->enc_appheadsz)) ||
-	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), stream->enc_appheader, stream->enc_appheadsz)))
+	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), stream->enc_appheader,
+				     stream->enc_appheadsz)))
 	    {
 	      return ret;
 	    }
@@ -3387,7 +3399,7 @@ xd3_emit_hdr (xd3_stream *stream)
   inst_len = xd3_sizeof_output (INST_HEAD (stream));
   addr_len = xd3_sizeof_output (ADDR_HEAD (stream));
 
-  /* The enc_len field is redundent... doh! */
+  /* The enc_len field is a redundency for future extensions.*/
   enc_len = (1 + (xd3_sizeof_size (tgt_len) +
 		  xd3_sizeof_size (data_len) +
 		  xd3_sizeof_size (inst_len) +
@@ -3508,11 +3520,29 @@ xd3_alloc_iopt (xd3_stream *stream, int elts)
   return 0;
 }
 
+/* This function allocates the encoder output buffers. */
+static int
+xd3_encode_init_buffers (xd3_stream *stream)
+{
+  int i;
+
+  for (i = 0; i < ENC_SECTS; i += 1)
+    {
+      if ((stream->enc_heads[i] =
+	   stream->enc_tails[i] =
+	   xd3_alloc_output (stream, NULL)) == NULL)
+	{
+	  return ENOMEM;
+	}
+    }
+
+  return 0;
+}  
+
 /* This function allocates all memory initially used by the encoder. */
 static int
 xd3_encode_init (xd3_stream *stream)
 {
-  int i;
   int large_comp = (stream->src != NULL);
   int small_comp = ! (stream->flags & XD3_NOCOMPRESS);
 
@@ -3537,15 +3567,8 @@ xd3_encode_init (xd3_stream *stream)
 			  & stream->small_hash);
     }
 
-  for (i = 0; i < ENC_SECTS; i += 1)
-    {
-      if ((stream->enc_heads[i] =
-	   stream->enc_tails[i] =
-	   xd3_alloc_output (stream, NULL)) == NULL)
-	{
-	  goto fail;
-	}
-    }
+  /* data buffers */
+  if (xd3_encode_init_buffers(stream) != 0) { goto fail; }
 
   /* iopt buffer */
   xd3_rlist_init (& stream->iopt_used);
@@ -3725,10 +3748,17 @@ xd3_encode_input (xd3_stream *stream)
 
       /* Flush the instrution buffer, then possibly add one more instruction, then emit
        * the header. */
-      stream->enc_state = ENC_FLUSH;
       if ((ret = xd3_iopt_flush_instructions (stream, 1)) ||
-          (ret = xd3_iopt_add_finalize (stream)) ||
-	  (ret = xd3_emit_hdr (stream)))
+          (ret = xd3_iopt_add_finalize (stream)))
+	{
+	  return ret;
+	}
+
+      stream->enc_state = ENC_FLUSH;
+
+    case ENC_FLUSH:
+      /* Note: main_recode_func() bypasses string-matching by setting ENC_FLUSH. */
+      if ((ret = xd3_emit_hdr (stream)))
 	{
 	  return ret;
 	}

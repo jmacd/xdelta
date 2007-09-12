@@ -99,22 +99,20 @@ xd3_decode_setup_buffers (xd3_stream *stream)
 static int
 xd3_decode_allocate (xd3_stream  *stream,
 		     usize_t       size,
-		     uint8_t    **copied1,
-		     usize_t      *alloc1,
-		     uint8_t    **copied2,
-		     usize_t      *alloc2)
+		     uint8_t    **buf_ptr,
+		     usize_t      *buf_alloc)
 {
-  if (*copied1 != NULL && *alloc1 < size)
+  if (*buf_ptr != NULL && *buf_alloc < size)
     {
-      xd3_free (stream, *copied1);
-      *copied1 = NULL;
+      xd3_free (stream, *buf_ptr);
+      *buf_ptr = NULL;
     }
 
-  if (*copied1 == NULL)
+  if (*buf_ptr == NULL)
     {
-      *alloc1 = xd3_round_blksize (size, XD3_ALLOCSIZE);
+      *buf_alloc = xd3_round_blksize (size, XD3_ALLOCSIZE);
 
-      if ((*copied1 = xd3_alloc (stream, *alloc1, 1)) == NULL)
+      if ((*buf_ptr = xd3_alloc (stream, *buf_alloc, 1)) == NULL)
 	{
 	  return ENOMEM;
 	}
@@ -161,9 +159,7 @@ xd3_decode_section (xd3_stream *stream,
 	      if ((ret = xd3_decode_allocate (stream,
 					      section->size,
 					      & section->copied1,
-					      & section->alloc1,
-					      & section->copied2,
-					      & section->alloc2))) { return ret; }
+					      & section->alloc1))) { return ret; }
 
 	      section->buf = section->copied1;
 	    }

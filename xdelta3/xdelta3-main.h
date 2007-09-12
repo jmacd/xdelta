@@ -159,6 +159,7 @@ typedef enum
   CMD_PRINTHDR,
   CMD_PRINTHDRS,
   CMD_PRINTDELTA,
+  CMD_RECODE,
 #if XD3_ENCODER
   CMD_ENCODE,
 #endif
@@ -303,6 +304,9 @@ static int lru_filled = 0;
 
 /* Hacks for VCDIFF tools */
 static int allow_fake_source = 0;
+
+/* State for xdelta3 recode */
+static xd3_stream *recode_stream = NULL;
 
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is false just so
  * the program knows the mapping of IDENT->NAME. */
@@ -982,7 +986,7 @@ main_file_seek (main_file *xfile, xoff_t pos)
 
 /* The following macros let VCDIFF printing something printf-like with
  * main_file_write(), e.g.,:
- * 
+ *
  *   VC(UT "trying to be portable: %d\n", x)VE;
  */
 #define SNPRINTF_BUFSIZE 1024
@@ -1219,6 +1223,97 @@ main_print_func (xd3_stream* stream, main_file *xfile)
     }
 
   return ret;
+}
+
+static int
+main_recode_copy (xd3_stream* stream,
+		  xd3_output* output,
+		  xd3_desect* input)
+{
+  int ret;
+
+  XD3_ASSERT(output != NULL);
+  XD3_ASSERT(output->next_page == NULL);
+
+  if ((ret = xd3_decode_allocate (recode_stream,
+				  input->size,
+				  &output->base,
+				  &output->avail)))
+    {
+      return ret;
+    }
+
+  memcpy (output->base, input->buf, input->size);
+  output->next = input->size;
+  return 0;
+}
+
+// Re-encode one window
+static int
+main_recode_func (xd3_stream* stream, main_file *xfile)
+{
+  int ret;
+
+  XD3_ASSERT(stream->dec_state == DEC_FINISH);
+  XD3_ASSERT(recode_stream->enc_state == ENC_INIT ||
+	     recode_stream->enc_state == ENC_INPUT);
+
+  // Copy partial decoder output to partial encoder inputs
+  if ((ret = main_recode_copy (recode_stream,
+			       DATA_HEAD(recode_stream),
+			       &stream->data_sect)) ||
+      (ret = main_recode_copy (recode_stream,
+			       INST_HEAD(recode_stream),
+			       &stream->inst_sect)) ||
+      (ret = main_recode_copy (recode_stream,
+			       ADDR_HEAD(recode_stream),
+			       &stream->addr_sect)))
+    {
+      return ret;
+    }
+
+  // This jumps to xd3_emit_hdr()
+  recode_stream->enc_state = ENC_FLUSH;
+  //recode_stream->avail_in = stream->dec_tgtlen;
+  //recode_stream->n_emit = stream->dec_tgtlen;
+
+  // Output loop
+  for (;;)
+    {
+      switch((ret = xd3_encode_input (recode_stream)))
+	{
+	case XD3_INPUT: {
+	  /* finished recoding one window */
+	  return 0;
+	}
+	case XD3_OUTPUT: {
+	  /* main_file_write below */
+	  break;
+	}
+	case XD3_GOTHEADER:
+	case XD3_WINSTART:
+	case XD3_WINFINISH: {
+	  /* ignore */
+	  continue;
+	}
+	case XD3_GETSRCBLK:
+	case 0: {
+	    stream->msg = "invalid operation";
+	    return XD3_INTERNAL;
+	  }
+	default:
+	  return ret;
+	}
+
+      if ((ret = main_file_write(xfile,
+				 recode_stream->next_out,
+				 recode_stream->avail_out, "write failed")))
+	{
+	  return ret;
+	}
+
+      xd3_consume_output (recode_stream);
+    }
 }
 #endif /* VCDIFF_TOOLS */
 
@@ -2054,7 +2149,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   source->ioh      = sfile;
   source->curblkno = (xoff_t) -1;
   source->curblk   = NULL;
-  
+
 #if EXTERNAL_COMPRESSION
   if (option_decompress_inputs)
     {
@@ -2149,7 +2244,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
   if (option_verbose)
     {
       static char buf[32];
-      
+
       XPR(NT "source %s winsize %s size %"Q"u\n",
 	  sfile->filename, main_format_bcnt(option_srcwinsz, buf), source->size);
     }
@@ -2371,6 +2466,7 @@ main_input (xd3_cmd     cmd,
 
   config.alloc = main_alloc;
   config.freef = main_free1;
+  // TODO: what about sec_xxxx.ngroups = 1?
   config.sec_data.ngroups = 1;
   config.sec_addr.ngroups = 1;
   config.sec_inst.ngroups = 1;
@@ -2393,6 +2489,31 @@ main_input (xd3_cmd     cmd,
       output_func   = main_print_func;
       stream_flags |= XD3_ADLER32_NOVER;
       stdout_only   = 1;
+      break;
+
+    case CMD_RECODE:
+
+      XD3_ASSERT (recode_stream == NULL);
+      recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream));
+
+      xd3_config recode_config;
+      xd3_init_config(&recode_config, 0);
+
+      // TODO: what about sec_xxxx.ngroups = 1?
+      config.alloc = main_alloc;
+      config.freef = main_free1;
+
+      if ((ret = xd3_config_stream (recode_stream, &recode_config)) ||
+	  (ret = xd3_encode_init_buffers (recode_stream)))
+	{
+	  return EXIT_FAILURE;
+	}
+
+      // TODO: xd3_set_appheader (recode_stream)
+
+      ifile->flags |= RD_NONEXTERNAL;
+      input_func    = xd3_decode_input;
+      output_func   = main_recode_func;
       break;
 #endif
 #if XD3_ENCODER
@@ -2615,7 +2736,8 @@ main_input (xd3_cmd     cmd,
 	      }
 	    else if (cmd == CMD_PRINTHDR ||
 		     cmd == CMD_PRINTHDRS ||
-		     cmd == CMD_PRINTDELTA)
+		     cmd == CMD_PRINTDELTA ||
+		     cmd == CMD_RECODE)
 	      {
 		if (xd3_decoder_needs_source (& stream) && sfile->filename == NULL)
 		  {
@@ -2676,7 +2798,7 @@ main_input (xd3_cmd     cmd,
 			    stream.current_window * option_winsize,
 			    (stream.current_window+1) * option_winsize);
 		      }
-		    
+
 		    /* Limited instruction buffer size affects source copies */
 		    if (option_verbose > 1 && stream.i_slots_used > stream.iopt_size)
 		      {
@@ -2835,6 +2957,13 @@ main_cleanup (void)
   lru_hits = 0;
   lru_misses = 0;
   lru_filled = 0;
+
+  if (recode_stream != NULL)
+    {
+      xd3_free_stream (recode_stream);
+      main_free (recode_stream);
+      recode_stream = NULL;
+    }
 
   XD3_ASSERT (main_mallocs == 0);
 }
@@ -3044,6 +3173,7 @@ main (int argc, char **argv)
 	  else if (strcmp (my_optstr, "printhdr") == 0) { cmd = CMD_PRINTHDR; }
 	  else if (strcmp (my_optstr, "printhdrs") == 0) { cmd = CMD_PRINTHDRS; }
 	  else if (strcmp (my_optstr, "printdelta") == 0) { cmd = CMD_PRINTDELTA; }
+	  else if (strcmp (my_optstr, "recode") == 0) { cmd = CMD_RECODE; }
 #endif
 
 	  /* If no option was found and still no command, let the default command be
@@ -3216,6 +3346,7 @@ main (int argc, char **argv)
     case CMD_PRINTDELTA:
 #if XD3_ENCODER
     case CMD_ENCODE:
+    case CMD_RECODE:
 #endif
     case CMD_DECODE:
       ret = main_input (cmd, & ifile, & ofile, & sfile);
@@ -3285,6 +3416,7 @@ main_help (void)
   DP(RINT "    printdelta  print information about the entire delta\n");
   DP(RINT "    printhdr    print information about the first window\n");
   DP(RINT "    printhdrs   print information about all windows\n");
+  DP(RINT "    recode      encode with new application/secondary settings\n");
 #endif
   DP(RINT "standard options:\n");
   DP(RINT "   -0 .. -9     compression level\n");
