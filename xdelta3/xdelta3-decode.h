@@ -495,6 +495,27 @@ xd3_decode_finish_window (xd3_stream *stream)
 }
 
 static int
+xd3_decode_secondary_sections (xd3_stream *secondary_stream)
+{
+#if SECONDARY_ANY
+  int ret;
+#define DECODE_SECONDARY_SECTION(UPPER,LOWER) \
+  ((secondary_stream->dec_del_ind & VCD_ ## UPPER ## COMP) && \
+   (ret = xd3_decode_secondary (secondary_stream, & secondary_stream-> LOWER ## _sect, \
+					& xd3_sec_ ## LOWER (secondary_stream))))
+
+  if (DECODE_SECONDARY_SECTION (DATA, data) ||
+      DECODE_SECONDARY_SECTION (INST, inst) ||
+      DECODE_SECONDARY_SECTION (ADDR, addr))
+    {
+      return ret;
+    }
+#undef DECODE_SECONDARY_SECTION
+#endif
+  return 0;
+}
+
+static int
 xd3_decode_sections (xd3_stream *stream)
 {
   usize_t need, more, take;
@@ -557,19 +578,7 @@ xd3_decode_sections (xd3_stream *stream)
 
   XD3_ASSERT (stream->dec_winbytes == need);
 
-#if SECONDARY_ANY
-#define DECODE_SECONDARY_SECTION(UPPER,LOWER) \
-  ((stream->dec_del_ind & VCD_ ## UPPER ## COMP) && \
-   (ret = xd3_decode_secondary (stream, & stream-> LOWER ## _sect, \
-					& xd3_sec_ ## LOWER (stream))))
-
-  if (DECODE_SECONDARY_SECTION (DATA, data) ||
-      DECODE_SECONDARY_SECTION (INST, inst) ||
-      DECODE_SECONDARY_SECTION (ADDR, addr))
-    {
-      return ret;
-    }
-#endif
+  if ((ret = xd3_decode_secondary_sections (stream))) { return ret; }
 
   if (stream->flags & XD3_SKIP_EMIT)
     {

@@ -198,6 +198,7 @@ xd3_decode_secondary (xd3_stream      *stream,
 
   sect->buf     = sect->copied2;
   sect->buf_max = sect->copied2 + dec_size;
+  sect->size = dec_size;
 
   return 0;
 }

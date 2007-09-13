@@ -1261,6 +1261,7 @@ main_recode_copy (xd3_stream* stream,
 				  &output->base,
 				  &output->avail)))
     {
+      XPR(NT XD3_LIB_ERRMSG (stream, ret));
       return ret;
     }
 
@@ -2484,13 +2485,40 @@ main_input (xd3_cmd     cmd,
 
   start_time = get_millisecs_now ();
 
+  if (option_use_secondary)
+    {
+      /* The default secondary compressor is DJW, if it's compiled, being used, etc. */
+      if (option_secondary == NULL)
+	{
+	  if (SECONDARY_DJW) { stream_flags |= XD3_SEC_DJW; }
+	}
+      else
+	{
+	  if (strcmp (option_secondary, "fgk") == 0 && SECONDARY_FGK)
+	    {
+	      stream_flags |= XD3_SEC_FGK;
+	    }
+	  else if (strcmp (option_secondary, "djw") == 0 && SECONDARY_DJW)
+	    {
+	      stream_flags |= XD3_SEC_DJW;
+	    }
+	  else
+	    {
+	      XPR(NT "unrecognized secondary compressor type: %s\n", option_secondary);
+	      return EXIT_FAILURE;
+	    }
+	}
+    }
+
+  if (option_use_checksum) { stream_flags |= XD3_ADLER32; }
+
   /* main_input setup. */
   switch ((int) cmd)
     {
 #if VCDIFF_TOOLS
-           if (1) { case CMD_PRINTHDR:   stream_flags = XD3_JUST_HDR; }
-      else if (1) { case CMD_PRINTHDRS:  stream_flags = XD3_SKIP_WINDOW; }
-      else        { case CMD_PRINTDELTA: stream_flags = XD3_SKIP_EMIT; }
+           if (1) { case CMD_PRINTHDR:   stream_flags |= XD3_JUST_HDR; }
+      else if (1) { case CMD_PRINTHDRS:  stream_flags |= XD3_SKIP_WINDOW; }
+      else        { case CMD_PRINTDELTA: stream_flags |= XD3_SKIP_EMIT; }
       ifile->flags |= RD_NONEXTERNAL;
       input_func    = xd3_decode_input;
       output_func   = main_print_func;
@@ -2499,14 +2527,13 @@ main_input (xd3_cmd     cmd,
       break;
 
     case CMD_RECODE:
-
       // No source will be read
-      stream_flags |= XD3_ADLER32_NOVER;
+      stream_flags |= XD3_ADLER32_NOVER | XD3_SKIP_EMIT;
 
       XD3_ASSERT (recode_stream == NULL);
       recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream));
 
-      int recode_flags = (stream.flags & XD3_SEC_TYPE);
+      int recode_flags = (stream_flags & XD3_SEC_TYPE);
       // TODO: what about sec_xxxx.ngroups = 1?
 
       xd3_config recode_config;
@@ -2521,6 +2548,7 @@ main_input (xd3_cmd     cmd,
       if ((ret = xd3_config_stream (recode_stream, &recode_config)) ||
 	  (ret = xd3_encode_init_buffers (recode_stream)))
 	{
+	  XPR(NT XD3_LIB_ERRMSG (& stream, ret));
 	  return EXIT_FAILURE;
 	}
 
@@ -2537,31 +2565,6 @@ main_input (xd3_cmd     cmd,
       input_func  = xd3_encode_input;
       output_func = main_write_output;
 
-      if (option_use_checksum) { stream_flags |= XD3_ADLER32; }
-      if (option_use_secondary)
-	{
-	  /* The default secondary compressor is DJW, if it's compiled, being used, etc. */
-	  if (option_secondary == NULL)
-	    {
-	      if (SECONDARY_DJW) { stream_flags |= XD3_SEC_DJW; }
-	    }
-	  else
-	    {
-	      if (strcmp (option_secondary, "fgk") == 0 && SECONDARY_FGK)
-		{
-		  stream_flags |= XD3_SEC_FGK;
-		}
-	      else if (strcmp (option_secondary, "djw") == 0 && SECONDARY_DJW)
-		{
-		  stream_flags |= XD3_SEC_DJW;
-		}
-	      else
-		{
-		  XPR(NT "unrecognized secondary compressor type: %s\n", option_secondary);
-		  return EXIT_FAILURE;
-		}
-	    }
-	}
       if (option_no_compress)      { stream_flags |= XD3_NOCOMPRESS; }
       if (option_use_altcodetable) { stream_flags |= XD3_ALT_CODE_TABLE; }
       if (option_smatch_config)
@@ -2615,7 +2618,6 @@ main_input (xd3_cmd     cmd,
 #endif
     case CMD_DECODE:
       if (option_use_checksum == 0) { stream_flags |= XD3_ADLER32_NOVER; }
-      stream_flags  = 0;
       ifile->flags |= RD_NONEXTERNAL;
       input_func    = xd3_decode_input;
       output_func   = main_write_output;

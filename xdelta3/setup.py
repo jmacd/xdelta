@@ -49,7 +49,7 @@ xdelta3_ext = Extension('xdelta3main',
                                                ])
 
 # $Format: "REL='$Xdelta3Version$'" $
-REL='0q'
+REL='0p_0'
 
 # This provides xdelta3.main(), which calls the xdelta3 command-line main()
 # from python.
