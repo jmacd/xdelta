@@ -100,7 +100,12 @@ typedef u_int16_t       uint16_t;
 typedef u_int32_t       uint32_t;
 #endif
 
+#if sizeof(long) < 8
 typedef u_int64_t       uint64_t;
+#else
+typedef long long unsigned int uint64_t;
+#endif
+
 #else
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
