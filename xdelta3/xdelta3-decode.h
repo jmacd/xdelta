@@ -411,7 +411,10 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((ret = xd3_getblk (stream, block)))
 		  {
 		    /* could be a XD3_GETSRCBLK failure. */
-		    XD3_ASSERT(ret != XD3_TOOFARBACK);
+		    if (ret == XD3_TOOFARBACK)
+		      {
+			ret = XD3_INTERNAL;
+		      }
 		    return ret;
 		  }
 
@@ -608,10 +611,11 @@ xd3_decode_emit (xd3_stream *stream)
    * is handled by setting the stream->dec_currentN instruction types to XD3_NOOP after
    * they have been processed. */
   XD3_ASSERT (! (stream->flags & XD3_SKIP_EMIT));
-  XD3_ASSERT (stream->avail_out == 0);
   XD3_ASSERT (stream->dec_tgtlen <= stream->space_out);
 
-  while (stream->inst_sect.buf != stream->inst_sect.buf_max)
+  while (stream->inst_sect.buf != stream->inst_sect.buf_max ||
+	 stream->dec_current1.type != XD3_NOOP ||
+	 stream->dec_current2.type != XD3_NOOP)
     {
       /* Decode next instruction pair. */
       if ((stream->dec_current1.type == XD3_NOOP) &&
@@ -620,15 +624,22 @@ xd3_decode_emit (xd3_stream *stream)
 
       /* Output for each instruction. */
       if ((stream->dec_current1.type != XD3_NOOP) &&
-	  (ret = xd3_decode_output_halfinst (stream, & stream->dec_current1))) { return ret; }
+	  (ret = xd3_decode_output_halfinst (stream, & stream->dec_current1)))
+	{
+	  return ret;
+	}
 
       if ((stream->dec_current2.type != XD3_NOOP) &&
-	  (ret = xd3_decode_output_halfinst (stream, & stream->dec_current2))) { return ret; }
+	  (ret = xd3_decode_output_halfinst (stream, & stream->dec_current2)))
+	{
+	  return ret;
+	}
     }
 
   if (stream->avail_out != stream->dec_tgtlen)
     {
-      IF_DEBUG1 (DP(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n", stream->avail_out, stream->dec_tgtlen));
+      IF_DEBUG1 (DP(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n",
+		    stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
       return XD3_INVALID_INPUT;
     }

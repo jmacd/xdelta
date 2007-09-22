@@ -537,6 +537,9 @@ djw_compute_mtf_1_2 (djw_prefix *prefix,
       for (j = 0; mtf[j] != sym; j += 1) { }
 
       XD3_ASSERT (j < nsym);
+      /* TODO: A reported test case triggers this assertion in debug and
+       * crashes (out of memory) in non-debug mode. Catch it here until fixed: */
+      if (j >= nsym) { abort(); }
 
       for (k = j; k >= 1; k -= 1) { mtf[k] = mtf[k-1]; }
 

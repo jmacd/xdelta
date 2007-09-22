@@ -2539,6 +2539,12 @@ xd3_config_stream(xd3_stream *stream,
 	default:
 	  IF_BUILD_SLOW(*smatcher = __smatcher_slow;
 			break;)
+	  IF_BUILD_DEFAULT(*smatcher = __smatcher_default;
+			   break;)
+	  IF_BUILD_FAST(*smatcher = __smatcher_fast;
+			break;)
+	  IF_BUILD_FASTEST(*smatcher = __smatcher_fastest;
+			   break;)
 	}
     }
 
@@ -4553,17 +4559,10 @@ xd3_source_extend_match (xd3_stream *stream)
  donefwd:
   stream->match_state = MATCH_SEARCHING;
 
-  /* Now decide whether to take the match.  There are several ways to answer this
-   * question and this is likely the best answer.  There is currently an assertion
-   * in xd3_iopt_erase that checks whether min_match works.  This variable maintains
-   * that every match exceeds the end of the previous match.  However, it is
-   * possible that match_back allows us to find a match that goes a long way back
-   * but not enough forward.  We could try an alternate approach, which might help
-   * or it might just be extra complexity: eliminate the next match_fwd >= min_match
-   * test and call xd3_iopt_erase right away.  Erase instructions as far as it goes
-   * back, then either remember what was deleted and re-insert it, or count on the
-   * string-matching algorithm to find that match again.  I think it is more
-   * worthwhile to implement large_hash duplicates. */
+  /* If the match ends short of the last instruction end, we probably don't want it.
+   * There is the possibility that a copy ends short of the last copy but also goes
+   * further back, in which case we might want it.  This code does not implement such: if
+   * so we would need more complicated xd3_iopt_erase logic. */
   if (stream->match_fwd < stream->min_match)
     {
       stream->match_fwd = 0;
@@ -4890,7 +4889,14 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   /* The min_match variable is updated to avoid matching the same lazy match over and over
    * again.  For example, if you find a (small) match of length 9 at one position, you
    * will likely find a match of length 8 at the next position. */
-  stream->min_match = MIN_MATCH;
+  if (xd3_iopt_last_matched (stream) > stream->input_position)
+    {
+      stream->min_match = max(MIN_MATCH, 1 + xd3_iopt_last_matched(stream) - stream->input_position);
+    }
+  else
+    {
+      stream->min_match = MIN_MATCH;
+    }
 
   /* The current input byte. */
   inp = stream->next_in + stream->input_position;
