@@ -2465,7 +2465,8 @@ main_input (xd3_cmd     cmd,
   xoff_t     last_total_out = 0;
   long       start_time;
   int        stdout_only = 0;
-
+  int        recode_flags;
+  xd3_config recode_config;
   int (*input_func) (xd3_stream*);
   int (*output_func) (xd3_stream*, main_file *);
 
@@ -2533,14 +2534,13 @@ main_input (xd3_cmd     cmd,
       XD3_ASSERT (recode_stream == NULL);
       recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream));
 
-      int recode_flags = (stream_flags & XD3_SEC_TYPE);
-      // TODO: what about sec_xxxx.ngroups = 1?
-
-      xd3_config recode_config;
+      recode_flags = (stream_flags & XD3_SEC_TYPE);
       xd3_init_config(&recode_config, recode_flags);
 
       recode_config.alloc = main_alloc;
       recode_config.freef = main_free1;
+
+      // TODO: what about sec_xxxx.ngroups = 1?
       recode_config.sec_data.ngroups = 1;
       recode_config.sec_addr.ngroups = 1;
       recode_config.sec_inst.ngroups = 1;
