@@ -925,6 +925,7 @@ static int sec_dist_func6 (xd3_stream *stream, xd3_output *data);
 static int sec_dist_func7 (xd3_stream *stream, xd3_output *data);
 static int sec_dist_func8 (xd3_stream *stream, xd3_output *data);
 static int sec_dist_func9 (xd3_stream *stream, xd3_output *data);
+static int sec_dist_func10 (xd3_stream *stream, xd3_output *data);
 
 static sec_dist_func sec_dists[] =
 {
@@ -937,6 +938,7 @@ static sec_dist_func sec_dists[] =
   sec_dist_func7,
   sec_dist_func8,
   sec_dist_func9,
+  sec_dist_func10,
 };
 
 /* Test ditsribution: 100 bytes of the same character (13). */
@@ -1089,6 +1091,21 @@ sec_dist_func9 (xd3_stream *stream, xd3_output *data)
   return 0;
 }
 
+/* Test distribution: freq[i] == i*i, creates a 21-bit code length, fixed in 3.0r. */
+static int
+sec_dist_func10 (xd3_stream *stream, xd3_output *data)
+{
+  int i, j, ret;
+  for (i = 0; i < ALPHABET_SIZE; i += 1)
+    {
+      for (j = 0; j <= (i*i); j += 1)
+	{
+	  if ((ret = xd3_emit_byte (stream, & data, i))) { return ret; }
+	}
+    }
+  return 0;
+}
+
 static int
 test_secondary_decode (xd3_stream         *stream,
 		       const xd3_sec_type *sec,
@@ -1213,7 +1230,8 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 
 	  CHECK(p_off == input_size);
 
-	  if ((ret = test_secondary_decode (stream, sec, input_size, compress_size, dec_input, dec_correct, dec_output)))
+	  if ((ret = test_secondary_decode (stream, sec, input_size, compress_size,
+					    dec_input, dec_correct, dec_output)))
 	    {
 	      DP(RINT "test %u: decode: %s", test_i, stream->msg);
 	      goto fail;
@@ -1229,9 +1247,12 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 	      {
 		dec_input[i/8] ^= 1 << (i%8);
 
-		if ((ret = test_secondary_decode (stream, sec, input_size, compress_size, dec_input, dec_correct, dec_output)) == 0)
+		if ((ret = test_secondary_decode (stream, sec, input_size,
+						  compress_size, dec_input,
+						  dec_correct, dec_output)) == 0)
 		  {
-		    /*DP(RINT "test %u: decode single-bit [%u/%u] error non-failure", test_i, i/8, i%8);*/
+		    /*DP(RINT "test %u: decode single-bit [%u/%u]
+		      error non-failure", test_i, i/8, i%8);*/
 		  }
 
 		dec_input[i/8] ^= 1 << (i%8);
@@ -1261,8 +1282,10 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
   return 0;
 }
 
-IF_FGK (static int test_secondary_fgk  (xd3_stream *stream, int gp) { return test_secondary (stream, & fgk_sec_type, gp); })
-IF_DJW (static int test_secondary_huff (xd3_stream *stream, int gp) { return test_secondary (stream, & djw_sec_type, gp); })
+IF_FGK (static int test_secondary_fgk  (xd3_stream *stream, int gp)
+	{ return test_secondary (stream, & fgk_sec_type, gp); })
+IF_DJW (static int test_secondary_huff (xd3_stream *stream, int gp)
+	{ return test_secondary (stream, & djw_sec_type, gp); })
 #endif
 
 /******************************************************************************************

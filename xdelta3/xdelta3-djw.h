@@ -86,25 +86,6 @@ typedef struct _djw_heapen   djw_heapen;
 typedef struct _djw_prefix   djw_prefix;
 typedef uint32_t             djw_weight;
 
-/* To enable Huffman tuning code... */
-#ifndef TUNE_HUFFMAN
-#define TUNE_HUFFMAN 0
-#endif
-
-#if TUNE_HUFFMAN == 0
-#define xd3_real_encode_huff xd3_encode_huff
-#define IF_TUNE(x)
-#define IF_NTUNE(x) x
-#else
-static uint xd3_bitsof_output (xd3_output *output, bit_state *bstate);
-#define IF_TUNE(x) x
-#define IF_NTUNE(x)
-static djw_weight tune_freq[DJW_TOTAL_CODES];
-static uint8_t tune_clen[DJW_MAX_GROUPS][ALPHABET_SIZE];
-static usize_t  tune_prefix_bits;
-static usize_t  tune_select_bits;
-static usize_t  tune_encode_bits;
-#endif
 struct _djw_heapen
 {
   uint32_t depth;
@@ -481,7 +462,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
 }
 
 static void
-djw_build_codes (uint *codes, const uint8_t *clen, int asize DEBUG_ARG (int abs_max))
+djw_build_codes (uint *codes, const uint8_t *clen, int asize, int abs_max)
 {
   int i, l;
   int min_clen = DJW_MAX_CODELEN;
@@ -642,14 +623,12 @@ djw_encode_prefix (xd3_stream    *stream,
   uint8_t    clclen[DJW_TOTAL_CODES];
   uint       clcode[DJW_TOTAL_CODES];
 
-  IF_TUNE (memset (clfreq, 0, sizeof (clfreq)));
-
   /* Move-to-front encode prefix symbols, count frequencies */
   djw_compute_prefix_1_2 (prefix, clfreq);
 
   /* Compute codes */
   djw_build_prefix (clfreq, clclen, DJW_TOTAL_CODES, DJW_MAX_CLCLEN);
-  djw_build_codes  (clcode, clclen, DJW_TOTAL_CODES DEBUG_ARG (DJW_MAX_CLCLEN));
+  djw_build_codes  (clcode, clclen, DJW_TOTAL_CODES, DJW_MAX_CLCLEN);
 
   /* Compute number of extra codes beyond basic ones for this template. */
   num_to_encode = DJW_TOTAL_CODES;
@@ -675,8 +654,6 @@ djw_encode_prefix (xd3_stream    *stream,
 
       if ((ret = xd3_encode_bits (stream, output, bstate, bits, code))) { return ret; }
     }
-
-  IF_TUNE (memcpy (tune_freq, clfreq, sizeof (clfreq)));
 
   return 0;
 }
@@ -798,11 +775,11 @@ xd3_encode_howmany_groups (xd3_stream *stream,
 }
 
 static int
-xd3_real_encode_huff (xd3_stream   *stream,
-		      djw_stream  *h,
-		      xd3_output   *input,
-		      xd3_output   *output,
-		      xd3_sec_cfg  *cfg)
+xd3_encode_huff (xd3_stream   *stream,
+		 djw_stream   *h,
+		 xd3_output   *input,
+		 xd3_output   *output,
+		 xd3_sec_cfg  *cfg)
 {
   int         ret;
   usize_t      groups, sector_size;
@@ -841,14 +818,13 @@ xd3_real_encode_huff (xd3_stream   *stream,
     {
       /* Single Huffman group. */
       uint        code[ALPHABET_SIZE]; /* Codes */
-      IF_TUNE  (uint8_t    *clen = tune_clen[0];)
-      IF_NTUNE (uint8_t     clen[ALPHABET_SIZE];)
+      uint8_t     clen[ALPHABET_SIZE];
       uint8_t    prefix_mtfsym[ALPHABET_SIZE];
       djw_prefix prefix;
 
       encode_bits =
 	djw_build_prefix (real_freq, clen, ALPHABET_SIZE, DJW_MAX_CODELEN);
-      djw_build_codes  (code, clen, ALPHABET_SIZE DEBUG_ARG (DJW_MAX_CODELEN));
+      djw_build_codes  (code, clen, ALPHABET_SIZE, DJW_MAX_CODELEN);
 
       if (encode_bits + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient) { goto nosecond; }
 
@@ -860,10 +836,6 @@ xd3_real_encode_huff (xd3_stream   *stream,
       if ((ret = djw_encode_prefix (stream, & output, & bstate, & prefix))) { goto failure; }
 
       if (encode_bits + (8 * output->next) + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient) { goto nosecond; }
-
-      IF_TUNE (tune_prefix_bits = xd3_bitsof_output (output, & bstate));
-      IF_TUNE (tune_select_bits = 0);
-      IF_TUNE (tune_encode_bits = encode_bits);
 
       /* Encode: data */
       for (in = input; in; in = in->next_page)
@@ -889,11 +861,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
     {
       /* DJW Huffman */
       djw_weight evolve_freq[DJW_MAX_GROUPS][ALPHABET_SIZE];
-#if TUNE_HUFFMAN == 0
       uint8_t evolve_clen[DJW_MAX_GROUPS][ALPHABET_SIZE];
-#else
-#define evolve_clen tune_clen
-#endif
       djw_weight left = input_bytes;
       int gp;
       int niter = 0;
@@ -1129,11 +1097,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
 
 	select_bits =
 	  djw_build_prefix (gbest_freq, gbest_clen, groups+1, DJW_MAX_GBCLEN);
-	djw_build_codes  (gbest_code, gbest_clen, groups+1  DEBUG_ARG (DJW_MAX_GBCLEN));
-
-	IF_TUNE (tune_prefix_bits = xd3_bitsof_output (output, & bstate));
-	IF_TUNE (tune_select_bits = select_bits);
-	IF_TUNE (tune_encode_bits = encode_bits);
+	djw_build_codes  (gbest_code, gbest_clen, groups+1, DJW_MAX_GBCLEN);
 
 	for (i = 0; i < groups+1; i += 1)
 	  {
@@ -1167,7 +1131,7 @@ xd3_real_encode_huff (xd3_stream   *stream,
 	/* Build code tables for each group. */
 	for (gp = 0; gp < groups; gp += 1)
 	  {
-	    djw_build_codes (evolve_code[gp], evolve_clen[gp], ALPHABET_SIZE DEBUG_ARG (DJW_MAX_CODELEN));
+	    djw_build_codes (evolve_code[gp], evolve_clen[gp], ALPHABET_SIZE, DJW_MAX_CODELEN);
 	  }
 
 	/* Now loop over the input. */
@@ -1687,240 +1651,5 @@ xd3_decode_huff (xd3_stream     *stream,
   (*output_pos) = output;
   return ret;
 }
-
-/*********************************************************************/
-/*                              TUNING                               */
-/*********************************************************************/
-
-#if TUNE_HUFFMAN && XD3_ENCODER
-#include <stdio.h>
-#include "xdelta3-fgk.h"
-
-static uint
-xd3_bitsof_output (xd3_output *output, bit_state *bstate)
-{
-  uint x = 0;
-  uint m = bstate->cur_mask;
-
-  while (m != 1)
-    {
-      x += 1;
-      m >>= 1;
-    }
-
-  return x + 8 * xd3_sizeof_output (output);
-}
-
-static const char* xd3_sect_type (xd3_section_type type)
-{
-  switch (type)
-    {
-    case DATA_SECTION: return "DATA";
-    case INST_SECTION: return "INST";
-    case ADDR_SECTION: return "ADDR";
-    }
-  abort ();
-}
-
-static int
-xd3_encode_huff (xd3_stream   *stream,
-		 djw_stream  *h,
-		 xd3_output   *input,
-		 xd3_output   *unused_output,
-		 xd3_sec_cfg  *cfg)
-{
-  int ret = 0;
-  int input_size = xd3_sizeof_output (input);
-  static int hdr = 0;
-  const char *sect_type = xd3_sect_type (cfg->data_type);
-  xd3_output *output;
-  usize_t output_size;
-
-  if (hdr == 0) { hdr = 1; DP(RINT "____ SECT INSZ SECTORSZ GPNO OUTSZ PREFIX SELECT ENCODE\n"); }
-
-  DP(RINT "SECTION %s %u\n", sect_type, input_size);
-
-    {
-      int gp, i;
-      int best_size = 99999999;
-      usize_t best_prefix = 0, best_select = 0, best_encode = 0, best_sector_size = 0;
-      int best_gpno = -1;
-      const char *t12 = "12";
-      usize_t clen_count[DJW_MAX_CODELEN+1];
-      djw_weight best_freq[DJW_TOTAL_CODES];
-
-      for (cfg->ngroups = 1; cfg->ngroups <= /*1*/ DJW_MAX_GROUPS; cfg->ngroups += 1)
-	{
-	  for (cfg->sector_size = 10; cfg->sector_size <= DJW_SECTORSZ_MAX; cfg->sector_size += 10)
-	    {
-	      output = xd3_alloc_output (stream, NULL);
-
-	      if ((ret = xd3_real_encode_huff (stream, h, input, output, cfg))) { goto fail; }
-
-	      output_size = xd3_sizeof_output (output);
-
-	      if (output_size < best_size)
-		{
-		  best_size = output_size;
-		  best_gpno = cfg->ngroups;
-		  best_prefix = tune_prefix_bits;
-		  best_select = tune_select_bits;
-		  best_encode = tune_encode_bits;
-		  best_sector_size = cfg->sector_size;
-		  memset (clen_count, 0, sizeof (clen_count));
-
-		  for (gp = 0; gp < cfg->ngroups; gp += 1)
-		    {
-		      for (i = 0; i < ALPHABET_SIZE; i += 1)
-			{
-			  clen_count[tune_clen[gp][i]] += 1;
-			}
-		    }
-
-		  memcpy (best_freq, tune_freq, sizeof (tune_freq));
-
-		  XD3_ASSERT (sizeof (tune_freq) == sizeof (mtf_freq));
-		}
-
-	      if (1)
-		{
-		  DP(RINT "COMP%s %u %u %u %u %u %u\n",
-			   t12, cfg->ngroups, cfg->sector_size,
-			   output_size, tune_prefix_bits, tune_select_bits, tune_encode_bits);
-		}
-	      else
-		{
-		fail:
-		  DP(RINT "COMP%s %u %u %u %u %u %u\n",
-			   t12, cfg->ngroups, cfg->sector_size,
-			   input_size, 0, 0, 0);
-		}
-
-	      xd3_free_output (stream, output);
-
-	      XD3_ASSERT (ret == 0 || ret == XD3_NOSECOND);
-
-	      if (cfg->ngroups == 1) { break; }
-	    }
-	}
-
-      if (best_gpno > 0)
-	{
-	  DP(RINT "BEST%s %u %u %u %u %u %u\n",
-		   t12, best_gpno, best_sector_size,
-		   best_size, best_prefix, best_select, best_encode);
-
-#if 0
-	  DP(RINT "CLEN%s ", t12);
-	  for (i = 1; i <= DJW_MAX_CODELEN; i += 1)
-	    {
-	      DP(RINT "%u ", clen_count[i]);
-	    }
-	  DP(RINT "\n");
-
-	  DP(RINT "FREQ%s ", t12);
-	  for (i = 0; i < DJW_TOTAL_CODES; i += 1)
-	    {
-	      DP(RINT "%u ", tune_freq[i]);
-	    }
-	  DP(RINT "\n");
-#endif
-	}
-    }
-
-  /* Compare to split single-table windows. */
-  {
-    int parts, i;
-
-    cfg->ngroups = 1;
-
-    for (parts = 2; parts <= DJW_MAX_GROUPS; parts += 1)
-      {
-	usize_t part_size = input_size / parts;
-	xd3_output *inp = input, *partin, *partin_head;
-	usize_t      off = 0;
-	usize_t      part_total = 0;
-	
-	if (part_size < 1000) { break; } 
-
-	for (i = 0; i < parts; i += 1)
-	  {
-	    usize_t inc;
-
-	    partin = partin_head = xd3_alloc_output (stream, NULL);
-	    output = xd3_alloc_output (stream, NULL);
-
-	    for (inc = 0; ((i < parts-1) && inc < part_size) ||
-		   ((i == parts-1) && inp != NULL); )
-	      {
-		usize_t take;
-
-		if (i < parts-1)
-		  {
-		    take = min (part_size - inc, inp->next - off);
-		  }
-		else
-		  {
-		    take = inp->next - off;
-		  }
-
-		ret = xd3_emit_bytes (stream, & partin, inp->base + off, take);
-
-		off += take;
-		inc += take;
-
-		if (off == inp->next)
-		  {
-		    inp = inp->next_page;
-		    off = 0;
-		  }
-	      }
-
-	    ret = xd3_real_encode_huff (stream, h, partin_head, output, cfg);
-
-	    part_total += xd3_sizeof_output (output);
-
-	    xd3_free_output (stream, partin_head);
-	    xd3_free_output (stream, output);
-
-	    XD3_ASSERT (ret == 0 || ret == XD3_NOSECOND);
-
-	    if (ret == XD3_NOSECOND)
-	      {
-		break;
-	      }
-	  }
-
-	if (ret != XD3_NOSECOND)
-	  {
-	    DP(RINT "PART %u %u\n", parts, part_total);
-	  }
-      }
-  }
-
-  /* Compare to FGK */
-  {
-    fgk_stream *fgk = fgk_alloc (stream);
-    
-    fgk_init (fgk);
-    
-    output = xd3_alloc_output (stream, NULL);
-    
-    ret = xd3_encode_fgk (stream, fgk, input, output, NULL);
-    
-    output_size = xd3_sizeof_output (output);
-    xd3_free_output (stream, output);
-    fgk_destroy (stream, fgk);
-
-    XD3_ASSERT (ret == 0);
-    
-    DP(RINT "FGK %u\n", output_size);
-  }
-
-  DP(RINT "END_SECTION %s %u\n", sect_type, input_size);
-
-  return 0;
-}
-#endif
 
 #endif

@@ -337,7 +337,6 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	    return XD3_INVALID_INPUT;
 	  }
 
-	/* TUNE: Probably want to eliminate memset/memcpy here */
 	memset (stream->next_out + stream->avail_out,
 		stream->data_sect.buf[0],
 		take);

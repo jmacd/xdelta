@@ -138,14 +138,14 @@ xdelta3.o: $(SOURCES)
 xdelta3_wrap.o: xdelta3_wrap.c
 	$(CC) $(SWIG_FLAGS) \
               -DHAVE_CONFIG_H \
-	      -I/usr/include/python2.4 \
-	      -I/usr/lib/python2.4/config \
+	      -I/usr/include/python2.5 \
+	      -I/usr/lib/python2.5/config \
 	      -fpic \
 	      -c -g xdelta3_wrap.c
 
 xdelta3module.dll: xdelta3_wrap.o xdelta3.o
-	gcc -shared -Wl,--enable-auto-image-base xdelta3.o xdelta3_wrap.o -L/usr/lib/python2.4/config -lpython2.4 -o xdelta3module.dll
-	cp $(SWIGTGT) /usr/lib/python2.4/site-packages
+	gcc -shared -Wl,--enable-auto-image-base xdelta3.o xdelta3_wrap.o -L/usr/lib/python2.5/config -lpython2.5 -o xdelta3module.dll
+	cp $(SWIGTGT) /usr/lib/python2.5/site-packages
 
 xdelta3module.so: xdelta3_wrap.o xdelta3.o
 	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
@@ -188,10 +188,6 @@ xdelta3-everything: $(SOURCES)
 					-DXD3_POSIX=1 \
 					-DEXTERNAL_COMPRESSION=1 \
 					-DXD3_DEBUG=1 -lm
-
-xdelta3-tune: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow xdelta3.c -o xdelta3-tune -DXD3_MAIN=1 \
-		-DSECONDARY_FGK=1 -DSECONDARY_DJW=1 -DTUNE_HUFFMAN=1
 
 xdelta3-Opg: $(SOURCES)
 	$(CC) -pg -g -O -Wall -Wshadow xdelta3.c -o xdelta3-Opg -DXD3_MAIN=1 \

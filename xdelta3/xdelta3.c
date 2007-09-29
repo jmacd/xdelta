@@ -517,10 +517,8 @@ IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 /* This CPP-conditional stuff can be cleaned up... */
 #if XD3_DEBUG
 #define IF_DEBUG(x) x
-#define DEBUG_ARG(x) , x
 #else
 #define IF_DEBUG(x)
-#define DEBUG_ARG(x)
 #endif
 #if XD3_DEBUG > 1
 #define IF_DEBUG1(x) x
