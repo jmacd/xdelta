@@ -57,15 +57,6 @@
 #ifndef XD3_HARDMAXWINSIZE
 #define XD3_HARDMAXWINSIZE (1U<<24)
 #endif
-
-/* The XD3_NODECOMPRESSSIZE parameter tells the xdelta main routine not to try to
- * externally-decompress source inputs that are too large.  Since these files must be
- * seekable, they are decompressed to a temporary file location and the user may not wish
- * for this. */
-#ifndef XD3_NODECOMPRESSSIZE
-#define XD3_NODECOMPRESSSIZE (1U<<28)
-#endif
-
 /* The IOPT_SIZE value sets the size of a buffer used to batch overlapping copy
  * instructions before they are optimized by picking the best non-overlapping ranges.  The
  * larger this buffer, the longer a forced xd3_srcwin_setup() decision is held off.

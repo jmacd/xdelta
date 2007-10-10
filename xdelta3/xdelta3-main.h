@@ -362,7 +362,6 @@ main_config (void)
   DP(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
   DP(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
   DP(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
-  DP(RINT "XD3_NODECOMPRESSSIZE=%d\n", XD3_NODECOMPRESSSIZE);
 
   return EXIT_SUCCESS;
 }
@@ -2199,14 +2198,6 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       if (sfile->compressor)
 	{
 	  xoff_t osize = source->size;
-
-	  if (osize > XD3_NODECOMPRESSSIZE)
-	    {
-	      XPR(NT "source file too large for external decompression: %s: %"Q"u\n",
-		       sfile->filename, osize);
-	      ret = XD3_INTERNAL;
-	      goto error;
-	    }
 
 	  if ((ret = main_decompress_source (sfile, source)))
 	    {
