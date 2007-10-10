@@ -2494,6 +2494,10 @@ main_input (xd3_cmd     cmd,
 	    {
 	      stream_flags |= XD3_SEC_DJW;
 	    }
+	  else if (strcmp (option_secondary, "none") == 0 && SECONDARY_DJW)
+	    {
+	      /* No secondary */
+	    }
 	  else
 	    {
 	      XPR(NT "unrecognized secondary compressor type: %s\n", option_secondary);
@@ -3227,8 +3231,17 @@ main (int argc, char **argv)
 	case 'T': option_use_altcodetable = 1; break;
 	case 'C': option_smatch_config = my_optarg; break;
 	case 'J': option_no_output = 1; break;
-	case 'S': if (my_optarg == NULL) { option_use_secondary = 0; }
-	          else { option_use_secondary = 1; option_secondary = my_optarg; } break;
+	case 'S': if (my_optarg == NULL)
+	    {
+	      option_use_secondary = 1;
+	      option_secondary = "none";
+	    }
+	  else
+	    {
+	      option_use_secondary = 1;
+	      option_secondary = my_optarg;
+	    }
+	  break;
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
 	          else { option_appheader = (uint8_t*) my_optarg; } break;
 	case 'B':
