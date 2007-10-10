@@ -26,7 +26,7 @@
  * Coding" in Journal of Algorithms 6. */
 
 /* A 32bit counter (fgk_weight) is used as the frequency counter for nodes in the huffman
- * tree.  @!@ Need to test for overflow and/or reset stats. */
+ * tree.  TODO: Need to test for overflow and/or reset stats. */
 
 typedef struct _fgk_stream fgk_stream;
 typedef struct _fgk_node   fgk_node;

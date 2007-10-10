@@ -60,7 +60,7 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -O3
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0p_pre3
+REL=0r
 RELDIR = xdelta3$(REL)
 
 all: xdelta3-debug xdelta3

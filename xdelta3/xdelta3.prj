@@ -1,33 +1,33 @@
 ;; -*- Prcs -*-
 (Created-By-Prcs-Version 1 3 4)
 (Project-Description "")
-(Project-Version xdelta3 0 32)
-(Parent-Version xdelta3 0 31)
-(Version-Log "version 3.0q")
+(Project-Version xdelta3 0 34)
+(Parent-Version xdelta3 0 33)
+(Version-Log "3.0r Adds recode, fixes non-blocking API bug, fixes -S djw encoder crash.")
 (New-Version-Log "")
-(Checkin-Time "Sat, 24 Mar 2007 06:11:54 -0800")
+(Checkin-Time "Wed, 10 Oct 2007 02:15:52 -0700")
 (Checkin-Login jmacd)
 (Populate-Ignore ("\\.svn"))
 (Project-Keywords
- (Xdelta3Version "0p_0")
+ (Xdelta3Version "0r")
  )
 (Files
   (COPYING (xdelta3/b/29_COPYING 1.1 744))
 
   (xdelta3-cfgs.h (xdelta3/9_xdelta3-cf 1.8 744))
-  (xdelta3-decode.h (xdelta3/b/30_xdelta3-de 1.6 744))
-  (xdelta3-djw.h (xdelta3/8_xdelta3-dj 1.7 744))
-  (xdelta3-fgk.h (xdelta3/7_xdelta3-fg 1.3 744))
+  (xdelta3-decode.h (xdelta3/b/30_xdelta3-de 1.7 744))
+  (xdelta3-djw.h (xdelta3/8_xdelta3-dj 1.8 744))
+  (xdelta3-fgk.h (xdelta3/7_xdelta3-fg 1.4 744))
   (xdelta3-list.h (xdelta3/6_xdelta3-li 1.3 744))
-  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.19 744))
+  (xdelta3-main.h (xdelta3/5_xdelta3-ma 1.20 744))
   (xdelta3-python.h (xdelta3/4_xdelta3-py 1.5 744))
-  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.19 744))
-  (xdelta3-second.h (xdelta3/3_xdelta3-se 1.5 744))
-  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.15 744))
-  (xdelta3.c (xdelta3/16_xdelta3.c 1.18 744))
-  (xdelta3.h (xdelta3/1_xdelta3.h 1.15 744))
+  (xdelta3-regtest.py (xdelta3/10_xdelta3-re 1.20 744))
+  (xdelta3-second.h (xdelta3/3_xdelta3-se 1.6 744))
+  (xdelta3-test.h (xdelta3/2_xdelta3-te 1.16 744))
+  (xdelta3.c (xdelta3/16_xdelta3.c 1.19 744))
+  (xdelta3.h (xdelta3/1_xdelta3.h 1.16 744))
 
-  (Makefile (xdelta3/0_Makefile 1.12 744))
+  (Makefile (xdelta3/0_Makefile 1.13 744))
   (setup.py (xdelta3/11_setup.py 1.5 744))
 
   (draft-korn-vcdiff.txt (xdelta3/b/22_draft-korn 1.1 744))
@@ -38,19 +38,24 @@
 
   (README (xdelta3/b/31_README 1.1 744))
   (badcopy.vcproj (xdelta3/b/32_badcopy.vc 1.1 744))
-  (xdelta3.vcproj (xdelta3/b/33_xdelta3.vc 1.3 744))
+  (xdelta3.vcproj (xdelta3/b/33_xdelta3.vc 1.4 744))
 
   (xdelta3.swig (xdelta3/b/27_xdelta3.sw 1.3 744))
 
   (xdelta3-test.py (xdelta3/b/28_xdelta3-te 1.5 744))
 
-  (examples/Makefile (xdelta3/b/34_Makefile 1.1 744))
+  (examples/Makefile (xdelta3/b/34_Makefile 1.2 744))
   (examples/small_page_test.c (xdelta3/b/35_small_page 1.2 744))
 
   (plot.sh (xdelta3/b/36_plot.sh 1.1 744))
 
-  (xdelta3.wxs ())
-  (xdelta3.wxi ())
+  (xdelta3.wxs (xdelta3/b/37_xdelta3.wx 1.1 744))
+  (xdelta3.wxi (xdelta3/b/38_xdelta3.wx 1.1 744))
+
+;; Files added by populate at Wed, 10 Oct 2007 02:15:48 -0700,
+;; to version 0.33(w), by jmacd:
+
+  (examples/encode_decode_test.c (xdelta3/b/39_encode_dec 1.1 744))
 )
 (Merge-Parents)
 (New-Merge-Parents)
