@@ -4199,145 +4199,6 @@ xd3_srcwin_setup (xd3_stream *stream)
   return 0;
 }
 
-/* This function computes more source checksums to advance the window.
- * Called at every entrance to the string-match loop and each time
- * stream->input_position reaches the value returned as
- * *next_move_point.  NB: this is one of the most expensive functions
- * in this code and also the most critical for good compression.
- *
- * TODO: really would like a good test for this logic. how?
- * TODO: optimize the inner loop
- */
-static int
-xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
-{
-  xoff_t logical_input_cksum_pos;
-
-  XD3_ASSERT(stream->srcwin_cksum_pos <= stream->src->size);
-  if (stream->srcwin_cksum_pos == stream->src->size)
-    {
-      *next_move_point = USIZE_T_MAX;
-      return 0;
-    }
-
-  /* Begin by advancing at twice the input rate, up to half the
-   * maximum window size. */
-  logical_input_cksum_pos = min((stream->total_in + stream->input_position) * 2,
-				(stream->total_in + stream->input_position) +
-				  (stream->srcwin_maxsz / 2));
-
-  /* If srcwin_cksum_pos is already greater, wait until the difference
-   * is met. */
-  if (stream->srcwin_cksum_pos > logical_input_cksum_pos)
-    {
-      *next_move_point = stream->input_position +
-	(usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
-      return 0;
-    }
-
-  /* A long match may have extended past srcwin_cksum_pos.  Don't
-   * start checksumming already-matched source data. */
-  if (stream->maxsrcaddr > stream->srcwin_cksum_pos)
-    {
-      stream->srcwin_cksum_pos = stream->maxsrcaddr;
-    }
-
-  if (logical_input_cksum_pos < stream->srcwin_cksum_pos)
-    {
-      logical_input_cksum_pos = stream->srcwin_cksum_pos;
-    }
-
-  /* Advance at least one source block.  With the command-line
-   * defaults this means:
-   *
-   * if (src->size <= srcwin_maxsz), index the entire source at once
-   * using the position of the first non-match.  This is good for
-   * small inputs, especially when the content may have moved anywhere
-   * in the file (e.g., tar files).
-   *
-   * if (src->size > srcwin_maxsz), index at least one block (which
-   * the command-line sets to 1/32 of srcwin_maxsz) ahead of the
-   * logical position.  This is good for different reasons: when a
-   * long match spanning several source blocks is encountered, this
-   * avoids computing checksums for those blocks.  If the data can
-   * move anywhere, this is bad.
-   */
-  logical_input_cksum_pos += stream->src->blksize;
-
-  IF_DEBUG1 (DP(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n",
-	       stream->total_in + stream->input_position,
-	       stream->srcwin_cksum_pos,
-	       logical_input_cksum_pos));
-
-  while (stream->srcwin_cksum_pos < logical_input_cksum_pos &&
-	 stream->srcwin_cksum_pos < stream->src->size)
-    {
-      xoff_t  blkno = stream->srcwin_cksum_pos / stream->src->blksize;
-      ssize_t oldpos = stream->srcwin_cksum_pos % stream->src->blksize;
-      ssize_t blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
-      int ret;
-
-      if (oldpos + stream->smatcher.large_look > blkpos)
-	{
-	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
-	  continue;
-	}
-
-      if ((ret = xd3_getblk (stream, blkno)))
-	{
-	  /* TOOFARBACK should never occur here, since we read forward. */
-	  if (ret == XD3_TOOFARBACK)
-	    {
- 	      ret = XD3_INTERNAL;
-	    }
-	  return ret;
-	}
-
-      /* This inserts checksums for the entire block, in reverse,
-       * starting from the end of the block.  This logic does not test
-       * stream->srcwin_cksum_pos because it always advances it to the
-       * start of the next block.
-       *
-       * oldpos is the srcwin_cksum_pos within this block.  blkpos is
-       * the number of bytes available.  Each iteration inspects
-       * large_look bytes then steps back large_step bytes.  The
-       * if-stmt above ensures at least one large_look of data. */
-      blkpos -= stream->smatcher.large_look;
-
-      do
-	{
-	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkpos,
-				       stream->smatcher.large_look);
-	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
-
-	  stream->large_table[hval] =
-	    (usize_t) ((stream->src->blksize * blkno) +
-		       (xoff_t)(blkpos + HASH_CKOFFSET));
-
-	  IF_DEBUG (stream->large_ckcnt += 1);
-
-	  blkpos -= stream->smatcher.large_step;
-	}
-      while (blkpos >= oldpos);
-
-      stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
-    }
-
-  if (stream->srcwin_cksum_pos >= stream->src->size)
-    {
-      /* This invariant is needed for xd3_source_cksum_offset() */
-      stream->srcwin_cksum_pos = stream->src->size;
-      *next_move_point = USIZE_T_MAX;
-      return 0;
-    }
-
-  /* How long until this function should be called again. */
-  XD3_ASSERT(stream->srcwin_cksum_pos >= logical_input_cksum_pos);
-  *next_move_point = stream->input_position + 1 +
-    (usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
-  return 0;
-}
-
 /* Sets the bounding region for a newly discovered source match, prior to calling
  * xd3_source_extend_match().  This sets the match_maxfwd, match_maxback variables.  Note:
  * srcpos is an absolute position (xoff_t) but the match_maxfwd, match_maxback variables
@@ -4848,6 +4709,145 @@ static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
 #endif
 };
 
+/* This function computes more source checksums to advance the window.
+ * Called at every entrance to the string-match loop and each time
+ * stream->input_position reaches the value returned as
+ * *next_move_point.  NB: this is one of the most expensive functions
+ * in this code and also the most critical for good compression.
+ *
+ * TODO: really would like a good test for this logic. how?
+ * TODO: optimize the inner loop
+ */
+static int
+XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_point)
+{
+  xoff_t logical_input_cksum_pos;
+
+  XD3_ASSERT(stream->srcwin_cksum_pos <= stream->src->size);
+  if (stream->srcwin_cksum_pos == stream->src->size)
+    {
+      *next_move_point = USIZE_T_MAX;
+      return 0;
+    }
+
+  /* Begin by advancing at twice the input rate, up to half the
+   * maximum window size. */
+  logical_input_cksum_pos = min((stream->total_in + stream->input_position) * 2,
+				(stream->total_in + stream->input_position) +
+				  (stream->srcwin_maxsz / 2));
+
+  /* If srcwin_cksum_pos is already greater, wait until the difference
+   * is met. */
+  if (stream->srcwin_cksum_pos > logical_input_cksum_pos)
+    {
+      *next_move_point = stream->input_position +
+	(usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
+      return 0;
+    }
+
+  /* A long match may have extended past srcwin_cksum_pos.  Don't
+   * start checksumming already-matched source data. */
+  if (stream->maxsrcaddr > stream->srcwin_cksum_pos)
+    {
+      stream->srcwin_cksum_pos = stream->maxsrcaddr;
+    }
+
+  if (logical_input_cksum_pos < stream->srcwin_cksum_pos)
+    {
+      logical_input_cksum_pos = stream->srcwin_cksum_pos;
+    }
+
+  /* Advance at least one source block.  With the command-line
+   * defaults this means:
+   *
+   * if (src->size <= srcwin_maxsz), index the entire source at once
+   * using the position of the first non-match.  This is good for
+   * small inputs, especially when the content may have moved anywhere
+   * in the file (e.g., tar files).
+   *
+   * if (src->size > srcwin_maxsz), index at least one block (which
+   * the command-line sets to 1/32 of srcwin_maxsz) ahead of the
+   * logical position.  This is good for different reasons: when a
+   * long match spanning several source blocks is encountered, this
+   * avoids computing checksums for those blocks.  If the data can
+   * move anywhere, this is bad.
+   */
+  logical_input_cksum_pos += stream->src->blksize;
+
+  IF_DEBUG1 (DP(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n",
+	       stream->total_in + stream->input_position,
+	       stream->srcwin_cksum_pos,
+	       logical_input_cksum_pos));
+
+  while (stream->srcwin_cksum_pos < logical_input_cksum_pos &&
+	 stream->srcwin_cksum_pos < stream->src->size)
+    {
+      xoff_t  blkno = stream->srcwin_cksum_pos / stream->src->blksize;
+      ssize_t oldpos = stream->srcwin_cksum_pos % stream->src->blksize;
+      ssize_t blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
+      int ret;
+
+      if (oldpos + stream->smatcher.large_look > blkpos)
+	{
+	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
+	  continue;
+	}
+
+      if ((ret = xd3_getblk (stream, blkno)))
+	{
+	  /* TOOFARBACK should never occur here, since we read forward. */
+	  if (ret == XD3_TOOFARBACK)
+	    {
+ 	      ret = XD3_INTERNAL;
+	    }
+	  return ret;
+	}
+
+      /* This inserts checksums for the entire block, in reverse,
+       * starting from the end of the block.  This logic does not test
+       * stream->srcwin_cksum_pos because it always advances it to the
+       * start of the next block.
+       *
+       * oldpos is the srcwin_cksum_pos within this block.  blkpos is
+       * the number of bytes available.  Each iteration inspects
+       * large_look bytes then steps back large_step bytes.  The
+       * if-stmt above ensures at least one large_look of data. */
+      blkpos -= stream->smatcher.large_look;
+
+      do
+	{
+	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkpos,
+				       stream->smatcher.large_look);
+	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
+
+	  stream->large_table[hval] =
+	    (usize_t) ((stream->src->blksize * blkno) +
+		       (xoff_t)(blkpos + HASH_CKOFFSET));
+
+	  IF_DEBUG (stream->large_ckcnt += 1);
+
+	  blkpos -= stream->smatcher.large_step;
+	}
+      while (blkpos >= oldpos);
+
+      stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
+    }
+
+  if (stream->srcwin_cksum_pos >= stream->src->size)
+    {
+      /* This invariant is needed for xd3_source_cksum_offset() */
+      stream->srcwin_cksum_pos = stream->src->size;
+      *next_move_point = USIZE_T_MAX;
+      return 0;
+    }
+
+  /* How long until this function should be called again. */
+  XD3_ASSERT(stream->srcwin_cksum_pos >= logical_input_cksum_pos);
+  *next_move_point = stream->input_position + 1 +
+    (usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
+  return 0;
+}
+
 static int
 XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 {
@@ -4866,7 +4866,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   int            run_l;
   int            ret;
   usize_t         match_length;
-  usize_t         match_offset;  /* "may be unused" warnings are bogus (due to min_match test) */
+  usize_t         match_offset = 0;
   usize_t         next_move_point;
 
   /* If there will be no compression due to settings or short input, skip it entirely. */
@@ -4917,7 +4917,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
     {
       /* Source window: next_move_point is the point that stream->input_position must reach before
        * computing more source checksum. */
-      if ((ret = xd3_srcwin_move_point (stream, & next_move_point)))
+      if ((ret = XD3_TEMPLATE(xd3_srcwin_move_point_) (stream, & next_move_point)))
 	{
 	  return ret;
 	}
@@ -4973,7 +4973,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       if (DO_LARGE && (stream->input_position + LLOOK <= stream->avail_in))
 	{
 	  if ((stream->input_position >= next_move_point) &&
-	      (ret = xd3_srcwin_move_point (stream, & next_move_point)))
+	      (ret = XD3_TEMPLATE(xd3_srcwin_move_point_) (stream, & next_move_point)))
 	    {
 	      return ret;
 	    }

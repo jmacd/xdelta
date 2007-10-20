@@ -1370,11 +1370,11 @@ static char* ext_tmpfile = NULL;
 
 /* Like write(), but makes repeated calls to empty the buffer. */
 static int
-main_pipe_write (int outfd, const uint8_t *exist_buf, usize_t remain)
+main_pipe_write (int outfd, uint8_t *exist_buf, usize_t remain)
 {
   int ret;
 
-  if ((ret = xd3_posix_io (outfd, (uint8_t*) exist_buf, remain, (xd3_posix_func*) &write, NULL)))
+  if ((ret = xd3_posix_io (outfd, exist_buf, remain, (xd3_posix_func*) &write, NULL)))
     {
       XPR(NT "pipe write failed: %s", xd3_mainerror (ret));
       return ret;
@@ -3420,10 +3420,13 @@ main (int argc, char **argv)
 static int
 main_help (void)
 {
-  /* TODO: license info */
+  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, Joshua MacDonald\n\");" $ */
+
+  DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
+  DP(RINT "This is free software, and you are welcome to redistribute it\n");
+  DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
 
   /* Note: update wiki when command-line features change */
-  main_version ();
   DP(RINT "usage: xdelta3 [command/options] [input [output]]\n");
   DP(RINT "special command names:\n");
   DP(RINT "    config      prints xdelta3 configuration\n");
@@ -3465,13 +3468,8 @@ main_help (void)
   DP(RINT "   -n           disable checksum (encode/decode)\n");
   DP(RINT "   -C           soft config (encode, undocumented)\n");
   DP(RINT "   -A [apphead] disable/provide application header (encode)\n");
-
-#if XD3_DEBUG > 0
-  DP(RINT "developer options:\n");
   DP(RINT "   -J           disable output (check/compute only)\n");
-  DP(RINT "   -P           repeat count (for profiling)\n");
-  DP(RINT "   -T           use alternate code table\n");
-#endif
+  DP(RINT "   -T           use alternate code table (test)\n");
 
   DP(RINT "the XDELTA environment variable may contain extra args:\n");
   DP(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
@@ -3479,4 +3477,3 @@ main_help (void)
   DP(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y/\n");
   return EXIT_FAILURE;
 }
-

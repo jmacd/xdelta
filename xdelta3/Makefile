@@ -104,6 +104,8 @@ wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
 	$(WIXDIR)/candle.exe xdelta3.wxs -out xdelta3.wixobj
 	$(WIXDIR)/light.exe xdelta3.wixobj -out xdelta3.msi
 
+CC=gcc-4.2.0
+
 xdelta3: $(SOURCES)
 	$(CC) -O3 -Wall -Wshadow xdelta3.c -lm -o xdelta3 \
               -DXD3_DEBUG=0 \
