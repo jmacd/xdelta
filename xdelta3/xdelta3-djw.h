@@ -224,7 +224,7 @@ djw_destroy (xd3_stream *stream,
 /*                               HEAP                                */
 /*********************************************************************/
 
-static INLINE int
+static inline int
 heap_less (const djw_heapen *a, const djw_heapen *b)
 {
   return a->freq   < b->freq ||
@@ -232,7 +232,7 @@ heap_less (const djw_heapen *a, const djw_heapen *b)
      a->depth  < b->depth);
 }
 
-static INLINE void
+static inline void
 heap_insert (uint *heap, const djw_heapen *ents, uint p, const uint e)
 {
   /* Insert ents[e] into next slot heap[p] */
@@ -248,7 +248,7 @@ heap_insert (uint *heap, const djw_heapen *ents, uint p, const uint e)
   heap[p] = e;
 }
 
-static INLINE djw_heapen*
+static inline djw_heapen*
 heap_extract (uint *heap, const djw_heapen *ents, uint heap_last)
 {
   uint smallest = heap[1];
@@ -296,7 +296,7 @@ heap_check (uint *heap, djw_heapen *ents, uint heap_last)
 /*                             MTF, 1/2                              */
 /*********************************************************************/
 
-static INLINE usize_t
+static inline usize_t
 djw_update_mtf (uint8_t *mtf, usize_t mtf_i)
 {
   int k;
@@ -308,7 +308,7 @@ djw_update_mtf (uint8_t *mtf, usize_t mtf_i)
   return sym;
 }
 
-static INLINE void
+static inline void
 djw_update_1_2 (int *mtf_run, usize_t *mtf_i, uint8_t *mtfsym, djw_weight *freq)
 {
   int code;
@@ -449,7 +449,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
 
   if (! overflow)
     {
-      IF_DEBUG1 (if (first_bits != total_bits)
+      IF_DEBUG (if (first_bits != total_bits)
       {
 	DP(RINT "code length overflow changed %u bits\n", (usize_t)(total_bits - first_bits));
       });
@@ -536,7 +536,7 @@ djw_compute_mtf_1_2 (djw_prefix  *prefix,
 
       /* TODO: This assertion was firing in 3.0q due to the wrong value of
        * DJW_MAX_CODELEN, which disabled the code-length overflow logic.
-       * Leave this in until more comments. */
+       * Bug fix has been confirmed. . */
       if (j > nsym)
 	{
 	  abort();
@@ -1296,7 +1296,7 @@ djw_build_decoder (xd3_stream    *stream,
   *max_clenp = max_clen;
 }
 
-static INLINE int
+static inline int
 djw_decode_symbol (xd3_stream     *stream,
 		   bit_state      *bstate,
 		   const uint8_t **input,
@@ -1413,7 +1413,7 @@ djw_decode_clclen (xd3_stream     *stream,
   return 0;
 }
 
-static INLINE int
+static inline int
 djw_decode_1_2 (xd3_stream     *stream,
 		bit_state      *bstate,
 		const uint8_t **input,
@@ -1488,7 +1488,7 @@ djw_decode_1_2 (xd3_stream     *stream,
   return 0;
 }
 
-static INLINE int
+static inline int
 djw_decode_prefix (xd3_stream     *stream,
 		   bit_state      *bstate,
 		   const uint8_t **input,

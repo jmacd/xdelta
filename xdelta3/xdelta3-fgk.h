@@ -103,7 +103,7 @@ static fgk_stream*     fgk_alloc           (xd3_stream *stream /*, int alphabet_
 static void            fgk_init            (fgk_stream *h);
 static int             fgk_encode_data     (fgk_stream *h,
 					    int         n);
-static INLINE fgk_bit  fgk_get_encoded_bit (fgk_stream *h);
+static inline fgk_bit  fgk_get_encoded_bit (fgk_stream *h);
 
 static int             xd3_encode_fgk      (xd3_stream  *stream,
 					    fgk_stream  *sec_stream,
@@ -115,7 +115,7 @@ static int             xd3_encode_fgk      (xd3_stream  *stream,
 /* 			       Decoder                               */
 /*********************************************************************/
 
-static INLINE int      fgk_decode_bit      (fgk_stream *h,
+static inline int      fgk_decode_bit      (fgk_stream *h,
 					    fgk_bit     b);
 static int             fgk_decode_data     (fgk_stream *h);
 static void            fgk_destroy         (xd3_stream *stream,
@@ -143,7 +143,7 @@ static void         fgk_init_node            (fgk_node *node, int i, int size);
 static fgk_block*   fgk_make_block           (fgk_stream *h, fgk_node *l);
 static void         fgk_free_block           (fgk_stream *h, fgk_block *b);
 static void         fgk_factor_remaining     (fgk_stream *h);
-static INLINE void  fgk_swap_ptrs            (fgk_node **one, fgk_node **two);
+static inline void  fgk_swap_ptrs            (fgk_node **one, fgk_node **two);
 
 /*********************************************************************/
 /* 			    Basic Routines                           */
@@ -283,7 +283,7 @@ static int fgk_encode_data (fgk_stream* h, int n)
 
 /* Should be called as many times as fgk_encode_data returns.
  */
-static INLINE fgk_bit fgk_get_encoded_bit (fgk_stream *h)
+static inline fgk_bit fgk_get_encoded_bit (fgk_stream *h)
 {
   XD3_ASSERT (h->coded_depth > 0);
 
@@ -650,7 +650,7 @@ static void fgk_factor_remaining (fgk_stream *h)
 /* receives a bit at a time and returns true when a complete code has
  * been received.
  */
-static int INLINE fgk_decode_bit (fgk_stream* h, fgk_bit b)
+static int inline fgk_decode_bit (fgk_stream* h, fgk_bit b)
 {
   XD3_ASSERT (b == 1 || b == 0);
 

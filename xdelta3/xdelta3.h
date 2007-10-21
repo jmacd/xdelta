@@ -1,5 +1,5 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -79,20 +79,16 @@
 /* Sizes and addresses within VCDIFF windows are represented as usize_t
  *
  * For source-file offsets and total file sizes, total input and output counts, the xoff_t
- * type is used.  The decoder and encoder generally check for overflow of the xoff_t size,
- * and this is tested at the 32bit boundary [xdelta3-test.h].
+ * type is used.  The decoder and encoder generally check for overflow of the xoff_t size
+ * (this is tested at the 32bit boundary [xdelta3-test.h]).
+ *
+ * As of 3.0r, a 64bit xoff_t is ~33% slower on a 32bit platform.  TODO: fix this.
  */
 #ifndef _WIN32
 typedef unsigned int    usize_t;
 typedef u_int8_t        uint8_t;
 typedef u_int16_t       uint16_t;
-
-#ifndef __uint32_t_defined  /* Note: Cygwin compat */
-typedef u_int32_t       uint32_t;
-#endif
-
 typedef long long unsigned int uint64_t;
-
 #else
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -116,19 +112,21 @@ typedef ULONGLONG      uint64_t;
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
 typedef uint64_t xoff_t;
 #define SIZEOF_XOFF_T 8
+#ifndef WIN32
+#define Q "q"
+#else
+#define Q "I64"
+#endif
 #else
 typedef uint32_t xoff_t;
 #define SIZEOF_XOFF_T 4
+#define Q
 #endif
 
 #define USE_UINT32 (SIZEOF_USIZE_T == 4 || SIZEOF_XOFF_T == 4 || REGRESSION_TEST)
 #define USE_UINT64 (SIZEOF_USIZE_T == 8 || SIZEOF_XOFF_T == 8 || REGRESSION_TEST)
 
 /**********************************************************************/
-
-#ifndef INLINE
-#define INLINE inline
-#endif
 
 /* Whether to build the encoder, otherwise only build the decoder. */
 #ifndef XD3_ENCODER

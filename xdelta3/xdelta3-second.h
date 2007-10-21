@@ -63,13 +63,13 @@ struct _bit_state
   usize_t cur_mask;
 };
 
-static INLINE void xd3_bit_state_encode_init  (bit_state       *bits)
+static inline void xd3_bit_state_encode_init  (bit_state       *bits)
 {
   bits->cur_byte = 0;
   bits->cur_mask = 1;
 }
 
-static INLINE int xd3_decode_bits     (xd3_stream     *stream,
+static inline int xd3_decode_bits     (xd3_stream     *stream,
 				       bit_state      *bits,
 				       const uint8_t **input,
 				       const uint8_t  *input_max,
@@ -205,7 +205,7 @@ xd3_decode_secondary (xd3_stream      *stream,
 
 #if XD3_ENCODER
 /* OPT: Should these be inline? */
-static INLINE int xd3_encode_bit       (xd3_stream      *stream,
+static inline int xd3_encode_bit       (xd3_stream      *stream,
 					xd3_output     **output,
 					bit_state       *bits,
 					int              bit)
@@ -233,14 +233,14 @@ static INLINE int xd3_encode_bit       (xd3_stream      *stream,
   return 0;
 }
 
-static INLINE int xd3_flush_bits       (xd3_stream      *stream,
+static inline int xd3_flush_bits       (xd3_stream      *stream,
 					xd3_output     **output,
 					bit_state       *bits)
 {
   return (bits->cur_mask == 1) ? 0 : xd3_emit_byte (stream, output, bits->cur_byte);
 }
 
-static INLINE int xd3_encode_bits      (xd3_stream      *stream,
+static inline int xd3_encode_bits      (xd3_stream      *stream,
 					xd3_output     **output,
 					bit_state       *bits,
 					usize_t           nbits,

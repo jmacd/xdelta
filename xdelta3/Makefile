@@ -60,8 +60,8 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -O3
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=0r
-RELDIR = xdelta3$(REL)
+REL=3.0s_pre0
+RELDIR = xdelta$(REL)
 
 all: xdelta3-debug xdelta3
 
@@ -103,8 +103,6 @@ clean:
 wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
 	$(WIXDIR)/candle.exe xdelta3.wxs -out xdelta3.wixobj
 	$(WIXDIR)/light.exe xdelta3.wixobj -out xdelta3.msi
-
-CC=gcc-4.2.0
 
 xdelta3: $(SOURCES)
 	$(CC) -O3 -Wall -Wshadow xdelta3.c -lm -o xdelta3 \
@@ -193,7 +191,7 @@ xdelta3-everything: $(SOURCES)
 
 xdelta3-Opg: $(SOURCES)
 	$(CC) -pg -g -O -Wall -Wshadow xdelta3.c -o xdelta3-Opg -DXD3_MAIN=1 \
-		-DSECONDARY_DJW=1 -DXD3_POSIX=1 -DXD3_USE_LARGEFILE64=1
+		-DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -DXD3_POSIX=1 -DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1
 
 xdelta3-nosec.o: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 -o xdelta3-nosec.o

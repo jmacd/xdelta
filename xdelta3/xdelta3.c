@@ -1,5 +1,5 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -215,8 +215,8 @@
    tool, misc optional features, and a regression test.  Features are
    controled with CPP #defines, see Makefile.am.
 
-   The initial __XDELTA3_C_HEADER_PASS__ starts first, the INLINE and
-   TEMPLATE sections follow.  Easy stuff first, hard stuff last.
+   The initial __XDELTA3_C_HEADER_PASS__ starts first, the _INLINE_ and
+   _TEMPLATE_ sections follow.  Easy stuff first, hard stuff last.
 
    Optional features include:
 
@@ -296,16 +296,6 @@
 #endif
 #ifndef GENERIC_ENCODE_TABLES_COMPUTE_PRINT
 #define GENERIC_ENCODE_TABLES_COMPUTE_PRINT 0
-#endif
-
-#if XD3_USE_LARGEFILE64          /* How does everyone else do this? */
-#ifndef WIN32
-#define Q "q"
-#else
-#define Q "I64"
-#endif
-#else
-#define Q
 #endif
 
 #if XD3_ENCODER
@@ -490,6 +480,8 @@ IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 #define NEXTRUN(c) do { if ((c) == run_c) { run_l += 1; } else { run_c = (c); run_l = 1; } } while (0)
 
 /* Update the checksum state. */
+#define OLD_LARGE_CKSUM 1
+#if OLD_LARGE_CKSUM
 #define LARGE_CKSUM_UPDATE(cksum,base,look)                              \
   do {                                                                   \
     uint32_t old_c = PERMUTE((base)[0]);                                    \
@@ -498,6 +490,13 @@ IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
     uint32_t high  = (((cksum) >> 16) - (old_c * (look)) + low) & 0xffff;   \
     (cksum) = (high << 16) | low;                                        \
   } while (0)
+#else
+#define LARGE_CKSUM_UPDATE(cksum,base,look)                              \
+  do { \
+    (cksum) = (cksum
+linear congruential generators of different sizes and good lattice structure
+  } while (0)
+#endif
 
 /* Multiply and add hash function */
 #if ARITH_SMALL_CKSUM
@@ -719,7 +718,7 @@ static const xd3_sec_type djw_sec_type =
 #include "xdelta3-cfgs.h"
 #undef __XDELTA3_C_TEMPLATE_PASS__
 
-#if XD3_MAIN || PYTHON_MODULE || SWIG_MODULE
+#if XD3_MAIN || PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
 #include "xdelta3-main.h"
 #endif
 
@@ -1486,7 +1485,7 @@ static const usize_t __primes[] =
 static const usize_t __nprimes = SIZEOF_ARRAY (__primes);
 #endif
 
-static INLINE uint32_t
+static inline uint32_t
 xd3_checksum_hash (const xd3_hash_cfg *cfg, const uint32_t cksum)
 {
 #if HASH_PRIME
@@ -1502,7 +1501,7 @@ xd3_checksum_hash (const xd3_hash_cfg *cfg, const uint32_t cksum)
  Create the hash table.
  ******************************************************************************************/
 
-static INLINE void
+static inline void
 xd3_swap_uint8p (uint8_t** p1, uint8_t** p2)
 {
   uint8_t *t = (*p1);
@@ -1510,7 +1509,7 @@ xd3_swap_uint8p (uint8_t** p1, uint8_t** p2)
   (*p2) = t;
 }
 
-static INLINE void
+static inline void
 xd3_swap_usize_t (usize_t* p1, usize_t* p2)
 {
   usize_t t = (*p1);
@@ -1608,11 +1607,11 @@ xd3_size_hashtable (xd3_stream    *stream,
  Cksum function
  ******************************************************************************************/
 
-/* OPT: It turns out that the compiler can't unroll the loop as well as you can by hand. */
-static INLINE uint32_t
+#if OLD_LARGE_CKSUM
+static inline uint32_t
 xd3_lcksum (const uint8_t *seg, const int ln)
 {
-  int   i    = 0;
+  int i = 0;
   uint32_t low  = 0;
   uint32_t high = 0;
 
@@ -1624,9 +1623,22 @@ xd3_lcksum (const uint8_t *seg, const int ln)
 
   return ((high & 0xffff) << 16) | (low & 0xffff);
 }
+#else
+static inline int
+xd3_lcksum (const uint8_t *seg, const int ln)
+{
+  int i;
+  int x = 0;
+  for (i = 0; i < ln; ++i)
+    {
+      x = (x * 103) + *seg++;
+    }
+  return x;
+}
+#endif
 
 #if ARITH_SMALL_CKSUM
-static INLINE usize_t
+static inline usize_t
 xd3_scksum (const uint8_t *seg, const int ln)
 {
   usize_t c;
@@ -1690,7 +1702,7 @@ static unsigned long adler32 (unsigned long adler, const uint8_t *buf, usize_t l
  Run-length function
  ******************************************************************************************/
 
-static INLINE int
+static inline int
 xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp)
 {
   int i;
@@ -3238,7 +3250,7 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, uint c
 
 /* This enters a potential run instruction into the iopt buffer.  The position argument is
  * relative to the target window. */
-static INLINE int
+static inline int
 xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
 {
   xd3_rinst* ri;
@@ -3258,7 +3270,7 @@ xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
 
 /* This enters a potential copy instruction into the iopt buffer.  The position argument
  * is relative to the target window.. */
-static INLINE int
+static inline int
 xd3_found_match (xd3_stream *stream, usize_t pos, usize_t size, xoff_t addr, int is_source)
 {
   xd3_rinst* ri;
@@ -4656,10 +4668,8 @@ xd3_verify_large_state (xd3_stream    *stream,
 			uint32_t          x_cksum)
 {
   uint32_t cksum = xd3_lcksum (inp, stream->smatcher.large_look);
-
   XD3_ASSERT (cksum == x_cksum);
 }
-
 static void
 xd3_verify_run_state (xd3_stream    *stream,
 		      const uint8_t *inp,
@@ -4787,7 +4797,7 @@ XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_poi
       ssize_t blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
       int ret;
 
-      if (oldpos + stream->smatcher.large_look > blkpos)
+      if (oldpos + LLOOK > blkpos)
 	{
 	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
 	  continue;
@@ -4812,12 +4822,11 @@ XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_poi
        * the number of bytes available.  Each iteration inspects
        * large_look bytes then steps back large_step bytes.  The
        * if-stmt above ensures at least one large_look of data. */
-      blkpos -= stream->smatcher.large_look;
+      blkpos -= LLOOK;
 
       do
 	{
-	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkpos,
-				       stream->smatcher.large_look);
+	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkpos, LLOOK);
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
 
 	  stream->large_table[hval] =
@@ -4826,7 +4835,7 @@ XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_poi
 
 	  IF_DEBUG (stream->large_ckcnt += 1);
 
-	  blkpos -= stream->smatcher.large_step;
+	  blkpos -= LSTEP;
 	}
       while (blkpos >= oldpos);
 
@@ -5079,7 +5088,10 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       /* Compute next RUN, CKSUM */
       if (DO_RUN)   { NEXTRUN (inp[SLOOK]); }
       if (DO_SMALL) { SMALL_CKSUM_UPDATE (scksum, inp, SLOOK); }
-      if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in)) { LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK); }
+      if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in))
+	{
+	  LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK);
+	}
     }
 
  loopnomore:

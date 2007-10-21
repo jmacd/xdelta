@@ -1,5 +1,5 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -164,7 +164,6 @@ test_cleanup (void)
 {
   static int x = 0;
   x++;
-  //DP(RINT "test cleanup: %d", x);  
   test_unlink (TEST_TARGET_FILE);
   test_unlink (TEST_SOURCE_FILE);
   test_unlink (TEST_DELTA_FILE);
@@ -695,7 +694,7 @@ test_compress_text (xd3_stream  *stream,
   cfg.smatcher_soft.small_lchain = 16;
   cfg.smatcher_soft.max_lazy = 8;
   cfg.smatcher_soft.long_enough = 128;
-  
+
   xd3_config_stream (stream, & cfg);
 
   (*encoded_size) = 0;
@@ -926,6 +925,7 @@ static int sec_dist_func7 (xd3_stream *stream, xd3_output *data);
 static int sec_dist_func8 (xd3_stream *stream, xd3_output *data);
 static int sec_dist_func9 (xd3_stream *stream, xd3_output *data);
 static int sec_dist_func10 (xd3_stream *stream, xd3_output *data);
+static int sec_dist_func11 (xd3_stream *stream, xd3_output *data);
 
 static sec_dist_func sec_dists[] =
 {
@@ -939,6 +939,7 @@ static sec_dist_func sec_dists[] =
   sec_dist_func8,
   sec_dist_func9,
   sec_dist_func10,
+  sec_dist_func11,
 };
 
 /* Test ditsribution: 100 bytes of the same character (13). */
@@ -1105,6 +1106,26 @@ sec_dist_func10 (xd3_stream *stream, xd3_output *data)
     }
   return 0;
 }
+
+/* Test distribution: fibonacci */
+static int
+sec_dist_func11 (xd3_stream *stream, xd3_output *data)
+{
+  int sum0 = 0;
+  int sum1 = 1;
+  int i, j, ret;
+  for (i = 0; i < 33; ++i)
+    {
+      for (j = 0; j < (sum0 + sum1); ++j)
+	{
+	  if ((ret = xd3_emit_byte (stream, & data, i))) { return ret; }
+	}
+      sum0 = sum1;
+      sum1 = j;
+    }
+  return 0;
+}
+
 
 static int
 test_secondary_decode (xd3_stream         *stream,
@@ -1533,7 +1554,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 
       sprintf (ecmd, cmdpairs[2*i], program_name, test_softcfg_str, TEST_TARGET_FILE, TEST_DELTA_FILE);
       sprintf (dcmd, cmdpairs[2*i+1], program_name, TEST_DELTA_FILE, TEST_RECON_FILE);
-    
+
       /* Encode and decode. */
       if ((ret = system (ecmd)) != 0)
 	{
@@ -1838,7 +1859,7 @@ test_no_output (xd3_stream *stream, int ignore)
 {
   int ret;
   char buf[TESTBUFSIZE];
-  
+
   test_setup ();
 
   sprintf (buf, "touch %s && chmod 0000 %s", TEST_NOPERM_FILE, TEST_NOPERM_FILE);
@@ -1889,7 +1910,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   usize_t delpos = 0, recsize;
   xd3_config config;
 
-  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = rand (); } 
+  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = rand (); }
 
   stream->winsize = IDB_WINSZ;
 
@@ -2194,7 +2215,7 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
     xoff_t   output; // output 64-bit offset
 
   } cksum_test[] = {
-    // If cpos is <= 2^32 
+    // If cpos is <= 2^32
     { 1, 1, 1, 1, 1 },
 
 #if XD3_USE_LARGEFILE64

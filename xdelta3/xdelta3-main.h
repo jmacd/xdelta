@@ -62,6 +62,9 @@
 #ifndef XD3_WIN32
 #define XD3_WIN32 0
 #endif
+#ifndef NOT_MAIN
+#define NOT_MAIN 0
+#endif
 
 /* Combines xd3_strerror() and strerror() */
 const char* xd3_mainerror(int err_num);
@@ -332,8 +335,11 @@ static int main_help (void);
 static int
 main_version (void)
 {
-  /* $Format: "  DP(RINT \"VERSION=3.$Xdelta3Version$\\n\");" $ */
-  DP(RINT "VERSION=3.0r\n");
+  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, Joshua MacDonald\n\");" $ */
+  DP(RINT "Xdelta version 3.0s_pre0, Copyright (C) 2007, Joshua MacDonald\n");
+  DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
+  DP(RINT "This is free software, and you are welcome to redistribute it\n");
+  DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
   return EXIT_SUCCESS;
 }
 
@@ -2141,7 +2147,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
-      source->size = UINT64_MAX;
+      source->size = XOFF_T_MAX;
     }
   else
     {
@@ -2349,8 +2355,8 @@ main_getblk_func (xd3_stream *stream,
 	  return 0;
 	}
 
-      if (lru[idx].blkno != -1LL &&
-	  lru[idx].blkno != blkno - lru_size)
+      if (lru[idx].blkno != (xoff_t)-1 &&
+	  lru[idx].blkno != (xoff_t)(blkno - lru_size))
 	{
 	  return XD3_TOOFARBACK;
 	}
@@ -2412,7 +2418,7 @@ main_getblk_func (xd3_stream *stream,
 
   if (option_verbose > 3)
     {
-      if (blru->blkno != -1LL)
+      if (blru->blkno != (xoff_t)-1)
 	{
 	  XPR(NT "source block %"Q"u ejects %"Q"u (lru_hits=%u, lru_misses=%u, lru_filled=%u)\n",
 	      blkno, blru->blkno, lru_hits, lru_misses, lru_filled);
@@ -2456,8 +2462,10 @@ main_input (xd3_cmd     cmd,
   xoff_t     last_total_out = 0;
   long       start_time;
   int        stdout_only = 0;
+#if VCDIFF_TOOLS
   int        recode_flags;
   xd3_config recode_config;
+#endif
   int (*input_func) (xd3_stream*);
   int (*output_func) (xd3_stream*, main_file *);
 
@@ -3037,7 +3045,7 @@ setup_environment (int argc,
 }
 
 int
-#if PYTHON_MODULE || SWIG_MODULE
+#if PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
 xd3_main_cmdline (int argc, char **argv)
 #else
 main (int argc, char **argv)
@@ -3420,11 +3428,7 @@ main (int argc, char **argv)
 static int
 main_help (void)
 {
-  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, Joshua MacDonald\n\");" $ */
-
-  DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
-  DP(RINT "This is free software, and you are welcome to redistribute it\n");
-  DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
+  main_version();
 
   /* Note: update wiki when command-line features change */
   DP(RINT "usage: xdelta3 [command/options] [input [output]]\n");
