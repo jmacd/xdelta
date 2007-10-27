@@ -88,6 +88,7 @@
 typedef unsigned int    usize_t;
 typedef u_int8_t        uint8_t;
 typedef u_int16_t       uint16_t;
+typedef int       uint32_t;
 typedef long long unsigned int uint64_t;
 #else
 #define WIN32_LEAN_AND_MEAN

@@ -7,7 +7,7 @@
 //---------------------------------------------------------------------------
 
 #include <stdio.h>
-#include <sys\stat.h>
+#include <sys/stat.h>
 #include "xdelta3.h"
 #include "xdelta3.c"
 
