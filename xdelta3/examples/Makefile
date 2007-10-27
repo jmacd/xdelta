@@ -15,8 +15,10 @@ small_page_test: small_page_test.c $(DEPS)
 encode_decode_test: encode_decode_test.c $(DEPS)
 	$(CC) $(CFLAGS) encode_decode_test.c -o encode_decode_test
 
-speed_test32 speed_test64: speed_test.c $(DEPS)
+speed_test32: speed_test.c $(DEPS)
 	$(CC) $(CFLAGS) -DXD3_USE_LARGEFILE64=0 speed_test.c -o speed_test32
+
+speed_test64: speed_test.c $(DEPS)
 	$(CC) $(CFLAGS) -DXD3_USE_LARGEFILE64=1 speed_test.c -o speed_test64
 
 clean:
