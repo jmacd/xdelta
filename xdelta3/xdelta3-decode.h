@@ -20,19 +20,21 @@
 #define _XDELTA3_DECODE_H_
 
 
-/* Return true if the caller must provide a source.  Theoretically, this has to be checked
- * after every window.  It could be that the first window requires no source, but the
- * second window does.  In practice? */
+/* Return true if the caller must provide a source.  Theoretically,
+ * this has to be checked after every window.  It could be that the
+ * first window requires no source, but the second window does.  In
+ * practice? */
 int xd3_decoder_needs_source (xd3_stream *stream)
 {
   return stream->dec_win_ind & VCD_SOURCE;
 }
 
-/* Initialize the decoder for a new window.  The dec_tgtlen value is preserved across
- * successive window decodings, and the update to dec_winstart is delayed until a new
- * window actually starts.  This is to avoid throwing an error due to overflow until the
- * last possible moment.  This makes it possible to encode exactly 4GB through a 32-bit
- * encoder. */
+/* Initialize the decoder for a new window.  The dec_tgtlen value is
+ * preserved across successive window decodings, and the update to
+ * dec_winstart is delayed until a new window actually starts.  This
+ * is to avoid throwing an error due to overflow until the last
+ * possible moment.  This makes it possible to encode exactly 4GB
+ * through a 32-bit encoder. */
 static int
 xd3_decode_init_window (xd3_stream *stream)
 {
@@ -45,25 +47,28 @@ xd3_decode_init_window (xd3_stream *stream)
   return 0;
 }
 
-/* Allocates buffer space for the target window and possibly the VCD_TARGET copy-window.
- * Also sets the base of the two copy segments. */
+/* Allocates buffer space for the target window and possibly the
+ * VCD_TARGET copy-window.  Also sets the base of the two copy
+ * segments. */
 static int
 xd3_decode_setup_buffers (xd3_stream *stream)
 {
   /* If VCD_TARGET is set then the previous buffer may be reused. */
   if (stream->dec_win_ind & VCD_TARGET)
     {
-      /* But this implementation only supports copying from the last target window.  If the
-       * offset is outside that range, it can't be done. */
+      /* But this implementation only supports copying from the last
+       * target window.  If the offset is outside that range, it can't
+       * be done. */
       if (stream->dec_cpyoff < stream->dec_laststart)
 	{
 	  stream->msg = "unsupported VCD_TARGET offset";
 	  return XD3_INVALID_INPUT;
 	}
 
-      /* See if the two windows are the same.  This indicates the first time VCD_TARGET is
-       * used.  This causes a second buffer to be allocated, after that the two are
-       * swapped in the DEC_FINISH case. */
+      /* See if the two windows are the same.  This indicates the
+       * first time VCD_TARGET is used.  This causes a second buffer
+       * to be allocated, after that the two are swapped in the
+       * DEC_FINISH case. */
       if (stream->dec_lastwin == stream->next_out)
 	{
 	  stream->next_out  = NULL;
@@ -88,9 +93,10 @@ xd3_decode_setup_buffers (xd3_stream *stream)
       stream->next_out = stream->dec_buffer;
     }
 
-  /* dec_tgtaddrbase refers to an invalid base address, but it is always used with a
-   * sufficiently large instruction offset (i.e., beyond the copy window).  This condition
-   * is enforced by xd3_decode_output_halfinst. */
+  /* dec_tgtaddrbase refers to an invalid base address, but it is
+   * always used with a sufficiently large instruction offset (i.e.,
+   * beyond the copy window).  This condition is enforced by
+   * xd3_decode_output_halfinst. */
   stream->dec_tgtaddrbase = stream->next_out - stream->dec_cpylen;
 
   return 0;
@@ -190,9 +196,10 @@ xd3_decode_section (xd3_stream *stream,
   return 0;
 }
 
-/* Decode the size and address for half of an instruction (i.e., a single opcode).  This
- * updates the stream->dec_position, which are bytes already output prior to processing
- * this instruction.  Perform bounds checking for sizes and copy addresses, which uses the
+/* Decode the size and address for half of an instruction (i.e., a
+ * single opcode).  This updates the stream->dec_position, which are
+ * bytes already output prior to processing this instruction.  Perform
+ * bounds checking for sizes and copy addresses, which uses the
  * dec_position (which is why these checks are done here). */
 static int
 xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
@@ -303,9 +310,10 @@ xd3_decode_instruction (xd3_stream *stream)
   stream->dec_current1.size = inst->size1;
   stream->dec_current2.size = inst->size2;
 
-  /* For each instruction with a real operation, decode the corresponding size and
-   * addresses if necessary.  Assume a code-table may have NOOP in either position,
-   * although this is unlikely. */
+  /* For each instruction with a real operation, decode the
+   * corresponding size and addresses if necessary.  Assume a
+   * code-table may have NOOP in either position, although this is
+   * unlikely. */
   if (inst->type1 != XD3_NOOP && (ret = xd3_decode_parse_halfinst (stream, & stream->dec_current1)))
     {
       return ret;
@@ -317,11 +325,13 @@ xd3_decode_instruction (xd3_stream *stream)
   return 0;
 }
 
-/* Output the result of a single half-instruction. OPT: This the decoder hotspot. */
+/* Output the result of a single half-instruction. OPT: This the
+   decoder hotspot. */
 static int
 xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 {
-  /* To make this reentrant, set take = min (inst->size, available space)... */
+  /* To make this reentrant, set take = min (inst->size, available
+     space)... */
   usize_t take = inst->size;
 
   XD3_ASSERT (inst->type != XD3_NOOP);
@@ -370,14 +380,15 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	const uint8_t *src;
 	uint8_t *dst;
 
-	/* See if it copies from the VCD_TARGET/VCD_SOURCE window or the target window.
-	 * Out-of-bounds checks for the addresses and sizes are performed in
-	 * xd3_decode_parse_halfinst. */
+	/* See if it copies from the VCD_TARGET/VCD_SOURCE window or
+	 * the target window.  Out-of-bounds checks for the addresses
+	 * and sizes are performed in xd3_decode_parse_halfinst. */
 	if (inst->addr < stream->dec_cpylen)
 	  {
 	    if (stream->dec_win_ind & VCD_TARGET)
 	      {
-		/* For VCD_TARGET we know the entire range is in-memory, as established by
+		/* For VCD_TARGET we know the entire range is
+		 * in-memory, as established by
 		 * decode_setup_buffers. */
 		src = stream->dec_cpyaddrbase + inst->addr;
 		inst->type = XD3_NOOP;
@@ -385,8 +396,9 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	      }
 	    else
 	      {
-		/* In this case we have to read a source block, which could return control
-		 * to the caller.  We need to know the first block number needed for this
+		/* In this case we have to read a source block, which
+		 * could return control to the caller.  We need to
+		 * know the first block number needed for this
 		 * copy. */
 		xd3_source *source;
 		xoff_t block;
@@ -419,8 +431,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 
 		src = source->curblk + blkoff;
 
-		/* This block either contains enough data or the source file is
-		 * short. */
+		/* This block either contains enough data or the
+		 * source file is short. */
 		if ((source->onblk != blksize) && (blkoff + take > source->onblk))
 		  {
 		    stream->msg = "source file too short";
@@ -437,8 +449,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		  }
 		else
 		  {
-		    /* This block doesn't contain all the data, modify the instruction, do
-		     * not set to XD3_NOOP. */
+		    /* This block doesn't contain all the data, modify
+		     * the instruction, do not set to XD3_NOOP. */
 		    take = blksize - blkoff;
 		    inst->size -= take;
 		    inst->addr += take;
@@ -447,9 +459,10 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  }
 	else
 	  {
-	    /* For a target-window copy, we know the entire range is in-memory.  The
-	     * dec_tgtaddrbase is negatively offset by dec_cpylen because the addresses
-	     * start beyond that point. */
+	    /* For a target-window copy, we know the entire range is
+	     * in-memory.  The dec_tgtaddrbase is negatively offset by
+	     * dec_cpylen because the addresses start beyond that
+	     * point. */
 	    src = stream->dec_tgtaddrbase + inst->addr;
 	    inst->type = XD3_NOOP;
 	    inst->size = 0;
@@ -587,9 +600,10 @@ xd3_decode_sections (xd3_stream *stream)
       return xd3_decode_finish_window (stream);
     }
 
-  /* OPT: A possible optimization is to avoid allocating memory in decode_setup_buffers
-   * and to avoid a large memcpy when the window consists of a single VCD_SOURCE copy
-   * instruction.  The only potential problem is if the following window is a VCD_TARGET,
+  /* OPT: A possible optimization is to avoid allocating memory in
+   * decode_setup_buffers and to avoid a large memcpy when the window
+   * consists of a single VCD_SOURCE copy instruction.  The only
+   * potential problem is if the following window is a VCD_TARGET,
    * then you need to remember... */
   if ((ret = xd3_decode_setup_buffers (stream))) { return ret; }
 
@@ -601,14 +615,16 @@ xd3_decode_emit (xd3_stream *stream)
 {
   int ret;
 
-  /* Produce output: originally structured to allow reentrant code that fills as much of
-   * the output buffer as possible, but VCDIFF semantics allows to copy from anywhere from
-   * the target window, so instead allocate a sufficiently sized buffer after the target
+  /* Produce output: originally structured to allow reentrant code
+   * that fills as much of the output buffer as possible, but VCDIFF
+   * semantics allows to copy from anywhere from the target window, so
+   * instead allocate a sufficiently sized buffer after the target
    * window length is decoded.
    *
-   * This code still needs to be reentrant to allow XD3_GETSRCBLK to return control.  This
-   * is handled by setting the stream->dec_currentN instruction types to XD3_NOOP after
-   * they have been processed. */
+   * This code still needs to be reentrant to allow XD3_GETSRCBLK to
+   * return control.  This is handled by setting the
+   * stream->dec_currentN instruction types to XD3_NOOP after they
+   * have been processed. */
   XD3_ASSERT (! (stream->flags & XD3_SKIP_EMIT));
   XD3_ASSERT (stream->dec_tgtlen <= stream->space_out);
 
@@ -683,35 +699,39 @@ xd3_decode_input (xd3_stream *stream)
       return XD3_INVALID_INPUT;
     }
 
-#define BYTE_CASE(expr,x,nstate)                                               \
-      do {                                                                     \
-      if ( (expr) &&                                                           \
-           ((ret = xd3_decode_byte (stream, & (x))) != 0) ) { return ret; }    \
-      stream->dec_state = (nstate);                                            \
+#define BYTE_CASE(expr,x,nstate) \
+      do { \
+      if ( (expr) && \
+           ((ret = xd3_decode_byte (stream, & (x))) != 0) ) { return ret; } \
+      stream->dec_state = (nstate); \
       } while (0)
 
-#define OFFSET_CASE(expr,x,nstate)                                             \
-      do {                                                                     \
-      if ( (expr) &&                                                           \
-           ((ret = xd3_decode_offset (stream, & (x))) != 0) ) { return ret; }  \
-      stream->dec_state = (nstate);                                            \
+#define OFFSET_CASE(expr,x,nstate) \
+      do { \
+      if ( (expr) && \
+           ((ret = xd3_decode_offset (stream, & (x))) != 0) ) { return ret; } \
+      stream->dec_state = (nstate); \
       } while (0)
 
-#define SIZE_CASE(expr,x,nstate)                                               \
-      do {                                                                     \
-      if ( (expr) &&                                                           \
-           ((ret = xd3_decode_size (stream, & (x))) != 0) ) { return ret; }    \
-      stream->dec_state = (nstate);                                            \
+#define SIZE_CASE(expr,x,nstate) \
+      do { \
+      if ( (expr) && \
+           ((ret = xd3_decode_size (stream, & (x))) != 0) ) { return ret; } \
+      stream->dec_state = (nstate); \
       } while (0)
 
-#define SRCORTGT(x) (((x) & VCD_SRCORTGT) == VCD_SOURCE ||                     \
+#define SRCORTGT(x) (((x) & VCD_SRCORTGT) == VCD_SOURCE || \
 		     ((x) & VCD_SRCORTGT) == VCD_TARGET)
 
   switch (stream->dec_state)
     {
     case DEC_VCHEAD:
       {
-	if ((ret = xd3_decode_bytes (stream, stream->dec_magic, & stream->dec_magicbytes, 4))) { return ret; }
+	if ((ret = xd3_decode_bytes (stream, stream->dec_magic,
+				     & stream->dec_magicbytes, 4)))
+	  {
+	    return ret;
+	  }
 
 	if (stream->dec_magic[0] != VCDIFF_MAGIC1 ||
 	    stream->dec_magic[1] != VCDIFF_MAGIC2 ||
@@ -817,7 +837,8 @@ xd3_decode_input (xd3_stream *stream)
       /* Application data */
       if (stream->dec_hdr_ind & VCD_APPHEADER)
 	{
-	  /* Note: we add an additional byte for padding, to allow 0-termination. */
+	  /* Note: we add an additional byte for padding, to allow
+	     0-termination. */
 	  if ((stream->dec_appheader == NULL) &&
 	      (stream->dec_appheader = xd3_alloc (stream, stream->dec_appheadsz+1, 1)) == NULL) { return ENOMEM; }
 
@@ -865,9 +886,10 @@ xd3_decode_input (xd3_stream *stream)
       /* Copy window length: only if VCD_SOURCE or VCD_TARGET is set */
       SIZE_CASE(SRCORTGT (stream->dec_win_ind), stream->dec_cpylen, DEC_CPYOFF);
 
-      /* Set the initial, logical decoder position (HERE address) in dec_position.  This
-       * is set to just after the source/copy window, as we are just about to output the
-       * first byte of target window. */
+      /* Set the initial, logical decoder position (HERE address) in
+       * dec_position.  This is set to just after the source/copy
+       * window, as we are just about to output the first byte of
+       * target window. */
       stream->dec_position = stream->dec_cpylen;
 
     case DEC_CPYOFF:
@@ -881,7 +903,8 @@ xd3_decode_input (xd3_stream *stream)
 	  return XD3_INVALID_INPUT;
 	}
 
-      /* Check copy window bounds: VCD_TARGET window may not exceed current position. */
+      /* Check copy window bounds: VCD_TARGET window may not exceed
+	 current position. */
       if ((stream->dec_win_ind & VCD_TARGET) &&
 	  (stream->dec_cpyoff + (xoff_t) stream->dec_cpylen > stream->dec_winstart))
 	{
@@ -896,9 +919,9 @@ xd3_decode_input (xd3_stream *stream)
       /* Length of target window */
       SIZE_CASE(1, stream->dec_tgtlen, DEC_DELIND);
 
-      /* Set the maximum decoder position, beyond which we should not decode any data.
-       * This is the maximum value for dec_position.  This may not exceed the size of a
-       * usize_t. */
+      /* Set the maximum decoder position, beyond which we should not
+       * decode any data.  This is the maximum value for dec_position.
+       * This may not exceed the size of a usize_t. */
       if (USIZE_T_OVERFLOW (stream->dec_cpylen, stream->dec_tgtlen))
 	{
 	  stream->msg = "decoder target window overflows a usize_t";
@@ -973,8 +996,8 @@ xd3_decode_input (xd3_stream *stream)
 	  }
       }
 
-      /* Returning here gives the application a chance to inspect the header, skip the
-       * window, etc. */
+      /* Returning here gives the application a chance to inspect the
+       * header, skip the window, etc. */
       if (stream->current_window == 0) { return XD3_GOTHEADER; }
       else                             { return XD3_WINSTART; }
 
@@ -986,8 +1009,8 @@ xd3_decode_input (xd3_stream *stream)
 
     case DEC_EMIT:
 
-      /* To speed VCD_SOURCE block-address calculations, the source cpyoff_blocks and
-       * cpyoff_blkoff are pre-computed. */
+      /* To speed VCD_SOURCE block-address calculations, the source
+       * cpyoff_blocks and cpyoff_blkoff are pre-computed. */
       if (stream->dec_win_ind & VCD_SOURCE)
 	{
 	  xd3_source *src = stream->src;
@@ -1030,8 +1053,8 @@ xd3_decode_input (xd3_stream *stream)
 	stream->dec_laststart = stream->dec_winstart;
 	stream->dec_window_count += 1;
 
-	/* Note: the updates to dec_winstart & current_window are deferred until after the
-	 * next DEC_WININD byte is read. */
+	/* Note: the updates to dec_winstart & current_window are
+	 * deferred until after the next DEC_WININD byte is read. */
 	stream->dec_state = DEC_WININD;
 	return XD3_WINFINISH;
       }

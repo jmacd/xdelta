@@ -601,7 +601,10 @@ djw_count_freqs (djw_weight *freq, xd3_output *input)
 
   IF_DEBUG1 ({int i;
   DP(RINT "freqs: ");
-  for (i = 0; i < ALPHABET_SIZE; i += 1) { DP(RINT "%u ", freq[i]); }
+  for (i = 0; i < ALPHABET_SIZE; i += 1)
+    {
+      DP(RINT "%u ", freq[i]);
+    }
   DP(RINT "\n");});
 
   return size;

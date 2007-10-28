@@ -49,12 +49,13 @@ static int test_exponential_dist (usize_t mean, usize_t max);
 
 #define CHECK(cond) if (!(cond)) { DP(RINT "check failure: " #cond); abort(); }
 
-/* Use a fixed soft config so that test values are fixed.  See also test_compress_text(). */
+/* Use a fixed soft config so that test values are fixed.  See also
+   test_compress_text(). */
 static const char* test_softcfg_str = "-C64,64,4,128,16,8,128";
 
-/******************************************************************************************
+/***********************************************************************
  TEST HELPERS
- ******************************************************************************************/
+ ***********************************************************************/
 
 static void DOT (void) { DP(RINT "."); }
 static int do_cmd (xd3_stream *stream, const char *buf)
@@ -193,9 +194,10 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       goto failure;
     }
 
-  /* Then modify the data to produce copies, everything not copied is an add.  The
-   * following logic produces the TEST_ADD_RATIO.  The variable SADD contains the number
-   * of adds so far, which should not exceed SADD_MAX. */
+  /* Then modify the data to produce copies, everything not copied is
+   * an add.  The following logic produces the TEST_ADD_RATIO.  The
+   * variable SADD contains the number of adds so far, which should
+   * not exceed SADD_MAX. */
   for (i = 0; i < ss; )
     {
       usize_t left = ss - i;
@@ -350,13 +352,14 @@ test_file_size (const char* file, xoff_t *size)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  READ OFFSET
- ******************************************************************************************/
+ ***********************************************************************/
 
-/* Common test for read_integer errors: encodes a 64-bit value and then attempts to read
- * as a 32-bit value.  If TRUNC is non-zero, attempts to get errors by shortening the
- * input, otherwise it should overflow.  Expects XD3_INTERNAL and MSG. */
+/* Common test for read_integer errors: encodes a 64-bit value and
+ * then attempts to read as a 32-bit value.  If TRUNC is non-zero,
+ * attempts to get errors by shortening the input, otherwise it should
+ * overflow.  Expects XD3_INTERNAL and MSG. */
 static int
 test_read_integer_error (xd3_stream *stream, int trunto, const char *msg)
 {
@@ -538,9 +541,9 @@ test_usize_t_overflow (xd3_stream *stream, int unused)
   return XD3_INTERNAL;
 }
 
-/******************************************************************************************
+/***********************************************************************
  Address cache
- ******************************************************************************************/
+ ***********************************************************************/
 
 static int
 test_address_cache (xd3_stream *stream, int unused)
@@ -644,9 +647,9 @@ test_address_cache (xd3_stream *stream, int unused)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  Encode and decode with single bit error
- ******************************************************************************************/
+ ***********************************************************************/
 
 /* It compresses from 256 to around 185 bytes.
  * Avoids matching addresses that are a single-bit difference.
@@ -814,9 +817,10 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
 #if 1
 #define TEST_FAILURES()
 #else
-  /* For checking non-failure cases by hand, enable this macro and run xdelta printdelta
-   * with print_cpymode enabled.  Every non-failure should change a copy address mode,
-   * which doesn't cause a failure because the address cache starts out with all zeros.
+  /* For checking non-failure cases by hand, enable this macro and run
+   * xdelta printdelta with print_cpymode enabled.  Every non-failure
+   * should change a copy address mode, which doesn't cause a failure
+   * because the address cache starts out with all zeros.
 
     ./xdelta3 test
     for i in test_text.xz.*; do ./xdelta3 printdelta $i > $i.out; diff $i.out test_text.xz.0.out; done
@@ -909,9 +913,9 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  Secondary compression tests
- ******************************************************************************************/
+ ***********************************************************************/
 
 #if SECONDARY_ANY
 typedef int (*sec_dist_func) (xd3_stream *stream, xd3_output *data);
@@ -1031,8 +1035,8 @@ sec_dist_func7 (xd3_stream *stream, xd3_output *data)
   return 0;
 }
 
-/* Test distribution: A small number of frequent characters, difficult to divide into many
- * groups */
+/* Test distribution: A small number of frequent characters, difficult
+ * to divide into many groups */
 static int
 sec_dist_func8 (xd3_stream *stream, xd3_output *data)
 {
@@ -1058,9 +1062,9 @@ sec_dist_func9 (xd3_stream *stream, xd3_output *data)
   int prom   = 0;
   int pcount = 0;
 
-  /* 200 was long enough to trigger it--only when stricter checking that counted all
-   * blocks was turned on, but it seems I deleted this code. (missing fgk_free_block on
-   * line 398). */
+  /* 200 was long enough to trigger it--only when stricter checking
+   * that counted all blocks was turned on, but it seems I deleted
+   * this code. (missing fgk_free_block on line 398). */
   for (i = 0; i < ALPHABET_SIZE*200; i += 1)
     {
     repeat:
@@ -1259,9 +1263,10 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 	      goto fail;
 	    }
 
-	  /* Single-bit error test, only cover the first 10 bytes.  Some non-failures are
-	   * expected in the Huffman case: Changing the clclen array, for example, may not
-	   * harm the decoding.  Really looking for faults here. */
+	  /* Single-bit error test, only cover the first 10 bytes.
+	   * Some non-failures are expected in the Huffman case:
+	   * Changing the clclen array, for example, may not harm the
+	   * decoding.  Really looking for faults here. */
 	  {
 	    int i;
 	    int bytes = min (compress_size, 10U);
@@ -1310,9 +1315,9 @@ IF_DJW (static int test_secondary_huff (xd3_stream *stream, int gp)
 	{ return test_secondary (stream, & djw_sec_type, gp); })
 #endif
 
-/******************************************************************************************
+/***********************************************************************
  TEST INSTRUCTION TABLE
- ******************************************************************************************/
+ ***********************************************************************/
 
 /* Test that xd3_choose_instruction() does the right thing for its code table. */
 static int
@@ -1369,9 +1374,9 @@ test_choose_instruction (xd3_stream *stream, int ignore)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  TEST INSTRUCTION TABLE CODING
- ******************************************************************************************/
+ ***********************************************************************/
 
 #if GENERIC_ENCODE_TABLES
 /* Test that encoding and decoding a code table works */
@@ -1405,12 +1410,13 @@ test_encode_code_table (xd3_stream *stream, int ignore)
 }
 #endif
 
-/******************************************************************************************
+/***********************************************************************
  64BIT STREAMING
- ******************************************************************************************/
+ ***********************************************************************/
 
-/* This test encodes and decodes a series of 1 megabyte windows, each containing a long
- * run of zeros along with a single xoff_t size record to indicate the sequence. */
+/* This test encodes and decodes a series of 1 megabyte windows, each
+ * containing a long run of zeros along with a single xoff_t size
+ * record to indicate the sequence. */
 static int
 test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t *delbuf, usize_t megs)
 {
@@ -1503,14 +1509,16 @@ test_compressed_stream_overflow (xd3_stream *stream, int ignore)
   return ret;
 }
 
-/******************************************************************************************
+/***********************************************************************
  COMMAND LINE
- ******************************************************************************************/
+ ***********************************************************************/
 
-/* For each pair of command templates in the array below, test that encoding and decoding
- * commands work.  Also check for the expected size delta, which should be approximately
- * TEST_ADD_RATIO times the file size created by test_make_inputs.  Due to differences in
- * the application header, it is suppressed (-A) so that all delta files are the same. */
+/* For each pair of command templates in the array below, test that
+ * encoding and decoding commands work.  Also check for the expected
+ * size delta, which should be approximately TEST_ADD_RATIO times the
+ * file size created by test_make_inputs.  Due to differences in the
+ * application header, it is suppressed (-A) so that all delta files
+ * are the same. */
 static int
 test_command_line_arguments (xd3_stream *stream, int ignore)
 {
@@ -1616,14 +1624,15 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  EXTERNAL I/O DECOMPRESSION/RECOMPRESSION
- ******************************************************************************************/
+ ***********************************************************************/
 
 #if EXTERNAL_COMPRESSION
-/* This performs one step of the test_externally_compressed_io function described below.
- * It builds a pipe containing both Xdelta and external compression/decompression that
- * should not modify the data passing through. */
+/* This performs one step of the test_externally_compressed_io
+ * function described below.  It builds a pipe containing both Xdelta
+ * and external compression/decompression that should not modify the
+ * data passing through. */
 static int
 test_compressed_pipe (xd3_stream *stream, main_extcomp *ext, char* buf,
 		      const char* comp_options, const char* decomp_options,
@@ -1668,11 +1677,12 @@ test_compressed_pipe (xd3_stream *stream, main_extcomp *ext, char* buf,
  *
  * --> | gzip -cf | xdelta3 -cf | xdelta3 -dcf | gzip -dcf | -->
  *
- * is transparent, i.e., does not modify the stream of data.  However, we also want to
- * verify that at the center the data is properly compressed, i.e., that we do not just
- * have a re-compressed gzip format, that we have an VCDIFF format.  We do this in two
- * steps.  First test the above pipe, then test with suppressed output recompression
- * (-D).  The result should be the original input:
+ * is transparent, i.e., does not modify the stream of data.  However,
+ * we also want to verify that at the center the data is properly
+ * compressed, i.e., that we do not just have a re-compressed gzip
+ * format, that we have an VCDIFF format.  We do this in two steps.
+ * First test the above pipe, then test with suppressed output
+ * recompression (-D).  The result should be the original input:
  *
  * --> | gzip -cf | xdelta3 -cf | xdelta3 -Ddcf | -->
  *
@@ -1717,14 +1727,17 @@ test_externally_compressed_io (xd3_stream *stream, int ignore)
   return 0;
 }
 
-/* This tests the proper functioning of external decompression for source files.  The
- * source and target files are identical and compressed by gzip.  Decoding such a delta
- * with recompression disbaled (-R) should produce the original, uncompressed
- * source/target file.  Then it checks with output recompression enabled--in this case the
- * output should be a compressed copy of the original source/target file.  Then it checks
- * that encoding with decompression disabled works--the compressed files are identical and
- * decoding them should always produce a compressed output, regardless of -R since the
- * encoded delta file had decompression disabled..
+/* This tests the proper functioning of external decompression for
+ * source files.  The source and target files are identical and
+ * compressed by gzip.  Decoding such a delta with recompression
+ * disbaled (-R) should produce the original, uncompressed
+ * source/target file.  Then it checks with output recompression
+ * enabled--in this case the output should be a compressed copy of the
+ * original source/target file.  Then it checks that encoding with
+ * decompression disabled works--the compressed files are identical
+ * and decoding them should always produce a compressed output,
+ * regardless of -R since the encoded delta file had decompression
+ * disabled..
  */
 static int
 test_source_decompression (xd3_stream *stream, int ignore)
@@ -1789,12 +1802,13 @@ test_source_decompression (xd3_stream *stream, int ignore)
 }
 #endif
 
-/******************************************************************************************
+/***********************************************************************
  FORCE, STDOUT
- ******************************************************************************************/
+ ***********************************************************************/
 
-/* This tests that output will not overwrite an existing file unless -f was specified.
- * The test is for encoding (the same code handles it for decoding). */
+/* This tests that output will not overwrite an existing file unless
+ * -f was specified.  The test is for encoding (the same code handles
+ * it for decoding). */
 static int
 test_force_behavior (xd3_stream *stream, int ignore)
 {
@@ -1821,9 +1835,9 @@ test_force_behavior (xd3_stream *stream, int ignore)
   return 0;
 }
 
-/* This checks the proper operation of the -c flag.  When specified the default output
- * becomes stdout, otherwise the input must be provided (encode) or it may be defaulted
- * (decode w/ app header). */
+/* This checks the proper operation of the -c flag.  When specified
+ * the default output becomes stdout, otherwise the input must be
+ * provided (encode) or it may be defaulted (decode w/ app header). */
 static int
 test_stdout_behavior (xd3_stream *stream, int ignore)
 {
@@ -1886,13 +1900,14 @@ test_no_output (xd3_stream *stream, int ignore)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  Source identical optimization
- ******************************************************************************************/
+ ***********************************************************************/
 
-/* Computing a delta should be fastest when the two inputs are identical, this checks it.
- * The library is called to compute a delta between a 10000 byte file, 1000 byte winsize,
- * 500 byte source blocksize.  The same buffer is used for both source and target. */
+/* Computing a delta should be fastest when the two inputs are
+ * identical, this checks it.  The library is called to compute a
+ * delta between a 10000 byte file, 1000 byte winsize, 500 byte source
+ * blocksize.  The same buffer is used for both source and target. */
 static int
 test_identical_behavior (xd3_stream *stream, int ignore)
 {
@@ -1907,7 +1922,9 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   uint8_t del[IDB_DELSZ];
   uint8_t rec[IDB_TGTSZ];
   xd3_source source;
-  int    encwin = 0;
+  int nextencwin = 0;
+  int winstarts = 0, winfinishes = 0;
+  xoff_t srcwin = -1;
   usize_t delpos = 0, recsize;
   xd3_config config;
 
@@ -1930,9 +1947,8 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 
       if (ret == XD3_INPUT)
 	{
-	  if (encwin == IDB_WINCNT-1) { break; }
-	  xd3_avail_input (stream, buf + (IDB_WINSZ * encwin), IDB_WINSZ);
-	  encwin += 1;
+	  xd3_avail_input (stream, buf + (IDB_WINSZ * nextencwin), IDB_WINSZ);
+	  nextencwin += 1;
 	  continue;
 	}
 
@@ -1941,11 +1957,24 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 	  source.curblkno = source.getblkno;
 	  source.onblk    = IDB_BLKSZ;
 	  source.curblk   = buf + source.getblkno * IDB_BLKSZ;
+	  srcwin = source.getblkno;
 	  continue;
 	}
 
-      if (ret == XD3_WINSTART) { continue; }
-      if (ret == XD3_WINFINISH) { continue; }
+      if (ret == XD3_WINSTART)
+	{
+	  winstarts++;
+	  continue;
+	}
+      if (ret == XD3_WINFINISH)
+	{
+	  winfinishes++;
+	  if (winfinishes == IDB_WINCNT)
+	    {
+	      break;
+	    }
+	  continue;
+	}
 
       if (ret != XD3_OUTPUT) { goto fail; }
 
@@ -1957,6 +1986,11 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 
       xd3_consume_output (stream);
     }
+
+  XD3_ASSERT(srcwin == source.blocks - 1);
+  XD3_ASSERT(winfinishes == IDB_WINCNT);
+  XD3_ASSERT(winstarts == IDB_WINCNT);
+  XD3_ASSERT(nextencwin == IDB_WINCNT);
 
   /* Reset. */
   source.blksize  = IDB_TGTSZ;
@@ -1982,7 +2016,8 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 		stream->n_add != 0 ||
 		stream->n_run != 0) { stream->msg = "wrong copy count"; goto fail; });
 
-  /* Check that no checksums were computed because the initial match was presumed. */
+  /* Check that no checksums were computed because the initial match
+     was presumed. */
   IF_DEBUG (if (stream->large_ckcnt != 0) { stream->msg = "wrong checksum behavior"; goto fail; });
 
   ret = 0;
@@ -1990,12 +2025,12 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   return ret;
 }
 
-/******************************************************************************************
+/***********************************************************************
  String matching test
- ******************************************************************************************/
+ ***********************************************************************/
 
-/* Check particular matching behaviors by calling xd3_string_match_soft directly with
- * specific arguments. */
+/* Check particular matching behaviors by calling
+ * xd3_string_match_soft directly with specific arguments. */
 typedef struct _string_match_test string_match_test;
 
 typedef enum
@@ -2285,9 +2320,9 @@ test_in_memory (xd3_stream *stream, int ignore)
   return 0;
 }
 
-/******************************************************************************************
+/***********************************************************************
  TEST MAIN
- ******************************************************************************************/
+ ***********************************************************************/
 
 static int
 xd3_selftest (void)
@@ -2322,13 +2357,13 @@ xd3_selftest (void)
   IF_GENCODETBL (DO_TEST (address_cache, XD3_ALT_CODE_TABLE, 0));
 
   DO_TEST (string_matching, 0, 0);
-
   DO_TEST (choose_instruction, 0, 0);
+  DO_TEST (identical_behavior, 0, 0);
+  DO_TEST (in_memory, 0, 0);
+
   IF_GENCODETBL (DO_TEST (choose_instruction, XD3_ALT_CODE_TABLE, 0));
   IF_GENCODETBL (DO_TEST (encode_code_table, 0, 0));
 
-  DO_TEST (in_memory, 0, 0);
-  DO_TEST (identical_behavior, 0, 0);
   DO_TEST (iopt_flush_instructions, 0, 0);
   DO_TEST (source_cksum_offset, 0, 0);
 

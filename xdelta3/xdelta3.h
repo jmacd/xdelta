@@ -126,7 +126,11 @@ typedef uint64_t xoff_t;
 #define Q "I64"
 #endif
 #else
+#ifndef __uint32_t_defined
+typedef unsigned int xoff_t;
+#else
 typedef uint32_t xoff_t;
+#endif
 #define SIZEOF_XOFF_T 4
 #define SIZEOF_USIZE_T 4
 #define Q
@@ -614,23 +618,31 @@ struct _xd3_sec_cfg
 struct _xd3_config
 {
   usize_t             winsize;       /* The encoder window size. */
-  usize_t             sprevsz;       /* How far back small string matching goes */
-  usize_t             iopt_size;     /* entries in the instruction-optimizing buffer */
-  usize_t             srcwin_maxsz;  /* srcwin_size grows by a factor of 2 when no matches are found */
+  usize_t             sprevsz;       /* How far back small string
+					matching goes */
+  usize_t             iopt_size;     /* entries in the
+					instruction-optimizing
+					buffer */
+  usize_t             srcwin_maxsz;  /* srcwin_size grows by a factor
+					of 2 when no matches are
+					found */
 
   xd3_getblk_func   *getblk;        /* The three callbacks. */
   xd3_alloc_func    *alloc;
   xd3_free_func     *freef;
   void              *opaque;        /* Not used. */
-  int                flags;         /* stream->flags are initialized from xd3_config &
-				     * never modified by the library.  Use xd3_set_flags
-				     * to modify flags settings mid-stream. */
+  int                flags;         /* stream->flags are initialized
+				     * from xd3_config & never
+				     * modified by the library.  Use
+				     * xd3_set_flags to modify flags
+				     * settings mid-stream. */
 
   xd3_sec_cfg       sec_data;       /* Secondary compressor config: data */
   xd3_sec_cfg       sec_inst;       /* Secondary compressor config: inst */
   xd3_sec_cfg       sec_addr;       /* Secondary compressor config: addr */
 
-  xd3_smatch_cfg     smatch_cfg;    /* See enum: use fields below for soft config */
+  xd3_smatch_cfg     smatch_cfg;    /* See enum: use fields below  for
+				       soft config */
   xd3_smatcher       smatcher_soft;
 };
 
@@ -645,49 +657,66 @@ struct _xd3_source
   /* you set */
   xoff_t              size;          /* size of this source */
   usize_t             blksize;       /* block size */
-  const char         *name;          /* its name, for debug/print purposes */
+  const char         *name;          /* its name, for debug/print
+					purposes */
   void               *ioh;           /* opaque handle */
 
   /* getblk sets */
-  xoff_t              curblkno;      /* current block number: client sets after getblk request */
-  usize_t             onblk;         /* number of bytes on current block: client sets, xd3 verifies */
-  const uint8_t      *curblk;        /* current block array: client sets after getblk request */
+  xoff_t              curblkno;      /* current block number: client
+					sets after getblk request */
+  usize_t             onblk;         /* number of bytes on current
+					block: client sets, xd3
+					verifies */
+  const uint8_t      *curblk;        /* current block array: client
+					sets after getblk request */
 
   /* xd3 sets */
   usize_t             srclen;        /* length of this source window */
-  xoff_t              srcbase;       /* offset of this source window in the source itself */
-  xoff_t              blocks;        /* the total number of blocks in this source */
-  usize_t             cpyoff_blocks; /* offset of copy window in blocks */
-  usize_t             cpyoff_blkoff; /* offset of copy window in blocks, remainder */
-  xoff_t              getblkno;      /* request block number: xd3 sets current getblk request */
+  xoff_t              srcbase;       /* offset of this source window
+					in the source itself */
+  xoff_t              blocks;        /* the total number of blocks in
+					this source */
+  usize_t             onlastblk;     /* cached size info, avoid __udivdi3 */
+  usize_t             cpyoff_blocks; /* offset of copy window in
+					blocks */
+  usize_t             cpyoff_blkoff; /* offset of copy window in
+					blocks, remainder */
+  xoff_t              getblkno;      /* request block number: xd3 sets
+					current getblk request */
 };
 
-/* The primary xd3_stream object, used for encoding and decoding.  You may access only two
- * fields: avail_out, next_out.  Use the methods above to operate on xd3_stream. */
+/* The primary xd3_stream object, used for encoding and decoding.  You
+ * may access only two fields: avail_out, next_out.  Use the methods
+ * above to operate on xd3_stream. */
 struct _xd3_stream
 {
   /* input state */
   const uint8_t    *next_in;          /* next input byte */
-  usize_t           avail_in;         /* number of bytes available at next_in */
+  usize_t           avail_in;         /* number of bytes available at
+					 next_in */
   xoff_t            total_in;         /* how many bytes in */
 
   /* output state */
   uint8_t          *next_out;         /* next output byte */
-  usize_t           avail_out;        /* number of bytes available at next_out */
+  usize_t           avail_out;        /* number of bytes available at
+					 next_out */
   usize_t           space_out;        /* total out space */
   xoff_t            current_window;   /* number of windows encoded/decoded */
   xoff_t            total_out;        /* how many bytes out */
 
   /* to indicate an error, xd3 sets */
-  const char       *msg;              /* last error message, NULL if no error */
+  const char       *msg;              /* last error message, NULL if
+					 no error */
 
   /* source configuration */
   xd3_source       *src;              /* source array */
 
   /* encoder memory configuration */
   usize_t           winsize;          /* suggested window size */
-  usize_t           sprevsz;          /* small string, previous window size (power of 2) */
-  usize_t           sprevmask;        /* small string, previous window size mask */
+  usize_t           sprevsz;          /* small string, previous window
+					 size (power of 2) */
+  usize_t           sprevmask;        /* small string, previous window
+					 size mask */
   uint              iopt_size;
   uint              iopt_unlimited;
   uint              srcwin_maxsz;
@@ -696,7 +725,8 @@ struct _xd3_stream
   xd3_getblk_func  *getblk;           /* set nxtblk, nxtblkno to scanblkno */
   xd3_alloc_func   *alloc;            /* malloc function */
   xd3_free_func    *free;             /* free function */
-  void*             opaque;           /* private data object passed to alloc, free, and getblk */
+  void*             opaque;           /* private data object passed to
+					 alloc, free, and getblk */
   int               flags;            /* various options */
   
   /* secondary compressor configuration */
@@ -710,8 +740,10 @@ struct _xd3_stream
   xd3_hash_cfg       large_hash;       /* large hash config */
 
   usize_t           *small_table;      /* table of small checksums */
-  xd3_slist         *small_prev;       /* table of previous offsets, circular linked list */
-  int                small_reset;      /* true if small table should be reset */
+  xd3_slist         *small_prev;       /* table of previous offsets,
+					  circular linked list */
+  int                small_reset;      /* true if small table should
+					  be reset */
 
   xd3_hash_cfg       small_hash;       /* small hash config */
   xd3_addr_cache     acache;           /* the vcdiff address cache */
@@ -719,39 +751,54 @@ struct _xd3_stream
 
   usize_t            taroff;           /* base offset of the target input */
   usize_t            input_position;   /* current input position */
-  usize_t            min_match;        /* current minimum match length, avoids redundent matches */
-  usize_t            unencoded_offset; /* current input, first unencoded offset. this value is <= the first
-				       * instruction's position in the iopt buffer, if there is at least one
+  usize_t            min_match;        /* current minimum match
+					  length, avoids redundent
+					  matches */
+  usize_t            unencoded_offset; /* current input, first
+				       * unencoded offset. this value
+				       * is <= the first instruction's
+				       * position in the iopt buffer,
+				       * if there is at least one
 				       * match in the buffer. */
 
   // SRCWIN
   // these variables plus srcwin_maxsz above (set by config)
-  int                srcwin_decided;    /* boolean: true if the srclen,srcbase have been decided. */
+  int                srcwin_decided;    /* boolean: true if the
+					   srclen,srcbase have been
+					   decided. */
   xoff_t             srcwin_cksum_pos;  /* Source checksum position */
 
   // MATCH
   xd3_match_state    match_state;      /* encoder match state */
-  xoff_t             match_srcpos;     /* current match source position relative to srcbase */
-  xoff_t             match_minaddr;    /* smallest matching address to set window params
-				       * (reset each window xd3_encode_reset) */
-  xoff_t             match_maxaddr;    /* largest matching address to set window params
-				       * (reset each window xd3_encode_reset) */
+  xoff_t             match_srcpos;     /* current match source
+					  position relative to
+					  srcbase */
+  xoff_t             match_minaddr;    /* smallest matching address to
+				       * set window params (reset each
+				       * window xd3_encode_reset) */
+  xoff_t             match_maxaddr;    /* largest matching address to
+				       * set window params (reset each
+				       * window xd3_encode_reset) */
   usize_t            match_back;       /* match extends back so far */
   usize_t            match_maxback;    /* match extends back maximum */
   usize_t            match_fwd;        /* match extends forward so far */
   usize_t            match_maxfwd;     /* match extends forward maximum */
 
-  xoff_t             maxsrcaddr;      /* address of the last source match (across windows) */
+  xoff_t             maxsrcaddr;      /* address of the last source
+					 match (across windows) */
 
   uint8_t          *buf_in;           /* for saving buffered input */
   usize_t            buf_avail;        /* amount of saved input */
-  const uint8_t    *buf_leftover;     /* leftover content of next_in (i.e., user's buffer) */
+  const uint8_t    *buf_leftover;     /* leftover content of next_in
+					 (i.e., user's buffer) */
   usize_t            buf_leftavail;    /* amount of leftover content */
 
   xd3_output       *enc_current;      /* current output buffer */
   xd3_output       *enc_free;         /* free output buffers */
-  xd3_output       *enc_heads[4];     /* array of encoded outputs: head of chain */
-  xd3_output       *enc_tails[4];     /* array of encoded outputs: tail of chain */
+  xd3_output       *enc_heads[4];     /* array of encoded outputs:
+					 head of chain */
+  xd3_output       *enc_tails[4];     /* array of encoded outputs:
+					 tail of chain */
 
   xd3_rlist         iopt_used;        /* instruction optimizing buffer */
   xd3_rlist         iopt_free;
@@ -776,16 +823,21 @@ struct _xd3_stream
   uint8_t          *dec_codetbl;      /* Optional code table: storage. */
   usize_t           dec_codetblbytes; /* Optional code table: position. */
 
-  uint32_t          dec_appheadsz;    /* Optional application header: size. */
-  uint8_t          *dec_appheader;    /* Optional application header: storage */
-  usize_t           dec_appheadbytes; /* Optional application header: position. */
+  uint32_t          dec_appheadsz;    /* Optional application header:
+					 size. */
+  uint8_t          *dec_appheader;    /* Optional application header:
+					 storage */
+  usize_t           dec_appheadbytes; /* Optional application header:
+					 position. */
 
   usize_t            dec_cksumbytes;   /* Optional checksum: position. */
   uint8_t           dec_cksum[4];     /* Optional checksum: storage. */
   uint32_t          dec_adler32;      /* Optional checksum: value. */
 
-  uint32_t           dec_cpylen;       /* length of copy window (VCD_SOURCE or VCD_TARGET) */
-  xoff_t             dec_cpyoff;       /* offset of copy window (VCD_SOURCE or VCD_TARGET)  */
+  uint32_t           dec_cpylen;       /* length of copy window
+					  (VCD_SOURCE or VCD_TARGET) */
+  xoff_t             dec_cpyoff;       /* offset of copy window
+					  (VCD_SOURCE or VCD_TARGET) */
   uint32_t           dec_enclen;       /* length of delta encoding */
   uint32_t           dec_tgtlen;       /* length of target window */
 
@@ -1114,7 +1166,10 @@ const char* xd3_errstring (xd3_stream  *stream)
 
 /* This function tells the number of bytes expected to be set in
  * source->onblk after a getblk request.  This is for convenience of
- * handling a partial last block. */
+ * handling a partial last block.  Note that this is a relatively
+ * expensive function for 64-bit binaries on platforms w/o native
+ * 64-bit integers, so source->onlastblk is set to this value.
+ * TODO: force source->blksize to a power of two? */
 static inline
 usize_t xd3_bytes_on_srcblk (xd3_source *source, xoff_t blkno)
 {
@@ -1126,6 +1181,14 @@ usize_t xd3_bytes_on_srcblk (xd3_source *source, xoff_t blkno)
     }
 
   return (usize_t)((source->size - 1) % source->blksize) + 1;
+}
+
+static inline
+usize_t xd3_bytes_on_srcblk_fast (xd3_source *source, xoff_t blkno)
+{
+  return (blkno == source->blocks - 1 ?
+	  source->onlastblk :
+	  source->blksize);
 }
 
 #endif /* _XDELTA3_H_ */

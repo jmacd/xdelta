@@ -555,10 +555,10 @@ main_format_bcnt (xoff_t r, char *buf)
   for (i = 0; i < SIZEOF_ARRAY(fmts); i += 1)
     {
       if (r <= (10 * 1024) || i == (-1 + (int)SIZEOF_ARRAY(fmts)))
-  	    {
-	      sprintf (buf, "%"Q"u %s", r, fmts[i]);
-	      break;
-	    }
+	{
+	  sprintf (buf, "%"Q"u %s", r, fmts[i]);
+	  break;
+	}
       r /= 1024;
     }
   return buf;
@@ -2436,7 +2436,7 @@ main_getblk_func (xd3_stream *stream,
   xoff_t      pos   = blkno * source->blksize;
   main_file   *sfile = (main_file*) source->ioh;
   main_blklru *blru  = NULL;
-  usize_t      onblk = xd3_bytes_on_srcblk (source, blkno);
+  usize_t      onblk = xd3_bytes_on_srcblk_fast (source, blkno);
   usize_t      nread;
   int         ret;
   int         i;

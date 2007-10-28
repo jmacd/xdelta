@@ -125,12 +125,30 @@ xdelta3-32: $(SOURCES)
               -DXD3_POSIX=1
 
 xdelta3-debug: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
-		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=1 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
+	$(CC) -g -Wall -Wshadow \
+		xdelta3.c -o xdelta3-debug \
+		-DXD3_DEBUG=1 \
+		-DXD3_MAIN=1 \
+		-DXD3_STDIO=1 \
+		-DXD3_USE_LARGEFILE64=1 \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DREGRESSION_TEST=1 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-lm
 
 xdelta3-debug2: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug2 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
-		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=2 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
+	$(CC) -g -Wall -Wshadow \
+		xdelta3.c -o xdelta3-debug2 \
+		-DXD3_DEBUG=2 \
+		-DXD3_MAIN=1 \
+		-DXD3_STDIO=1 \
+		-DXD3_USE_LARGEFILE64=1 \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DREGRESSION_TEST=1 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-lm
 
 xdelta3-debug3: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug3 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
