@@ -2339,10 +2339,10 @@ xd3_selftest (void)
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);
 
   IF_FGK (DO_TEST (decompress_single_bit_error, XD3_SEC_FGK, 3));
-  IF_DJW (DO_TEST (decompress_single_bit_error, XD3_SEC_DJW, 17));
+  IF_DJW (DO_TEST (decompress_single_bit_error, XD3_SEC_DJW, 18));
 
-  /* There are many expected non-failures for ALT_CODE_TABLE because not all of the
-   * instruction codes are used. */
+  /* There are many expected non-failures for ALT_CODE_TABLE because
+   * not all of the instruction codes are used. */
   IF_GENCODETBL (DO_TEST (decompress_single_bit_error, XD3_ALT_CODE_TABLE, 224));
 
 #ifndef WIN32

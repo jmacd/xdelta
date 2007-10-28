@@ -4778,6 +4778,7 @@ static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
  *
  * TODO: really would like a good test for this logic. how?
  * TODO: optimize the inner loop
+ * TODO: do-templatize this
  */
 static int
 XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_point)
@@ -4911,8 +4912,8 @@ XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_poi
 static int
 XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 {
-  /* TODO config: These next three variables should be statically compliled in various
-   * scan_cfg configurations? */
+  /* TODO config: These next three variables should be statically
+   * compliled in various scan_cfg configurations? */
   const int      DO_SMALL = ! (stream->flags & XD3_NOCOMPRESS);
   const int      DO_LARGE = (stream->src != NULL);
   const int      DO_RUN   = (1);

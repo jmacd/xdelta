@@ -16,15 +16,15 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* TODO: This code needs a thorough round of commenting.  There is some slop in the
- * declaration of arrays, which are maybe one element larger than they need to be and
- * comments would help clear it up. */
+/* TODO: This code needs a thorough round of commenting.  There is
+ * some slop in the declaration of arrays, which are maybe one element
+ * larger than they need to be and comments would help clear it up. */
 
 #ifndef _XDELTA3_DJW_H_
 #define _XDELTA3_DJW_H_
 
-/* The following people deserve much credit for the algorithms and techniques contained in
- * this file:
+/* The following people deserve much credit for the algorithms and
+ * techniques contained in this file:
 
  Julian Seward
  Bzip2 sources, implementation of the multi-table Huffman technique.
@@ -43,13 +43,14 @@
 
 */
 
-/* OPT: during the multi-table iteration, pick the worst-overall performing table and
- * replace it with exactly the frequencies of the worst-overall performing sector or
- * N-worst performing sectors. */
+/* OPT: during the multi-table iteration, pick the worst-overall
+ * performing table and replace it with exactly the frequencies of the
+ * worst-overall performing sector or N-worst performing sectors. */
 
-/* REF: See xdfs-0.222 and xdfs-0.226 for some old experiments with the Bzip prefix coding
- * strategy.  xdfs-0.256 contains the last of the other-format tests, including RFC1950
- * and the RFC1950+MTF tests. */
+/* REF: See xdfs-0.222 and xdfs-0.226 for some old experiments with
+ * the Bzip prefix coding strategy.  xdfs-0.256 contains the last of
+ * the other-format tests, including RFC1950 and the RFC1950+MTF
+ * tests. */
 
 #define DJW_MAX_CODELEN      20 /* Maximum length of an alphabet code. */
 
@@ -111,27 +112,31 @@ struct _djw_stream
   int unused;
 };
 
-/* Each Huffman table consists of 256 "code length" (CLEN) codes, which are themselves
- * Huffman coded after eliminating repeats and move-to-front coding.  The prefix consists
- * of all the CLEN codes in djw_encode_basic plus a 4-bit value stating how many of the
- * djw_encode_extra codes are actually coded (the rest are presumed zero, or unused CLEN
- * codes).
+/* Each Huffman table consists of 256 "code length" (CLEN) codes,
+ * which are themselves Huffman coded after eliminating repeats and
+ * move-to-front coding.  The prefix consists of all the CLEN codes in
+ * djw_encode_basic plus a 4-bit value stating how many of the
+ * djw_encode_extra codes are actually coded (the rest are presumed
+ * zero, or unused CLEN codes).
  *
- * These values of these two arrays were arrived at by studying the distribution of min
- * and max clen over a collection of DATA, INST, and ADDR inputs.  The goal is to specify
- * the order of djw_extra_codes that is most likely to minimize the number of extra codes
- * that must be encoded.
+ * These values of these two arrays were arrived at by studying the
+ * distribution of min and max clen over a collection of DATA, INST,
+ * and ADDR inputs.  The goal is to specify the order of
+ * djw_extra_codes that is most likely to minimize the number of extra
+ * codes that must be encoded.
  *
- * Results: 158896 sections were counted by compressing files (window size 512K) listed
- * with: `find / -type f ( -user jmacd -o -perm +444 )`
+ * Results: 158896 sections were counted by compressing files (window
+ * size 512K) listed with: `find / -type f ( -user jmacd -o -perm +444
+ * )`
  *
- * The distribution of CLEN codes for each efficient invocation of the secondary
- * compressor (taking the best number of groups/sector size) was recorded.  Then we look at
- * the distribution of min and max clen values, counting the number of times the value
- * C_low is less than the min and C_high is greater than the max.  Values >= C_high and <=
- * C_low will not have their lengths coded.  The results are sorted and the least likely
- * 15 are placed into the djw_encode_extra[] array in order.  These values are used as
- * the initial MTF ordering.
+ * The distribution of CLEN codes for each efficient invocation of the
+ * secondary compressor (taking the best number of groups/sector size)
+ * was recorded.  Then we look at the distribution of min and max clen
+ * values, counting the number of times the value C_low is less than
+ * the min and C_high is greater than the max.  Values >= C_high and
+ * <= C_low will not have their lengths coded.  The results are sorted
+ * and the least likely 15 are placed into the djw_encode_extra[]
+ * array in order.  These values are used as the initial MTF ordering.
 
  clow[1] = 155119
  clow[2] = 140325

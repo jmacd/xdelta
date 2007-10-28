@@ -22,11 +22,12 @@
 #ifndef _XDELTA3_FGK_h_
 #define _XDELTA3_FGK_h_
 
-/* An implementation of the FGK algorithm described by D.E. Knuth in "Dynamic Huffman
- * Coding" in Journal of Algorithms 6. */
+/* An implementation of the FGK algorithm described by D.E. Knuth in
+ * "Dynamic Huffman Coding" in Journal of Algorithms 6. */
 
-/* A 32bit counter (fgk_weight) is used as the frequency counter for nodes in the huffman
- * tree.  TODO: Need to test for overflow and/or reset stats. */
+/* A 32bit counter (fgk_weight) is used as the frequency counter for
+ * nodes in the huffman tree.  TODO: Need oto test for overflow and/or
+ * reset stats. */
 
 typedef struct _fgk_stream fgk_stream;
 typedef struct _fgk_node   fgk_node;
@@ -47,12 +48,14 @@ struct _fgk_block {
 /* The code can also support fixed huffman encoding/decoding. */
 #define IS_ADAPTIVE 1
 
-/* weight is a count of the number of times this element has been seen in the current
- * encoding/decoding.  parent, right_child, and left_child are pointers defining the tree
- * structure.  right and left point to neighbors in an ordered sequence of
- * weights.  The left child of a node is always guaranteed to have weight not greater than
- * its sibling.  fgk_blockLeader points to the element with the same weight as itself which is
- * closest to the next increasing weight block.  */
+/* weight is a count of the number of times this element has been seen
+ * in the current encoding/decoding.  parent, right_child, and
+ * left_child are pointers defining the tree structure.  right and
+ * left point to neighbors in an ordered sequence of weights.  The
+ * left child of a node is always guaranteed to have weight not
+ * greater than its sibling.  fgk_blockLeader points to the element
+ * with the same weight as itself which is closest to the next
+ * increasing weight block.  */
 struct _fgk_node
 {
   fgk_weight  weight;
@@ -64,14 +67,17 @@ struct _fgk_node
   fgk_block  *my_block;
 };
 
-/* alphabet_size is the a count of the number of possible leaves in the huffman tree.  The
- * number of total nodes counting internal nodes is ((2 * alphabet_size) - 1).
- * zero_freq_count is the number of elements remaining which have zero frequency.
- * zero_freq_exp and zero_freq_rem satisfy the equation zero_freq_count = 2^zero_freq_exp +
- * zero_freq_rem.  root_node is the root of the tree, which is initialized to a node with
- * zero frequency and contains the 0th such element.  free_node contains a pointer to the
- * next available fgk_node space.  alphabet contains all the elements and is indexed by N.
- * remaining_zeros points to the head of the list of zeros.  */
+/* alphabet_size is the a count of the number of possible leaves in
+ * the huffman tree.  The number of total nodes counting internal
+ * nodes is ((2 * alphabet_size) - 1).  zero_freq_count is the number
+ * of elements remaining which have zero frequency.  zero_freq_exp and
+ * zero_freq_rem satisfy the equation zero_freq_count =
+ * 2^zero_freq_exp + zero_freq_rem.  root_node is the root of the
+ * tree, which is initialized to a node with zero frequency and
+ * contains the 0th such element.  free_node contains a pointer to the
+ * next available fgk_node space.  alphabet contains all the elements
+ * and is indexed by N.  remaining_zeros points to the head of the
+ * list of zeros.  */
 struct _fgk_stream
 {
   int alphabet_size;
@@ -533,9 +539,10 @@ static fgk_node* fgk_increase_zero_weight (fgk_stream *h, int n)
   return this_zero;
 }
 
-/* When a zero frequency element is encoded, it is followed by the binary representation
- * of the index into the remaining elements.  Sets a cache to the element before it so
- * that it can be removed without calling this procedure again.  */
+/* When a zero frequency element is encoded, it is followed by the
+ * binary representation of the index into the remaining elements.
+ * Sets a cache to the element before it so that it can be removed
+ * without calling this procedure again.  */
 static unsigned int fgk_find_nth_zero (fgk_stream* h, int n)
 {
   fgk_node *target_ptr = h->alphabet + n;
@@ -604,9 +611,10 @@ static void fgk_init_node (fgk_node *node, int i, int size)
   node->my_block    = NULL;
 }
 
-/* The data structure used is an array of blocks, which are unions of free pointers and
- * huffnode pointers.  free blocks are a linked list of free blocks, the front of which is
- * h->free_block.  The used blocks are pointers to the head of each block.  */
+/* The data structure used is an array of blocks, which are unions of
+ * free pointers and huffnode pointers.  free blocks are a linked list
+ * of free blocks, the front of which is h->free_block.  The used
+ * blocks are pointers to the head of each block.  */
 static fgk_block* fgk_make_block (fgk_stream *h, fgk_node* lead)
 {
   fgk_block *ret = h->free_block;
@@ -627,8 +635,8 @@ static void fgk_free_block (fgk_stream *h, fgk_block *b)
   h->free_block = b;
 }
 
-/* sets zero_freq_count, zero_freq_rem, and zero_freq_exp to satsity the equation given
- * above.  */
+/* sets zero_freq_count, zero_freq_rem, and zero_freq_exp to satsity
+ * the equation given above.  */
 static void fgk_factor_remaining (fgk_stream *h)
 {
   unsigned int i;
@@ -705,9 +713,10 @@ static int fgk_nth_zero (fgk_stream* h, int n)
 {
   fgk_node *ret = h->remaining_zeros;
 
-  /* ERROR: if during this loop (ret->right_child == NULL) then the encoder's zero count
-   * is too high.  Could return an error code now, but is probably unnecessary overhead,
-   * since the caller should check integrity anyway. */
+  /* ERROR: if during this loop (ret->right_child == NULL) then the
+   * encoder's zero count is too high.  Could return an error code
+   * now, but is probably unnecessary overhead, since the caller
+   * should check integrity anyway. */
   for (; n != 0 && ret->right_child != NULL; n -= 1)
     {
       ret = ret->right_child;

@@ -2955,10 +2955,11 @@ done:
   main_file_close (ifile);
   main_file_close (sfile);
 
-  /* If output file is not open yet because of delayed-open, it means we never encountered
-   * a window in the delta, but it could have had a VCDIFF header?  TODO: solve this
-   * elsewhere.  For now, it prints "nothing to output" below, but the check doesn't
-   * happen in case of option_no_output.  */
+  /* If output file is not open yet because of delayed-open, it means
+   * we never encountered a window in the delta, but it could have had
+   * a VCDIFF header?  TODO: solve this elsewhere.  For now, it prints
+   * "nothing to output" below, but the check doesn't happen in case
+   * of option_no_output.  */
   if (! option_no_output)
     {
       if (!stdout_only && ! main_file_isopen (ofile))
