@@ -2000,7 +2000,7 @@ xd3_alloc_cache (xd3_stream *stream)
   return 0;
 }
 
-static void
+void
 xd3_init_cache (xd3_addr_cache* acache)
 {
   if (acache->s_near > 0)
@@ -2746,9 +2746,10 @@ xd3_iopt_free_nonadd (xd3_stream *stream, xd3_rinst *i)
     }
 }
 
-/* When an instruction is ready to flush from the iopt buffer, this function is called to
- * produce an encoding.  It writes the instruction plus size, address, and data to the
- * various encoding sections. */
+/* When an instruction is ready to flush from the iopt buffer, this
+ * function is called to produce an encoding.  It writes the
+ * instruction plus size, address, and data to the various encoding
+ * sections. */
 static int
 xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 {
@@ -2767,9 +2768,10 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 
 	if (src != NULL)
 	  {
-	    /* If there is a source copy, the source must have its source window decided
-	     * before we can encode.  This can be bad -- we have to make this decision
-	     * even if no source matches have been found. */
+	    /* If there is a source copy, the source must have its
+	     * source window decided before we can encode.  This can
+	     * be bad -- we have to make this decision even if no
+	     * source matches have been found. */
 	    if (stream->srcwin_decided == 0)
 	      {
 		if ((ret = xd3_srcwin_setup (stream))) { return ret; }
@@ -2881,8 +2883,9 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
   return 0;
 }
 
-/* This possibly encodes an add instruction, iadd, which must remain on the stack until
- * the following call to xd3_iopt_finish_encoding. */
+/* This possibly encodes an add instruction, iadd, which must remain
+ * on the stack until the following call to
+ * xd3_iopt_finish_encoding. */
 static int
 xd3_iopt_add (xd3_stream *stream, usize_t pos, xd3_rinst *iadd)
 {
@@ -2901,8 +2904,9 @@ xd3_iopt_add (xd3_stream *stream, usize_t pos, xd3_rinst *iadd)
   return 0;
 }
 
-/* This function calls xd3_iopt_finish_encoding to finish encoding an instruction, and it
- * may also produce an add instruction for an unmatched region. */
+/* This function calls xd3_iopt_finish_encoding to finish encoding an
+ * instruction, and it may also produce an add instruction for an
+ * unmatched region. */
 static int
 xd3_iopt_add_encoding (xd3_stream *stream, xd3_rinst *inst)
 {
@@ -2936,9 +2940,10 @@ xd3_iopt_add_finalize (xd3_stream *stream)
   return 0;
 }
 
-/* Compact the instruction buffer by choosing the best non-overlapping instructions when
- * lazy string-matching.  There are no ADDs in the iopt buffer because those are
- * synthesized in xd3_iopt_add_encoding and during xd3_iopt_add_finalize. */
+/* Compact the instruction buffer by choosing the best non-overlapping
+ * instructions when lazy string-matching.  There are no ADDs in the
+ * iopt buffer because those are synthesized in xd3_iopt_add_encoding
+ * and during xd3_iopt_add_finalize. */
 static int
 xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 {
@@ -2955,9 +2960,9 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 
   XD3_ASSERT (xd3_iopt_check (stream));
 
-  /* Note: once tried to skip this step if it's possible to assert there are no
-   * overlapping instructions.  Doesn't work because xd3_opt_erase leaves overlapping
-   * instructions. */
+  /* Note: once tried to skip this step if it's possible to assert
+   * there are no overlapping instructions.  Doesn't work because
+   * xd3_opt_erase leaves overlapping instructions. */
   while (! xd3_rlist_end (& stream->iopt_used, r1) &&
 	 ! xd3_rlist_end (& stream->iopt_used, r2 = xd3_rlist_next (r1)))
     {
@@ -2995,8 +3000,9 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
       r2moff = r2end - r1end;
       gap    = r2end - r1->pos;
 
-      /* If the two matches overlap almost entirely, choose the better match and discard
-       * the other.  This heuristic is BLACK MAGIC.  Havesomething better? */
+      /* If the two matches overlap almost entirely, choose the better
+       * match and discard the other.  This heuristic is BLACK MAGIC.
+       * Havesomething better? */
       if (gap < 2*MIN_MATCH || r2moff <= 2 || r2off <= 2)
 	{
 	  /* Only one match should be used, choose the longer one. */
@@ -3014,16 +3020,16 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 	}
       else
 	{
-	  /* Shorten one of the instructions -- could be optimized based on the address
-	   * cache. */
+	  /* Shorten one of the instructions -- could be optimized
+	   * based on the address cache. */
 	  usize_t average;
 	  usize_t newsize;
 	  usize_t adjust1;
 
 	  XD3_ASSERT (r1end > r2->pos && r2end > r1->pos);
 
-	  /* Try to balance the length of both instructions, but avoid making both longer
-	   * than MAX_MATCH_SPLIT . */
+	  /* Try to balance the length of both instructions, but avoid
+	   * making both longer than MAX_MATCH_SPLIT . */
 	  average = (gap) / 2;
 	  newsize = min (MAX_MATCH_SPLIT, gap - average);
 
@@ -3081,8 +3087,8 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 
   XD3_ASSERT (xd3_iopt_check (stream));
 
-  /* If forcing, pick instructions until the list is empty, otherwise this empties 50% of
-   * the queue. */
+  /* If forcing, pick instructions until the list is empty, otherwise
+   * this empties 50% of the queue. */
   for (flushed = 0; ! xd3_rlist_empty (& stream->iopt_used); )
     {
       xd3_rinst *renc = xd3_rlist_pop_front (& stream->iopt_used);
@@ -3098,9 +3104,9 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 	      break;
 	    }
 
-	  /* If there are only two instructions remaining, break, because they were
-	   * not optimized.  This means there were more than 50% eliminated by the
-	   * loop above. */
+	  /* If there are only two instructions remaining, break,
+	   * because they were not optimized.  This means there were
+	   * more than 50% eliminated by the loop above. */
  	  r1 = xd3_rlist_front (& stream->iopt_used);
  	  if (xd3_rlist_end(& stream->iopt_used, r1) ||
  	      xd3_rlist_end(& stream->iopt_used, r2 = xd3_rlist_next (r1)) ||
@@ -3156,10 +3162,11 @@ xd3_iopt_get_slot (xd3_stream *stream, xd3_rinst** iptr)
   return 0;
 }
 
-/* A copy is about to be emitted that extends backwards to POS, therefore it may
- * completely cover some existing instructions in the buffer.  If an instruction is
- * completely covered by this new match, erase it.  If the new instruction is covered by
- * the previous one, return 1 to skip it. */
+/* A copy is about to be emitted that extends backwards to POS,
+ * therefore it may completely cover some existing instructions in the
+ * buffer.  If an instruction is completely covered by this new match,
+ * erase it.  If the new instruction is covered by the previous one,
+ * return 1 to skip it. */
 static void
 xd3_iopt_erase (xd3_stream *stream, usize_t pos, usize_t size)
 {
@@ -3167,21 +3174,22 @@ xd3_iopt_erase (xd3_stream *stream, usize_t pos, usize_t size)
     {
       xd3_rinst *r = xd3_rlist_back (& stream->iopt_used);
 
-      /* Verify that greedy is working.  The previous instruction should end before the
-       * new one begins. */
+      /* Verify that greedy is working.  The previous instruction
+       * should end before the new one begins. */
       XD3_ASSERT ((stream->flags & XD3_BEGREEDY) == 0 || (r->pos + r->size <= pos));
-      /* Verify that min_match is working.  The previous instruction should end before the
-       * new one ends. */
+      /* Verify that min_match is working.  The previous instruction
+       * should end before the new one ends. */
       XD3_ASSERT ((stream->flags & XD3_BEGREEDY) != 0 || (r->pos + r->size < pos + size));
 
-      /* See if the last instruction starts before the new instruction.  If so, there is
-       * nothing to erase. */
+      /* See if the last instruction starts before the new
+       * instruction.  If so, there is nothing to erase. */
       if (r->pos < pos)
 	{
 	  return;
 	}
 
-      /* Otherwise, the new instruction covers the old one, delete it and repeat. */
+      /* Otherwise, the new instruction covers the old one, delete it
+	 and repeat. */
       xd3_rlist_remove (r);
       xd3_rlist_push_back (& stream->iopt_free, r);
       --stream->i_slots_used;
@@ -3204,9 +3212,9 @@ xd3_iopt_last_matched (xd3_stream *stream)
   return r->pos + r->size;
 }
 
-/******************************************************************************************
+/*********************************************************
  Emit routines
- ******************************************************************************************/
+ ***********************************************************/
 
 static int
 xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint code)
@@ -3273,10 +3281,11 @@ xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
   return 0;
 }
 
-/* This enters a potential copy instruction into the iopt buffer.  The position argument
- * is relative to the target window.. */
-static inline int
-xd3_found_match (xd3_stream *stream, usize_t pos, usize_t size, xoff_t addr, int is_source)
+/* This enters a potential copy instruction into the iopt buffer.  The
+ * position argument is relative to the target window.. */
+int
+xd3_found_match (xd3_stream *stream, usize_t pos,
+		 usize_t size, xoff_t addr, int is_source)
 {
   xd3_rinst* ri;
   int ret;
@@ -3557,15 +3566,15 @@ xd3_encode_init_buffers (xd3_stream *stream)
 }  
 
 /* This function allocates all memory initially used by the encoder. */
-static int
+int
 xd3_encode_init (xd3_stream *stream)
 {
   int large_comp = (stream->src != NULL);
   int small_comp = ! (stream->flags & XD3_NOCOMPRESS);
 
-  /* Memory allocations for checksum tables are delayed until xd3_string_match_init in the
-   * first call to string_match--that way identical or short inputs require no table
-   * allocation. */
+  /* Memory allocations for checksum tables are delayed until
+   * xd3_string_match_init in the first call to string_match--that way
+   * identical or short inputs require no table allocation. */
   if (large_comp)
     {
       usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_step);
@@ -3608,9 +3617,9 @@ xd3_encode_init (xd3_stream *stream)
   return ENOMEM;
 }
 
-/* Called after the ENC_POSTOUT state, this puts the output buffers back into separate
- * lists and re-initializes some variables.  (The output lists were spliced together
- * during the ENC_FLUSH state.) */
+/* Called after the ENC_POSTOUT state, this puts the output buffers
+ * back into separate lists and re-initializes some variables.  (The
+ * output lists were spliced together during the ENC_FLUSH state.) */
 static void
 xd3_encode_reset (xd3_stream *stream)
 {
@@ -3674,21 +3683,24 @@ xd3_encode_input (xd3_stream *stream)
 
     case ENC_INPUT:
 
-      /* If there is no input yet, just return.  This checks for next_in == NULL, not
-       * avail_in == 0 since zero bytes is a valid input.  There is an assertion in
-       * xd3_avail_input() that next_in != NULL for this reason.  By returning right away
-       * we avoid creating an input buffer before the caller has supplied its first data.
-       * It is possible for xd3_avail_input to be called both before and after the first
-       * call to xd3_encode_input(). */
+      /* If there is no input yet, just return.  This checks for
+       * next_in == NULL, not avail_in == 0 since zero bytes is a
+       * valid input.  There is an assertion in xd3_avail_input() that
+       * next_in != NULL for this reason.  By returning right away we
+       * avoid creating an input buffer before the caller has supplied
+       * its first data.  It is possible for xd3_avail_input to be
+       * called both before and after the first call to
+       * xd3_encode_input(). */
       if (stream->next_in == NULL)
 	{
 	  return XD3_INPUT;
 	}
 
     enc_flush:
-      /* See if we should buffer the input: either if there is already a leftover buffer,
-       * or if the input is short of winsize without flush.  The label at this point is
-       * reached by a goto below, when there is leftover input after postout. */
+      /* See if we should buffer the input: either if there is already
+       * a leftover buffer, or if the input is short of winsize
+       * without flush.  The label at this point is reached by a goto
+       * below, when there is leftover input after postout. */
       if ((stream->buf_leftover != NULL) ||
 	  (stream->avail_in < stream->winsize && ! (stream->flags & XD3_FLUSH)))
 	{
@@ -3717,14 +3729,17 @@ xd3_encode_input (xd3_stream *stream)
 	  switch (stream->match_state)
 	    {
 	    case MATCH_TARGET:
-	      /* Try matching forward at the start of the target.  This is entered the
-	       * first time through, to check for a perfect match, and whenever there is a
-	       * source match that extends to the end of the previous window.  The
-	       * match_srcpos field is initially zero and later set during
-	       * xd3_source_extend_match. */
+	      /* Try matching forward at the start of the target.
+	       * This is entered the first time through, to check for
+	       * a perfect match, and whenever there is a source match
+	       * that extends to the end of the previous window.  The
+	       * match_srcpos field is initially zero and later set
+	       * during xd3_source_extend_match. */
+	       
 	      if (stream->avail_in > 0)
 		{
-		  /* This call can't fail because the source window is unrestricted. */
+		  /* This call can't fail because the source window is
+		     unrestricted. */
 		  ret = xd3_source_match_setup (stream, stream->match_srcpos);
 		  XD3_ASSERT (ret == 0);
 		  stream->match_state = MATCH_FORWARD;
@@ -3748,9 +3763,10 @@ xd3_encode_input (xd3_stream *stream)
 		}
 
 	    case MATCH_SEARCHING:
-	      /* Continue string matching.  (It's possible that the initial match
-	       * continued through the entire input, in which case we're still in
-	       * MATCH_FORWARD and should remain so for the next input window.) */
+	      /* Continue string matching.  (It's possible that the
+	       * initial match continued through the entire input, in
+	       * which case we're still in MATCH_FORWARD and should
+	       * remain so for the next input window.) */
 	      break;
 	    }
 	}
@@ -3762,8 +3778,14 @@ xd3_encode_input (xd3_stream *stream)
 	  return ret;
 	}
 
-      /* Flush the instrution buffer, then possibly add one more instruction, then emit
-       * the header. */
+      stream->enc_state = ENC_INSTR;
+
+    case ENC_INSTR:
+      /* Note: Jump here to encode VCDIFF deltas w/o using this
+       * string-matching code. */
+
+      /* Flush the instrution buffer, then possibly add one more
+       * instruction, then emit the header. */
       if ((ret = xd3_iopt_flush_instructions (stream, 1)) ||
           (ret = xd3_iopt_add_finalize (stream)))
 	{
@@ -3773,7 +3795,8 @@ xd3_encode_input (xd3_stream *stream)
       stream->enc_state = ENC_FLUSH;
 
     case ENC_FLUSH:
-      /* Note: main_recode_func() bypasses string-matching by setting ENC_FLUSH. */
+      /* Note: main_recode_func() bypasses string-matching by setting
+       * ENC_FLUSH. */
       if ((ret = xd3_emit_hdr (stream)))
 	{
 	  return ret;
@@ -3782,9 +3805,9 @@ xd3_encode_input (xd3_stream *stream)
       /* Begin output. */
       stream->enc_current = HDR_HEAD (stream);
 
-      /* Chain all the outputs together.  After doing this, it looks as if there is only
-       * one section.  The other enc_heads are set to NULL to avoid freeing them more than
-       * once. */
+      /* Chain all the outputs together.  After doing this, it looks
+       * as if there is only one section.  The other enc_heads are set
+       * to NULL to avoid freeing them more than once. */
        for (i = 1; i < ENC_SECTS; i += 1)
 	{
 	  stream->enc_tails[i-1]->next_page = stream->enc_heads[i];
@@ -3798,9 +3821,9 @@ xd3_encode_input (xd3_stream *stream)
       stream->avail_out  = stream->enc_current->next;
       stream->total_out += (xoff_t) stream->avail_out;
 
-      /* If there is any output in this buffer, return it, otherwise fall through to
-       * handle the next buffer or finish the window after all buffers have been
-       * output. */
+      /* If there is any output in this buffer, return it, otherwise
+       * fall through to handle the next buffer or finish the window
+       * after all buffers have been output. */
       if (stream->avail_out > 0)
 	{
 	  /* This is the only place xd3_encode returns XD3_OUTPUT */
@@ -3849,9 +3872,9 @@ xd3_encode_input (xd3_stream *stream)
 }
 #endif /* XD3_ENCODER */
 
-/******************************************************************************************
+/*****************************************************************
  Client convenience functions
- ******************************************************************************************/
+ ******************************************************************/
 
 static int
 xd3_process_stream (int            is_encode,
@@ -4067,13 +4090,14 @@ xd3_encode_memory (const uint8_t *input,
 #endif
 
 
-/******************************************************************************************
+/*************************************************************
  String matching helpers
- ******************************************************************************************/
+ *************************************************************/
 
 #if XD3_ENCODER
-/* Do the initial xd3_string_match() checksum table setup.  Allocations are delayed until
- * first use to avoid allocation sometimes (e.g., perfect matches, zero-length inputs). */
+/* Do the initial xd3_string_match() checksum table setup.
+ * Allocations are delayed until first use to avoid allocation
+ * sometimes (e.g., perfect matches, zero-length inputs). */
 static int
 xd3_string_match_init (xd3_stream *stream)
 {
@@ -4160,9 +4184,9 @@ xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 }
 #endif
 
-/* This function sets up the stream->src fields srcbase, srclen.  The call is delayed
- * until these values are needed to encode a copy address.  At this point the decision has
- * to be made. */
+/* This function sets up the stream->src fields srcbase, srclen.  The
+ * call is delayed until these values are needed to encode a copy
+ * address.  At this point the decision has to be made. */
 static int
 xd3_srcwin_setup (xd3_stream *stream)
 {
@@ -4175,17 +4199,19 @@ xd3_srcwin_setup (xd3_stream *stream)
   /* Avoid repeating this call. */
   stream->srcwin_decided = 1;
 
-  /* If the stream is flushing, then the iopt buffer was able to contain the complete
-   * encoding.  If no copies were issued no source window is actually needed.  This
-   * prevents the VCDIFF header from including source base/len.  xd3_emit_hdr checks
-   * for srclen == 0. */
-  if (stream->enc_state == ENC_FLUSH && stream->match_maxaddr == 0)
+  /* If the stream is flushing, then the iopt buffer was able to
+   * contain the complete encoding.  If no copies were issued no
+   * source window is actually needed.  This prevents the VCDIFF
+   * header from including source base/len.  xd3_emit_hdr checks for
+   * srclen == 0. */
+  if (stream->enc_state == ENC_INSTR && stream->match_maxaddr == 0)
     {
       goto done;
     }
 
-  /* Check for overflow, srclen is usize_t - this can't happen unless XD3_DEFAULT_SRCBACK
-   * and related parameters are extreme - should use smaller windows. */
+  /* Check for overflow, srclen is usize_t - this can't happen unless
+   * XD3_DEFAULT_SRCBACK and related parameters are extreme - should
+   * use smaller windows. */
   length = stream->match_maxaddr - stream->match_minaddr;
 
   xoff_t x = (xoff_t) USIZE_T_MAX;
@@ -4195,9 +4221,9 @@ xd3_srcwin_setup (xd3_stream *stream)
       return XD3_INTERNAL;
     }
 
-  /* If ENC_FLUSH, then we know the exact source window to use because no more copies can
-   * be issued. */
-  if (stream->enc_state == ENC_FLUSH)
+  /* If ENC_INSTR, then we know the exact source window to use because
+   * no more copies can be issued. */
+  if (stream->enc_state == ENC_INSTR)
     {
       src->srcbase = stream->match_minaddr;
       src->srclen  = (usize_t) length;
@@ -4205,8 +4231,9 @@ xd3_srcwin_setup (xd3_stream *stream)
       goto done;
     }
 
-  /* Otherwise, we have to make a guess.  More copies may still be issued, but we have to
-   * decide the source window base and length now.  */
+  /* Otherwise, we have to make a guess.  More copies may still be
+   * issued, but we have to decide the source window base and length
+   * now.  */
   src->srcbase = stream->match_minaddr;
   src->srclen  = max ((usize_t) length, stream->avail_in + (stream->avail_in >> 2));
   if (src->size < src->srcbase + (xoff_t) src->srclen)
@@ -4217,16 +4244,18 @@ xd3_srcwin_setup (xd3_stream *stream)
 
   XD3_ASSERT (src->srclen);
  done:
-  /* Set the taroff.  This convenience variable is used even when stream->src == NULL. */
+  /* Set the taroff.  This convenience variable is used even when
+     stream->src == NULL. */
   stream->taroff = src->srclen;
   return 0;
 }
 
-/* Sets the bounding region for a newly discovered source match, prior to calling
- * xd3_source_extend_match().  This sets the match_maxfwd, match_maxback variables.  Note:
- * srcpos is an absolute position (xoff_t) but the match_maxfwd, match_maxback variables
- * are usize_t.  Returns 0 if the setup succeeds, or 1 if the source position lies outside
- * an already-decided srcbase/srclen window. */
+/* Sets the bounding region for a newly discovered source match, prior
+ * to calling xd3_source_extend_match().  This sets the match_maxfwd,
+ * match_maxback variables.  Note: srcpos is an absolute position
+ * (xoff_t) but the match_maxfwd, match_maxback variables are usize_t.
+ * Returns 0 if the setup succeeds, or 1 if the source position lies
+ * outside an already-decided srcbase/srclen window. */
 static int
 xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 {
@@ -4238,19 +4267,22 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   stream->match_back    = 0;
   stream->match_fwd     = 0;
 
-  /* Going backwards, the 1.5-pass algorithm allows some already-matched input may be
-   * covered by a longer source match.  The greedy algorithm does not allow this. */
+  /* Going backwards, the 1.5-pass algorithm allows some
+   * already-matched input may be covered by a longer source match.
+   * The greedy algorithm does not allow this. */
   if (stream->flags & XD3_BEGREEDY)
     {
-      /* The greedy algorithm allows backward matching to the last matched position. */
+      /* The greedy algorithm allows backward matching to the last
+	 matched position. */
       greedy_or_not = xd3_iopt_last_matched (stream);
     }
   else
     {
-      /* The 1.5-pass algorithm allows backward matching to go back as far as the
-       * unencoded offset, which is updated as instructions pass out of the iopt buffer.
-       * If this (default) is chosen, it means xd3_iopt_erase may be called to eliminate
-       * instructions when a covering source match is found. */
+      /* The 1.5-pass algorithm allows backward matching to go back as
+       * far as the unencoded offset, which is updated as instructions
+       * pass out of the iopt buffer.  If this (default) is chosen, it
+       * means xd3_iopt_erase may be called to eliminate instructions
+       * when a covering source match is found. */
       greedy_or_not = stream->unencoded_offset;
     }
 
@@ -4264,13 +4296,14 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   XD3_ASSERT (stream->avail_in > stream->input_position);
   stream->match_maxfwd = stream->avail_in - stream->input_position;
 
-  /* Now we take the source position into account.  It depends whether the srclen/srcbase
-   * have been decided yet. */
+  /* Now we take the source position into account.  It depends whether
+   * the srclen/srcbase have been decided yet. */
   if (stream->srcwin_decided == 0)
     {
-      /* Unrestricted case: the match can cover the entire source, 0--src->size.  We
-       * compare the usize_t match_maxfwd/match_maxback against the xoff_t src->size/srcpos values
-       * and take the min. */
+      /* Unrestricted case: the match can cover the entire source,
+       * 0--src->size.  We compare the usize_t
+       * match_maxfwd/match_maxback against the xoff_t
+       * src->size/srcpos values and take the min. */
       xoff_t srcavail;
 
       if (srcpos < (xoff_t) stream->match_maxback)
@@ -4323,23 +4356,29 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
-/* This function expands the source match backward and forward.  It is reentrant, since
- * xd3_getblk may return XD3_GETSRCBLK, so most variables are kept in xd3_stream.  There
- * are two callers of this function, the string_matching routine when a checksum match is
- * discovered, and xd3_encode_input whenever a continuing (or initial) match is suspected.
- * The two callers do different things with the input_position, thus this function leaves
- * that variable untouched.  If a match is taken the resulting stream->match_fwd is left
+/* This function expands the source match backward and forward.  It is
+ * reentrant, since xd3_getblk may return XD3_GETSRCBLK, so most
+ * variables are kept in xd3_stream.  There are two callers of this
+ * function, the string_matching routine when a checksum match is
+ * discovered, and xd3_encode_input whenever a continuing (or initial)
+ * match is suspected.  The two callers do different things with the
+ * input_position, thus this function leaves that variable untouched.
+ * If a match is taken the resulting stream->match_fwd is left
  * non-zero. */
 static int
 xd3_source_extend_match (xd3_stream *stream)
 {
   int ret;
   xd3_source *src = stream->src;
-  xoff_t matchoff;  /* matchoff is the current right/left-boundary of the source match being tested. */
-  usize_t streamoff; /* streamoff is the current right/left-boundary of the input match being tested. */
-  xoff_t tryblk;    /* tryblk, tryoff are the block, offset position of matchoff */
+  xoff_t matchoff;  /* matchoff is the current right/left-boundary of
+		       the source match being tested. */
+  usize_t streamoff; /* streamoff is the current right/left-boundary
+			of the input match being tested. */
+  xoff_t tryblk;    /* tryblk, tryoff are the block, offset position
+		       of matchoff */
   usize_t tryoff;
-  usize_t tryrem;    /* tryrem is the number of matchable bytes on the source block */
+  usize_t tryrem;    /* tryrem is the number of matchable bytes on the
+			source block */
 
   XD3_ASSERT (src != NULL);
 
@@ -4376,7 +4415,8 @@ xd3_source_extend_match (xd3_stream *stream)
 	    }
 
 	  /* OPT: This code can be optimized. */
-	  for (tryrem = min (tryoff, stream->match_maxback - stream->match_back);
+	  for (tryrem = min (tryoff, stream->match_maxback -
+			     stream->match_back);
 	       tryrem != 0;
 	       tryrem -= 1, stream->match_back += 1)
 	    {

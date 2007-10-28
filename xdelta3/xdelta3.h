@@ -423,10 +423,11 @@ typedef enum {
   ENC_INIT      = 0, /* xd3_encode_input has never been called. */
   ENC_INPUT     = 1, /* waiting for xd3_avail_input () to be called. */
   ENC_SEARCH    = 2, /* currently searching for matches. */
-  ENC_FLUSH     = 3, /* currently emitting output. */
-  ENC_POSTOUT   = 4, /* after an output section. */
-  ENC_POSTWIN   = 5, /* after all output sections. */
-  ENC_ABORTED   = 6, /* abort. */
+  ENC_INSTR     = 3, /* currently formatting output. */
+  ENC_FLUSH     = 4, /* currently emitting output. */
+  ENC_POSTOUT   = 5, /* after an output section. */
+  ENC_POSTWIN   = 6, /* after all output sections. */
+  ENC_ABORTED   = 7, /* abort. */
 } xd3_encode_state;
 
 /* The xd3_decode_input state machine steps through these states in
@@ -1022,6 +1023,22 @@ int     xd3_get_appheader (xd3_stream     *stream,
  * function which returns 1 if the decoder will require source
  * data. */
 int     xd3_decoder_needs_source (xd3_stream *stream);
+
+
+/* To generate a VCDIFF encoded delta with xd3_encode_init() from
+ * another format, use:
+ *
+ *   xd3_encode_init() -- initialze encoder state
+ *   xd3_init_cache() -- reset VCDIFF address cache
+ *   xd3_found_match() -- to report a copy instruction
+ *
+ * set stream->enc_state to ENC_INSTR and call xd3_encode_input as usual.
+ */
+int xd3_encode_init (xd3_stream *stream);
+void xd3_init_cache (xd3_addr_cache* acache);
+int xd3_found_match (xd3_stream *stream,
+		     usize_t pos, usize_t size,
+		     xoff_t addr, int is_source);
 
 /* Gives an error string for xdelta3-speficic errors, returns NULL for
    system errors */
