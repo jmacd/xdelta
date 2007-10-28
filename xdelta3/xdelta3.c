@@ -1830,9 +1830,9 @@ xd3_emit_bytes (xd3_stream     *stream,
 }
 #endif /* XD3_ENCODER */
 
-/******************************************************************************************
+/*********************************************************************
  Integer encoder/decoder functions
- ******************************************************************************************/
+ **********************************************************************/
 
 #define DECODE_INTEGER_TYPE(PART,OFLOW)                                \
   while (stream->avail_in != 0)                                        \
@@ -1930,7 +1930,8 @@ xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_32part, UINT32_OFLOW_MASK); }
 
 static int
-xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp, const uint8_t *max, uint32_t *valp)
+xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *max, uint32_t *valp)
 { READ_INTEGER_TYPE (uint32_t, UINT32_OFLOW_MASK); }
 
 #if XD3_ENCODER
@@ -1954,7 +1955,8 @@ xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 /* These are tested but not used */
 #if REGRESSION_TEST
 static int
-xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp, const uint8_t *max, uint64_t *valp)
+xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *max, uint64_t *valp)
 { READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
 
 static uint
@@ -3935,13 +3937,14 @@ xd3_process_memory (int            is_encode,
   xd3_source src;
   int ret;
 
-  if (input == NULL || output == NULL) {
-    stream.msg = "invalid input/output buffer";
-    return XD3_INTERNAL;
-  }
-
   memset (& stream, 0, sizeof (stream));
   memset (& config, 0, sizeof (config));
+
+  if (input == NULL || output == NULL) {
+    stream.msg = "invalid input/output buffer";
+    ret = XD3_INTERNAL;
+    goto exit;
+  }
 
   config.flags = flags;
 
@@ -3992,6 +3995,9 @@ xd3_process_memory (int            is_encode,
     }
 
  exit:
+  if (ret != 0) {
+    IF_DEBUG1 (DP(RINT "process_memory: %d: %s", ret, stream.msg));
+  }
   xd3_free_stream(&stream);
   return ret;
 }
@@ -4178,7 +4184,8 @@ xd3_srcwin_setup (xd3_stream *stream)
    * and related parameters are extreme - should use smaller windows. */
   length = stream->match_maxaddr - stream->match_minaddr;
 
-  if (length > (xoff_t) USIZE_T_MAX)
+  xoff_t x = (xoff_t) USIZE_T_MAX;
+  if (length > x)
     {
       stream->msg = "source window length overflow (not 64bit)";
       return XD3_INTERNAL;

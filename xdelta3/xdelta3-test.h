@@ -413,95 +413,96 @@ test_decode_integer_end_of_input (xd3_stream *stream, int unused)
   return test_read_integer_error (stream, 1, "end-of-input in read_integer");
 }
 
-/* Test that emit_integer/decode_integer/sizeof_integer/read_integer work on correct
- * inputs.  Tests powers of (2^7), plus or minus, up to the maximum value. */
-#define TEST_ENCODE_DECODE_INTEGER(TYPE,ONE,MAX)                                \
-  xd3_output *rbuf = NULL;                                                      \
-  xd3_output *dbuf = NULL;                                                      \
-  TYPE values[64];                                                              \
-  int nvalues = 0;                                                              \
-  int i, ret = 0;                                                               \
-                                                                                \
-  for (i = 0; i < (sizeof (TYPE) * 8); i += 7)                                  \
-    {                                                                           \
-      values[nvalues++] = (ONE << i) - ONE;                                     \
-      values[nvalues++] = (ONE << i);                                           \
-      values[nvalues++] = (ONE << i) + ONE;                                     \
-    }                                                                           \
-                                                                                \
-  values[nvalues++] = MAX-ONE;                                                  \
-  values[nvalues++] = MAX;                                                      \
-                                                                                \
-  rbuf = xd3_alloc_output (stream, rbuf);                                       \
-  dbuf = xd3_alloc_output (stream, dbuf);                                       \
-                                                                                \
-  for (i = 0; i < nvalues; i += 1)                                              \
-    {                                                                           \
-      const uint8_t *max;                                                       \
-      const uint8_t *inp;                                                       \
-      TYPE val;                                                                 \
-                                                                                \
-      DOT ();                                                                   \
-      rbuf->next = 0;                                                           \
-                                                                                \
-      if ((ret = xd3_emit_ ## TYPE (stream, & rbuf, values[i])) ||              \
-	  (ret = xd3_emit_ ## TYPE (stream, & dbuf, values[i])))                \
-	{                                                                       \
-	  goto fail;                                                            \
-	}                                                                       \
-                                                                                \
-      inp = rbuf->base;                                                         \
-      max = rbuf->base + rbuf->next;                                            \
-                                                                                \
-      if (rbuf->next != xd3_sizeof_ ## TYPE (values[i]))                        \
-	{                                                                       \
-	  ret = XD3_INTERNAL;                                                         \
-	  goto fail;                                                            \
-	}                                                                       \
-                                                                                \
-      if ((ret = xd3_read_ ## TYPE (stream, & inp, max, & val)))                \
-	{                                                                       \
-	  goto fail;                                                            \
-	}                                                                       \
-                                                                                \
-      if (val != values[i])                                                     \
-	{                                                                       \
-	  ret = XD3_INTERNAL;                                                         \
-	  goto fail;                                                            \
-	}                                                                       \
-                                                                                \
-      DOT ();                                                                   \
-    }                                                                           \
-                                                                                \
-  stream->next_in  = dbuf->base;                                                \
-  stream->avail_in = dbuf->next;                                                \
-                                                                                \
-  for (i = 0; i < nvalues; i += 1)                                              \
-    {                                                                           \
-      TYPE val;                                                                 \
-                                                                                \
-      if ((ret = xd3_decode_ ## TYPE (stream, & val)))                          \
-        {                                                                       \
-          goto fail;                                                            \
-        }                                                                       \
-                                                                                \
-      if (val != values[i])                                                     \
-        {                                                                       \
-          ret = XD3_INTERNAL;                                                         \
-          goto fail;                                                            \
-        }                                                                       \
-    }                                                                           \
-                                                                                \
-  if (stream->avail_in != 0)                                                    \
-    {                                                                           \
-      ret = XD3_INTERNAL;                                                             \
-      goto fail;                                                                \
-    }                                                                           \
-                                                                                \
- fail:                                                                          \
-  xd3_free_output (stream, rbuf);                                               \
-  xd3_free_output (stream, dbuf);                                               \
-                                                                                \
+/* Test that emit_integer/decode_integer/sizeof_integer/read_integer
+ * work on correct inputs.  Tests powers of (2^7), plus or minus, up
+ * to the maximum value. */
+#define TEST_ENCODE_DECODE_INTEGER(TYPE,ONE,MAX) \
+  xd3_output *rbuf = NULL; \
+  xd3_output *dbuf = NULL; \
+  TYPE values[64]; \
+  int nvalues = 0; \
+  int i, ret = 0; \
+ \
+  for (i = 0; i < (sizeof (TYPE) * 8); i += 7) \
+    { \
+      values[nvalues++] = (ONE << i) - ONE; \
+      values[nvalues++] = (ONE << i); \
+      values[nvalues++] = (ONE << i) + ONE; \
+    } \
+ \
+  values[nvalues++] = MAX-ONE; \
+  values[nvalues++] = MAX; \
+ \
+  rbuf = xd3_alloc_output (stream, rbuf); \
+  dbuf = xd3_alloc_output (stream, dbuf); \
+ \
+  for (i = 0; i < nvalues; i += 1) \
+    { \
+      const uint8_t *max; \
+      const uint8_t *inp; \
+      TYPE val; \
+ \
+      DOT (); \
+      rbuf->next = 0; \
+ \
+      if ((ret = xd3_emit_ ## TYPE (stream, & rbuf, values[i])) || \
+	  (ret = xd3_emit_ ## TYPE (stream, & dbuf, values[i]))) \
+	{ \
+	  goto fail; \
+	} \
+ \
+      inp = rbuf->base; \
+      max = rbuf->base + rbuf->next; \
+ \
+      if (rbuf->next != xd3_sizeof_ ## TYPE (values[i])) \
+	{ \
+	  ret = XD3_INTERNAL; \
+	  goto fail; \
+	} \
+ \
+      if ((ret = xd3_read_ ## TYPE (stream, & inp, max, & val))) \
+	{ \
+	  goto fail; \
+	} \
+ \
+      if (val != values[i]) \
+	{ \
+	  ret = XD3_INTERNAL; \
+	  goto fail; \
+	} \
+ \
+      DOT (); \
+    } \
+ \
+  stream->next_in  = dbuf->base; \
+  stream->avail_in = dbuf->next; \
+ \
+  for (i = 0; i < nvalues; i += 1) \
+    { \
+      TYPE val; \
+ \
+      if ((ret = xd3_decode_ ## TYPE (stream, & val))) \
+        { \
+          goto fail; \
+        } \
+ \
+      if (val != values[i]) \
+        { \
+          ret = XD3_INTERNAL; \
+          goto fail; \
+        } \
+    } \
+ \
+  if (stream->avail_in != 0) \
+    { \
+      ret = XD3_INTERNAL; \
+      goto fail; \
+    } \
+ \
+ fail: \
+  xd3_free_output (stream, rbuf); \
+  xd3_free_output (stream, dbuf); \
+ \
   return ret
 
 static int

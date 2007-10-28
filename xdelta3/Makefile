@@ -114,6 +114,16 @@ xdelta3: $(SOURCES)
               -DXD3_MAIN=1 \
               -DXD3_POSIX=1
 
+xdelta3-32: $(SOURCES)
+	$(CC) -g -Wall -Wshadow xdelta3.c -lm -o xdelta3-32 \
+              -DXD3_DEBUG=1 \
+              -DXD3_USE_LARGEFILE64=0 \
+              -DREGRESSION_TEST=1 \
+              -DSECONDARY_DJW=1 \
+              -DSECONDARY_FGK=1 \
+              -DXD3_MAIN=1 \
+              -DXD3_POSIX=1
+
 xdelta3-debug: $(SOURCES)
 	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=1 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
@@ -161,9 +171,6 @@ xdelta3-decoder-nomain.o: $(SOURCES) linkxd3lib.c
 	    -DXD3_ENCODER=0 -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 \
 	    -o xdelta3-decoder-nomain.o
 	strip xdelta3-decoder-nomain.o
-
-xdelta3-32: $(SOURCES)
-	$(CC) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-32 -DXD3_MAIN=1 -DSECONDARY_DJW=1 -DREGRESSION_TEST=1 -lm
 
 xdelta3-O++: $(SOURCES)
 	$(CXX) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-O++ -DXD3_MAIN=1 -DSECONDARY_DJW=1 -DREGRESSION_TEST=1 -lm

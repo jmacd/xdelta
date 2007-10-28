@@ -13,7 +13,7 @@ usize_t bench_speed(const uint8_t *from_buf, const size_t from_len,
   int ret = xd3_encode_memory(to_buf, to_len, from_buf, from_len,
 			      delta_buf, &delta_size, delta_alloc, flags);
   if (ret != 0) {
-    fprintf(stderr, "encode failure: %d\n", ret);
+    fprintf(stderr, "encode failure: %d: %s\n", ret, xd3_strerror(ret));
     abort();
   }
   return delta_size;

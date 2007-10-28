@@ -19,9 +19,9 @@
 #ifndef _XDELTA3_SECOND_H_
 #define _XDELTA3_SECOND_H_
 
-/******************************************************************************************
+/**************************************************************
  Secondary compression
- ******************************************************************************************/
+ **************************************************************/
 
 #define xd3_sec_data(s) ((s)->sec_stream_d)
 #define xd3_sec_inst(s) ((s)->sec_stream_i)
@@ -291,13 +291,14 @@ xd3_encode_secondary (xd3_stream      *stream,
 
   tmp_head = xd3_alloc_output (stream, NULL);
 
-  /* Encode the size, encode the data.  @@ Encoding the size makes it simpler, but is a
-   * little gross.  Should not need the entire section in contiguous memory, but it is
-   * much easier this way. */
+  /* Encode the size, encode the data.  @@ Encoding the size makes it
+   * simpler, but is a little gross.  Should not need the entire
+   * section in contiguous memory, but it is much easier this way. */
   if ((ret = xd3_emit_size (stream, & tmp_head, orig_size)) ||
       (ret = stream->sec_type->encode (stream, sec_stream, *head, tmp_head, cfg))) { goto getout; }
 
-  /* If the secondary compressor determines its no good, it returns XD3_NOSECOND. */
+  /* If the secondary compressor determines its no good, it returns
+     XD3_NOSECOND. */
 
   /* Setup tmp_tail, comp_size */
   tmp_tail  = tmp_head;
