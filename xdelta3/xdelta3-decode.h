@@ -1021,8 +1021,9 @@ xd3_decode_input (xd3_stream *stream)
 	      return XD3_INVALID_INPUT;
 	    }
 
-	  src->cpyoff_blocks = stream->dec_cpyoff / src->blksize;
-	  src->cpyoff_blkoff = stream->dec_cpyoff % src->blksize;
+	  xd3_blksize_div(stream->dec_cpyoff, src,
+			  &src->cpyoff_blocks,
+			  &src->cpyoff_blkoff);
 	}
 
       /* xd3_decode_emit returns XD3_OUTPUT on every success. */

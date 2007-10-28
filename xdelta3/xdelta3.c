@@ -2629,15 +2629,14 @@ xd3_set_source (xd3_stream *stream,
 		xd3_source *src)
 {
   xoff_t blk_num;
-  xoff_t tail_size;
+  usize_t tail_size;
 
   IF_DEBUG1 (DP(RINT "[set source] size %"Q"u\n", src->size));
 
   if (src == NULL || src->size < stream->smatcher.large_look) { return 0; }
 
   stream->src  = src;
-  blk_num      = src->size / src->blksize;
-  tail_size    = src->size - (blk_num * src->blksize);
+  xd3_blksize_div (src->size, src, &blk_num, &tail_size);
   src->blocks  = blk_num + (tail_size > 0);
   src->onlastblk = xd3_bytes_on_srcblk (src, src->blocks - 1);
   src->srclen  = 0;
@@ -4416,8 +4415,7 @@ xd3_source_extend_match (xd3_stream *stream)
        * match_fwd/match_back and direction.  Consolidate? */
       matchoff  = stream->match_srcpos - stream->match_back;
       streamoff = stream->input_position - stream->match_back;
-      tryblk    = matchoff / src->blksize;
-      tryoff    = matchoff - (tryblk * src->blksize);
+      xd3_blksize_div (matchoff, src, &tryblk, &tryoff);
 
       /* this loops backward over source blocks */
       while (stream->match_back < stream->match_maxback)
@@ -4465,8 +4463,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
   matchoff  = stream->match_srcpos + stream->match_fwd;
   streamoff = stream->input_position + stream->match_fwd;
-  tryblk    = matchoff / src->blksize;
-  tryoff    = matchoff - (tryblk * src->blksize);
+  xd3_blksize_div (matchoff, src, & tryblk, & tryoff);
 
   /* Note: practically the same code as backwards case above: same comments */
   while (stream->match_fwd < stream->match_maxfwd)
@@ -4839,11 +4836,16 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   while (stream->srcwin_cksum_pos < logical_input_cksum_pos &&
 	 stream->srcwin_cksum_pos < stream->src->size)
     {
-      xoff_t  blkno = stream->srcwin_cksum_pos / stream->src->blksize;
-      xoff_t  blkbaseoffset = blkno * stream->src->blksize;
-      ssize_t oldpos = stream->srcwin_cksum_pos - blkbaseoffset;
-      ssize_t blkpos = xd3_bytes_on_srcblk_fast (stream->src, blkno);
+      xoff_t  blkno;
+      xoff_t  blkbaseoffset;
+      usize_t blkrem;
+      ssize_t oldpos;
+      ssize_t blkpos;
       int ret;
+      xd3_blksize_div (stream->srcwin_cksum_pos,
+		       stream->src, &blkno, &blkrem);
+      oldpos = blkrem;
+      blkpos = xd3_bytes_on_srcblk_fast (stream->src, blkno);
 
       if (oldpos + stream->smatcher.large_look > blkpos)
 	{

@@ -677,8 +677,7 @@ struct _xd3_source
   xoff_t              blocks;        /* the total number of blocks in
 					this source */
   usize_t             onlastblk;     /* cached size info, avoid __udivdi3 */
-  usize_t             cpyoff_blocks; /* offset of copy window in
-					blocks */
+  xoff_t              cpyoff_blocks; /* offset of dec_cpyoff in blocks */
   usize_t             cpyoff_blkoff; /* offset of copy window in
 					blocks, remainder */
   xoff_t              getblkno;      /* request block number: xd3 sets
@@ -1164,6 +1163,18 @@ const char* xd3_errstring (xd3_stream  *stream)
   return stream->msg ? stream->msg : "";
 }
 
+
+/* 64-bit divisions are expensive.  on a 32bit platform, these show in
+ * a profile as __udivdi3().  these are all the xoff_t divisions: */
+static inline
+void xd3_blksize_div (const xoff_t offset,
+		      const xd3_source *source,
+		      xoff_t *blkno,
+		      usize_t *blkoff) {
+  *blkno = offset / source->blksize;
+  *blkoff = offset - (*blkno * source->blksize);
+}
+
 /* This function tells the number of bytes expected to be set in
  * source->onblk after a getblk request.  This is for convenience of
  * handling a partial last block.  Note that this is a relatively
@@ -1173,14 +1184,16 @@ const char* xd3_errstring (xd3_stream  *stream)
 static inline
 usize_t xd3_bytes_on_srcblk (xd3_source *source, xoff_t blkno)
 {
+  xoff_t s_1_div;
+  usize_t s_1_rem;
   XD3_ASSERT (blkno < source->blocks);
 
   if (blkno != source->blocks - 1)
     {
       return source->blksize;
     }
-
-  return (usize_t)((source->size - 1) % source->blksize) + 1;
+  xd3_blksize_div(source->size - 1, source, &s_1_div, &s_1_rem);
+  return s_1_rem + 1;
 }
 
 static inline
