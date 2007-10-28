@@ -341,7 +341,7 @@ typedef enum
   XD3_SEC_NOADDR     = (1 << 9),   /* disable secondary compression of
 				      the addr section. */
 
-  XD3_SEC_OTHER      = (XD3_SEC_NODATA | XD3_SEC_NOINST | XD3_SEC_NOADDR),
+  XD3_SEC_NOALL      = (XD3_SEC_NODATA | XD3_SEC_NOINST | XD3_SEC_NOADDR),
 
   XD3_ADLER32        = (1 << 10),  /* enable checksum computation in
 				      the encoder. */

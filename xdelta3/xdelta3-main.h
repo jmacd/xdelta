@@ -17,38 +17,37 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* This is all the extra stuff you need for convenience to users in a command line
- * application.  It contains these major components:
+/* This is all the extra stuff you need for convenience to users in a
+ * command line application.  It contains these major components:
  *
- * 1. VCDIFF tools
- * 2. external compression support (this is POSIX-specific).
- * 3. a general read/write loop that handles all of the Xdelta decode/encode/VCDIFF-print
- *    functions
- * 4. command-line interpreter
- * 5. an Xdelta application header which stores default filename, external compression settings
- * 6. output/error printing
+ * 1. VCDIFF tools 2. external compression support (this is
+ * POSIX-specific).  3. a general read/write loop that handles all of
+ * the Xdelta decode/encode/VCDIFF-print functions 4. command-line
+ * interpreter 5. an Xdelta application header which stores default
+ * filename, external compression settings 6. output/error printing
  * 7. basic file support and OS interface
  */
 
-/* TODO list:
- * 1. do exact gzip-like filename, stdout handling.  make a .vcdiff extension, refuse
- *    to encode to stdout without -cf, etc.
- * 2. Allow the user to add a comment string to the app header without disturbing the default
- *    behavior.
- * 3. "Source file must be seekable" is not actually true for encoding, given current
- *    behavior.  Allow non-seekable sources?  It would in theory let you use a fifo for
- *    the source.
+/* TODO list: 1. do exact gzip-like filename, stdout handling.  make a
+ * .vcdiff extension, refuse to encode to stdout without -cf, etc.
+ * 2. Allow the user to add a comment string to the app header without
+ * disturbing the default behavior.  3. "Source file must be seekable"
+ * is not actually true for encoding, given current behavior.  Allow
+ * non-seekable sources?  It would in theory let you use a fifo for
+ * the source.
  */
 
 /* On error handling and printing:
  *
- * The xdelta library sets stream->msg to indicate what condition caused an internal
- * failure, but many failures originate here and are printed here.  The return convention
- * is 0 for success, as throughout Xdelta code, but special attention is required here for
- * the operating system calls with different error handling.  See the main_file_* routines.
- * All errors in this file have a message printed at the time of occurance.  Since some of
- * these calls occur within calls to the library, the error may end up being printed again
- * with a more general error message.
+ * The xdelta library sets stream->msg to indicate what condition
+ * caused an internal failure, but many failures originate here and
+ * are printed here.  The return convention is 0 for success, as
+ * throughout Xdelta code, but special attention is required here for
+ * the operating system calls with different error handling.  See the
+ * main_file_* routines.  All errors in this file have a message
+ * printed at the time of occurance.  Since some of these calls occur
+ * within calls to the library, the error may end up being printed
+ * again with a more general error message.
  */
 
 /******************************************************************************************/
@@ -89,8 +88,8 @@ const char* xd3_mainerror(int err_num);
 /* The number of soft-config variables.  */
 #define XD3_SOFTCFG_VARCNT 7
 
-/* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an error message
- * from the library. */
+/* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an
+ * error message from the library. */
 #define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", xd3_errstring (stream), xd3_mainerror (ret)
 
 #include <stdio.h>  /* fprintf */
@@ -127,20 +126,24 @@ const char* xd3_mainerror(int err_num);
 static STARTUPINFO winStartupInfo;
 #endif
 
-/******************************************************************************************
+/**********************************************************************
  ENUMS and TYPES
- ******************************************************************************************/
+ *********************************************************************/
 
-/* These flags (mainly pertaining to main_read() operations) are set in the
- * main_file->flags variable.  All are related to with external decompression support.
+/* These flags (mainly pertaining to main_read() operations) are set
+ * in the main_file->flags variable.  All are related to with external
+ * decompression support.
  *
- * RD_FIRST causes the external decompression check when the input is first read.
+ * RD_FIRST causes the external decompression check when the input is
+ * first read.
  *
- * RD_NONEXTERNAL disables external decompression for reading a compressed input, in the
- * case of Xdelta inputs.  Note: Xdelta is supported as an external compression type,
- * which makes is the reason for this flag.  An example to justify this is: to create a
- * delta between two files that are VCDIFF-compressed.  Two external Xdelta decoders are
- * run to supply decompressed source and target inputs to the Xdelta encoder. */
+ * RD_NONEXTERNAL disables external decompression for reading a
+ * compressed input, in the case of Xdelta inputs.  Note: Xdelta is
+ * supported as an external compression type, which makes is the
+ * reason for this flag.  An example to justify this is: to create a
+ * delta between two files that are VCDIFF-compressed.  Two external
+ * Xdelta decoders are run to supply decompressed source and target
+ * inputs to the Xdelta encoder. */
 typedef enum
 {
   RD_FIRST        = (1 << 0),
@@ -155,7 +158,8 @@ typedef enum
   XO_WRITE = 1,
 } main_file_modes;
 
-/* Main commands.  For example, CMD_PRINTHDR is the "xdelta printhdr" command. */
+/* Main commands.  For example, CMD_PRINTHDR is the "xdelta printhdr"
+ * command. */
 typedef enum
 {
   CMD_NONE = 0,
@@ -184,10 +188,11 @@ typedef struct _main_extcomp     main_extcomp;
 typedef struct _main_blklru      main_blklru;
 typedef struct _main_blklru_list main_blklru_list;
 
-/* The main_file object supports abstract system calls like open, close, read, write, seek,
- * stat.  The program uses these to represent both seekable files and non-seekable files.
- * Source files must be seekable, but the target input and any output file do not require
- * seekability.
+/* The main_file object supports abstract system calls like open,
+ * close, read, write, seek, stat.  The program uses these to
+ * represent both seekable files and non-seekable files.  Source files
+ * must be seekable, but the target input and any output file do not
+ * require seekability.
  */
 struct _main_file
 {
@@ -210,8 +215,8 @@ struct _main_file
   uint8_t            *snprintf_buf;  /* internal snprintf() use */
 };
 
-/* Various strings and magic values used to detect and call external compression.  See
- * below for examples. */
+/* Various strings and magic values used to detect and call external
+ * compression.  See below for examples. */
 struct _main_extcomp
 {
   const char    *recomp_cmdname;
@@ -616,7 +621,8 @@ main_strtoxoff (const char* s, xoff_t *xo, char which)
 }
 
 static int
-main_atou (const char* arg, usize_t *xo, usize_t low, usize_t high, char which)
+main_atou (const char* arg, usize_t *xo, usize_t low,
+	   usize_t high, char which)
 {
   xoff_t x;
   int ret;
@@ -641,13 +647,14 @@ main_atou (const char* arg, usize_t *xo, usize_t low, usize_t high, char which)
   return 0;
 }
 
-/******************************************************************************************
+/******************************************************************
  FILE BASICS
- ******************************************************************************************/
+ ******************************************************************/
 
-/* With all the variation in file system-call semantics, arguments, return values and
- * error-handling for the POSIX and STDIO file APIs, the insides of these functions make
- * me sick, which is why these wrappers exist. */
+/* With all the variation in file system-call semantics, arguments,
+ * return values and error-handling for the POSIX and STDIO file APIs,
+ * the insides of these functions make me sick, which is why these
+ * wrappers exist. */
 
 #define XOPEN_OPNAME (xfile->mode == XO_READ ? "read" : "write")
 #define XOPEN_STDIO  (xfile->mode == XO_READ ? "rb" : "wb")
@@ -836,10 +843,10 @@ main_file_exists (main_file *xfile)
 }
 
 #if (XD3_POSIX || EXTERNAL_COMPRESSION)
-/* POSIX-generic code takes a function pointer to read() or write().  This calls the
- * function repeatedly until the buffer is full or EOF.  The NREAD parameter is not
- * set for write, NULL is passed.  Return is signed, < 0 indicate errors, otherwise
- * byte count. */
+/* POSIX-generic code takes a function pointer to read() or write().
+ * This calls the function repeatedly until the buffer is full or EOF.
+ * The NREAD parameter is not set for write, NULL is passed.  Return
+ * is signed, < 0 indicate errors, otherwise byte count. */
 typedef int (xd3_posix_func) (int fd, uint8_t *buf, usize_t size);
 
 static int
@@ -871,8 +878,8 @@ xd3_posix_io (int fd, uint8_t *buf, usize_t size, xd3_posix_func *func, usize_t 
 }
 #endif
 
-/* POSIX is unbuffered, while STDIO is buffered.  main_file_read() should always be called
- * on blocks. */
+/* POSIX is unbuffered, while STDIO is buffered.  main_file_read()
+ * should always be called on blocks. */
 static int
 main_file_read (main_file   *ifile,
 	       uint8_t    *buf,
@@ -988,8 +995,9 @@ main_file_seek (main_file *xfile, xoff_t pos)
   return ret;
 }
 
-/* This function simply writes the stream output buffer, if there is any, for encode, decode and recode
- * commands.  (The VCDIFF tools use main_print_func()). */
+/* This function simply writes the stream output buffer, if there is
+ * any, for encode, decode and recode commands.  (The VCDIFF tools use
+ * main_print_func()). */
 static int
 main_write_output (xd3_stream* stream, main_file *ofile)
 {
@@ -1004,9 +1012,79 @@ main_write_output (xd3_stream* stream, main_file *ofile)
   return 0;
 }
 
-/******************************************************************************************
+static int
+main_set_secondary_flags (xd3_config *config)
+{
+  int ret;
+  if (option_use_secondary)
+    {
+      /* The default secondary compressor is DJW, if it's compiled. */
+      if (option_secondary == NULL)
+	{
+	  if (SECONDARY_DJW)
+	    {
+	      config->flags |= XD3_SEC_DJW;
+	    }
+	}
+      else
+	{
+	  if (strcmp (option_secondary, "fgk") == 0 && SECONDARY_FGK)
+	    {
+	      config->flags |= XD3_SEC_FGK;
+	    }
+	  else if (strncmp (option_secondary, "djw", 3) == 0 && SECONDARY_DJW)
+	    {
+	      usize_t level = 3;
+
+	      config->flags |= XD3_SEC_DJW;
+
+	      if (strlen (option_secondary) > 3 &&
+		  (ret = main_atou (option_secondary + 3,
+				    &level,
+				    0, 9, 'S')) != 0 &&
+		  !option_quiet)
+		{
+		  return XD3_INVALID;
+		}
+
+	      /* XD3_SEC_NOXXXX flags disable secondary compression on
+	       * a per-section basis.  For djw, ngroups=1 indicates
+	       * minimum work, ngroups=0 uses default settings, which
+	       * is > 1 groups by default. */
+	      if (level < 1) { config->flags |= XD3_SEC_NODATA; }
+	      if (level < 7) { config->sec_data.ngroups = 1; }
+	      else { config->sec_data.ngroups = 0; }
+
+	      if (level < 3) { config->flags |= XD3_SEC_NOINST; }
+	      if (level < 8) { config->sec_inst.ngroups = 1; }
+	      else { config->sec_inst.ngroups = 0; }
+
+	      if (level < 5) { config->flags |= XD3_SEC_NOADDR; }
+	      if (level < 9) { config->sec_addr.ngroups = 1; }
+	      else { config->sec_addr.ngroups = 0; }
+	    }
+	  else if (strcmp (option_secondary, "none") == 0 && SECONDARY_DJW)
+	    {
+	      /* No secondary */
+	    }
+	  else
+	    {
+	      if (!option_quiet)
+		{
+		  XPR(NT "unrecognized secondary compressor type: %s\n",
+		      option_secondary);
+		  return XD3_INVALID;
+		}
+	    }
+	}
+    }
+
+  return 0;
+}
+
+/******************************************************************
  VCDIFF TOOLS
- ******************************************************************************************/
+ *****************************************************************/
 
 #if VCDIFF_TOOLS
 
@@ -1025,9 +1103,10 @@ main_write_output (xd3_stream* stream, main_file *ofile)
   { return ret; } } while (0)
 
 #ifdef WIN32
-/* According to the internet, Windows vsnprintf() differs from most Unix
- * implementations regarding the terminating 0 when the boundary condition
- * is met. It doesn't matter here, we don't rely on the trailing 0. */
+/* According to the internet, Windows vsnprintf() differs from most
+ * Unix implementations regarding the terminating 0 when the boundary
+ * condition is met. It doesn't matter here, we don't rely on the
+ * trailing 0. */
 #include <stdarg.h>
 int
 snprintf (char *str, int n, char *fmt, ...)
@@ -1089,7 +1168,8 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	{
 	  size += stream->dec_current2.size;
 	  VC(UT "  %s %3u",
-	     xd3_rtype_to_string (stream->dec_current2.type, option_print_cpymode),
+	     xd3_rtype_to_string (stream->dec_current2.type,
+				  option_print_cpymode),
 	     (usize_t)stream->dec_current2.size)VE;
 
 	  if (stream->dec_current2.type >= XD3_CPY)
@@ -1128,11 +1208,13 @@ main_print_vcdiff_file (main_file *xfile, main_file *file, const char *type)
   int ret;  /* Used by above macros */
   if (file->filename)
     {
-      VC(UT "XDELTA filename (%s):     %s\n", type, file->filename)VE;
+      VC(UT "XDELTA filename (%s):     %s\n", type,
+	 file->filename)VE;
     }
   if (file->compressor)
     {
-      VC(UT "XDELTA ext comp (%s):     %s\n", type, file->compressor->recomp_cmdname)VE;
+      VC(UT "XDELTA ext comp (%s):     %s\n", type,
+	 file->compressor->recomp_cmdname)VE;
     }
   return 0;
 }
@@ -1154,13 +1236,17 @@ main_print_func (xd3_stream* stream, main_file *xfile)
   if (stream->dec_winstart == 0)
     {
       VC(UT "VCDIFF version:               0\n")VE;
-
-      VC(UT "VCDIFF header size:           %d\n", stream->dec_hdrsize)VE;
+      VC(UT "VCDIFF header size:           %d\n",
+	 stream->dec_hdrsize)VE;
       VC(UT "VCDIFF header indicator:      ")VE;
-      if ((stream->dec_hdr_ind & VCD_SECONDARY) != 0) VC(UT "VCD_SECONDARY ")VE;
-      if ((stream->dec_hdr_ind & VCD_CODETABLE) != 0) VC(UT "VCD_CODETABLE ")VE;
-      if ((stream->dec_hdr_ind & VCD_APPHEADER) != 0) VC(UT "VCD_APPHEADER ")VE;
-      if (stream->dec_hdr_ind == 0) VC(UT "none")VE;
+      if ((stream->dec_hdr_ind & VCD_SECONDARY) != 0)
+	VC(UT "VCD_SECONDARY ")VE;
+      if ((stream->dec_hdr_ind & VCD_CODETABLE) != 0)
+	VC(UT "VCD_CODETABLE ")VE;
+      if ((stream->dec_hdr_ind & VCD_APPHEADER) != 0)
+	VC(UT "VCD_APPHEADER ")VE;
+      if (stream->dec_hdr_ind == 0)
+	VC(UT "none")VE;
       VC(UT "\n")VE;
 
       IF_SEC(VC(UT "VCDIFF secondary compressor:  %s\n",
@@ -1350,22 +1436,25 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
 }
 #endif /* VCDIFF_TOOLS */
 
-/******************************************************************************************
+/*******************************************************************
  Input decompression, output recompression
- ******************************************************************************************/
+ ******************************************************************/
 
 #if EXTERNAL_COMPRESSION
-/* This is tricky POSIX-specific code with lots of fork(), pipe(), dup(), waitpid(), and
- * exec() business.  Most of this code originated in PRCS1, which did automatic
- * package-file decompression.  It works with both XD3_POSIX and XD3_STDIO file
+/* This is tricky POSIX-specific code with lots of fork(), pipe(),
+ * dup(), waitpid(), and exec() business.  Most of this code
+ * originated in PRCS1, which did automatic package-file
+ * decompression.  It works with both XD3_POSIX and XD3_STDIO file
  * disciplines.
  *
- * To automatically detect compressed inputs requires a child process to reconstruct the
- * input stream, which was advanced in order to detect compression, because it may not be
- * seekable.  In other words, the main program reads part of the input stream, and if it
- * detects a compressed input it then forks a pipe copier process, which copies the
- * first-read block out of the main-program's memory, then streams the remaining
- * compressed input into the input-decompression pipe.
+ * To automatically detect compressed inputs requires a child process
+ * to reconstruct the input stream, which was advanced in order to
+ * detect compression, because it may not be seekable.  In other
+ * words, the main program reads part of the input stream, and if it
+ * detects a compressed input it then forks a pipe copier process,
+ * which copies the first-read block out of the main-program's memory,
+ * then streams the remaining compressed input into the
+ * input-decompression pipe.
  */
 
 #include <unistd.h>
@@ -1441,10 +1530,10 @@ main_external_compression_finish (void)
   return 0;
 }
 
-/* This runs as a forked process of main_input_decompress_setup() to copy input to the
- * decompression process.  First, the available input is copied out of the existing
- * buffer, then the buffer is reused to continue reading from the compressed input
- * file. */
+/* This runs as a forked process of main_input_decompress_setup() to
+ * copy input to the decompression process.  First, the available
+ * input is copied out of the existing buffer, then the buffer is
+ * reused to continue reading from the compressed input file. */
 static int
 main_pipe_copier (uint8_t    *pipe_buf,
 		  usize_t      pipe_bufsize,
@@ -1475,10 +1564,11 @@ main_pipe_copier (uint8_t    *pipe_buf,
   return 0;
 }
 
-/* This function is called after we have read some amount of data from the input file and
- * detected a compressed input.  Here we start a decompression subprocess by forking
- * twice.  The first process runs the decompression command, the second process copies
- * data to the input of the first. */
+/* This function is called after we have read some amount of data from
+ * the input file and detected a compressed input.  Here we start a
+ * decompression subprocess by forking twice.  The first process runs
+ * the decompression command, the second process copies data to the
+ * input of the first. */
 static int
 main_input_decompress_setup (const main_extcomp     *decomp,
 			     main_file              *ifile,
@@ -1594,17 +1684,20 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 }
 
 
-/* This routine is called when the first buffer of input data is read by the main program
- * (unless input decompression is disabled by command-line option).  If it recognizes the
- * magic number of a known input type it invokes decompression.
+/* This routine is called when the first buffer of input data is read
+ * by the main program (unless input decompression is disabled by
+ * command-line option).  If it recognizes the magic number of a known
+ * input type it invokes decompression.
  *
- * Skips decompression if the decompression type or the file type is RD_NONEXTERNAL.
+ * Skips decompression if the decompression type or the file type is
+ * RD_NONEXTERNAL.
  *
  * Behaves exactly like main_file_read, otherwise.
  *
- * This function uses a separate buffer to read the first small block of input.  If a
- * compressed input is detected, the separate buffer is passed to the pipe copier.  This
- * avoids using the same size buffer in both cases. */
+ * This function uses a separate buffer to read the first small block
+ * of input.  If a compressed input is detected, the separate buffer
+ * is passed to the pipe copier.  This avoids using the same size
+ * buffer in both cases. */
 static int
 main_decompress_input_check (main_file   *ifile,
 			    uint8_t    *input_buf,
@@ -1626,8 +1719,8 @@ main_decompress_input_check (main_file   *ifile,
       const main_extcomp *decomp = & extcomp_types[i];
 
       if ((check_nread > decomp->magic_size) &&
-	  /* The following expr skips decompression if we are trying to read a VCDIFF
-	   * input and that is the magic number. */
+	  /* The following expr skips decompression if we are trying
+	   * to read a VCDIFF input and that is the magic number. */
 	  !((decomp->flags & RD_NONEXTERNAL) && (ifile->flags & RD_NONEXTERNAL)) &&
 	  memcmp (check_buf, decomp->magic, decomp->magic_size) == 0)
 	{
@@ -1663,8 +1756,9 @@ main_decompress_input_check (main_file   *ifile,
   return 0;
 }
 
-/* This is called when the source file needs to be decompressed.  We fork/exec a
- * decompression command with the proper input and output to a temporary file. */
+/* This is called when the source file needs to be decompressed.  We
+ * fork/exec a decompression command with the proper input and output
+ * to a temporary file. */
 static int
 main_decompress_source (main_file *sfile, xd3_source *source)
 {
@@ -1758,9 +1852,10 @@ main_decompress_source (main_file *sfile, xd3_source *source)
   return ret;
 }
 
-/* Initiate re-compression of the output stream.  This is easier than input decompression
- * because we know beforehand that the stream will be compressed, whereas the input has
- * already been read when we decide it should be decompressed.  Thus, it only requires one
+/* Initiate re-compression of the output stream.  This is easier than
+ * input decompression because we know beforehand that the stream will
+ * be compressed, whereas the input has already been read when we
+ * decide it should be decompressed.  Thus, it only requires one
  * subprocess and one pipe. */
 static int
 main_recompress_output (main_file *ofile)
@@ -1803,8 +1898,8 @@ main_recompress_output (main_file *ofile)
 
   ext_subprocs[0] = recomp_id;
 
-  /* The parent closes both pipes after duplicating the output-fd for writing to the
-   * compression pipe. */
+  /* The parent closes both pipes after duplicating the output-fd for
+   * writing to the compression pipe. */
   output_fd = dup (pipefd[PIPE_WRITE_FD]);
 
   if (output_fd < 0 ||
@@ -1839,8 +1934,8 @@ main_recompress_output (main_file *ofile)
 }
 #endif /* EXTERNAL_COMPRESSION */
 
-/* Identify the compressor that was used based on its ident string, which is passed in the
- * application header. */
+/* Identify the compressor that was used based on its ident string,
+ * which is passed in the application header. */
 static const main_extcomp*
 main_ident_compressor (const char *ident)
 {
@@ -1887,9 +1982,9 @@ main_get_compressor (const char *ident)
     }
 }
 
-/******************************************************************************************
+/*********************************************************************
  APPLICATION HEADER
- ******************************************************************************************/
+ *******************************************************************/
 
 #if XD3_ENCODER
 static const char*
@@ -1910,11 +2005,12 @@ main_apphead_string (const char* x)
 static int
 main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 {
-  /* The user may disable the application header.  Once the appheader is set, this
-   * disables setting it again. */
+  /* The user may disable the application header.  Once the appheader
+   * is set, this disables setting it again. */
   if (appheader_used || ! option_use_appheader) { return 0; }
 
-  /* The user may specify the application header, otherwise format the default header. */
+  /* The user may specify the application header, otherwise format the
+     default header. */
   if (option_appheader)
     {
       appheader_used = option_appheader;
@@ -2010,14 +2106,15 @@ main_get_appheader_params (main_file *file, char **parsed, int output, const cha
 }
 
 static void
-main_get_appheader (xd3_stream *stream, main_file *ifile, main_file *output, main_file *sfile)
+main_get_appheader (xd3_stream *stream, main_file *ifile,
+		    main_file *output, main_file *sfile)
 {
   uint8_t *apphead;
   usize_t appheadsz;
   int ret;
 
-  /* The user may disable the application header.  Once the appheader is set, this
-   * disables setting it again. */
+  /* The user may disable the application header.  Once the appheader
+   * is set, this disables setting it again. */
   if (! option_use_appheader) { return; }
 
   ret = xd3_get_appheader (stream, & apphead, & appheadsz);
@@ -2060,13 +2157,14 @@ main_get_appheader (xd3_stream *stream, main_file *ifile, main_file *output, mai
   return;
 }
 
-/******************************************************************************************
+/*********************************************************************
  Main I/O routines
- ******************************************************************************************/
+ **********************************************************************/
 
-/* This function acts like the above except it may also try to recognize a compressed
- * input when the first buffer of data is read.  The EXTERNAL_COMPRESSION code is called
- * to search for magic numbers. */
+/* This function acts like the above except it may also try to
+ * recognize a compressed input when the first buffer of data is read.
+ * The EXTERNAL_COMPRESSION code is called to search for magic
+ * numbers. */
 static int
 main_read_primary_input (main_file   *ifile,
 			 uint8_t    *buf,
@@ -2085,8 +2183,9 @@ main_read_primary_input (main_file   *ifile,
   return main_file_read (ifile, buf, size, nread, "input read failed");
 }
 
-/* Open the main output file, sets a default file name, initiate recompression.  This
- * function is expected to fprint any error messages. */
+/* Open the main output file, sets a default file name, initiate
+ * recompression.  This function is expected to fprint any error
+ * messages. */
 static int
 main_open_output (xd3_stream *stream, main_file *ofile)
 {
@@ -2137,9 +2236,10 @@ main_open_output (xd3_stream *stream, main_file *ofile)
   return 0;
 }
 
-/* This is called at different times for encoding and decoding.  The encoder calls it
- * immediately, the decoder delays until the application header is received.
- * Stream may be NULL, in which case xd3_set_source is not called. */
+/* This is called at different times for encoding and decoding.  The
+ * encoder calls it immediately, the decoder delays until the
+ * application header is received.  Stream may be NULL, in which case
+ * xd3_set_source is not called. */
 static int
 main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *source)
 {
@@ -2256,7 +2356,8 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       static char buf[32];
 
       XPR(NT "source %s winsize %s size %"Q"u\n",
-	  sfile->filename, main_format_bcnt(option_srcwinsz, buf), source->size);
+	  sfile->filename, main_format_bcnt(option_srcwinsz, buf),
+	  source->size);
     }
 
   if (option_verbose > 1)
@@ -2315,17 +2416,18 @@ main_set_winsize (main_file *ifile) {
     }
 }
 
-/******************************************************************************************
+/*******************************************************************
  Source routines
- ******************************************************************************************/
+ *******************************************************************/
 
-/* This is the callback for reading a block of source.  This function is blocking and it
- * implements a small LRU.
+/* This is the callback for reading a block of source.  This function
+ * is blocking and it implements a small LRU.
  *
- * Note that it is possible for main_input() to handle getblk requests in a non-blocking
- * manner.  If the callback is NULL then the caller of xd3_*_input() must handle the
- * XD3_GETSRCBLK return value and fill the source in the same way.  See xd3_getblk for
- * details.  To see an example of non-blocking getblk, see xdelta-test.h. */
+ * Note that it is possible for main_input() to handle getblk requests
+ * in a non-blocking manner.  If the callback is NULL then the caller
+ * of xd3_*_input() must handle the XD3_GETSRCBLK return value and
+ * fill the source in the same way.  See xd3_getblk for details.  To
+ * see an example of non-blocking getblk, see xdelta-test.h. */
 static int
 main_getblk_func (xd3_stream *stream,
 		  xd3_source *source,
@@ -2443,13 +2545,13 @@ main_getblk_func (xd3_stream *stream,
   return 0;
 }
 
-/******************************************************************************************
+/*********************************************************************
  Main routines
- ******************************************************************************************/
+ ********************************************************************/
 
-/* This is a generic input function.  It calls the xd3_encode_input or xd3_decode_input
- * functions and makes calls to the various input handling routines above, which
- * coordinate external decompression.
+/* This is a generic input function.  It calls the xd3_encode_input or
+ * xd3_decode_input functions and makes calls to the various input
+ * handling routines above, which coordinate external decompression.
  */
 static int
 main_input (xd3_cmd     cmd,
@@ -2474,50 +2576,19 @@ main_input (xd3_cmd     cmd,
   int (*input_func) (xd3_stream*);
   int (*output_func) (xd3_stream*, main_file *);
 
+  memset (& stream, 0, sizeof (stream));
   memset (& source, 0, sizeof (source));
   memset (& config, 0, sizeof (config));
 
   config.alloc = main_alloc;
   config.freef = main_free1;
-  // TODO: what about sec_xxxx.ngroups = 1?
-  config.sec_data.ngroups = 1;
-  config.sec_addr.ngroups = 1;
-  config.sec_inst.ngroups = 1;
+
   config.iopt_size = option_iopt_size;
   config.sprevsz = option_sprevsz;
 
   do_not_lru = 0;
 
   start_time = get_millisecs_now ();
-
-  if (option_use_secondary)
-    {
-      /* The default secondary compressor is DJW, if it's compiled, being used, etc. */
-      if (option_secondary == NULL)
-	{
-	  if (SECONDARY_DJW) { stream_flags |= XD3_SEC_DJW; }
-	}
-      else
-	{
-	  if (strcmp (option_secondary, "fgk") == 0 && SECONDARY_FGK)
-	    {
-	      stream_flags |= XD3_SEC_FGK;
-	    }
-	  else if (strcmp (option_secondary, "djw") == 0 && SECONDARY_DJW)
-	    {
-	      stream_flags |= XD3_SEC_DJW;
-	    }
-	  else if (strcmp (option_secondary, "none") == 0 && SECONDARY_DJW)
-	    {
-	      /* No secondary */
-	    }
-	  else
-	    {
-	      XPR(NT "unrecognized secondary compressor type: %s\n", option_secondary);
-	      return EXIT_FAILURE;
-	    }
-	}
-    }
 
   if (option_use_checksum) { stream_flags |= XD3_ADLER32; }
 
@@ -2543,24 +2614,22 @@ main_input (xd3_cmd     cmd,
       recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream));
 
       recode_flags = (stream_flags & XD3_SEC_TYPE);
-      xd3_init_config(&recode_config, recode_flags);
 
       recode_config.alloc = main_alloc;
       recode_config.freef = main_free1;
 
-      // TODO: what about sec_xxxx.ngroups = 1?
-      recode_config.sec_data.ngroups = 1;
-      recode_config.sec_addr.ngroups = 1;
-      recode_config.sec_inst.ngroups = 1;
+      xd3_init_config(&recode_config, recode_flags);
 
-      if ((ret = xd3_config_stream (recode_stream, &recode_config)) ||
+      if ((ret = main_set_secondary_flags (&recode_config)) ||
+	  (ret = xd3_config_stream (recode_stream, &recode_config)) ||
 	  (ret = xd3_encode_init_buffers (recode_stream)))
 	{
-	  XPR(NT XD3_LIB_ERRMSG (& stream, ret));
+
+	  XPR(NT XD3_LIB_ERRMSG (recode_stream, ret));
 	  return EXIT_FAILURE;
 	}
 
-      // TODO: xd3_set_appheader (recode_stream)
+      // TODO: main_set_appheader (recode_stream)
 
       ifile->flags |= RD_NONEXTERNAL;
       input_func    = xd3_decode_input;
@@ -2644,9 +2713,10 @@ main_input (xd3_cmd     cmd,
 
   if (IS_ENCODE (cmd))
     {
-      /* When encoding, open the source file, possibly decompress it.  The decoder delays
-       * this step until XD3_GOTHEADER. */
-      if (sfile->filename != NULL && (ret = main_set_source (NULL, cmd, sfile, & source)))
+      /* When encoding, open the source file, possibly decompress it.
+       * The decoder delays this step until XD3_GOTHEADER. */
+      if (sfile->filename != NULL &&
+	  (ret = main_set_source (NULL, cmd, sfile, & source)))
 	{
 	  return EXIT_FAILURE;
 	}
@@ -2657,7 +2727,8 @@ main_input (xd3_cmd     cmd,
   config.getblk = main_getblk_func;
   config.flags = stream_flags;
 
-  if ((ret = xd3_config_stream (& stream, & config)))
+  if ((ret = main_set_secondary_flags (&config)) ||
+      (ret = xd3_config_stream (& stream, & config)))
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
       return EXIT_FAILURE;
@@ -2694,14 +2765,15 @@ main_input (xd3_cmd     cmd,
       /* If we've reached EOF tell the stream to flush. */
       if (nread < try_read)
 	{
-	  stream_flags |= XD3_FLUSH;
-	  xd3_set_flags (& stream, stream_flags);
+	  stream.flags |= XD3_FLUSH;
 	}
 
 #if XD3_ENCODER
-      /* After the first main_read_primary_input completes, we know all the information
-       * needed to encode the application header. */
-      if (cmd == CMD_ENCODE && (ret = main_set_appheader (& stream, ifile, sfile)))
+      /* After the first main_read_primary_input completes, we know
+       * all the information needed to encode the application
+       * header. */
+      if (cmd == CMD_ENCODE &&
+	  (ret = main_set_appheader (& stream, ifile, sfile)))
 	{
 	  return EXIT_FAILURE;
 	}
@@ -2776,7 +2848,6 @@ main_input (xd3_cmd     cmd,
 	case XD3_WINSTART:
 	  {
 	    /* e.g., set or unset XD3_SKIP_WINDOW. */
-	    /* xd3_set_flags (& stream, stream_flags); */
 	    goto again;
 	  }
 

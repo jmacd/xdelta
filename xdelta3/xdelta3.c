@@ -2450,7 +2450,7 @@ xd3_config_stream(xd3_stream *stream,
   switch (stream->flags & XD3_SEC_TYPE)
     {
     case 0:
-      if (stream->flags & XD3_SEC_OTHER)
+      if (stream->flags & XD3_SEC_NOALL)
 	{
 	  stream->msg = "XD3_SEC flags require a secondary compressor type";
 	  return XD3_INTERNAL;
