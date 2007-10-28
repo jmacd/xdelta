@@ -477,7 +477,8 @@ IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 #endif /* XD3_DEBUG */
 
 /* Update the run-length state */
-#define NEXTRUN(c) do { if ((c) == run_c) { run_l += 1; } else { run_c = (c); run_l = 1; } } while (0)
+#define NEXTRUN(c) do { if ((c) == run_c) { run_l += 1; } \
+  else { run_c = (c); run_l = 1; } } while (0)
 
 /* Update the checksum state. */
 #define OLD_LARGE_CKSUM 1
@@ -493,9 +494,9 @@ IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 #else
 #define LARGE_CKSUM_UPDATE(cksum,base,look)                              \
   do { \
-    (cksum) = (cksum
-linear congruential generators of different sizes and good lattice structure
-  } while (0)
+    // linear congruential generators of different
+    // sizes and good lattice structure
+  } while (1)
 #endif
 
 /* Multiply and add hash function */
@@ -1152,9 +1153,10 @@ xd3_compute_alternate_table_encoding (xd3_stream *stream, const uint8_t **data, 
 static uint8_t __alternate_code_table_compressed[CODE_TABLE_VCDIFF_SIZE];
 static usize_t  __alternate_code_table_compressed_size;
 
-/* This function generates a delta describing the code table for encoding within a VCDIFF
- * file.  This function is NOT thread safe because it is only intended that this function
- * is used to generate statically-compiled strings. */
+/* This function generates a delta describing the code table for
+ * encoding within a VCDIFF file.  This function is NOT thread safe
+ * because it is only intended that this function is used to generate
+ * statically-compiled strings. */
 int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *code_table,
 				     uint8_t *comp_string, usize_t *comp_string_size)
 {
@@ -2660,8 +2662,9 @@ xd3_close_stream (xd3_stream *stream)
 	{
 	case DEC_VCHEAD:
 	case DEC_WININD:
-	  /* TODO: Address the zero-byte ambiguity.  Does the encoder emit a window or
-	   * not?  If so, then catch an error here.  If not, need another routine to say
+	  /* TODO: Address the zero-byte ambiguity.  Does the encoder
+	   * emit a window or not?  If so, then catch an error here.
+	   * If not, need another routine to say
 	   * decode_at_least_one_if_empty. */
 	case DEC_ABORTED:
 	  break;
@@ -4091,8 +4094,9 @@ xd3_string_match_init (xd3_stream *stream)
       if (stream->small_table != NULL)
 	{
 	  /* The target hash table is reinitialized once per window. */
-	  /* TODO: This would not have to be reinitialized if absolute offsets
-	   * were being stored, as we would do for VCD_TARGET encoding. */
+	  /* TODO: This would not have to be reinitialized if absolute
+	   * offsets were being stored, as we would do for VCD_TARGET
+	   * encoding. */
 	  if (stream->small_reset)
 	    {
 	      stream->small_reset = 0;
