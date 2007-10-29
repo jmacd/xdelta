@@ -31,9 +31,9 @@ xdelta3_ext = Extension('xdelta3main',
                                          ('PYTHON_MODULE',1),
                                          ('SECONDARY_DJW',1),
                                          ('VCDIFF_TOOLS',1),
-                                         ('GENERIC_ENCODE_TABLES',1),
+                                         ('GENERIC_ENCODE_TABLES',0),
                                          ('XD3_POSIX',1),
-                                         ('XD3_USE_LARGEFILE64',1),
+                                         ('XD3_USE_LARGEFILE64',0),
 
                                          # the fork/exec stuff doesn't
                                          # work inside python.

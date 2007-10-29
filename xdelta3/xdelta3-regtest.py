@@ -23,11 +23,11 @@ import xdelta3main
 import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
-RCSDIR = '/tmp/PRCS_read_copy'
-SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
+#RCSDIR = '/tmp/PRCS_read_copy'
+#SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
-#RCSDIR = 'G:/jmacd/PRCS/prcs/b'
-#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+#RCSDIR = 'G:/jmacd/PRCS_copy/prcs/b'
+SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 #
 MIN_SIZE       = 0
@@ -98,15 +98,15 @@ def INPUT_SPEC(rand):
 
     # -C 1,2,3,4,5,6,7
     'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([3, 5, 7, 8, 15]),
-    'small_chain'  : lambda d: rand.choice([40, 10, 4, 1]),
-    'small_lchain' : lambda d: rand.choice([x for x in [10, 4, 2, 1] if x <= d['small_chain']]),
-    'max_lazy'     : lambda d: rand.choice([9, 18, 27, 36, 72, 108]),
-    'long_enough'  : lambda d: rand.choice([9, 18, 27, 36, 72, 108]),
+    'large_step' : lambda d: rand.choice([15, 17, 19, 21, 23, 25, ]),
     'small_look'   : lambda d: rand.choice([4]),
+    'small_chain'  : lambda d: rand.choice([1]),
+    'small_lchain' : lambda d: rand.choice([1]),
+    'max_lazy'     : lambda d: rand.choice([4, 5, 7, 11, 18, ]), 
+    'long_enough'  : lambda d: rand.choice([18, ]),
 
     # -N
-    'nocompress'   : lambda d: rand.choice(['true']),
+    'nocompress'   : lambda d: rand.choice(['false']),
 
     # -T
     'altcode'      : lambda d: rand.choice(['false']),
@@ -1199,11 +1199,11 @@ if __name__ == "__main__":
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
 
-        rcsf = GetTestRcsFiles()
-        generator = rcsf.Generator()
+        #rcsf = GetTestRcsFiles()
+        #generator = rcsf.Generator()
 
-        #sample = SampleDataTest([SAMPLEDIR])
-        #generator = sample.Generator()
+        sample = SampleDataTest([SAMPLEDIR])
+        generator = sample.Generator()
 
         rand = random.Random(135135135135135)
         RunTestLoop(rand, generator, TEST_ROUNDS)
