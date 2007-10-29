@@ -77,7 +77,7 @@
 /* The default compression level
  */
 #ifndef XD3_DEFAULT_LEVEL
-#define XD3_DEFAULT_LEVEL 1
+#define XD3_DEFAULT_LEVEL 3
 #endif
 
 /* Sizes and addresses within VCDIFF windows are represented as usize_t
@@ -181,6 +181,9 @@ typedef uint32_t xoff_t;
 #endif
 #ifndef XD3_BUILD_FAST
 #define XD3_BUILD_FAST 1
+#endif
+#ifndef XD3_BUILD_FASTER
+#define XD3_BUILD_FASTER 1
 #endif
 #ifndef XD3_BUILD_FASTEST
 #define XD3_BUILD_FASTEST 1
@@ -386,8 +389,9 @@ typedef enum
 			     else default. */
   XD3_SMATCH_SLOW    = 1,
   XD3_SMATCH_FAST    = 2,
-  XD3_SMATCH_FASTEST = 3,
-  XD3_SMATCH_SOFT    = 4,
+  XD3_SMATCH_FASTER  = 3,
+  XD3_SMATCH_FASTEST = 4,
+  XD3_SMATCH_SOFT    = 5,
 } xd3_smatch_cfg;
 
 /*********************************************************************

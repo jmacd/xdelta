@@ -832,7 +832,7 @@ xd3_decode_fgk (xd3_stream     *stream,
 
 	  *output++ = fgk_decode_data (sec_stream);
 
-	  if (unlikely (output == output_max))
+	  if (output == output_max)
 	    {
 	      /* During regression testing: */
 	      IF_REGRESSION ({

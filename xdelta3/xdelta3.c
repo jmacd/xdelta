@@ -362,18 +362,10 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 
 /***********************************************************************/
 
-#ifndef unlikely              /* The unlikely macro - any good? */
-#if defined(__GNUC__) && __GNUC__ >= 3
-#define unlikely(x) __builtin_expect((x),0)
-#define likely(x)   __builtin_expect((x),1)
-#else
-#define unlikely(x) (x)
-#define likely(x)   (x)
-#endif
-#endif
-
-#define SECONDARY_MIN_SAVINGS 2  /* Secondary compression has to save at least this many bytes. */
-#define SECONDARY_MIN_INPUT   10 /* Secondary compression needs at least this many bytes. */
+#define SECONDARY_MIN_SAVINGS 2  /* Secondary compression has to save
+				    at least this many bytes. */
+#define SECONDARY_MIN_INPUT   10 /* Secondary compression needs at
+				    least this many bytes. */
 
 #define VCDIFF_MAGIC1  0xd6  /* 1st file byte */
 #define VCDIFF_MAGIC2  0xc3  /* 2nd file byte */
@@ -442,6 +434,11 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #else
 #define IF_BUILD_FAST(x)
 #endif
+#if XD3_BUILD_FASTER
+#define IF_BUILD_FASTER(x) x
+#else
+#define IF_BUILD_FASTER(x)
+#endif
 #if XD3_BUILD_FASTEST
 #define IF_BUILD_FASTEST(x) x
 #else
@@ -461,6 +458,7 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 IF_BUILD_SOFT(static const xd3_smatcher    __smatcher_soft;)
 IF_BUILD_FAST(static const xd3_smatcher    __smatcher_fast;)
 IF_BUILD_SLOW(static const xd3_smatcher    __smatcher_slow;)
+IF_BUILD_FASTER(static const xd3_smatcher    __smatcher_faster;)
 IF_BUILD_FASTEST(static const xd3_smatcher    __smatcher_fastest;)
 IF_BUILD_DEFAULT(static const xd3_smatcher    __smatcher_default;)
 
@@ -1224,8 +1222,10 @@ static usize_t  __alternate_code_table_compressed_size;
  * encoding within a VCDIFF file.  This function is NOT thread safe
  * because it is only intended that this function is used to generate
  * statically-compiled strings. */
-int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *code_table,
-				     uint8_t *comp_string, usize_t *comp_string_size)
+int xd3_compute_code_table_encoding (xd3_stream *in_stream,
+				     const xd3_dinst *code_table,
+				     uint8_t *comp_string,
+				     usize_t *comp_string_size)
 {
   /* TODO: use xd3_encode_memory() */
   uint8_t dflt_string[CODE_TABLE_STRING_SIZE];
@@ -1240,7 +1240,8 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream, const xd3_dinst *cod
   xd3_compute_code_table_string (xd3_rfc3284_code_table (), dflt_string);
   xd3_compute_code_table_string (code_table, code_string);
 
-  /* Use DJW secondary compression if it is on by default.  This saves about 20 bytes. */
+  /* Use DJW secondary compression if it is on by default.  This saves
+   * about 20 bytes. */
   xd3_init_config (& config, XD3_FLUSH | (SECONDARY_DJW ? XD3_SEC_DJW : 0));
 
   /* Be exhaustive. */
@@ -2605,6 +2606,9 @@ xd3_config_stream(xd3_stream *stream,
       IF_BUILD_FASTEST(case XD3_SMATCH_FASTEST:
 		    *smatcher = __smatcher_fastest;
 		    break;)
+      IF_BUILD_FASTER(case XD3_SMATCH_FASTER:
+		    *smatcher = __smatcher_faster;
+		    break;)
       IF_BUILD_FAST(case XD3_SMATCH_FAST:
 		    *smatcher = __smatcher_fast;
 		    break;)
@@ -2620,8 +2624,11 @@ xd3_config_stream(xd3_stream *stream,
 
       switch (level)
 	{
-	case 1: case 2:
+	case 1: 
 	  IF_BUILD_FASTEST(*smatcher = __smatcher_fastest;
+			   break;)
+	case 2:
+	  IF_BUILD_FASTER(*smatcher = __smatcher_faster;
 			   break;)
 	case 3: case 4: case 5:
 	  IF_BUILD_FAST(*smatcher = __smatcher_fast;
@@ -2635,6 +2642,8 @@ xd3_config_stream(xd3_stream *stream,
 	  IF_BUILD_DEFAULT(*smatcher = __smatcher_default;
 			   break;)
 	  IF_BUILD_FAST(*smatcher = __smatcher_fast;
+			break;)
+	  IF_BUILD_FASTER(*smatcher = __smatcher_faster;
 			break;)
 	  IF_BUILD_FASTEST(*smatcher = __smatcher_fastest;
 			   break;)
@@ -4849,6 +4858,41 @@ xd3_verify_run_state (xd3_stream    *stream,
 }
 #endif /* XD3_DEBUG */
 
+#endif /* XD3_ENCODER */
+
+/********************************************************************
+ TEMPLATE pass
+ *********************************************************************/
+
+#endif /* __XDELTA3_C_INLINE_PASS__ */
+#ifdef __XDELTA3_C_TEMPLATE_PASS__
+
+#if XD3_ENCODER
+
+/********************************************************************
+ Templates
+ *******************************************************************/
+
+/* Template macros */
+#define XD3_TEMPLATE(x)      XD3_TEMPLATE2(x,TEMPLATE)
+#define XD3_TEMPLATE2(x,n)   XD3_TEMPLATE3(x,n)
+#define XD3_TEMPLATE3(x,n)   x ## n
+#define XD3_STRINGIFY(x)     XD3_STRINGIFY2(x)
+#define XD3_STRINGIFY2(x)    #x
+
+static int XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream);
+
+static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
+{
+  XD3_STRINGIFY(TEMPLATE),
+  XD3_TEMPLATE(xd3_string_match_),
+#if SOFTCFG == 1
+  0, 0, 0, 0, 0, 0, 0
+#else
+  LLOOK, LSTEP, SLOOK, SCHAIN, SLCHAIN, MAXLAZY, LONGENOUGH
+#endif
+};
+
 /* This function computes more source checksums to advance the window.
  * Called at every entrance to the string-match loop and each time
  * stream->input_position reaches the value returned as
@@ -4859,7 +4903,7 @@ xd3_verify_run_state (xd3_stream    *stream,
  * TODO: optimize the inner loop
  */
 static int
-xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
+XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_point)
 {
   xoff_t logical_input_cksum_pos;
 
@@ -4995,46 +5039,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   return 0;
 }
 
-#endif /* XD3_ENCODER */
-
-/********************************************************************
- TEMPLATE pass
- *********************************************************************/
-
-#endif /* __XDELTA3_C_INLINE_PASS__ */
-#ifdef __XDELTA3_C_TEMPLATE_PASS__
-
-#if XD3_ENCODER
-
-/********************************************************************
- Templates
- *******************************************************************/
-
-/* Template macros */
-#define XD3_TEMPLATE(x)      XD3_TEMPLATE2(x,TEMPLATE)
-#define XD3_TEMPLATE2(x,n)   XD3_TEMPLATE3(x,n)
-#define XD3_TEMPLATE3(x,n)   x ## n
-#define XD3_STRINGIFY(x)     XD3_STRINGIFY2(x)
-#define XD3_STRINGIFY2(x)    #x
-
-static int XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream);
-
-static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
-{
-  XD3_STRINGIFY(TEMPLATE),
-  XD3_TEMPLATE(xd3_string_match_),
-#if SOFTCFG == 1
-  0, 0, 0, 0, 0, 0, 0
-#else
-  LLOOK, LSTEP, SLOOK, SCHAIN, SLCHAIN, MAXLAZY, LONGENOUGH
-#endif
-};
-
 static int
 XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 {
-  /* TODO config: These next three variables should be statically
-   * compliled in various scan_cfg configurations? */
   const int      DO_SMALL = ! (stream->flags & XD3_NOCOMPRESS);
   const int      DO_LARGE = (stream->src != NULL);
   const int      DO_RUN   = (1);
@@ -5104,7 +5111,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       /* Source window: next_move_point is the point that
        * stream->input_position must reach before computing more
        * source checksum. */
-      if ((ret = xd3_srcwin_move_point (stream, & next_move_point)))
+      if ((ret = XD3_TEMPLATE(xd3_srcwin_move_point_) (stream, & next_move_point)))
 	{
 	  return ret;
 	}
@@ -5162,7 +5169,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       if (DO_LARGE && (stream->input_position + LLOOK <= stream->avail_in))
 	{
 	  if ((stream->input_position >= next_move_point) &&
-	      (ret = xd3_srcwin_move_point (stream, & next_move_point)))
+	      (ret = XD3_TEMPLATE(xd3_srcwin_move_point_) (stream, & next_move_point)))
 	    {
 	      return ret;
 	    }
@@ -5177,7 +5184,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	   * main difference is the need for xd3_source_extend_match
 	   * to work outside of xd3_string_match, in the case where
 	   * inputs are identical. */
-	  if (unlikely (stream->large_table[linx] != 0))
+	  if (stream->large_table[linx] != 0)
 	    {
 	      /* the match_setup will fail if the source window has
 	       * been decided and the match lies outside it.  You
@@ -5211,7 +5218,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  IF_DEBUG (xd3_verify_small_state (stream, inp, scksum));
 
 	  /* Search for the longest match */
-	  if (unlikely (stream->small_table[sinx] != 0))
+	  if (stream->small_table[sinx] != 0)
 	    {
 	      match_length = xd3_smatch (stream,
 					 stream->small_table[sinx],
@@ -5227,7 +5234,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  xd3_scksum_insert (stream, sinx, scksum, stream->input_position);
 
 	  /* Maybe output a COPY instruction */
-	  if (unlikely (match_length >= stream->min_match))
+	  if (match_length >= stream->min_match)
 	    {
 	      IF_DEBUG1 ({
 		static int x = 0;

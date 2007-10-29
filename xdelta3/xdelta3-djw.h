@@ -404,7 +404,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
   XD3_ASSERT (heap_last != 0);
 
   /* If there is only one symbol, fake a second to prevent zero-length codes. */
-  if (unlikely (heap_last == 1))
+  if (heap_last == 1)
     {
       /* Pick either the first or last symbol. */
       int s = freq[0] ? asize-1 : 0;

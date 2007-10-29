@@ -2687,6 +2687,7 @@ main_input (xd3_cmd     cmd,
 	      config.smatch_cfg = XD3_SMATCH_FASTEST;
 	    }
 	  else if (option_level == 1) { config.smatch_cfg = XD3_SMATCH_FASTEST; }
+	  else if (option_level == 2) { config.smatch_cfg = XD3_SMATCH_FASTER; }
 	  else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
 	  else if (option_level == 6) { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
 	  else                        { config.smatch_cfg = XD3_SMATCH_SLOW; }
