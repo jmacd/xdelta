@@ -80,6 +80,10 @@
 #define XD3_DEFAULT_LEVEL 3
 #endif
 
+#ifndef XD3_DEFAULT_SECONDARY_LEVEL
+#define XD3_DEFAULT_SECONDARY_LEVEL 6
+#endif
+
 /* Sizes and addresses within VCDIFF windows are represented as usize_t
  *
  * For source-file offsets and total file sizes, total input and

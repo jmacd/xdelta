@@ -1034,7 +1034,7 @@ main_set_secondary_flags (xd3_config *config)
 	    }
 	  else if (strncmp (option_secondary, "djw", 3) == 0 && SECONDARY_DJW)
 	    {
-	      usize_t level = 3;
+	      usize_t level = XD3_DEFAULT_SECONDARY_LEVEL;
 
 	      config->flags |= XD3_SEC_DJW;
 
