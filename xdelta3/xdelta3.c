@@ -4858,41 +4858,6 @@ xd3_verify_run_state (xd3_stream    *stream,
 }
 #endif /* XD3_DEBUG */
 
-#endif /* XD3_ENCODER */
-
-/********************************************************************
- TEMPLATE pass
- *********************************************************************/
-
-#endif /* __XDELTA3_C_INLINE_PASS__ */
-#ifdef __XDELTA3_C_TEMPLATE_PASS__
-
-#if XD3_ENCODER
-
-/********************************************************************
- Templates
- *******************************************************************/
-
-/* Template macros */
-#define XD3_TEMPLATE(x)      XD3_TEMPLATE2(x,TEMPLATE)
-#define XD3_TEMPLATE2(x,n)   XD3_TEMPLATE3(x,n)
-#define XD3_TEMPLATE3(x,n)   x ## n
-#define XD3_STRINGIFY(x)     XD3_STRINGIFY2(x)
-#define XD3_STRINGIFY2(x)    #x
-
-static int XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream);
-
-static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
-{
-  XD3_STRINGIFY(TEMPLATE),
-  XD3_TEMPLATE(xd3_string_match_),
-#if SOFTCFG == 1
-  0, 0, 0, 0, 0, 0, 0
-#else
-  LLOOK, LSTEP, SLOOK, SCHAIN, SLCHAIN, MAXLAZY, LONGENOUGH
-#endif
-};
-
 /* This function computes more source checksums to advance the window.
  * Called at every entrance to the string-match loop and each time
  * stream->input_position reaches the value returned as
@@ -4903,7 +4868,7 @@ static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
  * TODO: optimize the inner loop
  */
 static int
-XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_point)
+xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 {
   xoff_t logical_input_cksum_pos;
 
@@ -5039,6 +5004,41 @@ XD3_TEMPLATE(xd3_srcwin_move_point_) (xd3_stream *stream, usize_t *next_move_poi
   return 0;
 }
 
+#endif /* XD3_ENCODER */
+
+/********************************************************************
+ TEMPLATE pass
+ *********************************************************************/
+
+#endif /* __XDELTA3_C_INLINE_PASS__ */
+#ifdef __XDELTA3_C_TEMPLATE_PASS__
+
+#if XD3_ENCODER
+
+/********************************************************************
+ Templates
+ *******************************************************************/
+
+/* Template macros */
+#define XD3_TEMPLATE(x)      XD3_TEMPLATE2(x,TEMPLATE)
+#define XD3_TEMPLATE2(x,n)   XD3_TEMPLATE3(x,n)
+#define XD3_TEMPLATE3(x,n)   x ## n
+#define XD3_STRINGIFY(x)     XD3_STRINGIFY2(x)
+#define XD3_STRINGIFY2(x)    #x
+
+static int XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream);
+
+static const xd3_smatcher XD3_TEMPLATE(__smatcher_) =
+{
+  XD3_STRINGIFY(TEMPLATE),
+  XD3_TEMPLATE(xd3_string_match_),
+#if SOFTCFG == 1
+  0, 0, 0, 0, 0, 0, 0
+#else
+  LLOOK, LSTEP, SLOOK, SCHAIN, SLCHAIN, MAXLAZY, LONGENOUGH
+#endif
+};
+
 static int
 XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 {
@@ -5111,7 +5111,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       /* Source window: next_move_point is the point that
        * stream->input_position must reach before computing more
        * source checksum. */
-      if ((ret = XD3_TEMPLATE(xd3_srcwin_move_point_) (stream, & next_move_point)))
+      if ((ret = xd3_srcwin_move_point (stream, & next_move_point)))
 	{
 	  return ret;
 	}
@@ -5169,7 +5169,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       if (DO_LARGE && (stream->input_position + LLOOK <= stream->avail_in))
 	{
 	  if ((stream->input_position >= next_move_point) &&
-	      (ret = XD3_TEMPLATE(xd3_srcwin_move_point_) (stream, & next_move_point)))
+	      (ret = xd3_srcwin_move_point (stream, & next_move_point)))
 	    {
 	      return ret;
 	    }
