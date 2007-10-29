@@ -19,50 +19,6 @@
 #ifndef _XDELTA3_SECOND_H_
 #define _XDELTA3_SECOND_H_
 
-/**************************************************************
- Secondary compression
- **************************************************************/
-
-#define xd3_sec_data(s) ((s)->sec_stream_d)
-#define xd3_sec_inst(s) ((s)->sec_stream_i)
-#define xd3_sec_addr(s) ((s)->sec_stream_a)
-
-struct _xd3_sec_type
-{
-  int         id;
-  const char *name;
-  xd3_secondary_flags flags;
-
-  /* xd3_sec_stream is opaque to the generic code */
-  xd3_sec_stream* (*alloc)   (xd3_stream     *stream);
-  void            (*destroy) (xd3_stream     *stream,
-			      xd3_sec_stream *sec);
-  void            (*init)    (xd3_sec_stream *sec);
-  int             (*decode)  (xd3_stream     *stream,
-			      xd3_sec_stream *sec_stream,
-			      const uint8_t **input,
-			      const uint8_t  *input_end,
-			      uint8_t       **output,
-			      const uint8_t  *output_end);
-#if XD3_ENCODER
-  int             (*encode)  (xd3_stream     *stream,
-			      xd3_sec_stream *sec_stream,
-			      xd3_output     *input,
-			      xd3_output     *output,
-			      xd3_sec_cfg    *cfg);
-#endif
-};
-
-#define BIT_STATE_ENCODE_INIT { 0, 1 }
-#define BIT_STATE_DECODE_INIT { 0, 0x100 }
-
-typedef struct _bit_state bit_state;
-struct _bit_state
-{
-  usize_t cur_byte;
-  usize_t cur_mask;
-};
-
 static inline void xd3_bit_state_encode_init  (bit_state       *bits)
 {
   bits->cur_byte = 0;
@@ -204,7 +160,6 @@ xd3_decode_secondary (xd3_stream      *stream,
 }
 
 #if XD3_ENCODER
-/* OPT: Should these be inline? */
 static inline int xd3_encode_bit       (xd3_stream      *stream,
 					xd3_output     **output,
 					bit_state       *bits,

@@ -647,30 +647,69 @@ const char* xd3_strerror (int ret)
 
 /***********************************************************************/
 
+#define xd3_sec_data(s) ((s)->sec_stream_d)
+#define xd3_sec_inst(s) ((s)->sec_stream_i)
+#define xd3_sec_addr(s) ((s)->sec_stream_a)
+
+struct _xd3_sec_type
+{
+  int         id;
+  const char *name;
+  xd3_secondary_flags flags;
+
+  /* xd3_sec_stream is opaque to the generic code */
+  xd3_sec_stream* (*alloc)   (xd3_stream     *stream);
+  void            (*destroy) (xd3_stream     *stream,
+			      xd3_sec_stream *sec);
+  void            (*init)    (xd3_sec_stream *sec);
+  int             (*decode)  (xd3_stream     *stream,
+			      xd3_sec_stream *sec_stream,
+			      const uint8_t **input,
+			      const uint8_t  *input_end,
+			      uint8_t       **output,
+			      const uint8_t  *output_end);
+#if XD3_ENCODER
+  int             (*encode)  (xd3_stream     *stream,
+			      xd3_sec_stream *sec_stream,
+			      xd3_output     *input,
+			      xd3_output     *output,
+			      xd3_sec_cfg    *cfg);
+#endif
+};
+
+#define BIT_STATE_ENCODE_INIT { 0, 1 }
+#define BIT_STATE_DECODE_INIT { 0, 0x100 }
+
+typedef struct _bit_state bit_state;
+struct _bit_state
+{
+  usize_t cur_byte;
+  usize_t cur_mask;
+};
+
 #if SECONDARY_ANY == 0
 #define IF_SEC(x)
 #define IF_NSEC(x) x
 #else /* yuck */
 #define IF_SEC(x) x
 #define IF_NSEC(x)
-#include "xdelta3-second.h"
+static int
+xd3_decode_secondary (xd3_stream      *stream,
+		      xd3_desect      *sect,
+		      xd3_sec_stream **sec_streamp);
+#if XD3_ENCODER
+static int
+xd3_encode_secondary (xd3_stream      *stream,
+		      xd3_output     **head,
+		      xd3_output     **tail,
+		      xd3_sec_stream **sec_streamp,
+		      xd3_sec_cfg     *cfg,
+		      int             *did_it);
+#endif
 #endif /* SECONDARY_ANY */
 
 #if SECONDARY_FGK
-#include "xdelta3-fgk.h"
-
-static const xd3_sec_type fgk_sec_type =
-{
-  VCD_FGK_ID,
-  "FGK Adaptive Huffman",
-  SEC_NOFLAGS,
-  (xd3_sec_stream* (*)())  fgk_alloc,
-  (void (*)())             fgk_destroy,
-  (void (*)())             fgk_init,
-  (int (*)())              xd3_decode_fgk,
-  IF_ENCODER((int (*)())   xd3_encode_fgk)
-};
-
+static const xd3_sec_type fgk_sec_type;
 #define IF_FGK(x) x
 #define FGK_CASE(s) \
   s->sec_type = & fgk_sec_type; \
@@ -683,20 +722,7 @@ static const xd3_sec_type fgk_sec_type =
 #endif
 
 #if SECONDARY_DJW
-#include "xdelta3-djw.h"
-
-static const xd3_sec_type djw_sec_type =
-{
-  VCD_DJW_ID,
-  "Static Huffman",
-  SEC_COUNT_FREQS,
-  (xd3_sec_stream* (*)())  djw_alloc,
-  (void (*)())             djw_destroy,
-  (void (*)())             djw_init,
-  (int (*)())              xd3_decode_huff,
-  IF_ENCODER((int (*)())   xd3_encode_huff)
-};
-
+static const xd3_sec_type djw_sec_type;
 #define IF_DJW(x) x
 #define DJW_CASE(s) \
   s->sec_type = & djw_sec_type; \
@@ -714,6 +740,41 @@ static const xd3_sec_type djw_sec_type =
 #define __XDELTA3_C_INLINE_PASS__
 #include "xdelta3.c"
 #undef __XDELTA3_C_INLINE_PASS__
+
+/* Secondary compression */
+#if SECONDARY_ANY
+#include "xdelta3-second.h"
+#endif
+
+#if SECONDARY_FGK
+#include "xdelta3-fgk.h"
+static const xd3_sec_type fgk_sec_type =
+{
+  VCD_FGK_ID,
+  "FGK Adaptive Huffman",
+  SEC_NOFLAGS,
+  (xd3_sec_stream* (*)())  fgk_alloc,
+  (void (*)())             fgk_destroy,
+  (void (*)())             fgk_init,
+  (int (*)())              xd3_decode_fgk,
+  IF_ENCODER((int (*)())   xd3_encode_fgk)
+};
+#endif
+
+#if SECONDARY_DJW
+#include "xdelta3-djw.h"
+static const xd3_sec_type djw_sec_type =
+{
+  VCD_DJW_ID,
+  "Static Huffman",
+  SEC_COUNT_FREQS,
+  (xd3_sec_stream* (*)())  djw_alloc,
+  (void (*)())             djw_destroy,
+  (void (*)())             djw_init,
+  (int (*)())              xd3_decode_huff,
+  IF_ENCODER((int (*)())   xd3_encode_huff)
+};
+#endif
 
 /* Process template passes - this includes xdelta3.c several times. */
 #define __XDELTA3_C_TEMPLATE_PASS__
@@ -1743,7 +1804,7 @@ xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp)
  Basic encoder/decoder functions
  ***********************************************************************/
 
-static int
+static inline int
 xd3_decode_byte (xd3_stream *stream, uint *val)
 {
   if (stream->avail_in == 0)
@@ -1758,7 +1819,7 @@ xd3_decode_byte (xd3_stream *stream, uint *val)
   return 0;
 }
 
-static int
+static inline int
 xd3_decode_bytes (xd3_stream *stream, uint8_t *buf, usize_t *pos, usize_t size)
 {
   usize_t want;
@@ -1788,7 +1849,7 @@ xd3_decode_bytes (xd3_stream *stream, uint8_t *buf, usize_t *pos, usize_t size)
 }
 
 #if XD3_ENCODER
-static int
+static inline int
 xd3_emit_byte (xd3_stream  *stream,
 	       xd3_output **outputp,
 	       uint8_t      code)
@@ -1812,7 +1873,7 @@ xd3_emit_byte (xd3_stream  *stream,
   return 0;
 }
 
-static int
+static inline int
 xd3_emit_bytes (xd3_stream     *stream,
 		xd3_output    **outputp,
 		const uint8_t  *base,
@@ -1935,7 +1996,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define IF_SIZEOF64(x) if (num < (1ULL << (7 * (x)))) return (x);
 
 #if USE_UINT32
-static uint
+static inline uint
 xd3_sizeof_uint32_t (uint32_t num)
 {
   IF_SIZEOF32(1);
@@ -1945,29 +2006,29 @@ xd3_sizeof_uint32_t (uint32_t num)
   return 5;
 }
 
-static int
+static inline int
 xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_32part, UINT32_OFLOW_MASK); }
 
-static int
+static inline int
 xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
 		   const uint8_t *max, uint32_t *valp)
 { READ_INTEGER_TYPE (uint32_t, UINT32_OFLOW_MASK); }
 
 #if XD3_ENCODER
-static int
+static inline int
 xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
 { EMIT_INTEGER_TYPE (); }
 #endif
 #endif
 
 #if USE_UINT64
-static int
+static inline int
 xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
 
 #if XD3_ENCODER
-static int
+static inline int
 xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 { EMIT_INTEGER_TYPE (); }
 #endif
