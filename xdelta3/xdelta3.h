@@ -677,6 +677,8 @@ struct _xd3_source
   xoff_t              blocks;        /* the total number of blocks in
 					this source */
   usize_t             onlastblk;     /* cached size info, avoid __udivdi3 */
+  int                 shiftby;       /* for power-of-two blocksizes */
+  int                 maskby;        /* for power-of-two blocksizes */  
   xoff_t              cpyoff_blocks; /* offset of dec_cpyoff in blocks */
   usize_t             cpyoff_blkoff; /* offset of copy window in
 					blocks, remainder */
@@ -1171,8 +1173,12 @@ void xd3_blksize_div (const xoff_t offset,
 		      const xd3_source *source,
 		      xoff_t *blkno,
 		      usize_t *blkoff) {
-  *blkno = offset / source->blksize;
-  *blkoff = offset - (*blkno * source->blksize);
+  *blkno = source->maskby ?
+    (offset >> source->shiftby) :
+    (offset / source->blksize);
+  *blkoff = source->maskby ?
+    (offset & source->maskby) :
+    (offset - *blkno * source->blksize);
 }
 
 /* This function tells the number of bytes expected to be set in

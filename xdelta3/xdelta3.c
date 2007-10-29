@@ -1549,6 +1549,18 @@ xd3_check_pow2 (usize_t value, usize_t *logof)
 }
 
 static usize_t
+xd3_pow2_roundup (usize_t x)
+{
+  int i = 1;
+  int s = 0;
+  while (x > i) {
+    i <<= 1;
+    s++;
+  }
+  return i;
+}
+
+static usize_t
 xd3_round_blksize (usize_t sz, usize_t blksz)
 {
   usize_t mod = sz & (blksz-1);
@@ -2629,13 +2641,29 @@ xd3_set_source (xd3_stream *stream,
 		xd3_source *src)
 {
   xoff_t blk_num;
-  usize_t tail_size;
+  usize_t tail_size, shiftby;
 
   IF_DEBUG1 (DP(RINT "[set source] size %"Q"u\n", src->size));
 
   if (src == NULL || src->size < stream->smatcher.large_look) { return 0; }
 
   stream->src  = src;
+
+  // If src->blksize is a power-of-two, xd3_blksize_div() will use
+  // shift and mask rather than divide.  Check that here.
+  if (xd3_check_pow2 (src->blksize, &shiftby) == 0)
+    {
+      src->shiftby = shiftby;
+      src->maskby = (1 << shiftby) - 1;
+    }
+  else if (src->size <= src->blksize)
+    {
+      int x = xd3_pow2_roundup (src->blksize);
+      xd3_check_pow2 (x, &shiftby);
+      src->shiftby = shiftby;
+      src->maskby = (1 << shiftby) - 1;
+    }
+
   xd3_blksize_div (src->size, src, &blk_num, &tail_size);
   src->blocks  = blk_num + (tail_size > 0);
   src->onlastblk = xd3_bytes_on_srcblk (src, src->blocks - 1);
@@ -4006,13 +4034,9 @@ xd3_process_memory (int            is_encode,
       config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
       config.iopt_size = max(config.iopt_size, 128U);
-
       config.sprevsz = XD3_DEFAULT_SPREVSZ;
 
-      while (config.sprevsz / 2 > input_size)
-	{
-	  config.sprevsz /=  2;
-	}
+      while (config.sprevsz / 2 > input_size) { config.sprevsz /= 2; }
     }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)
@@ -4024,6 +4048,7 @@ xd3_process_memory (int            is_encode,
     {
       memset (& src, 0, sizeof (src));
       src.size = source_size;
+
       src.blksize = source_size;
       src.onblk = source_size;
       src.curblk = source;
