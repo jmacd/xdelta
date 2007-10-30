@@ -53,12 +53,12 @@
 #if XD3_BUILD_FASTEST
 #define TEMPLATE      fastest
 #define LLOOK         9
-#define LSTEP         15
+#define LSTEP         17
 #define SLOOK         4
 #define SCHAIN        1
 #define SLCHAIN       1
-#define MAXLAZY       4
-#define LONGENOUGH    7
+#define MAXLAZY       5
+#define LONGENOUGH    18
 
 #include "xdelta3.c"
 

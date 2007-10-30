@@ -26,8 +26,8 @@ import xdelta3
 #RCSDIR = '/tmp/PRCS_read_copy'
 #SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
-#RCSDIR = 'G:/jmacd/PRCS_copy/prcs/b'
-SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+RCSDIR = 'G:/jmacd/PRCS_copy'
+#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 #
 MIN_SIZE       = 0
@@ -45,11 +45,11 @@ MIN_STDDEV_PCT = 1.5
 
 # How many results per round
 MAX_RESULTS = 500
-TEST_ROUNDS = 500
+TEST_ROUNDS = 100
 KEEP_P = (0.5)
 
 # For RCS testing, what percent to select
-FILE_P = (0.30)
+FILE_P = (0.50)
 
 # For run-speed tests
 MIN_RUN = 1000 * 1000 * 1
@@ -97,12 +97,12 @@ def INPUT_SPEC(rand):
     # Time/space costs:
 
     # -C 1,2,3,4,5,6,7
-    'large_look' : lambda d: rand.choice([9]),
-    'large_step' : lambda d: rand.choice([15, 17, 19, 21, 23, 25, ]),
+    'large_look' : lambda d: rand.choice([9, 11]),
+    'large_step' : lambda d: rand.choice([15, 17, 19, 21, 23, 25, 27, 29, 31]),
     'small_look'   : lambda d: rand.choice([4]),
-    'small_chain'  : lambda d: rand.choice([1]),
+    'small_chain'  : lambda d: rand.choice([1, 2]),
     'small_lchain' : lambda d: rand.choice([1]),
-    'max_lazy'     : lambda d: rand.choice([4, 5, 7, 11, 18, ]), 
+    'max_lazy'     : lambda d: rand.choice([4, 5, 7, 11, 15, 18, 21, 23, 29, 31, ]), 
     'long_enough'  : lambda d: rand.choice([18, ]),
 
     # -N
@@ -1199,11 +1199,11 @@ if __name__ == "__main__":
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
 
-        #rcsf = GetTestRcsFiles()
-        #generator = rcsf.Generator()
+        rcsf = GetTestRcsFiles()
+        generator = rcsf.Generator()
 
-        sample = SampleDataTest([SAMPLEDIR])
-        generator = sample.Generator()
+        #sample = SampleDataTest([SAMPLEDIR])
+        #generator = sample.Generator()
 
         rand = random.Random(135135135135135)
         RunTestLoop(rand, generator, TEST_ROUNDS)
