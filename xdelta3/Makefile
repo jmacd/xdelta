@@ -56,8 +56,7 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DGENERIC_ENCODE_TABLES=1 \
               -DSECONDARY_DJW=1 \
 	      -DVCDIFF_TOOLS=1 \
-              -DSWIG_MODULE=1 \
-	      -O3
+              -DSWIG_MODULE=1
 
 # $Format: "REL=$Xdelta3Version$" $
 REL=3.0s_pre0
@@ -105,17 +104,18 @@ wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
 	$(WIXDIR)/light.exe xdelta3.wixobj -out xdelta3.msi
 
 xdelta3: $(SOURCES)
-	$(CC) -O3 -Wall -Wshadow xdelta3.c -lm -o xdelta3 \
+	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3 \
               -DXD3_DEBUG=0 \
               -DXD3_USE_LARGEFILE64=1 \
               -DREGRESSION_TEST=1 \
               -DSECONDARY_DJW=1 \
               -DSECONDARY_FGK=1 \
+	      -DUNALIGNED_OK=1 \
               -DXD3_MAIN=1 \
               -DXD3_POSIX=1
 
 xdelta3-32: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -lm -o xdelta3-32 \
+	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3-32 \
               -DXD3_DEBUG=1 \
               -DXD3_USE_LARGEFILE64=0 \
               -DREGRESSION_TEST=1 \
@@ -133,6 +133,7 @@ xdelta3-debug: $(SOURCES)
 		-DXD3_USE_LARGEFILE64=1 \
 		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
+	        -DUNALIGNED_OK=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
 		-lm
@@ -161,7 +162,7 @@ xdelta3_wrap.c xdelta3.py: xdelta3.swig
 	swig -python xdelta3.swig
 
 xdelta3.o: $(SOURCES)
-	$(CC) -g -Wall -Wshadow -c xdelta3.c $(SWIG_FLAGS) -o xdelta3.o
+	$(CC) -O3 -Wall -Wshadow -fno-builtin -c xdelta3.c $(SWIG_FLAGS) -o xdelta3.o
 
 xdelta3_wrap.o: xdelta3_wrap.c
 	$(CC) $(SWIG_FLAGS) \
@@ -169,7 +170,7 @@ xdelta3_wrap.o: xdelta3_wrap.c
 	      -I/usr/include/python2.5 \
 	      -I/usr/lib/python2.5/config \
 	      -fpic \
-	      -c -g xdelta3_wrap.c
+	      -c -O3 -fno-builtin xdelta3_wrap.c
 
 xdelta3module.dll: xdelta3_wrap.o xdelta3.o
 	gcc -shared -Wl,--enable-auto-image-base xdelta3.o xdelta3_wrap.o -L/usr/lib/python2.5/config -lpython2.5 -o xdelta3module.dll

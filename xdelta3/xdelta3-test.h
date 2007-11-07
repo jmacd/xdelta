@@ -541,6 +541,30 @@ test_usize_t_overflow (xd3_stream *stream, int unused)
   return XD3_INTERNAL;
 }
 
+static int
+test_forward_match (xd3_stream *stream, int unused)
+{
+  int i;
+  char buf1[256], buf2[256];
+
+  memset(buf1, 0, 256);
+  memset(buf2, 0, 256);
+
+  for (i = 0; i < 256; i++)
+    {
+      CHECK(xd3_forward_match(buf1, buf2, i) == i);
+    }
+
+  for (i = 0; i < 255; i++)
+    {
+      buf2[i] = 1;
+      CHECK(xd3_forward_match(buf1, buf2, 256) == i);
+      buf2[i] = 0;
+    }
+
+  return 0;
+}
+
 /***********************************************************************
  Address cache
  ***********************************************************************/
@@ -1987,10 +2011,10 @@ test_identical_behavior (xd3_stream *stream, int ignore)
       xd3_consume_output (stream);
     }
 
-  XD3_ASSERT(srcwin == source.blocks - 1);
-  XD3_ASSERT(winfinishes == IDB_WINCNT);
-  XD3_ASSERT(winstarts == IDB_WINCNT);
-  XD3_ASSERT(nextencwin == IDB_WINCNT);
+  CHECK(srcwin == source.blocks - 1);
+  CHECK(winfinishes == IDB_WINCNT);
+  CHECK(winstarts == IDB_WINCNT);
+  CHECK(nextencwin == IDB_WINCNT);
 
   /* Reset. */
   source.blksize  = IDB_TGTSZ;
@@ -2352,6 +2376,7 @@ xd3_selftest (void)
   DO_TEST (encode_decode_uint32_t, 0, 0);
   DO_TEST (encode_decode_uint64_t, 0, 0);
   DO_TEST (usize_t_overflow, 0, 0);
+  DO_TEST (forward_match, 0, 0);
 
   DO_TEST (address_cache, 0, 0);
   IF_GENCODETBL (DO_TEST (address_cache, XD3_ALT_CODE_TABLE, 0));

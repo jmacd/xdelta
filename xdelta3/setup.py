@@ -45,7 +45,7 @@ xdelta3_ext = Extension('xdelta3main',
                                          ],
                         extra_compile_args = [ '-O3',
                                                '-g',
-                                               '-funroll-loops',
+                                               '-fno-builtin',
                                                ])
 
 # $Format: "REL='$Xdelta3Version$'" $

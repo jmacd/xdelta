@@ -203,6 +203,10 @@ typedef uint32_t xoff_t;
 #include <stdio.h>
 #endif
 
+#ifndef UNALIGNED_OK
+#define UNALIGNED_OK 1
+#endif
+
 /* XPRINT.  Debug output and VCDIFF_TOOLS functions report to stderr.
  * I have used an irregular style to abbreviate [fprintf(stderr, "] as
  * [DP(RINT "]. */
@@ -254,16 +258,13 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
 						usize_t *size);
 
 
-/* Some junk. */
 
-#ifndef XD3_ASSERT
 #if XD3_DEBUG
 #define XD3_ASSERT(x) \
     do { if (! (x)) { DP(RINT "%s:%d: XD3 assertion failed: %s\n", __FILE__, __LINE__, #x); \
     abort (); } } while (0)
 #else
 #define XD3_ASSERT(x) (void)0
-#endif
 #endif
 
 #ifdef __GNUC__

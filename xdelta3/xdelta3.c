@@ -4477,6 +4477,58 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
+/* This code is experimental, and I'm having trouble benchmarking
+ * it reliably. */
+#if 0
+static inline int
+xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, size_t n)
+{
+  size_t i = 0;
+#if UNALIGNED_OK
+  size_t nint = n / sizeof(int);
+
+  if (nint >> 3)
+    {
+      size_t j = 0;
+      const int *s1 = (const int*)s1c;
+      const int *s2 = (const int*)s2c;
+      size_t nint_8 = nint - 8;
+
+      while (i <= nint_8 &&
+	     s1[i++] == s2[j++] &&
+	     s1[i++] == s2[j++] &&
+	     s1[i++] == s2[j++] &&
+	     s1[i++] == s2[j++] &&
+	     s1[i++] == s2[j++] &&
+	     s1[i++] == s2[j++] &&
+	     s1[i++] == s2[j++] &&	 
+	     s1[i++] == s2[j++]) { }
+
+      i = (i - 1) * sizeof(int);
+    }
+#endif
+
+  while (i < n && s1c[i] == s2c[i])
+    {
+      i++;
+    }
+  return i;
+}
+#else
+static inline usize_t
+xd3_forward_match(const uint8_t *s1c,
+		  const uint8_t *s2c,
+		  usize_t n) {
+  int i = 0;
+  while (i < n && s1c[i] == s2c[i])
+    {
+      i++;
+    }
+  return i;
+}
+#endif
+
+
 /* This function expands the source match backward and forward.  It is
  * reentrant, since xd3_getblk may return XD3_GETSRCBLK, so most
  * variables are kept in xd3_stream.  There are two callers of this
@@ -4498,8 +4550,8 @@ xd3_source_extend_match (xd3_stream *stream)
   xoff_t tryblk;    /* tryblk, tryoff are the block, offset position
 		       of matchoff */
   usize_t tryoff;
-  usize_t tryrem;    /* tryrem is the number of matchable bytes on the
-			source block */
+  usize_t tryrem;    /* tryrem is the number of matchable bytes */
+  usize_t matched;
 
   XD3_ASSERT (src != NULL);
 
@@ -4534,7 +4586,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	      return ret;
 	    }
 
-	  /* OPT: This code can be optimized. */
+	  /* TODO: This code can be optimized similar to xd3_match_forward() */
 	  for (tryrem = min (tryoff, stream->match_maxback -
 			     stream->match_back);
 	       tryrem != 0;
@@ -4563,6 +4615,12 @@ xd3_source_extend_match (xd3_stream *stream)
   /* Note: practically the same code as backwards case above: same comments */
   while (stream->match_fwd < stream->match_maxfwd)
     {
+      if (tryoff == src->blksize)
+	{
+	  tryoff  = 0;
+	  tryblk += 1;
+	}
+
       if ((ret = xd3_getblk (stream, tryblk)))
 	{
 	  /* if search went too far back, continue forward. */
@@ -4575,29 +4633,22 @@ xd3_source_extend_match (xd3_stream *stream)
 	  return ret;
 	}
 
-      /* There's a good speedup for doing word comparions: see zlib. */
-      for (tryrem = min(stream->match_maxfwd - stream->match_fwd,
-			src->blksize - tryoff);
-	   tryrem != 0;
-	   tryrem -= 1, stream->match_fwd += 1)
-	{
-	  if (src->curblk[tryoff] != stream->next_in[streamoff])
-	    {
-	      goto donefwd;
-	    }
+      tryrem = min(stream->match_maxfwd - stream->match_fwd,
+		   src->blksize - tryoff);
 
-	  tryoff    += 1;
-	  streamoff += 1;
-	}
+      matched = xd3_forward_match(src->curblk + tryoff,
+				  stream->next_in + streamoff,
+				  tryrem);
+      tryoff += matched;
+      streamoff += matched;
+      stream->match_fwd += matched;
 
-      if (tryoff == src->blksize)
+      if (tryrem != matched)
 	{
-	  tryoff  = 0;
-	  tryblk += 1;
+	  break;
 	}
     }
 
- donefwd:
   stream->match_state = MATCH_SEARCHING;
 
   /* If the match ends short of the last instruction end, we probably
