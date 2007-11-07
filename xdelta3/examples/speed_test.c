@@ -53,22 +53,24 @@ int read_whole_file(const char *name,
 }
 
 int main(int argc, char **argv) {
-  int repeat;
+  int repeat, level;
   char *from, *to;
   uint8_t *from_buf = NULL, *to_buf = NULL, *delta_buf = NULL;
   size_t from_len, to_len, delta_alloc, delta_size = 0;
   long start, finish;
   int i, ret;
-  int flags = XD3_COMPLEVEL_1;
+  int flags;
 
-  if (argc != 4) {
-    fprintf(stderr, "usage: speed_test COUNT FROM TO\n");
+  if (argc != 5) {
+    fprintf(stderr, "usage: speed_test LEVEL COUNT FROM TO\n");
     return 1;
   }
 
-  repeat = atoi(argv[1]);
-  from = argv[2];
-  to = argv[3];
+  level = atoi(argv[1]);
+  repeat = atoi(argv[2]);
+  from = argv[3];
+  to = argv[4];
+  flags = (level << XD3_COMPLEVEL_SHIFT) & XD3_COMPLEVEL_MASK;
 
   if ((ret = read_whole_file(from, &from_buf, &from_len)) ||
       (ret = read_whole_file(to, &to_buf, &to_len))) {
@@ -88,8 +90,8 @@ int main(int argc, char **argv) {
   finish = get_millisecs_now();
 
   fprintf(stderr,
-	  "STAT: encode %3ld ms from %s to %s repeat %d %dbit delta %d\n",
-	  (finish - start) / repeat, from, to, repeat, sizeof (xoff_t) * 8, delta_size);
+	  "STAT: encode %3.2f ms from %s to %s repeat %d %dbit delta %d\n",
+	  (double)(finish - start) / repeat, from, to, repeat, sizeof (xoff_t) * 8, delta_size);
 
   ret = 0;
 
