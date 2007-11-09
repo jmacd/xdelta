@@ -4312,7 +4312,7 @@ static int
 xd3_srcwin_setup (xd3_stream *stream)
 {
   xd3_source *src = stream->src;
-  xoff_t length;
+  xoff_t length, x;
 
   /* Check the undecided state. */
   XD3_ASSERT (src->srclen == 0 && src->srcbase == 0);
@@ -4335,7 +4335,7 @@ xd3_srcwin_setup (xd3_stream *stream)
    * use smaller windows. */
   length = stream->match_maxaddr - stream->match_minaddr;
 
-  xoff_t x = (xoff_t) USIZE_T_MAX;
+  x = (xoff_t) USIZE_T_MAX;
   if (length > x)
     {
       stream->msg = "source window length overflow (not 64bit)";

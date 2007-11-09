@@ -48,7 +48,9 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	xdelta3-regtest.py xdelta3-test.py setup.py \
 	examples/Makefile examples/small_page_test.c \
 	examples/README examples/encode_decode_test.c \
-	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi
+	examples/compare_test.c examples/speed_test.c \
+	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi \
+	README readme.txt
 
 SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DEXTERNAL_COMPRESSION=0 \
@@ -59,7 +61,7 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
               -DSWIG_MODULE=1
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0s_pre0
+REL=3.0s
 RELDIR = xdelta$(REL)
 
 all: xdelta3-debug xdelta3
