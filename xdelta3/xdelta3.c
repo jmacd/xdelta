@@ -968,7 +968,9 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
     {
       for (size1 = 1; size1 <= desc->addcopy_add_max; size1 += 1)
 	{
-	  int max = (mode < 2 + desc->near_modes) ? desc->addcopy_near_cpy_max : desc->addcopy_same_cpy_max;
+	  int max = (mode < 2 + desc->near_modes) ?
+	    desc->addcopy_near_cpy_max :
+	    desc->addcopy_same_cpy_max;
 
 	  for (size2 = MIN_MATCH; size2 <= max; size2 += 1, d += 1)
 	    {
@@ -982,7 +984,9 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
 
   for (mode = 0; mode < cpy_modes; mode += 1)
     {
-      int max = (mode < 2 + desc->near_modes) ? desc->copyadd_near_cpy_max : desc->copyadd_same_cpy_max;
+      int max = (mode < 2 + desc->near_modes) ?
+	desc->copyadd_near_cpy_max :
+	desc->copyadd_same_cpy_max;
 
       for (size1 = MIN_MATCH; size1 <= max; size1 += 1)
 	{
@@ -1073,7 +1077,9 @@ xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_ri
 		    {
 		      /* The second and third exprs are 0 in the
 			 default table. */
-		      prev->code2 = sizes->offset + (sizes->mult * (prev->size - MIN_MATCH)) + (inst->size - MIN_ADD);
+		      prev->code2 = sizes->offset +
+			(sizes->mult * (prev->size - MIN_MATCH)) +
+			(inst->size - MIN_ADD);
 		    }
 		}
 	    }
@@ -1105,7 +1111,9 @@ xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_ri
 
 		if (inst->size <= sizes->cpy_max)
 		  {
-		    prev->code2 = sizes->offset + (sizes->mult * (prev->size - MIN_ADD)) + (inst->size - MIN_MATCH);
+		    prev->code2 = sizes->offset +
+		      (sizes->mult * (prev->size - MIN_ADD)) +
+		      (inst->size - MIN_MATCH);
 		  }
 	      }
 	  }
@@ -1116,7 +1124,7 @@ xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_ri
 
 /* This version of xd3_choose_instruction is hard-coded for the default table. */
 static void
-xd3_choose_instruction (/* const xd3_code_table_desc *desc,*/ xd3_rinst *prev, xd3_rinst *inst)
+xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 {
   switch (inst->type)
     {
@@ -3121,9 +3129,12 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
       r2moff = r2end - r1end;
       gap    = r2end - r1->pos;
 
-      /* If the two matches overlap almost entirely, choose the better
-       * match and discard the other.  This heuristic is BLACK MAGIC.
-       * Havesomething better? */
+      /* If the two matches overlap almost entirely, choose the better match
+       * and discard the other.  The else branch can still create inefficient
+       * copies, e.g., a 4-byte copy that takes 4 bytes to encode, which
+       * xd3_smatch() wouldn't allow by its crude efficiency check.  However,
+       * in this case there are adjacent copies which mean the add would cost
+       * one extra byte.  Allow the inefficiency here. */
       if (gap < 2*MIN_MATCH || r2moff <= 2 || r2off <= 2)
 	{
 	  /* Only one match should be used, choose the longer one. */
@@ -4783,9 +4794,6 @@ xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
  * linked lists are in use (because stream->smatcher.small_chain > 1),
  * previous matches are tested searching for the longest match.  If
  * (stream->min_match > MIN_MATCH) then a lazy match is in effect.
- *
- * TODO: This is the second most-expensive function, after
- * xd3_srcwin_move_point().
  */
 static usize_t
 xd3_smatch (xd3_stream *stream,
@@ -4872,6 +4880,25 @@ xd3_smatch (xd3_stream *stream,
     }
 
  done:
+  /* Crude efficiency test: if the match is very short and very far back, it's
+   * unlikely to help, but the exact calculation requires knowing the state of
+   * the address cache and adjacent instructions, which we can't do here.
+   * Rather than encode a probably inefficient copy here and check it later
+   * (which complicates the code a lot), do this:
+   */
+  if (match_length == 4 && stream->input_position - (*match_offset) >= 1<<14)
+    {
+      /* It probably takes >2 bytes to encode an address >= 2^14 from here */
+      return 0;
+    }
+  if (match_length == 5 && stream->input_position - (*match_offset) >= 1<<21)
+    {
+      /* It probably takes >3 bytes to encode an address >= 2^21 from here */
+      return 0;
+    }
+
+  /* It's unlikely that a window is large enough for the (match_length == 6 &&
+   * address >= 2^28) check */
   return match_length;
 }
 

@@ -1138,7 +1138,12 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
-      uint   code = stream->inst_sect.buf[0];
+      uint code = stream->inst_sect.buf[0];
+      const uint8_t *addr_before = stream->addr_sect.buf;
+      const uint8_t *inst_before = stream->inst_sect.buf;
+      usize_t addr_bytes;
+      usize_t inst_bytes;
+      usize_t size_before = size;
 
       if ((ret = xd3_decode_instruction (stream)))
 	{
@@ -1147,13 +1152,15 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	  return ret;
 	}
 
+      addr_bytes = stream->addr_sect.buf - addr_before;
+      inst_bytes = stream->inst_sect.buf - inst_before;
+
       VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, code,
 	 xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
 	 (usize_t) stream->dec_current1.size)VE;
 
       if (stream->dec_current1.type != XD3_NOOP)
 	{
-	  size += stream->dec_current1.size;
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
 	      VC(UT " @%-6u", (usize_t)stream->dec_current1.addr)VE;
@@ -1162,11 +1169,12 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      VC(UT "        ")VE;
 	    }
+
+	  size += stream->dec_current1.size;
 	}
 
       if (stream->dec_current2.type != XD3_NOOP)
 	{
-	  size += stream->dec_current2.size;
 	  VC(UT "  %s %3u",
 	     xd3_rtype_to_string (stream->dec_current2.type,
 				  option_print_cpymode),
@@ -1176,9 +1184,22 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      VC(UT " @%-6u", (usize_t)stream->dec_current2.addr)VE;
 	    }
+
+	  size += stream->dec_current2.size;
 	}
 
       VC(UT "\n")VE;
+
+      if (option_verbose &&
+	  addr_bytes + inst_bytes >= (size - size_before) &&
+	  (stream->dec_current1.type >= XD3_CPY ||
+	   stream->dec_current2.type >= XD3_CPY))
+	{
+	  VC(UT "  %06"Q"u (inefficiency) %u encoded as %u bytes\n",
+	     stream->dec_winstart + size_before,
+	     size - size_before,
+	     addr_bytes + inst_bytes)VE;
+	}
     }
 
   if (stream->dec_tgtlen != size && (stream->flags & XD3_SKIP_WINDOW) == 0)

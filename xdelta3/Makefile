@@ -218,8 +218,13 @@ xdelta3-everything: $(SOURCES)
 					-DXD3_DEBUG=1 -lm
 
 xdelta3-Opg: $(SOURCES)
-	$(CC) -pg -g -O -Wall -Wshadow xdelta3.c -o xdelta3-Opg -DXD3_MAIN=1 \
-		-DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -DXD3_POSIX=1 -DXD3_USE_LARGEFILE64=1 -DREGRESSION_TEST=1
+	$(CC) -pg -g -O3 -fno-builtin -Wall -Wshadow xdelta3.c -o xdelta3-Opg \
+		-DXD3_MAIN=1 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-DXD3_POSIX=1 \
+		-DXD3_USE_LARGEFILE64=1 \
+		-DREGRESSION_TEST=1
 
 xdelta3-nosec.o: $(SOURCES)
 	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 -o xdelta3-nosec.o
