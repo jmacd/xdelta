@@ -4,9 +4,9 @@ CFLAGS = -O3 -Wall -I.. -DXD3_DEBUG=0 -fno-builtin
 
 SOURCES = small_page_test.c encode_decode_test.c speed_test.c
 
-DEPS = ../*.h ../*.c
+DEPS = ../*.h ../*.c *.h
 
-TARGETS = small_page_test encode_decode_test speed_test32 speed_test64 compare_test
+TARGETS = small_page_test encode_decode_test speed_test32 speed_test64 compare_test checksum_test
 
 all: $(TARGETS)
 
@@ -24,6 +24,9 @@ speed_test64: speed_test.c $(DEPS)
 
 compare_test: compare_test.c
 	$(CC) $(CFLAGS) compare_test.c -o compare_test
+
+checksum_test: checksum_test.cc
+	$(CXX) $(CFLAGS) checksum_test.cc -o checksum_test
 
 clean:
 	rm -f *.exe *.stackdump $(TARGETS)

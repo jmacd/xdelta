@@ -227,7 +227,7 @@ struct _main_extcomp
 
   const char    *ident;
   const char    *magic;
-  int            magic_size;
+  usize_t        magic_size;
   int            flags;
 };
 
@@ -300,7 +300,7 @@ static uint8_t*       appheader_used = NULL;
 static uint8_t*       main_bdata = NULL;
 
 /* The LRU: obviously this is shared by all callers. */
-static int               lru_size = 0;
+static usize_t           lru_size = 0;
 static main_blklru      *lru = NULL;  /* array of lru_size elts */
 static main_blklru_list  lru_list;
 static main_blklru_list  lru_free;
@@ -550,7 +550,7 @@ static char*
 main_format_bcnt (xoff_t r, char *buf)
 {
   static const char* fmts[] = { "B", "KB", "MB", "GB" };
-  int i;
+  usize_t i;
 
   for (i = 0; i < SIZEOF_ARRAY(fmts); i += 1)
     {
@@ -977,7 +977,7 @@ main_file_seek (main_file *xfile, xoff_t pos)
   if (fseek (xfile->file, pos, SEEK_SET) != 0) { ret = get_errno (); }
 
 #elif XD3_POSIX
-  if (lseek (xfile->file, pos, SEEK_SET) != pos) { ret = get_errno (); }
+  if ((xoff_t) lseek (xfile->file, pos, SEEK_SET) != pos) { ret = get_errno (); }
 
 #elif XD3_WIN32
   LARGE_INTEGER move, out;
@@ -1725,10 +1725,10 @@ main_decompress_input_check (main_file   *ifile,
 			    usize_t      input_size,
 			    usize_t     *nread)
 {
-  int i;
   int ret;
+  usize_t i;
+  usize_t check_nread;
   uint8_t check_buf[XD3_ALLOCSIZE];
-  usize_t  check_nread;
 
   if ((ret = main_file_read (ifile, check_buf, min (input_size, XD3_ALLOCSIZE), & check_nread, "input read failed")))
     {
@@ -1794,7 +1794,8 @@ main_decompress_source (main_file *sfile, xd3_source *source)
 
   /* Make a template for mkstmp() */
   if (tmpdir == NULL) { tmpdir = "/tmp"; }
-  if ((tmpname = main_malloc (strlen (tmpdir) + sizeof (tmpl) + 1)) == NULL) { return ENOMEM; }
+  if ((tmpname =
+       (char*) main_malloc (strlen (tmpdir) + sizeof (tmpl) + 1)) == NULL) { return ENOMEM; }
   sprintf (tmpname, "%s%s", tmpdir, tmpl);
 
   XD3_ASSERT (ext_tmpfile == NULL);
@@ -1960,7 +1961,7 @@ main_recompress_output (main_file *ofile)
 static const main_extcomp*
 main_ident_compressor (const char *ident)
 {
-  int i;
+  usize_t i;
 
   for (i = 0; i < SIZEOF_ARRAY (extcomp_types); i += 1)
     {
@@ -2059,7 +2060,7 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 	  sname = scomp = "";
 	}
 
-      if ((appheader_used = main_malloc (len)) == NULL)
+      if ((appheader_used = (uint8_t*) main_malloc (len)) == NULL)
 	{
 	  return ENOMEM;
 	}
@@ -2103,7 +2104,7 @@ main_get_appheader_params (main_file *file, char **parsed, int output, const cha
 	  int dlen = last_slash - other->filename;
 
 	  XD3_ASSERT(file->filename_copy == NULL);
-	  file->filename_copy = main_malloc(dlen + 2 + strlen(file->filename));
+	  file->filename_copy = (char*) main_malloc(dlen + 2 + strlen(file->filename));
 
 	  strncpy(file->filename_copy, other->filename, dlen);
 	  file->filename_copy[dlen] = '/';
@@ -2264,7 +2265,8 @@ main_open_output (xd3_stream *stream, main_file *ofile)
 static int
 main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *source)
 {
-  int ret = 0, i;
+  int ret = 0;
+  usize_t i;
   uint8_t *tmp_buf = NULL;
 
   /* Open it, check for seekability, set required xd3_source fields. */
@@ -2296,7 +2298,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       if (IS_ENCODE (cmd))
 	{
 	  usize_t nread;
-	  tmp_buf = main_malloc(XD3_ALLOCSIZE);
+	  tmp_buf = (uint8_t*) main_malloc (XD3_ALLOCSIZE);
 
 	  if ((ret = main_file_read (sfile, tmp_buf, XD3_ALLOCSIZE,
 				     & nread, "source read failed")))
@@ -2386,7 +2388,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       XPR(NT "source block size: %u\n", source->blksize);
     }
 
-  if ((lru = main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
+  if ((lru = (main_blklru*) main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
     {
       ret = ENOMEM;
       goto error;
@@ -2396,7 +2398,7 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
     {
       lru[i].blkno = (xoff_t) -1;
 
-      if ((lru[i].blk = main_malloc (source->blksize)) == NULL)
+      if ((lru[i].blk = (uint8_t*) main_malloc (source->blksize)) == NULL)
 	{
 	  ret = ENOMEM;
 	  goto error;
@@ -2454,13 +2456,13 @@ main_getblk_func (xd3_stream *stream,
 		  xd3_source *source,
 		  xoff_t      blkno)
 {
-  xoff_t      pos   = blkno * source->blksize;
-  main_file   *sfile = (main_file*) source->ioh;
+  int ret;
+  xoff_t pos = blkno * source->blksize;
+  main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru  = NULL;
-  usize_t      onblk = xd3_bytes_on_srcblk_fast (source, blkno);
-  usize_t      nread;
-  int         ret;
-  int         i;
+  usize_t onblk = xd3_bytes_on_srcblk_fast (source, blkno);
+  usize_t nread;
+  usize_t i;
 
   if (allow_fake_source)
     {
@@ -2728,7 +2730,7 @@ main_input (xd3_cmd     cmd,
 
   main_set_winsize (ifile);
 
-  if ((main_bdata = main_malloc (option_winsize)) == NULL)
+  if ((main_bdata = (uint8_t*) main_malloc (option_winsize)) == NULL)
     {
       return EXIT_FAILURE;
     }
@@ -3048,7 +3050,7 @@ done:
 static void
 main_cleanup (void)
 {
-  int i;
+  usize_t i;
 
   if (appheader_used != NULL &&
       appheader_used != option_appheader)
@@ -3105,7 +3107,7 @@ setup_environment (int argc,
     return;
   }
 
-  (*env_free) = main_malloc(strlen(v) + 1);
+  (*env_free) = (char*) main_malloc(strlen(v) + 1);
   strcpy(*env_free, v);
 
   /* Space needed for extra args, at least # of spaces */
@@ -3116,7 +3118,7 @@ setup_environment (int argc,
     }
   }
 
-  (*argv_free) = main_malloc(sizeof(char*) * (n + 1));
+  (*argv_free) = (char**) main_malloc(sizeof(char*) * (n + 1));
   (*argv_out) = (*argv_free);
   (*argv_out)[0] = argv[0];
   (*argv_out)[n] = NULL;

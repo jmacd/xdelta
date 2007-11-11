@@ -54,7 +54,7 @@
 #define TEMPLATE      fastest
 #define LLOOK         9
 #define LSTEP         26
-#define SLOOK         4
+#define SLOOK         4U
 #define SCHAIN        1
 #define SLCHAIN       1
 #define MAXLAZY       6
@@ -79,7 +79,7 @@
 #define TEMPLATE      faster
 #define LLOOK         9
 #define LSTEP         15
-#define SLOOK         4
+#define SLOOK         4U
 #define SCHAIN        1
 #define SLCHAIN       1
 #define MAXLAZY       18
@@ -104,7 +104,7 @@
 #define TEMPLATE      fast
 #define LLOOK         9
 #define LSTEP         8
-#define SLOOK         4
+#define SLOOK         4U
 #define SCHAIN        4
 #define SLCHAIN       1
 #define MAXLAZY       18
@@ -129,7 +129,7 @@
 #define TEMPLATE      slow
 #define LLOOK         9
 #define LSTEP         2
-#define SLOOK         4
+#define SLOOK         4U
 #define SCHAIN        44
 #define SLCHAIN       13
 #define MAXLAZY       90
@@ -154,7 +154,7 @@
 #define TEMPLATE      default
 #define LLOOK         9
 #define LSTEP         3
-#define SLOOK         4
+#define SLOOK         4U
 #define SCHAIN        8
 #define SLCHAIN       2
 #define MAXLAZY       36

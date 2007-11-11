@@ -5,6 +5,7 @@ SOURCES = xdelta3-cfgs.h \
           xdelta3-decode.h \
           xdelta3-djw.h \
           xdelta3-fgk.h \
+	  xdelta3-hash.h \
           xdelta3-list.h \
           xdelta3-main.h \
           xdelta3-python.h \
@@ -49,6 +50,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	examples/Makefile examples/small_page_test.c \
 	examples/README examples/encode_decode_test.c \
 	examples/compare_test.c examples/speed_test.c \
+	examples/test.h examples/checksum_test.c \
 	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi \
 	README readme.txt
 

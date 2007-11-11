@@ -1,9 +1,6 @@
 /* Copyright (C) 2007 Josh MacDonald */
 
-#define NOT_MAIN 1
-
-#include "xdelta3.h"
-#include "xdelta3.c"
+#include "test.h"
 
 usize_t bench_speed(const uint8_t *from_buf, const size_t from_len,
 		 const uint8_t *to_buf, const size_t to_len,
@@ -17,39 +14,6 @@ usize_t bench_speed(const uint8_t *from_buf, const size_t from_len,
     abort();
   }
   return delta_size;
-}
-
-int read_whole_file(const char *name,
-		    uint8_t **buf_ptr,
-		    size_t *buf_len) {
-  main_file file;
-  int ret;
-  xoff_t len;
-  size_t nread;
-  main_file_init(&file);
-  file.filename = name;
-  ret = main_file_open(&file, name, XO_READ);
-  if (ret != 0) {
-    goto exit;
-  }
-  ret = main_file_stat(&file, &len, 1);
-  if (ret != 0) {
-    goto exit;
-  }
-  
-  (*buf_len) = (size_t)len;
-  (*buf_ptr) = main_malloc(*buf_len);
-  ret = main_file_read(&file, *buf_ptr, *buf_len, &nread,
-		       "read failed");
-  if (ret == 0 && *buf_len == nread) {
-    ret = 0;
-  } else {
-    fprintf(stderr, "invalid read\n");
-    ret = XD3_INTERNAL;
-  }
- exit:
-  main_file_cleanup(&file);
-  return ret;
 }
 
 int main(int argc, char **argv) {

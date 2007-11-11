@@ -85,7 +85,7 @@ xd3_decode_setup_buffers (xd3_stream *stream)
 
       stream->space_out = xd3_round_blksize (stream->dec_tgtlen, XD3_ALLOCSIZE);
 
-      if ((stream->dec_buffer = xd3_alloc (stream, stream->space_out, 1)) == NULL)
+      if ((stream->dec_buffer = (uint8_t*) xd3_alloc (stream, stream->space_out, 1)) == NULL)
 	{
 	  return ENOMEM;
 	}
@@ -118,7 +118,7 @@ xd3_decode_allocate (xd3_stream  *stream,
     {
       *buf_alloc = xd3_round_blksize (size, XD3_ALLOCSIZE);
 
-      if ((*buf_ptr = xd3_alloc (stream, *buf_alloc, 1)) == NULL)
+      if ((*buf_ptr = (uint8_t*) xd3_alloc (stream, *buf_alloc, 1)) == NULL)
 	{
 	  return ENOMEM;
 	}
@@ -805,7 +805,8 @@ xd3_decode_input (xd3_stream *stream)
 	{
 	  /* Get the code table data. */
 	  if ((stream->dec_codetbl == NULL) &&
-	      (stream->dec_codetbl = xd3_alloc (stream, stream->dec_codetblsz, 1)) == NULL) { return ENOMEM; }
+	      (stream->dec_codetbl =
+	       (uint8_t*) xd3_alloc (stream, stream->dec_codetblsz, 1)) == NULL) { return ENOMEM; }
 
 	  if ((ret = xd3_decode_bytes (stream, stream->dec_codetbl, & stream->dec_codetblbytes, stream->dec_codetblsz)))
 	    {
@@ -840,7 +841,8 @@ xd3_decode_input (xd3_stream *stream)
 	  /* Note: we add an additional byte for padding, to allow
 	     0-termination. */
 	  if ((stream->dec_appheader == NULL) &&
-	      (stream->dec_appheader = xd3_alloc (stream, stream->dec_appheadsz+1, 1)) == NULL) { return ENOMEM; }
+	      (stream->dec_appheader =
+	       (uint8_t*) xd3_alloc (stream, stream->dec_appheadsz+1, 1)) == NULL) { return ENOMEM; }
 
 	  stream->dec_appheader[stream->dec_appheadsz] = 0;
 
