@@ -11,25 +11,21 @@ extern "C" {
 using std::list;
 using std::map;
 
-// Need gcc4
-// template <typename T, int TestCklen>
-// struct cksum_params {
-//   typedef T cksum_type;
-//   enum { test_cklen = TestCklen };
-// };
-
-
 // MLCG parameters
+// a, a*
 uint32_t good_32bit_values[] = {
-//    741103597U, 887987685U,
-    1597334677U,
+    1597334677U, // ...
+    741103597U, 887987685U,
 };
 
 // a, a*
 uint64_t good_64bit_values[] = {
-//    1181783497276652981ULL, 4292484099903637661ULL,
-    7664345821815920749ULL,
+    1181783497276652981ULL, 4292484099903637661ULL,
+    7664345821815920749ULL, // ...
 };
+
+struct true_type { };
+struct false_type { };
 
 template <typename Word>
 int bitsof();
@@ -44,7 +40,7 @@ int bitsof<uint64_t>() {
     return 64;
 }
 
-struct noperm {
+struct no_permute {
     int operator()(const uint8_t &c) {
 	return c;
     }
@@ -53,6 +49,13 @@ struct noperm {
 struct permute {
     int operator()(const uint8_t &c) {
 	return __single_hash[c];
+    }
+};
+
+template <typename Word>
+struct both {
+    Word operator()(const Word& t, const int &bits, const int &mask) {
+	return (t >> bits) ^ (t & mask);
     }
 };
 
@@ -87,15 +90,38 @@ size_log2 (int slots)
   return bits;
 }
 
-template <typename Word, int CksumSize, int CksumSkip, typename Permute>
+// CLASSES
+
+#define SELF Word, CksumSize, CksumSkip, Permute, Hash
+#define MEMBER template <typename Word, \
+			 int CksumSize, \
+			 int CksumSkip, \
+			 typename Permute, \
+			 typename Hash>
+
+MEMBER
+struct cksum_params {
+    typedef Word word_type;
+    typedef Permute permute_type;
+    typedef Hash hash_type;
+
+    enum { cksum_size = CksumSize,
+	   cksum_skip = CksumSkip, 
+    };
+};
+
+
+MEMBER
 struct rabin_karp {
     typedef Word word_type;
     typedef Permute permute_type;
+    typedef Hash hash_type;
 
     enum { cksum_size = CksumSize,
 	   cksum_skip = CksumSkip, 
     };
 
+    // In this code, we use (a^cksum_size-1 c_0) + (a^cksum_size-2 c_1) ...
     rabin_karp() {
 	multiplier = good_word<Word>();
 	powers = new Word[cksum_size];
@@ -104,6 +130,10 @@ struct rabin_karp {
 	    powers[i] = powers[i + 1] * multiplier;
 	}
 	product = powers[0] * multiplier;
+    }
+
+    ~rabin_karp() {
+	delete [] powers;
     }
 
     Word step(const uint8_t *ptr) {
@@ -115,21 +145,75 @@ struct rabin_karp {
     }
 
     Word state0(const uint8_t *ptr) {
-	state = step(ptr);
-	return state;
+	incr_state = step(ptr);
+	return incr_state;
     }
 
     Word incr(const uint8_t *ptr) {
-	state = state -
+	incr_state = multiplier * incr_state -
 	    product * permute_type()(ptr[-1]) +
 	    permute_type()(ptr[cksum_size - 1]);
-	return state;
+	return incr_state;
     }
 
     Word *powers;
     Word  product;
     Word  multiplier;
-    Word  state;
+    Word  incr_state;
+};
+
+// TESTS
+
+template <typename Word>
+struct file_stats {
+    typedef list<const uint8_t*> ptr_list;
+    typedef Word word_type;
+    typedef map<word_type, ptr_list> table_type;
+    typedef typename table_type::iterator table_iterator;
+    typedef typename ptr_list::iterator ptr_iterator;
+
+    int cksum_size;
+    int cksum_skip;
+    int unique;
+    int unique_values;
+    int count;
+    table_type table;
+
+    file_stats(int size, int skip)
+	: cksum_size(size),
+	  cksum_skip(skip),
+	  unique(0),
+	  unique_values(0),
+	  count(0) {
+    }
+
+    void update(const word_type &word, const uint8_t *ptr) {
+	table_iterator t_i = table.find(word);
+
+	count++;
+
+	if (t_i == table.end()) {
+	    table.insert(make_pair(word, ptr_list()));
+	}
+
+	ptr_list &pl = table[word];
+
+	for (ptr_iterator p_i = pl.begin();
+	     p_i != pl.end();
+	     ++p_i) {
+	    if (memcmp(*p_i, ptr, cksum_size) == 0) {
+		return;
+	    }
+	}
+
+	unique++;
+	pl.push_back(ptr);
+    }
+
+    void freeze() {
+	table.clear();
+	unique_values = table.size();
+    }
 };
 
 struct test_result_base;
@@ -139,126 +223,202 @@ static list<test_result_base*> all_tests;
 struct test_result_base {
     virtual ~test_result_base() {
     }
+    virtual void reset() = 0;
     virtual void print() = 0;
-    virtual void get(const uint8_t* buf, const int buf_size) = 0;
+    virtual void get(const uint8_t* buf, const int buf_size, int iters) = 0;
 };
 
-template<typename T>
+MEMBER
 struct test_result : public test_result_base {
+    typedef Word word_type;
+    typedef Permute permute_type;
+    typedef Hash hash_type;
+
+    enum { cksum_size = CksumSize,
+	   cksum_skip = CksumSkip, 
+    };
+
+    const char *test_name;
+    file_stats<Word> fstats;
+    int test_size;
+    int test_iters;
     int n_steps;
     int n_incrs;
     int s_bits;
     int s_mask;
-    int h_bits;
     int t_entries;
-    double step_fill;
-    double incr_fill;    
-    long start_step, end_step;
-    long start_incr, end_incr;
+    int h_bits;
+    double h_fill;
+    double l_fill;
+    char *hash_table;
+    long start_test, end_test;
 
-    test_result() {
+    test_result(const char *name)
+	: test_name(name),
+	  fstats(cksum_size, cksum_skip),
+	  hash_table(NULL) {
 	all_tests.push_back(this);
     }
 
-    void print() {
-	fprintf(stderr,
-		"cksum size %u: skip %u: %u steps: %u incrs: "
-		"s_fill %0.2f%% i_fill %0.2f%%\n",
-		T::cksum_size,
-		T::cksum_skip,
-		n_steps,
-		n_incrs,
-		100.0 * step_fill,
-		100.0 * incr_fill);
+    ~test_result() {
+	reset();
     }
 
-    int* new_table(int entries) {
+    void reset() {
+	test_size = -1;
+	test_iters = -1;
+	n_steps = -1;
+	n_incrs = -1;
+	s_bits = -1;
+	s_mask = -1;
+	t_entries = -1;
+	h_bits = -1;
+	h_fill = 0.0;
+	l_fill = 0.0;
+	if (hash_table) {
+	    delete(hash_table);
+	    hash_table = NULL;
+	}
+    }
+
+    int count() {
+	if (cksum_skip == 1) {
+	    return n_incrs;
+	} else {
+	    return n_steps;
+	}
+    }
+
+    void print() {
+
+	printf("%s: (%u#%u) count %u dups %0.2f%% coll %0.2f%% fill %0.2f%% heff %0.2f%% %.4f MB/s\n",
+	       test_name,
+	       cksum_size,
+	       cksum_skip,
+	       count(),
+	       100.0 * (fstats.count - fstats.unique) / fstats.count,
+	       100.0 * (fstats.unique - fstats.unique_values) / fstats.unique,
+	       100.0 * h_fill,
+	       100.0 * l_fill,
+	       0.001 * test_iters * test_size / (end_test - start_test));
+    }
+
+    void new_table(int entries) {
 	t_entries = entries;
 	h_bits = size_log2(entries);
-	s_bits = bitsof<typename T::word_type>() - h_bits;
+	s_bits = bitsof<word_type>() - h_bits;
 	s_mask = (1 << h_bits) - 1;
 
 	int n = 1 << h_bits;
-	int *t = new int[n];
-	memset(t, 0, sizeof(int) * n);
-	return t;
+	hash_table = new char[n / 8];
+	memset(hash_table, 0, n / 8);
     }
 
-    double summarize_table(int* table) {
+    int get_table_bit(int i) {
+	return hash_table[i/8] & (1 << i%8);
+    }
+
+    int set_table_bit(int i) {
+	return hash_table[i/8] |= (1 << i%8);
+    }
+
+    void summarize_table() {
 	int n = 1 << h_bits;
 	int f = 0;
 	for (int i = 0; i < n; i++) {
-	    if (table[i] != 0) {
+	    if (get_table_bit(i)) {
 		f++;
 	    }
 	}
-	delete [] table;
-	return (double) f / (double) t_entries;
+	h_fill = (double) f / (double) t_entries;
+	l_fill = (double) f / (double) fstats.unique;
     }
 
-    void get(const uint8_t* buf, const int buf_size) {
+    void get(const uint8_t* buf, const int buf_size, int iters) {
+	rabin_karp<SELF> test;
+	hash_type hash;
 	const uint8_t *ptr;
 	const uint8_t *end;
 	int last_offset;
 	int periods;
 	int stop;
-	int *hash_table;
 
-	last_offset = buf_size - T::cksum_size;
+	test_size = buf_size;
+	test_iters = iters;
+	last_offset = buf_size - cksum_size;
 
 	if (last_offset < 0) {
 	    periods = 0;
 	    n_steps = 0;
 	    n_incrs = 0;
-	    stop = -T::cksum_size;
+	    stop = -cksum_size;
 	} else {
-	    periods = last_offset / T::cksum_skip;
-	    n_steps = periods;
+	    periods = last_offset / cksum_skip;
+	    n_steps = periods + 1;
 	    n_incrs = last_offset;
-	    stop = last_offset - (periods + 1) * T::cksum_skip;
+	    stop = last_offset - (periods + 1) * cksum_skip;
 	}
 
-	hash_table = new_table(n_steps);
+	// Compute file stats
+	if (cksum_skip == 1) {
+	    for (int i = 0; i <= buf_size - cksum_size; i++) {
+		fstats.update(hash(test.step(buf + i), s_bits, s_mask), buf + i);
+	    }
+	} else {
+	    ptr = buf + last_offset;
+	    end = buf + stop;
+		
+	    for (; ptr != end; ptr -= cksum_skip) {
+		fstats.update(hash(test.step(ptr), s_bits, s_mask), ptr);
+	    }
+	}
+	fstats.freeze();
 
-	start_step = get_millisecs_now();
+	start_test = get_millisecs_now();
 
-	ptr = buf + last_offset;
-	end = buf + stop;
+	if (cksum_skip != 1) {
+	    new_table(n_steps);
 
-	T t;
-	typename T::word_type w;
+	    for (int i = 0; i < iters; i++) {
+		ptr = buf + last_offset;
+		end = buf + stop;
 
-	for (; ptr != end; ptr -= T::cksum_skip) {
-	    w = t.step(ptr);
-	    ++hash_table[(w >> s_bits) ^ (w & s_mask)];
+		for (; ptr != end; ptr -= cksum_skip) {
+		    set_table_bit(hash(test.step(ptr), s_bits, s_mask));
+		}
+	    }
+
+	    summarize_table();
 	}
 
-	end_step = get_millisecs_now();
-
-	step_fill = summarize_table(hash_table);
-	hash_table = new_table(n_incrs);
-
-	stop = buf_size - T::cksum_size + 1;
+	stop = buf_size - cksum_size + 1;
 	if (stop < 0) {
 	    stop = 0;
 	}
 
-	start_incr = end_step;
+	if (cksum_skip == 1) {
 
-	ptr = buf;
-	end = buf + stop;
-	if (ptr != end) {
-	    w = t.state0(ptr++);
-	    ++hash_table[(w >> s_bits) ^ (w & s_mask)];
+	    new_table(n_incrs);
+
+	    for (int i = 0; i < iters; i++) {
+		ptr = buf;
+		end = buf + stop;
+
+		if (ptr != end) {
+		    set_table_bit(hash(test.state0(ptr++), s_bits, s_mask));
+		}
+
+		for (; ptr != end; ptr++) {
+		    Word w = test.incr(ptr);
+		    assert(w == test.step(ptr));
+		    set_table_bit(hash(w, s_bits, s_mask));
+		}
+	    }
+
+	    summarize_table();
 	}
-	for (; ptr != end; ptr++) {
-	    w = t.incr(ptr);
-	    ++hash_table[(w >> s_bits) ^ (w & s_mask)];
-	}
 
-	end_incr = get_millisecs_now();
-
-	incr_fill = summarize_table(hash_table);
+	end_test = get_millisecs_now();
     }
 };
 
@@ -273,57 +433,41 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  test_result<rabin_karp<uint32_t, 4, 1, noperm> > small_1_cksum;
-  test_result<rabin_karp<uint32_t, 4, 4, noperm> > small_4_cksum;
-  test_result<rabin_karp<uint32_t, 9, 1, noperm> > large_1_cksum;  
-  test_result<rabin_karp<uint32_t, 9, 2, noperm> > large_2_cksum;  
-  test_result<rabin_karp<uint32_t, 9, 3, noperm> > large_3_cksum;
-  test_result<rabin_karp<uint32_t, 9, 5, noperm> > large_5_cksum;  
-  test_result<rabin_karp<uint32_t, 9, 6, noperm> > large_6_cksum;  
-  test_result<rabin_karp<uint32_t, 9, 7, noperm> > large_7_cksum;  
-  test_result<rabin_karp<uint32_t, 9, 8, noperm> > large_8_cksum;     
-  test_result<rabin_karp<uint32_t, 9, 15, noperm> > large_15_cksum;  
-  test_result<rabin_karp<uint32_t, 9, 26, noperm> > large_26_cksum; 
-  test_result<rabin_karp<uint32_t, 9, 55, noperm> > large_55_cksum; 
+#define TEST(T,Z,S,P,H) test_result<T,Z,S,P,H<T> > \
+      _ ## T ## Z ## S ## P ## H (#T "_" #Z "_" #S "_" #P "_" #H)
 
-  test_result<rabin_karp<uint32_t, 4, 1, permute> > small_1_cksum_p;
-  test_result<rabin_karp<uint32_t, 4, 4, permute> > small_4_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 1, permute> > large_1_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 2, permute> > large_2_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 3, permute> > large_3_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 5, permute> > large_5_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 6, permute> > large_6_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 7, permute> > large_7_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 8, permute> > large_8_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 15, permute> > large_15_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 26, permute> > large_26_cksum_p;
-  test_result<rabin_karp<uint32_t, 9, 55, permute> > large_55_cksum_p;
+  TEST(uint32_t, 4, 1, no_permute, both);
+  TEST(uint32_t, 4, 2, no_permute, both);
+  TEST(uint32_t, 4, 3, no_permute, both);
+  TEST(uint32_t, 4, 4, no_permute, both);
 
-  test_result<rabin_karp<uint64_t, 4, 1, noperm> > small_1_cksum_64;
-  test_result<rabin_karp<uint64_t, 4, 4, noperm> > small_4_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 1, noperm> > large_1_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 2, noperm> > large_2_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 3, noperm> > large_3_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 5, noperm> > large_5_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 6, noperm> > large_6_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 7, noperm> > large_7_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 8, noperm> > large_8_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 15, noperm> > large_15_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 26, noperm> > large_26_cksum_64;
-  test_result<rabin_karp<uint64_t, 9, 55, noperm> > large_55_cksum_64;
+  TEST(uint32_t, 7, 15, no_permute, both);
+  TEST(uint32_t, 7, 55, no_permute, both);
 
-  test_result<rabin_karp<uint64_t, 4, 1, permute> > small_1_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 4, 4, permute> > small_4_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 1, permute> > large_1_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 2, permute> > large_2_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 3, permute> > large_3_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 5, permute> > large_5_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 6, permute> > large_6_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 7, permute> > large_7_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 8, permute> > large_8_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 15, permute> > large_15_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 26, permute> > large_26_cksum_p_64;
-  test_result<rabin_karp<uint64_t, 9, 55, permute> > large_55_cksum_p_64;
+  TEST(uint32_t, 9, 1, no_permute, both);
+  TEST(uint32_t, 9, 2, no_permute, both);
+  TEST(uint32_t, 9, 3, no_permute, both);
+  TEST(uint32_t, 9, 4, no_permute, both);
+  TEST(uint32_t, 9, 5, no_permute, both);
+  TEST(uint32_t, 9, 6, no_permute, both);
+  TEST(uint32_t, 9, 7, no_permute, both);
+  TEST(uint32_t, 9, 8, no_permute, both);
+  TEST(uint32_t, 9, 15, no_permute, both);
+  TEST(uint32_t, 9, 26, no_permute, both);
+  TEST(uint32_t, 9, 55, no_permute, both);
+
+  TEST(uint32_t, 10, 14, no_permute, both);
+  TEST(uint32_t, 10, 25, no_permute, both);
+  TEST(uint32_t, 10, 54, no_permute, both);
+
+  TEST(uint32_t, 11, 13, no_permute, both);
+  TEST(uint32_t, 11, 24, no_permute, both);
+  TEST(uint32_t, 11, 53, no_permute, both);
+
+  TEST(uint32_t, 16, 16, no_permute, both);
+  TEST(uint32_t, 16, 31, no_permute, both);
+  TEST(uint32_t, 16, 32, no_permute, both);
+  TEST(uint32_t, 16, 48, no_permute, both);
 
   for (i = 1; i < argc; i++) {
     if ((ret = read_whole_file(argv[i],
@@ -332,11 +476,16 @@ int main(int argc, char** argv) {
       return 1;
     }
 
-    fprintf(stderr, "file %s is %u bytes\n", argv[i], buf_len);
+    int target = 100 << 20;
+    int iters = (target / buf_len) + 1;
+
+    fprintf(stderr, "file %s is %u bytes %u iters\n",
+	    argv[i], buf_len, iters);
 
     for (list<test_result_base*>::iterator i = all_tests.begin();
 	 i != all_tests.end(); ++i) {
-	(*i)->get(buf, buf_len);
+	(*i)->reset();
+	(*i)->get(buf, buf_len, iters);
 	(*i)->print();
     }
 

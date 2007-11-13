@@ -1,5 +1,5 @@
 #CFLAGS = -g -Wall -I.. -DXD3_DEBUG=1
-CFLAGS = -O3 -Wall -I.. -DXD3_DEBUG=0 -fno-builtin
+CFLAGS = -O3 -Wall -I.. -DXD3_DEBUG=0 -fno-builtin -DNDEBUG=1
 # -pg
 
 SOURCES = small_page_test.c encode_decode_test.c speed_test.c
