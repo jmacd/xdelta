@@ -77,8 +77,8 @@
 
 static const uint16_t __single_hash[256] =
 {
-  /* Random numbers generated using SLIB's pseudo-random number generator.  This hashes
-   * the input alphabet. */
+  /* Random numbers generated using SLIB's pseudo-random number generator.
+   * This hashes the input alphabet. */
   0xbcd1, 0xbb65, 0x42c2, 0xdffe, 0x9666, 0x431b, 0x8504, 0xeb46,
   0x6379, 0xd460, 0xcf14, 0x53cf, 0xdb51, 0xdb08, 0x12c8, 0xf602,
   0xe766, 0x2394, 0x250d, 0xdcbb, 0xa678, 0x02af, 0xa5c6, 0x7ea6,
@@ -208,9 +208,9 @@ xd3_size_hashtable (xd3_stream    *stream,
 		    usize_t        slots,
 		    xd3_hash_cfg  *cfg)
 {
-  /* initialize ctable: the number of hash buckets is computed from the table of primes or
-   * the nearest power-of-two, in both cases rounding down in favor of using less
-   * memory. */
+  /* initialize ctable: the number of hash buckets is computed from the table
+   * of primes or the nearest power-of-two, in both cases rounding down in
+   * favor of using less memory. */
 
 #if HASH_PRIME
   usize_t i;

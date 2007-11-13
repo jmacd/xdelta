@@ -2656,8 +2656,8 @@ xd3_set_appheader (xd3_stream    *stream,
 static int
 xd3_iopt_check (xd3_stream *stream)
 {
-  int ul = xd3_rlist_length (& stream->iopt_used);
-  int fl = xd3_rlist_length (& stream->iopt_free);
+  usize_t ul = xd3_rlist_length (& stream->iopt_used);
+  usize_t fl = xd3_rlist_length (& stream->iopt_free);
 
   return (ul + fl + (stream->iout ? 1 : 0)) == stream->iopt_size;
 }
@@ -3525,7 +3525,10 @@ xd3_encode_init (xd3_stream *stream)
 
   if (small_comp)
     {
-      usize_t hash_values = min(stream->winsize, stream->sprevsz);
+      /* TODO: This is under devel: used to have min(sprevsz) here, which sort
+       * of makes sense, but observed fast performance w/ larger tables, which
+       * also sort of makes sense. @@@ */
+      usize_t hash_values = stream->winsize;
 
       xd3_size_hashtable (stream,
 			  hash_values,
@@ -4579,7 +4582,7 @@ static int
 xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
 		  const uint8_t *inp_max, usize_t cmp_len)
 {
-  int i;
+  usize_t i;
 
   for (i = 0; i < cmp_len; i += 1)
     {
