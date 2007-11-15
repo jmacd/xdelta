@@ -2,14 +2,16 @@
 
 extern "C" {
 #include "test.h"
-#include <assert.h>
 }
 
 #include <list>
+#include <vector>
 #include <map>
+#include <algorithm>
 
 using std::list;
 using std::map;
+using std::vector;
 
 // MLCG parameters
 // a, a*
@@ -40,7 +42,7 @@ int bitsof<uint64_t>() {
     return 64;
 }
 
-struct no_permute {
+struct plain {
     int operator()(const uint8_t &c) {
 	return c;
     }
@@ -53,9 +55,12 @@ struct permute {
 };
 
 template <typename Word>
-struct both {
-    Word operator()(const Word& t, const int &bits, const int &mask) {
-	return (t >> bits) ^ (t & mask);
+struct hhash {  // take "h" of the high-bits as a hash value for this
+		// checksum, which are the most "distant" in terms of the
+		// spectral test for the rabin_karp MLCG.  For short windows,
+		// the high bits aren't enough, XOR "mask" worth of these in.
+    Word operator()(const Word& t, const int &h, const int &mask) {
+	return (t >> h) ^ (t & mask);
     }
 };
 
@@ -72,32 +77,15 @@ uint64_t good_word<uint64_t>() {
     return good_64bit_values[0];
 }
 
-int
-size_log2 (int slots)
-{
-  int bits = 31;
-  int i;
-
-  for (i = 3; i <= bits; i += 1)
-    {
-      if (slots <= (1 << i))
-	{
-	  bits = i;
-	  break;
-	}
-    }
-
-  return bits;
-}
-
 // CLASSES
 
-#define SELF Word, CksumSize, CksumSkip, Permute, Hash
+#define SELF Word, CksumSize, CksumSkip, Permute, Hash, Compaction
 #define MEMBER template <typename Word, \
 			 int CksumSize, \
 			 int CksumSkip, \
 			 typename Permute, \
-			 typename Hash>
+			 typename Hash, \
+                         int Compaction>
 
 MEMBER
 struct cksum_params {
@@ -106,7 +94,8 @@ struct cksum_params {
     typedef Hash hash_type;
 
     enum { cksum_size = CksumSize,
-	   cksum_skip = CksumSkip, 
+	   cksum_skip = CksumSkip,
+	   compaction = Compaction,
     };
 };
 
@@ -119,9 +108,10 @@ struct rabin_karp {
 
     enum { cksum_size = CksumSize,
 	   cksum_skip = CksumSkip, 
+	   compaction = Compaction,
     };
 
-    // In this code, we use (a^cksum_size-1 c_0) + (a^cksum_size-2 c_1) ...
+    // (a^cksum_size-1 c_0) + (a^cksum_size-2 c_1) ...
     rabin_karp() {
 	multiplier = good_word<Word>();
 	powers = new Word[cksum_size];
@@ -187,6 +177,13 @@ struct file_stats {
 	  count(0) {
     }
 
+    void reset() {
+	unique = 0;
+	unique_values = 0;
+	count = 0;
+	table.clear();
+    }
+
     void update(const word_type &word, const uint8_t *ptr) {
 	table_iterator t_i = table.find(word);
 
@@ -211,21 +208,39 @@ struct file_stats {
     }
 
     void freeze() {
-	table.clear();
 	unique_values = table.size();
+	table.clear();
     }
 };
 
 struct test_result_base;
 
-static list<test_result_base*> all_tests;
+static vector<test_result_base*> all_tests;
 
 struct test_result_base {
     virtual ~test_result_base() {
     }
     virtual void reset() = 0;
     virtual void print() = 0;
+    virtual void print_accum() = 0;
     virtual void get(const uint8_t* buf, const int buf_size, int iters) = 0;
+    virtual void stat() = 0;
+    virtual int count() = 0;
+    virtual int dups() = 0;
+    virtual double uniqueness() = 0;
+    virtual double time() = 0;
+    virtual double score() = 0;
+    virtual void set_score(double min_dups_frac, double min_time) = 0;
+    virtual double total_time() = 0;
+    virtual int total_count() = 0;
+    virtual int total_dups() = 0;
+};
+
+struct compare_h {
+    bool operator()(test_result_base *a,
+		    test_result_base *b) {
+	return a->score() < b->score();
+    }
 };
 
 MEMBER
@@ -236,27 +251,42 @@ struct test_result : public test_result_base {
 
     enum { cksum_size = CksumSize,
 	   cksum_skip = CksumSkip, 
+	   compaction = Compaction,
     };
 
     const char *test_name;
     file_stats<Word> fstats;
     int test_size;
-    int test_iters;
     int n_steps;
     int n_incrs;
     int s_bits;
     int s_mask;
     int t_entries;
     int h_bits;
-    double h_fill;
-    double l_fill;
+    int h_buckets_full;
+    double h_score;
     char *hash_table;
-    long start_test, end_test;
+    long accum_millis;
+    int accum_iters;
+
+    // These are not reset
+    double accum_time;
+    int accum_count;
+    int accum_dups;
+    int accum_colls;
+    int accum_size;
 
     test_result(const char *name)
 	: test_name(name),
 	  fstats(cksum_size, cksum_skip),
-	  hash_table(NULL) {
+	  hash_table(NULL),
+	  accum_millis(0),
+	  accum_iters(0),
+	  accum_time(0.0),
+	  accum_count(0),
+	  accum_dups(0),
+	  accum_colls(0),
+	  accum_size(0) {
 	all_tests.push_back(this);
     }
 
@@ -265,16 +295,26 @@ struct test_result : public test_result_base {
     }
 
     void reset() {
+	// size of file
 	test_size = -1;
-	test_iters = -1;
+
+	// count
 	n_steps = -1;
 	n_incrs = -1;
+
+	// four values used by new_table()/summarize_table()
 	s_bits = -1;
 	s_mask = -1;
 	t_entries = -1;
 	h_bits = -1;
-	h_fill = 0.0;
-	l_fill = 0.0;
+	h_buckets_full = -1;
+
+	accum_millis = 0;
+	accum_iters = 0;
+
+	fstats.reset();
+
+	// temporary
 	if (hash_table) {
 	    delete(hash_table);
 	    hash_table = NULL;
@@ -289,27 +329,109 @@ struct test_result : public test_result_base {
 	}
     }
 
-    void print() {
+    int dups() {
+	return fstats.count - fstats.unique;
+    }
 
-	printf("%s: (%u#%u) count %u dups %0.2f%% coll %0.2f%% fill %0.2f%% heff %0.2f%% %.4f MB/s\n",
+    int colls() {
+	return fstats.unique - fstats.unique_values;
+    }
+
+    double uniqueness() {
+	return 1.0 - (double) dups() / count();
+    }
+
+    double fullness() {
+	return (double) h_buckets_full / (1 << h_bits);
+    }
+
+    double time() {
+	return (double) accum_millis / accum_iters;
+    }
+
+    double score() {
+	return h_score;
+    }
+
+    void set_score(double min_uniqueness, double min_time) {
+	h_score = time();
+    }
+
+    double total_time() {
+	return accum_time;
+    }
+
+    int total_count() {
+	return accum_count;
+    }
+
+    int total_dups() {
+	return accum_dups;
+    }
+
+    int total_colls() {
+	return accum_dups;
+    }
+
+    void stat() {
+	accum_time += time();
+	accum_count += count();
+	accum_dups += dups();
+	accum_colls += colls();
+	accum_size += test_size;
+    }
+
+    void print_accum() {
+	printf("%s: (%u#%u) count %u dups %0.2f%% %.4f MB/s score %0.6f\n",
+	       test_name,
+	       cksum_size,
+	       cksum_skip,
+	       total_count(),
+	       100.0 * total_dups() / total_count(),
+	       0.001 * accum_size / time(),
+	       h_score);
+    }
+
+    void print() {
+	if (fstats.count != count()) {
+	    fprintf(stderr, "internal error: %d != %d\n", fstats.count, count());
+	    abort();
+	}
+	printf("%s: (%u#%u) count %u uniq %0.2f%% full %0.4f%% of 1<<%d @ %.4f MB/s %u iters\n",
 	       test_name,
 	       cksum_size,
 	       cksum_skip,
 	       count(),
-	       100.0 * (fstats.count - fstats.unique) / fstats.count,
-	       100.0 * (fstats.unique - fstats.unique_values) / fstats.unique,
-	       100.0 * h_fill,
-	       100.0 * l_fill,
-	       0.001 * test_iters * test_size / (end_test - start_test));
+	       100.0 * uniqueness(),
+	       100.0 * fullness(),
+	       h_bits,
+	       0.001 * accum_iters * test_size / accum_millis,
+	       accum_iters);
+    }
+
+    int size_log2 (int slots)
+    {
+	int bits = bitsof<word_type>() - 1;
+	int i;
+
+	for (i = 3; i <= bits; i += 1) {
+	    if (slots <= (1 << i)) {
+		return i - compaction;
+	    }
+	}
+
+	return bits;
     }
 
     void new_table(int entries) {
 	t_entries = entries;
 	h_bits = size_log2(entries);
-	s_bits = bitsof<word_type>() - h_bits;
-	s_mask = (1 << h_bits) - 1;
 
 	int n = 1 << h_bits;
+
+	s_bits = bitsof<word_type>() - h_bits;
+	s_mask = n - 1;
+
 	hash_table = new char[n / 8];
 	memset(hash_table, 0, n / 8);
     }
@@ -330,11 +452,10 @@ struct test_result : public test_result_base {
 		f++;
 	    }
 	}
-	h_fill = (double) f / (double) t_entries;
-	l_fill = (double) f / (double) fstats.unique;
+	h_buckets_full = f;
     }
 
-    void get(const uint8_t* buf, const int buf_size, int iters) {
+    void get(const uint8_t* buf, const int buf_size, int test_iters) {
 	rabin_karp<SELF> test;
 	hash_type hash;
 	const uint8_t *ptr;
@@ -344,7 +465,6 @@ struct test_result : public test_result_base {
 	int stop;
 
 	test_size = buf_size;
-	test_iters = iters;
 	last_offset = buf_size - cksum_size;
 
 	if (last_offset < 0) {
@@ -355,31 +475,33 @@ struct test_result : public test_result_base {
 	} else {
 	    periods = last_offset / cksum_skip;
 	    n_steps = periods + 1;
-	    n_incrs = last_offset;
+	    n_incrs = last_offset + 1;
 	    stop = last_offset - (periods + 1) * cksum_skip;
 	}
 
-	// Compute file stats
-	if (cksum_skip == 1) {
-	    for (int i = 0; i <= buf_size - cksum_size; i++) {
-		fstats.update(hash(test.step(buf + i), s_bits, s_mask), buf + i);
-	    }
-	} else {
-	    ptr = buf + last_offset;
-	    end = buf + stop;
+	// Compute file stats once.
+	if (fstats.unique_values == 0) {
+	    if (cksum_skip == 1) {
+		for (int i = 0; i <= buf_size - cksum_size; i++) {
+		    fstats.update(hash(test.step(buf + i), s_bits, s_mask), buf + i);
+		}
+	    } else {
+		ptr = buf + last_offset;
+		end = buf + stop;
 		
-	    for (; ptr != end; ptr -= cksum_skip) {
-		fstats.update(hash(test.step(ptr), s_bits, s_mask), ptr);
+		for (; ptr != end; ptr -= cksum_skip) {
+		    fstats.update(hash(test.step(ptr), s_bits, s_mask), ptr);
+		}
 	    }
+	    fstats.freeze();
 	}
-	fstats.freeze();
 
-	start_test = get_millisecs_now();
+	long start_test = get_millisecs_now();
 
 	if (cksum_skip != 1) {
 	    new_table(n_steps);
 
-	    for (int i = 0; i < iters; i++) {
+	    for (int i = 0; i < test_iters; i++) {
 		ptr = buf + last_offset;
 		end = buf + stop;
 
@@ -400,7 +522,7 @@ struct test_result : public test_result_base {
 
 	    new_table(n_incrs);
 
-	    for (int i = 0; i < iters; i++) {
+	    for (int i = 0; i < test_iters; i++) {
 		ptr = buf;
 		end = buf + stop;
 
@@ -418,7 +540,8 @@ struct test_result : public test_result_base {
 	    summarize_table();
 	}
 
-	end_test = get_millisecs_now();
+	accum_iters += test_iters;
+	accum_millis += get_millisecs_now() - start_test;
     }
 };
 
@@ -433,41 +556,52 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-#define TEST(T,Z,S,P,H) test_result<T,Z,S,P,H<T> > \
-      _ ## T ## Z ## S ## P ## H (#T "_" #Z "_" #S "_" #P "_" #H)
+#define TEST(T,Z,S,P,H,C) test_result<T,Z,S,P,H<T>,C> \
+      _ ## T ## _ ## Z ## _ ## S ## _ ## P ## _ ## H ## _ ## C \
+      (#T "_" #Z "_" #S "_" #P "_" #H "_" #C)
 
-  TEST(uint32_t, 4, 1, no_permute, both);
-  TEST(uint32_t, 4, 2, no_permute, both);
-  TEST(uint32_t, 4, 3, no_permute, both);
-  TEST(uint32_t, 4, 4, no_permute, both);
+#define TESTS(SKIP) \
+  TEST(uint32_t, 3, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 3, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 5, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 5, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 8, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 8, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 11, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 11, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 13, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 13, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 15, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 15, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 16, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 16, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 21, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 21, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 34, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 34, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 55, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 55, SKIP, plain, hhash, 1); \
+  TEST(uint32_t, 89, SKIP, plain, hhash, 0); \
+  TEST(uint32_t, 89, SKIP, plain, hhash, 1)
 
-  TEST(uint32_t, 7, 15, no_permute, both);
-  TEST(uint32_t, 7, 55, no_permute, both);
-
-  TEST(uint32_t, 9, 1, no_permute, both);
-  TEST(uint32_t, 9, 2, no_permute, both);
-  TEST(uint32_t, 9, 3, no_permute, both);
-  TEST(uint32_t, 9, 4, no_permute, both);
-  TEST(uint32_t, 9, 5, no_permute, both);
-  TEST(uint32_t, 9, 6, no_permute, both);
-  TEST(uint32_t, 9, 7, no_permute, both);
-  TEST(uint32_t, 9, 8, no_permute, both);
-  TEST(uint32_t, 9, 15, no_permute, both);
-  TEST(uint32_t, 9, 26, no_permute, both);
-  TEST(uint32_t, 9, 55, no_permute, both);
-
-  TEST(uint32_t, 10, 14, no_permute, both);
-  TEST(uint32_t, 10, 25, no_permute, both);
-  TEST(uint32_t, 10, 54, no_permute, both);
-
-  TEST(uint32_t, 11, 13, no_permute, both);
-  TEST(uint32_t, 11, 24, no_permute, both);
-  TEST(uint32_t, 11, 53, no_permute, both);
-
-  TEST(uint32_t, 16, 16, no_permute, both);
-  TEST(uint32_t, 16, 31, no_permute, both);
-  TEST(uint32_t, 16, 32, no_permute, both);
-  TEST(uint32_t, 16, 48, no_permute, both);
+  TESTS(1); // *
+  TESTS(2); // *
+  TESTS(3); // *
+  TESTS(5); // *
+  TESTS(8); // *
+  TESTS(9);
+  TESTS(11);
+  TESTS(13); // *
+  TESTS(15);
+  TESTS(16);
+  TESTS(21); // *
+  TESTS(34); // *
+  TESTS(55); // *
+  TESTS(89); // *
 
   for (i = 1; i < argc; i++) {
     if ((ret = read_whole_file(argv[i],
@@ -476,19 +610,58 @@ int main(int argc, char** argv) {
       return 1;
     }
 
-    int target = 100 << 20;
-    int iters = (target / buf_len) + 1;
+    fprintf(stderr, "file %s is %u bytes\n",
+	    argv[i], buf_len);
 
-    fprintf(stderr, "file %s is %u bytes %u iters\n",
-	    argv[i], buf_len, iters);
+    double min_time = -1.0;
+    double min_uniqueness = 0.0;
 
-    for (list<test_result_base*>::iterator i = all_tests.begin();
+    for (vector<test_result_base*>::iterator i = all_tests.begin();
 	 i != all_tests.end(); ++i) {
-	(*i)->reset();
-	(*i)->get(buf, buf_len, iters);
-	(*i)->print();
+	test_result_base *test = *i;
+	test->reset();
+
+	int iters = 100;
+	long start_test = get_millisecs_now();
+
+	do {
+	    test->get(buf, buf_len, iters);
+	    iters *= 3;
+	    iters /= 2;
+	} while (get_millisecs_now() - start_test < 2000);
+
+	test->stat();
+
+	if (min_time < 0.0) {
+	    min_uniqueness = test->uniqueness();
+	    min_time = test->time();
+	}
+
+	if (min_time > test->time()) {
+	    min_time = test->time();
+	}
+
+	if (min_uniqueness > test->uniqueness()) {
+	    min_uniqueness = test->uniqueness();
+	}
+
+	test->print();
     }
 
+    for (vector<test_result_base*>::iterator i = all_tests.begin();
+	 i != all_tests.end(); ++i) {
+	test_result_base *test = *i;
+	test->set_score(min_uniqueness, min_time);
+    }	
+
+    sort(all_tests.begin(), all_tests.end(), compare_h());
+    
+    for (vector<test_result_base*>::iterator i = all_tests.begin();
+	 i != all_tests.end(); ++i) {
+	test_result_base *test = *i;
+	test->print_accum();
+    }	
+    
     free(buf);
     buf = NULL;
   }
