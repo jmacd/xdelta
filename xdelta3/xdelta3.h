@@ -119,6 +119,9 @@ typedef ULONGLONG      uint64_t;
 #define XD3_USE_LARGEFILE64 1
 #endif
 
+/* TODO: note that SIZEOF_USIZE_T is never set to 8, although it should be for
+ * a 64bit platform.  OTOH, may be that using 32bits is appropriate even on a
+ * 64bit platform because we allocate large arrays of these values. */
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
 typedef uint64_t xoff_t;

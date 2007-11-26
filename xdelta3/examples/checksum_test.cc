@@ -48,12 +48,6 @@ struct plain {
     }
 };
 
-struct permute {
-    int operator()(const uint8_t &c) {
-	return __single_hash[c];
-    }
-};
-
 template <typename Word>
 struct hhash {  // take "h" of the high-bits as a hash value for this
 		// checksum, which are the most "distant" in terms of the
@@ -152,6 +146,34 @@ struct rabin_karp {
     Word  incr_state;
 };
 
+MEMBER
+struct adler32_cksum {
+    typedef Word word_type;
+    typedef Permute permute_type;
+    typedef Hash hash_type;
+
+    enum { cksum_size = CksumSize,
+	   cksum_skip = CksumSkip, 
+	   compaction = Compaction,
+    };
+
+    Word step(const uint8_t *ptr) {
+	return xd3_lcksum (ptr, cksum_size);
+    }
+
+    Word state0(const uint8_t *ptr) {
+	incr_state = step(ptr);
+	return incr_state;
+    }
+
+    Word incr(const uint8_t *ptr) {
+	LARGE_CKSUM_UPDATE(incr_state, ptr - 1, cksum_size);
+	return incr_state;
+    }
+
+    Word  incr_state;
+};
+
 // TESTS
 
 template <typename Word>
@@ -222,12 +244,15 @@ struct test_result_base {
     }
     virtual void reset() = 0;
     virtual void print() = 0;
-    virtual void print_accum() = 0;
     virtual void get(const uint8_t* buf, const int buf_size, int iters) = 0;
     virtual void stat() = 0;
     virtual int count() = 0;
     virtual int dups() = 0;
     virtual double uniqueness() = 0;
+    virtual double fullness() = 0;
+    virtual double collisions() = 0;
+    virtual double coverage() = 0;
+    virtual double compression() = 0;
     virtual double time() = 0;
     virtual double score() = 0;
     virtual void set_score(double min_dups_frac, double min_time) = 0;
@@ -345,6 +370,18 @@ struct test_result : public test_result_base {
 	return (double) h_buckets_full / (1 << h_bits);
     }
 
+    double collisions() {
+	return (double) colls() / fstats.unique;
+    }
+
+    double coverage() {
+	return (double) h_buckets_full / uniqueness() / count();
+    }
+
+    double compression() {
+	return 1.0 - coverage();
+    }
+
     double time() {
 	return (double) accum_millis / accum_iters;
     }
@@ -353,8 +390,9 @@ struct test_result : public test_result_base {
 	return h_score;
     }
 
-    void set_score(double min_uniqueness, double min_time) {
-	h_score = time();
+    void set_score(double min_compression, double min_time) {
+	h_score = (compression() - 0.99 * min_compression)
+	        * (time() - 0.99 * min_time);
     }
 
     double total_time() {
@@ -381,29 +419,21 @@ struct test_result : public test_result_base {
 	accum_size += test_size;
     }
 
-    void print_accum() {
-	printf("%s: (%u#%u) count %u dups %0.2f%% %.4f MB/s score %0.6f\n",
-	       test_name,
-	       cksum_size,
-	       cksum_skip,
-	       total_count(),
-	       100.0 * total_dups() / total_count(),
-	       0.001 * accum_size / time(),
-	       h_score);
-    }
-
     void print() {
 	if (fstats.count != count()) {
 	    fprintf(stderr, "internal error: %d != %d\n", fstats.count, count());
 	    abort();
 	}
-	printf("%s: (%u#%u) count %u uniq %0.2f%% full %0.4f%% of 1<<%d @ %.4f MB/s %u iters\n",
+	printf("%s: (%u#%u) count %u uniq %0.2f%% full %u (%0.4f%% coll %0.4f%%) covers %0.2f%% w/ 2^%d @ %.4f MB/s %u iters\n",
 	       test_name,
 	       cksum_size,
 	       cksum_skip,
 	       count(),
 	       100.0 * uniqueness(),
+	       h_buckets_full,
 	       100.0 * fullness(),
+	       100.0 * collisions(),
+	       100.0 * coverage(),
 	       h_bits,
 	       0.001 * accum_iters * test_size / accum_millis,
 	       accum_iters);
@@ -457,6 +487,7 @@ struct test_result : public test_result_base {
 
     void get(const uint8_t* buf, const int buf_size, int test_iters) {
 	rabin_karp<SELF> test;
+	//adler32_cksum<SELF> test;
 	hash_type hash;
 	const uint8_t *ptr;
 	const uint8_t *end;
@@ -545,6 +576,17 @@ struct test_result : public test_result_base {
     }
 };
 
+template <typename Word>
+void print_array(const char *tname) {
+    printf("static const %s hash_multiplier[64] = {\n", tname);
+    Word p = 1;
+    for (int i = 0; i < 64; i++) {
+	printf("  %uU,\n", p);
+	p *= good_word<Word>();
+    }
+    printf("};\n", tname);
+}
+
 int main(int argc, char** argv) {
   int i;
   uint8_t *buf = NULL;
@@ -556,21 +598,42 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  //print_array<uint32_t>("uint32_t");
+
 #define TEST(T,Z,S,P,H,C) test_result<T,Z,S,P,H<T>,C> \
       _ ## T ## _ ## Z ## _ ## S ## _ ## P ## _ ## H ## _ ## C \
       (#T "_" #Z "_" #S "_" #P "_" #H "_" #C)
 
+#if 0
+
+  TEST(uint32_t, 4, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 2); /* x */ \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 3); /* x */ \
+
+#endif
+
 #define TESTS(SKIP) \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 0); /* x */ \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 2); /* x */ \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 3)
+  
+#define TESTS_ALL(SKIP) \
   TEST(uint32_t, 3, SKIP, plain, hhash, 0); \
   TEST(uint32_t, 3, SKIP, plain, hhash, 1); \
   TEST(uint32_t, 4, SKIP, plain, hhash, 0); /* x */ \
   TEST(uint32_t, 4, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 2); /* x */ \
+  TEST(uint32_t, 4, SKIP, plain, hhash, 3); /* x */ \
   TEST(uint32_t, 5, SKIP, plain, hhash, 0); \
   TEST(uint32_t, 5, SKIP, plain, hhash, 1); \
   TEST(uint32_t, 8, SKIP, plain, hhash, 0); \
   TEST(uint32_t, 8, SKIP, plain, hhash, 1); \
   TEST(uint32_t, 9, SKIP, plain, hhash, 0); /* x */ \
   TEST(uint32_t, 9, SKIP, plain, hhash, 1); /* x */ \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 2); /* x */ \
+  TEST(uint32_t, 9, SKIP, plain, hhash, 3); /* x */ \
   TEST(uint32_t, 11, SKIP, plain, hhash, 0); /* x */ \
   TEST(uint32_t, 11, SKIP, plain, hhash, 1); /* x */ \
   TEST(uint32_t, 13, SKIP, plain, hhash, 0); \
@@ -584,24 +647,22 @@ int main(int argc, char** argv) {
   TEST(uint32_t, 34, SKIP, plain, hhash, 0); \
   TEST(uint32_t, 34, SKIP, plain, hhash, 1); \
   TEST(uint32_t, 55, SKIP, plain, hhash, 0); \
-  TEST(uint32_t, 55, SKIP, plain, hhash, 1); \
-  TEST(uint32_t, 89, SKIP, plain, hhash, 0); \
-  TEST(uint32_t, 89, SKIP, plain, hhash, 1)
+  TEST(uint32_t, 55, SKIP, plain, hhash, 1)
 
   TESTS(1); // *
-  TESTS(2); // *
-  TESTS(3); // *
-  TESTS(5); // *
-  TESTS(8); // *
-  TESTS(9);
-  TESTS(11);
-  TESTS(13); // *
+//   TESTS(2); // *
+//   TESTS(3); // *
+//   TESTS(5); // *
+//   TESTS(8); // *
+//   TESTS(9);
+//   TESTS(11);
+//   TESTS(13); // *
   TESTS(15);
-  TESTS(16);
-  TESTS(21); // *
-  TESTS(34); // *
-  TESTS(55); // *
-  TESTS(89); // *
+//   TESTS(16);
+//   TESTS(21); // *
+//   TESTS(34); // *
+//   TESTS(55); // *
+//   TESTS(89); // *
 
   for (i = 1; i < argc; i++) {
     if ((ret = read_whole_file(argv[i],
@@ -614,7 +675,7 @@ int main(int argc, char** argv) {
 	    argv[i], buf_len);
 
     double min_time = -1.0;
-    double min_uniqueness = 0.0;
+    double min_compression = 0.0;
 
     for (vector<test_result_base*>::iterator i = all_tests.begin();
 	 i != all_tests.end(); ++i) {
@@ -633,7 +694,7 @@ int main(int argc, char** argv) {
 	test->stat();
 
 	if (min_time < 0.0) {
-	    min_uniqueness = test->uniqueness();
+	    min_compression = test->compression();
 	    min_time = test->time();
 	}
 
@@ -641,26 +702,26 @@ int main(int argc, char** argv) {
 	    min_time = test->time();
 	}
 
-	if (min_uniqueness > test->uniqueness()) {
-	    min_uniqueness = test->uniqueness();
+	if (min_compression > test->compression()) {
+	    min_compression = test->compression();
 	}
 
 	test->print();
     }
 
-    for (vector<test_result_base*>::iterator i = all_tests.begin();
-	 i != all_tests.end(); ++i) {
-	test_result_base *test = *i;
-	test->set_score(min_uniqueness, min_time);
-    }	
+//     for (vector<test_result_base*>::iterator i = all_tests.begin();
+// 	 i != all_tests.end(); ++i) {
+// 	test_result_base *test = *i;
+// 	test->set_score(min_compression, min_time);
+//     }	
 
-    sort(all_tests.begin(), all_tests.end(), compare_h());
+//     sort(all_tests.begin(), all_tests.end(), compare_h());
     
-    for (vector<test_result_base*>::iterator i = all_tests.begin();
-	 i != all_tests.end(); ++i) {
-	test_result_base *test = *i;
-	test->print_accum();
-    }	
+//     for (vector<test_result_base*>::iterator i = all_tests.begin();
+// 	 i != all_tests.end(); ++i) {
+// 	test_result_base *test = *i;
+// 	test->print();
+//     }	
     
     free(buf);
     buf = NULL;

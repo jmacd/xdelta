@@ -41,8 +41,7 @@
   else { run_c = (c); run_l = 1; } } while (0)
 
 /* Update the checksum state. */
-#define OLD_LARGE_CKSUM 1
-#if OLD_LARGE_CKSUM
+#if ADLER_LARGE_CKSUM
 #define LARGE_CKSUM_UPDATE(cksum,base,look)                              \
   do {                                                                   \
     uint32_t old_c = PERMUTE((base)[0]);                                    \
@@ -52,16 +51,41 @@
     (cksum) = (high << 16) | low;                                        \
   } while (0)
 #else
-#define LARGE_CKSUM_UPDATE(cksum,base,look)                              \
+
+// This is a table of powers of 1597334677 (a good MLCG multiplier for 32-bit
+// modular arithmetic).  TODO: add citation for "linear congruential
+// generators of different sizes and good lattice structure"
+static const uint32_t hash_multiplier = 1597334677U;
+static const uint32_t hash_multiplier_powers[64] = {
+  1U,          1597334677U, 1664532153U, 1152009645U, 
+  438510001U,  2554380293U, 2226829033U, 2237430173U, 
+  785718369U,  1614047349U, 2189918233U, 3004453517U, 
+  2504269841U, 1873956325U, 3298675273U, 184041597U, 
+  412048577U,  513892437U,  1512523129U, 420197229U, 
+  3195470449U, 3365769157U, 782672297U,  1830755165U, 
+  3607904545U, 2926038069U, 2592473U,    2764040269U, 
+  2237745361U, 1146488229U, 3329146121U, 975735357U, 
+  4047063425U, 3720555541U, 992599097U,  2284876077U, 
+  1371042609U, 2776575877U, 857709673U,  1933315357U, 
+  18085345U,   3544121333U, 2019536281U, 657247757U, 
+  3376546193U, 235703653U,  3581067209U, 1515267069U, 
+  2578040385U, 3954624469U, 25854713U,   2236907245U, 
+  3587404785U, 2101452613U, 498181929U,  2150584029U, 
+  1830304417U, 3629515701U, 1929108569U, 4095149005U, 
+  3948038737U, 2377245989U, 565564041U,  309202365U, 
+};
+
+#define LARGE_CKSUM_UPDATE(cksum,base,look) \
   do { \
-    // linear congruential generators of different
-    // sizes and good lattice structure
-  } while (1)
+    cksum = (cksum * hash_multiplier) - \
+      (hash_multiplier_powers[look] * PERMUTE(base[0])) + \
+      PERMUTE(base[look]); \
+  } while (0)
 #endif
 
-/* Multiply and add hash function */
 #if ARITH_SMALL_CKSUM
-#define SMALL_CKSUM_UPDATE(cksum,base,look) (cksum) = ((*(unsigned long*)(base+1)) * 71143)
+#define SMALL_CKSUM_UPDATE(cksum,base,look) \
+  (cksum) = ((*(uint32_t*)(base+1)) * 1597334677U)
 #else
 #define SMALL_CKSUM_UPDATE LARGE_CKSUM_UPDATE
 #endif
@@ -118,40 +142,17 @@ static const uint16_t __single_hash[256] =
  Ctable stuff
  ***********************************************************************/
 
-#if HASH_PRIME
-static const usize_t __primes[] =
-{
-  11, 19, 37, 73, 109,
-  163, 251, 367, 557, 823,
-  1237, 1861, 2777, 4177, 6247,
-  9371, 14057, 21089, 31627, 47431,
-  71143, 106721, 160073, 240101, 360163,
-  540217, 810343, 1215497, 1823231, 2734867,
-  4102283, 6153409, 9230113, 13845163, 20767711,
-  31151543, 46727321, 70090921, 105136301, 157704401,
-  236556601, 354834919, 532252367, 798378509, 1197567719,
-  1796351503
-};
-
-static const usize_t __nprimes = SIZEOF_ARRAY (__primes);
-#endif
-
 static inline usize_t
 xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum)
 {
-#if HASH_PRIME
-  /* If the table is prime compute the modulus. */
-  return (cksum % cfg->size);
-#else
-  /* If the table is power-of-two compute the mask.*/
   return (cksum ^ (cksum >> cfg->shift)) & cfg->mask;
-#endif
 }
 
 /***********************************************************************
  Cksum function
  ***********************************************************************/
 
+#if ADLER_LARGE_CKSUM
 static inline uint32_t
 xd3_lcksum (const uint8_t *seg, const int ln)
 {
@@ -167,6 +168,18 @@ xd3_lcksum (const uint8_t *seg, const int ln)
 
   return ((high & 0xffff) << 16) | (low & 0xffff);
 }
+#else
+static inline uint32_t
+xd3_lcksum (const uint8_t *seg, const int ln)
+{
+  int i, j;
+  uint32_t h = 0;
+  for (i = 0, j = ln - 1; i < ln; ++i, --j) {
+    h += PERMUTE(seg[i]) * hash_multiplier_powers[j];
+  }
+  return h;
+}
+#endif
 
 #if ARITH_SMALL_CKSUM
 static inline usize_t
@@ -182,7 +195,6 @@ xd3_scksum (const uint8_t *seg, const int ln)
 #endif
 
 #if XD3_ENCODER
-#if !HASH_PRIME
 static usize_t
 xd3_size_log2 (usize_t slots)
 {
@@ -193,7 +205,8 @@ xd3_size_log2 (usize_t slots)
     {
       if (slots < (1U << i))
 	{
-	  bits = i-1;
+	  bits = i-1; /* TODO: this is compaction=1 in checksum_test.cc and
+		       * should not be fixed at 1. */
 	  break;
 	}
     }
@@ -201,37 +214,18 @@ xd3_size_log2 (usize_t slots)
   return bits;
 }
 #endif
-#endif
 
 static void
 xd3_size_hashtable (xd3_stream    *stream,
 		    usize_t        slots,
 		    xd3_hash_cfg  *cfg)
 {
-  /* initialize ctable: the number of hash buckets is computed from the table
-   * of primes or the nearest power-of-two, in both cases rounding down in
-   * favor of using less memory. */
-
-#if HASH_PRIME
-  usize_t i;
-
-  cfg->size = __primes[__nprimes-1];
-
-  for (i = 1; i < __nprimes; i += 1)
-    {
-      if (slots < __primes[i])
-	{
-	  cfg->size = __primes[i-1];
-	  break;
-	}
-    }
-#else
   int bits = xd3_size_log2 (slots);
 
+  /* TODO: there's a 32-bit assumption here */
   cfg->size  = (1 << bits);
   cfg->mask  = (cfg->size - 1);
-  cfg->shift = min (32 - bits, 16);
-#endif
+  cfg->shift = 32 - bits;
 }
 
 #endif

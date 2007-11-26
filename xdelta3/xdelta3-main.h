@@ -375,9 +375,9 @@ main_config (void)
   DP(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
   DP(RINT "sizeof(int)=%d\n", sizeof(int));
   DP(RINT "sizeof(uint32_t)=%d\n", sizeof(uint32_t));
-  DP(RINT "sizeof(uint64_t)=%d\n", sizeof(uint64_t));  
+  DP(RINT "sizeof(uint64_t)=%d\n", sizeof(uint64_t));
   DP(RINT "sizeof(usize_t)=%d\n", sizeof(usize_t));
-  DP(RINT "sizeof(xoff_t)=%d\n", sizeof(xoff_t));  
+  DP(RINT "sizeof(xoff_t)=%d\n", sizeof(xoff_t));
 
   return EXIT_SUCCESS;
 }

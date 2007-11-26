@@ -337,7 +337,7 @@ typedef enum {
 
 typedef enum {
   SEC_NOFLAGS     = 0,
-  SEC_COUNT_FREQS = (1 << 0), /* OPT: Not implemented: Could eliminate first pass of Huffman... */
+  SEC_COUNT_FREQS = (1 << 0), /* Note: Not implemented: eliminate 1st Huffman pass. */
 } xd3_secondary_flags;
 
 typedef enum {
@@ -378,34 +378,40 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define CODE_TABLE_STRING_SIZE (6 * 256) /* Should fit a code table string. */
 #define CODE_TABLE_VCDIFF_SIZE (6 * 256) /* Should fit a compressed code table string */
 
-#define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK) /* True if any secondary compressor is used. */
+#define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK)
 
-#define ALPHABET_SIZE      256  /* Used in test code--size of the secondary compressor alphabet. */
+#define ALPHABET_SIZE      256  /* Used in test code--size of the secondary
+				 * compressor alphabet. */
 
-#define HASH_PRIME         0    /* Old hashing experiments */
-#define HASH_PERMUTE       1
-#define ARITH_SMALL_CKSUM  1
+#define HASH_PERMUTE       1    /* The input is permuted by random nums */
+#define ARITH_SMALL_CKSUM  1    /* Simple small checksum function -- faster than RK */
+#define ADLER_LARGE_CKSUM  1    /* Adler checksum vs. RK checksum */
 
-#define HASH_CKOFFSET      1U   /* Table entries distinguish "no-entry" from offset 0 using this offset. */
+#define HASH_CKOFFSET      1U   /* Table entries distinguish "no-entry" from
+				 * offset 0 using this offset. */
 
 #define MIN_SMALL_LOOK    2U    /* Match-optimization stuff. */
 #define MIN_LARGE_LOOK    2U
 #define MIN_MATCH_OFFSET  1U
-#define MAX_MATCH_SPLIT   18U   /* VCDIFF code table: 18 is the default limit for direct-coded ADD sizes */
+#define MAX_MATCH_SPLIT   18U   /* VCDIFF code table: 18 is the default limit
+				 * for direct-coded ADD sizes */
 
-#define LEAST_MATCH_INCR  0   /* The least number of bytes an overlapping match must beat
-			       * the preceding match by.  This is a bias for the lazy
-			       * match optimization.  A non-zero value means that an
-			       * adjacent match has to be better by more than the step
+#define LEAST_MATCH_INCR  0   /* The least number of bytes an overlapping
+			       * match must beat the preceding match by.  This
+			       * is a bias for the lazy match optimization.  A
+			       * non-zero value means that an adjacent match
+			       * has to be better by more than the step
 			       * between them.  0. */
 
 #define MIN_MATCH         4U  /* VCDIFF code table: MIN_MATCH=4 */
 #define MIN_ADD           1U  /* 1 */
-#define MIN_RUN           8U  /* The shortest run, if it is shorter than this an immediate
-			       * add/copy will be just as good.  ADD1/COPY6 = 1I+1D+1A bytes,
-			       * RUN18 = 1I+1D+1A. */
+#define MIN_RUN           8U  /* The shortest run, if it is shorter than this
+			       * an immediate add/copy will be just as good.
+			       * ADD1/COPY6 = 1I+1D+1A bytes, RUN18 =
+			       * 1I+1D+1A. */
 
-#define MAX_MODES         9  /* Maximum number of nodes used for compression--does not limit decompression. */
+#define MAX_MODES         9  /* Maximum number of nodes used for
+			      * compression--does not limit decompression. */
 
 #define ENC_SECTS         4  /* Number of separate output sections. */
 
@@ -5067,12 +5073,6 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 
 	  IF_DEBUG (xd3_verify_large_state (stream, inp, lcksum));
 
-	  /* Note: To handle large checksum duplicates, this code
-	   * should be rearranged to resemble the small_match case
-	   * more.  But how much of the code can be truly shared?  The
-	   * main difference is the need for xd3_source_extend_match
-	   * to work outside of xd3_string_match, in the case where
-	   * inputs are identical. */
 	  if (stream->large_table[linx] != 0)
 	    {
 	      /* the match_setup will fail if the source window has
