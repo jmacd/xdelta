@@ -19,7 +19,7 @@
 #ifndef _XDELTA3_SECOND_H_
 #define _XDELTA3_SECOND_H_
 
-static inline void xd3_bit_state_encode_init  (bit_state       *bits)
+static inline void xd3_bit_state_encode_init (bit_state *bits)
 {
   bits->cur_byte = 0;
   bits->cur_mask = 1;
@@ -271,8 +271,8 @@ xd3_encode_secondary (xd3_stream      *stream,
   if (comp_size < (orig_size - SECONDARY_MIN_SAVINGS))
     {
       IF_DEBUG1(DP(RINT "secondary saved %u bytes: %u -> %u (%0.2f%%)\n",
-			 orig_size - comp_size, orig_size, comp_size,
-			 (double) comp_size / (double) orig_size));
+		   orig_size - comp_size, orig_size, comp_size,
+		   100.0 * (double) comp_size / (double) orig_size));
 
       xd3_free_output (stream, *head);
 

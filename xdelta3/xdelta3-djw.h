@@ -666,17 +666,27 @@ djw_encode_prefix (xd3_stream   *stream,
 
   /* Compute number of extra codes beyond basic ones for this template. */
   num_to_encode = DJW_TOTAL_CODES;
-  while (num_to_encode > DJW_EXTRA_12OFFSET && clclen[num_to_encode-1] == 0) { num_to_encode -= 1; }
+  while (num_to_encode > DJW_EXTRA_12OFFSET && clclen[num_to_encode-1] == 0)
+    {
+      num_to_encode -= 1;
+    }
   XD3_ASSERT (num_to_encode - DJW_EXTRA_12OFFSET < (1 << DJW_EXTRA_CODE_BITS));
 
   /* Encode: # of extra codes */
   if ((ret = xd3_encode_bits (stream, output, bstate, DJW_EXTRA_CODE_BITS,
-			      num_to_encode - DJW_EXTRA_12OFFSET))) { return ret; }
+			      num_to_encode - DJW_EXTRA_12OFFSET)))
+    {
+      return ret;
+    }
 
   /* Encode: MTF code lengths */
   for (i = 0; i < num_to_encode; i += 1)
     {
-      if ((ret = xd3_encode_bits (stream, output, bstate, DJW_CLCLEN_BITS, clclen[i]))) { return ret; }
+      if ((ret = xd3_encode_bits (stream, output, bstate,
+				  DJW_CLCLEN_BITS, clclen[i])))
+	{
+	  return ret;
+	}
     }
 
   /* Encode: CLEN code lengths */
@@ -686,7 +696,10 @@ djw_encode_prefix (xd3_stream   *stream,
       usize_t bits    = clclen[mtf_sym];
       usize_t code    = clcode[mtf_sym];
 
-      if ((ret = xd3_encode_bits (stream, output, bstate, bits, code))) { return ret; }
+      if ((ret = xd3_encode_bits (stream, output, bstate, bits, code)))
+	{
+	  return ret;
+	}
     }
 
   return 0;
@@ -821,7 +834,7 @@ xd3_encode_huff (xd3_stream   *stream,
   usize_t     groups, sector_size;
   bit_state   bstate = BIT_STATE_ENCODE_INIT;
   xd3_output *in;
-  int         encode_bits;
+  int         output_bits;
   usize_t     input_bits;
   usize_t     input_bytes;
   usize_t     initial_offset = output->next;
@@ -842,13 +855,15 @@ xd3_encode_huff (xd3_stream   *stream,
   if (0)
     {
     regroup:
-      /* Sometimes we dynamically decide there are too many groups.  Arrive here. */
+      /* Sometimes we dynamically decide there are too many groups.  Arrive
+       * here. */
       output->next = initial_offset;
       xd3_bit_state_encode_init (& bstate);
     }
 
   /* Encode: # of groups (3 bits) */
-  if ((ret = xd3_encode_bits (stream, & output, & bstate, DJW_GROUP_BITS, groups-1))) { goto failure; }
+  if ((ret = xd3_encode_bits (stream, & output, & bstate,
+			      DJW_GROUP_BITS, groups-1))) { goto failure; }
 
   if (groups == 1)
     {
@@ -858,21 +873,30 @@ xd3_encode_huff (xd3_stream   *stream,
       uint8_t    prefix_mtfsym[ALPHABET_SIZE];
       djw_prefix prefix;
 
-      encode_bits =
+      output_bits =
 	djw_build_prefix (real_freq, clen, ALPHABET_SIZE, DJW_MAX_CODELEN);
       djw_build_codes (code, clen, ALPHABET_SIZE, DJW_MAX_CODELEN);
 
-      if (encode_bits + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient) { goto nosecond; }
+      if (output_bits + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient)
+	{
+	  goto nosecond;
+	}
 
       /* Encode: prefix */
       prefix.mtfsym = prefix_mtfsym;
       prefix.symbol = clen;
       prefix.scount = ALPHABET_SIZE;
 
-      if ((ret = djw_encode_prefix (stream, & output, & bstate, & prefix))) { goto failure; }
+      if ((ret = djw_encode_prefix (stream, & output, & bstate, & prefix)))
+	{
+	  goto failure;
+	}
 
-      if (encode_bits + (8 * output->next) + EFFICIENCY_BITS >=
-	  input_bits && ! cfg->inefficient) { goto nosecond; }
+      if (output_bits + (8 * output->next) + EFFICIENCY_BITS >=
+	  input_bits && ! cfg->inefficient)
+	{
+	  goto nosecond;
+	}
 
       /* Encode: data */
       for (in = input; in; in = in->next_page)
@@ -885,14 +909,18 @@ xd3_encode_huff (xd3_stream   *stream,
 	      usize_t sym  = *p++;
 	      usize_t bits = clen[sym];
 
-	      IF_DEBUG (encode_bits -= bits);
+	      IF_DEBUG (output_bits -= bits);
 
-	      if ((ret = xd3_encode_bits (stream, & output, & bstate, bits, code[sym]))) { goto failure; }
+	      if ((ret = xd3_encode_bits (stream, & output,
+					  & bstate, bits, code[sym])))
+		{
+		  goto failure;
+		}
 	    }
 	  while (p < p_max);
 	}
 
-      XD3_ASSERT (encode_bits == 0);
+      XD3_ASSERT (output_bits == 0);
     }
   else
     {
@@ -916,17 +944,29 @@ xd3_encode_huff (xd3_stream   *stream,
 
       /* Encode: sector size (5 bits) */
       if ((ret = xd3_encode_bits (stream, & output, & bstate,
-				  DJW_SECTORSZ_BITS, (sector_size/DJW_SECTORSZ_MULT)-1))) { goto failure; }
+				  DJW_SECTORSZ_BITS,
+				  (sector_size/DJW_SECTORSZ_MULT)-1)))
+	{
+	  goto failure;
+	}
 
       /* Dynamic allocation. */
       if (gbest == NULL)
 	{
-	  if ((gbest = xd3_alloc (stream, gbest_max, 1)) == NULL) { ret = ENOMEM; goto failure; }
+	  if ((gbest = xd3_alloc (stream, gbest_max, 1)) == NULL)
+	    {
+	      ret = ENOMEM;
+	      goto failure;
+	    }
 	}
 
       if (gbest_mtf == NULL)
 	{
-	  if ((gbest_mtf = xd3_alloc (stream, gbest_max, 1)) == NULL) { ret = ENOMEM; goto failure; }
+	  if ((gbest_mtf = xd3_alloc (stream, gbest_max, 1)) == NULL)
+	    {
+	      ret = ENOMEM;
+	      goto failure;
+	    }
 	}
 
       /* OPT: Some of the inner loops can be optimized, as shown in bzip2 */
@@ -939,13 +979,14 @@ xd3_encode_huff (xd3_stream   *stream,
 
 	  IF_DEBUG1 (usize_t nz = 0);
 
-	  /* Due to the single-code granularity of this distribution, it may be that we
-	   * can't generate a distribution for each group.  In that case subtract one
-	   * group and try again.  If (inefficient), we're testing group behavior, so
-	   * don't mess things up. */
+	  /* Due to the single-code granularity of this distribution, it may
+	   * be that we can't generate a distribution for each group.  In that
+	   * case subtract one group and try again.  If (inefficient), we're
+	   * testing group behavior, so don't mess things up. */
 	  if (goal == 0 && !cfg->inefficient)
 	    {
-	      IF_DEBUG1 (DP(RINT "too many groups (%u), dropping one\n", groups));
+	      IF_DEBUG1 (DP(RINT "too many groups (%u), dropping one\n",
+			    groups));
 	      groups -= 1;
 	      goto regroup;
 	    }
@@ -958,8 +999,10 @@ xd3_encode_huff (xd3_stream   *stream,
 	      sum += real_freq[sym2++];
 	    }
 
-	  IF_DEBUG1(DP(RINT "group %u has symbols %u..%u (%u non-zero) (%u/%u = %.3f)\n",
-			     gp, sym1, sym2, nz, sum, input_bytes, sum / (double)input_bytes););
+	  IF_DEBUG1(DP(RINT "group %u has symbols %u..%u (%u non-zero) "
+		       "(%u/%u = %.3f)\n",
+		       gp, sym1, sym2, nz, sum,
+		       input_bytes, sum / (double)input_bytes););
 
 	  for (s = 0; s < ALPHABET_SIZE; s += 1)
 	    {
@@ -1040,7 +1083,7 @@ xd3_encode_huff (xd3_stream   *stream,
       XD3_ASSERT (gbest_no == gbest_max);
 
       /* Recompute code lengths. */
-      encode_bits = 0;
+      output_bits = 0;
       for (gp = 0; gp < groups; gp += 1)
 	{
 	  int i;
@@ -1049,11 +1092,12 @@ xd3_encode_huff (xd3_stream   *stream,
 
 	  memset (evolve_zero, 0, sizeof (evolve_zero));
 
-	  /* Cannot allow a zero clen when the real frequency is non-zero.  Note: this
-	   * means we are going to encode a fairly long code for these unused entries.  An
-	   * improvement would be to implement a NOTUSED code for when these are actually
-	   * zero, but this requires another data structure (evolve_zero) since we don't
-	   * know when evolve_freq[i] == 0...  Briefly tested, looked worse. */
+	  /* Cannot allow a zero clen when the real frequency is non-zero.
+	   * Note: this means we are going to encode a fairly long code for
+	   * these unused entries.  An improvement would be to implement a
+	   * NOTUSED code for when these are actually zero, but this requires
+	   * another data structure (evolve_zero) since we don't know when
+	   * evolve_freq[i] == 0...  Briefly tested, looked worse. */
 	  for (i = 0; i < ALPHABET_SIZE; i += 1)
 	    {
 	      if (evolve_freq[gp][i] == 0 && real_freq[i] != 0)
@@ -1064,46 +1108,53 @@ xd3_encode_huff (xd3_stream   *stream,
 		}
 	    }
 
-	  encode_bits += djw_build_prefix (evolve_freq[gp], evolve_clen[gp], ALPHABET_SIZE, DJW_MAX_CODELEN);
+	  output_bits += djw_build_prefix (evolve_freq[gp], evolve_clen[gp],
+					   ALPHABET_SIZE, DJW_MAX_CODELEN);
 
-	  /* The above faking of frequencies does not matter for the last iteration, but
-	   * we don't know when that is yet.  However, it also breaks the encode_bits
-	   * computation.  Necessary for accuracy, and for the (encode_bits==0) assert
-	   * after all bits are output. */
+	  /* The above faking of frequencies does not matter for the last
+	   * iteration, but we don't know when that is yet.  However, it also
+	   * breaks the output_bits computation.  Necessary for accuracy, and
+	   * for the (output_bits==0) assert after all bits are output. */
 	  if (any_zeros)
 	    {
-	      IF_DEBUG1 (usize_t save_total = encode_bits);
+	      IF_DEBUG1 (usize_t save_total = output_bits);
 
 	      for (i = 0; i < ALPHABET_SIZE; i += 1)
 		{
-		  if (evolve_zero[i]) { encode_bits -= evolve_clen[gp][i]; }
+		  if (evolve_zero[i]) { output_bits -= evolve_clen[gp][i]; }
 		}
 
-	      IF_DEBUG1 (DP(RINT "evolve_zero reduced %u bits in group %u\n", save_total - encode_bits, gp));
+	      IF_DEBUG1 (DP(RINT "evolve_zero reduced %u bits in group %u\n",
+			    save_total - output_bits, gp));
 	    }
 	}
 
       IF_DEBUG1(
-		DP(RINT "pass %u total bits: %u group uses: ", niter, encode_bits);
-		for (gp = 0; gp < groups; gp += 1) { DP(RINT "%u ", gcount[gp]); }
-		DP(RINT "\n"););
+	DP(RINT "pass %u total bits: %u group uses: ", niter, output_bits);
+	for (gp = 0; gp < groups; gp += 1) { DP(RINT "%u ", gcount[gp]); }
+	DP(RINT "\n");
+	);
 
-      /* End iteration.  (The following assertion proved invalid.) */
-      /*XD3_ASSERT (niter == 1 || best_bits >= encode_bits);*/
+      /* End iteration. */
 
-      IF_DEBUG1 (if (niter > 1 && best_bits < encode_bits) {
-	DP(RINT "iteration lost %u bits\n", encode_bits - best_bits); });
+      IF_DEBUG1 (if (niter > 1 && best_bits < output_bits) {
+	DP(RINT "iteration lost %u bits\n", output_bits - best_bits); });
 
-      if (niter == 1 || (niter < DJW_MAX_ITER && (best_bits - encode_bits) >= DJW_MIN_IMPROVEMENT))
+      if (niter == 1 || (niter < DJW_MAX_ITER &&
+			 (best_bits - output_bits) >= DJW_MIN_IMPROVEMENT))
 	{
-	  best_bits = encode_bits;
+	  best_bits = output_bits;
 	  goto repeat;
 	}
 
       /* Efficiency check. */
-      if (encode_bits + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient) { goto nosecond; }
+      if (output_bits + EFFICIENCY_BITS >= input_bits && ! cfg->inefficient)
+	{
+	  goto nosecond;
+	}
 
-      IF_DEBUG1 (DP(RINT "djw compression: %u -> %0.3f\n", input_bytes, encode_bits / 8.0));
+      IF_DEBUG1 (DP(RINT "djw compression: %u -> %0.3f\n",
+		    input_bytes, output_bits / 8.0));
 
       /* Encode: prefix */
       {
@@ -1117,7 +1168,10 @@ xd3_encode_huff (xd3_stream   *stream,
 	prefix.repcnt = prefix_repcnt;
 
 	djw_compute_multi_prefix (groups, evolve_clen, & prefix);
-	if ((ret = djw_encode_prefix (stream, & output, & bstate, & prefix))) { goto failure; }
+	if ((ret = djw_encode_prefix (stream, & output, & bstate, & prefix)))
+	  {
+	    goto failure;
+	  }
       }
 
       /* Encode: selector frequencies */
@@ -1139,7 +1193,10 @@ xd3_encode_huff (xd3_stream   *stream,
 	for (i = 0; i < groups+1; i += 1)
 	  {
 	    if ((ret = xd3_encode_bits (stream, & output, & bstate,
-					DJW_GBCLEN_BITS, gbest_clen[i]))) { goto failure; }
+					DJW_GBCLEN_BITS, gbest_clen[i])))
+	      {
+		goto failure;
+	      }
 	  }
 
 	for (i = 0; i < gbest_prefix.mcount; i += 1)
@@ -1151,7 +1208,10 @@ xd3_encode_huff (xd3_stream   *stream,
 	    XD3_ASSERT (gp_mtf < groups+1);
 
 	    if ((ret = xd3_encode_bits (stream, & output, & bstate,
-					gp_sel_bits, gp_sel_code))) { goto failure; }
+					gp_sel_bits, gp_sel_code)))
+	      {
+		goto failure;
+	      }
 
 	    IF_DEBUG (select_bits -= gp_sel_bits);
 	  }
@@ -1160,8 +1220,11 @@ xd3_encode_huff (xd3_stream   *stream,
       }
 
       /* Efficiency check. */
-      if (encode_bits + select_bits + (8 * output->next) +
-	  EFFICIENCY_BITS >= input_bits && ! cfg->inefficient) { goto nosecond; }
+      if (output_bits + select_bits + (8 * output->next) +
+	  EFFICIENCY_BITS >= input_bits && ! cfg->inefficient)
+	{
+	  goto nosecond;
+	}
 
       /* Encode: data */
       {
@@ -1171,7 +1234,8 @@ xd3_encode_huff (xd3_stream   *stream,
 	/* Build code tables for each group. */
 	for (gp = 0; gp < groups; gp += 1)
 	  {
-	    djw_build_codes (evolve_code[gp], evolve_clen[gp], ALPHABET_SIZE, DJW_MAX_CODELEN);
+	    djw_build_codes (evolve_code[gp], evolve_clen[gp],
+			     ALPHABET_SIZE, DJW_MAX_CODELEN);
 	  }
 
 	/* Now loop over the input. */
@@ -1196,9 +1260,13 @@ xd3_encode_huff (xd3_stream   *stream,
 		usize_t bits = gp_clens[sym];
 		usize_t code = gp_codes[sym];
 
-		IF_DEBUG (encode_bits -= bits);
+		IF_DEBUG (output_bits -= bits);
 
-		if ((ret = xd3_encode_bits (stream, & output, & bstate, bits, code))) { goto failure; }
+		if ((ret = xd3_encode_bits (stream, & output, & bstate,
+					    bits, code)))
+		  {
+		    goto failure;
+		  }
 
 		GP_PAGE ();
 	      }
@@ -1206,9 +1274,7 @@ xd3_encode_huff (xd3_stream   *stream,
 	while (in != NULL);
 
 	XD3_ASSERT (select_bits == 0);
-	XD3_ASSERT (encode_bits == 0);
-
-#undef evolve_clen
+	XD3_ASSERT (output_bits == 0);
       }
     }
 

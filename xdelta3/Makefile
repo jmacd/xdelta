@@ -2,17 +2,17 @@
 # Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
 
 SOURCES = xdelta3-cfgs.h \
-          xdelta3-decode.h \
-          xdelta3-djw.h \
-          xdelta3-fgk.h \
+	  xdelta3-decode.h \
+	  xdelta3-djw.h \
+	  xdelta3-fgk.h \
 	  xdelta3-hash.h \
-          xdelta3-list.h \
-          xdelta3-main.h \
-          xdelta3-python.h \
-          xdelta3-second.h \
-          xdelta3-test.h \
-          xdelta3.c \
-          xdelta3.h
+	  xdelta3-list.h \
+	  xdelta3-main.h \
+	  xdelta3-python.h \
+	  xdelta3-second.h \
+	  xdelta3-test.h \
+	  xdelta3.c \
+	  xdelta3.h
 
 TARGETS = xdelta3-debug \
 	  xdelta3 \
@@ -45,12 +45,12 @@ SWIGTGT = xdelta3module.dll
 PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
-        draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
+	draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
 	xdelta3-regtest.py xdelta3-test.py setup.py \
 	examples/Makefile examples/small_page_test.c \
 	examples/README examples/encode_decode_test.c \
 	examples/compare_test.c examples/speed_test.c \
-	examples/test.h examples/checksum_test.c \
+	examples/test.h examples/checksum_test.cc \
 	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi \
 	README readme.txt
 
@@ -58,12 +58,12 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DEXTERNAL_COMPRESSION=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
 	      -DGENERIC_ENCODE_TABLES=1 \
-              -DSECONDARY_DJW=1 \
+	      -DSECONDARY_DJW=1 \
 	      -DVCDIFF_TOOLS=1 \
-              -DSWIG_MODULE=1
+	      -DSWIG_MODULE=1
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0s
+REL=3.0t_pre0
 RELDIR = xdelta$(REL)
 
 all: xdelta3-debug xdelta3
@@ -109,38 +109,37 @@ wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
 
 xdelta3: $(SOURCES)
 	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3 \
-              -DXD3_DEBUG=0 \
-              -DXD3_USE_LARGEFILE64=1 \
-              -DREGRESSION_TEST=1 \
-              -DSECONDARY_DJW=1 \
-              -DSECONDARY_FGK=1 \
+	      -DGENERIC_ENCODE_TABLES=0 \
+	      -DREGRESSION_TEST=1 \
+	      -DSECONDARY_DJW=1 \
+	      -DSECONDARY_FGK=1 \
 	      -DUNALIGNED_OK=1 \
-              -DXD3_MAIN=1 \
-              -DXD3_POSIX=1
-
-xdelta3-32: $(SOURCES)
-	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3-32 \
-              -DXD3_DEBUG=1 \
-              -DXD3_USE_LARGEFILE64=0 \
-              -DREGRESSION_TEST=1 \
-              -DSECONDARY_DJW=1 \
-              -DSECONDARY_FGK=1 \
-              -DXD3_MAIN=1 \
-              -DXD3_POSIX=1
+	      -DXD3_DEBUG=0 \
+	      -DXD3_MAIN=1 \
+	      -DXD3_POSIX=1 \
+	      -DXD3_USE_LARGEFILE64=1
 
 xdelta3-debug: $(SOURCES)
-	$(CC) -g -Wall -Wshadow \
-		xdelta3.c -o xdelta3-debug \
+	$(CC) -g -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3-debug \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DREGRESSION_TEST=1 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-DUNALIGNED_OK=1 \
 		-DXD3_DEBUG=1 \
 		-DXD3_MAIN=1 \
 		-DXD3_STDIO=1 \
-		-DXD3_USE_LARGEFILE64=1 \
-		-DGENERIC_ENCODE_TABLES=1 \
-		-DREGRESSION_TEST=1 \
-	        -DUNALIGNED_OK=1 \
-		-DSECONDARY_DJW=1 \
-		-DSECONDARY_FGK=1 \
-		-lm
+		-DXD3_USE_LARGEFILE64=1
+
+xdelta3-32: $(SOURCES)
+	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3-32 \
+	      -DXD3_DEBUG=1 \
+	      -DXD3_USE_LARGEFILE64=0 \
+	      -DREGRESSION_TEST=1 \
+	      -DSECONDARY_DJW=1 \
+	      -DSECONDARY_FGK=1 \
+	      -DXD3_MAIN=1 \
+	      -DXD3_POSIX=1
 
 xdelta3-debug2: $(SOURCES)
 	$(CC) -g -Wall -Wshadow \
@@ -170,7 +169,7 @@ xdelta3.o: $(SOURCES)
 
 xdelta3_wrap.o: xdelta3_wrap.c
 	$(CC) $(SWIG_FLAGS) \
-              -DHAVE_CONFIG_H \
+	      -DHAVE_CONFIG_H \
 	      -I/usr/include/python2.5 \
 	      -I/usr/lib/python2.5/config \
 	      -fpic \

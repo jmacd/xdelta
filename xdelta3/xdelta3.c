@@ -332,12 +332,14 @@ typedef enum {
 
 typedef enum {
   VCD_DJW_ID    = 1,
-  VCD_FGK_ID    = 16, /* !!!Note: these are not a standard IANA-allocated ID!!! */
+  VCD_FGK_ID    = 16, /* Note: these are not standard IANA-allocated IDs! */
 } xd3_secondary_ids;
 
 typedef enum {
   SEC_NOFLAGS     = 0,
-  SEC_COUNT_FREQS = (1 << 0), /* Note: Not implemented: eliminate 1st Huffman pass. */
+
+  /* Note: SEC_COUNT_FREQS Not implemented (to eliminate 1st Huffman pass) */
+  SEC_COUNT_FREQS = (1 << 0),
 } xd3_secondary_flags;
 
 typedef enum {
@@ -561,12 +563,13 @@ static void xd3_verify_small_state (xd3_stream    *stream,
 #endif /* XD3_DEBUG */
 #endif /* XD3_ENCODER */
 
-static int         xd3_decode_allocate (xd3_stream  *stream, usize_t       size,
-					uint8_t    **copied1, usize_t      *alloc1);
+static int         xd3_decode_allocate (xd3_stream *stream, usize_t size,
+					uint8_t **copied1, usize_t *alloc1);
 
-static void        xd3_compute_code_table_string (const xd3_dinst *code_table, uint8_t *str);
-static void*       xd3_alloc (xd3_stream *stream, usize_t      elts, usize_t      size);
-static void        xd3_free  (xd3_stream *stream, void       *ptr);
+static void        xd3_compute_code_table_string (const xd3_dinst *code_table,
+						  uint8_t *str);
+static void*       xd3_alloc (xd3_stream *stream, usize_t elts, usize_t size);
+static void        xd3_free  (xd3_stream *stream, void *ptr);
 
 static int         xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
 				      const uint8_t *max, uint32_t *valp);
@@ -1745,7 +1748,7 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (PART & OFLOW)                                                \
 	{                                                              \
 	  stream->msg = "overflow in decode_integer";                  \
-	  return XD3_INVALID_INPUT;                                         \
+	  return XD3_INVALID_INPUT;                                    \
 	}                                                              \
                                                                        \
       PART = (PART << 7) | (next & 127);                               \
@@ -1771,13 +1774,13 @@ xd3_emit_bytes (xd3_stream     *stream,
       if (inp == max)                                                  \
 	{                                                              \
 	  stream->msg = "end-of-input in read_integer";                \
-	  return XD3_INVALID_INPUT;                                         \
+	  return XD3_INVALID_INPUT;                                    \
 	}                                                              \
                                                                        \
       if (val & OFLOW)                                                 \
 	{                                                              \
 	  stream->msg = "overflow in read_intger";                     \
-	  return XD3_INVALID_INPUT;                                         \
+	  return XD3_INVALID_INPUT;                                    \
 	}                                                              \
                                                                        \
       next = (*inp++);                                                 \
@@ -1888,10 +1891,12 @@ xd3_alloc_cache (xd3_stream *stream)
 {
   if (((stream->acache.s_near > 0) &&
        (stream->acache.near_array = (usize_t*)
-	xd3_alloc (stream, stream->acache.s_near, sizeof (usize_t))) == NULL) ||
+	xd3_alloc (stream, stream->acache.s_near, sizeof (usize_t)))
+       == NULL) ||
       ((stream->acache.s_same > 0) &&
        (stream->acache.same_array = (usize_t*)
-	xd3_alloc (stream, stream->acache.s_same * 256, sizeof (usize_t))) == NULL))
+	xd3_alloc (stream, stream->acache.s_same * 256, sizeof (usize_t)))
+       == NULL))
     {
       return ENOMEM;
     }
@@ -1940,8 +1945,9 @@ xd3_encode_address (xd3_stream *stream, usize_t addr, usize_t here, uint8_t* mod
 
 #define SMALLEST_INT(x) do { if (((x) & ~127) == 0) { goto good; } } while (0)
 
-  /* Attempt to find the address mode that yields the smallest integer value for "d", the
-   * encoded address value, thereby minimizing the encoded size of the address. */
+  /* Attempt to find the address mode that yields the smallest integer value
+   * for "d", the encoded address value, thereby minimizing the encoded size
+   * of the address. */
   bestd = addr;
   bestm = VCD_SELF;
 
@@ -3359,8 +3365,10 @@ xd3_emit_hdr (xd3_stream *stream)
   if (vcd_source)
     {
       /* or (vcd_target) { ... } */
-      if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream), stream->src->srclen)) ||
-	  (ret = xd3_emit_offset (stream, & HDR_TAIL (stream), stream->src->srcbase))) { return ret; }
+      if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream),
+				stream->src->srclen)) ||
+	  (ret = xd3_emit_offset (stream, & HDR_TAIL (stream),
+				  stream->src->srcbase))) { return ret; }
     }
 
   tgt_len  = stream->avail_in;

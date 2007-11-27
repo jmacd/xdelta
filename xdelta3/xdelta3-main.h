@@ -289,7 +289,7 @@ static int         option_recompress_outputs = 1;
 /* This is for comparing "printdelta" output without attention to
  * copy-instruction modes. */
 #if VCDIFF_TOOLS
-static int         option_print_cpymode = 1;
+static int option_print_cpymode = 1; /* Note: see reset_defaults(). */ 
 #endif
 
 /* Static variables */
@@ -3484,6 +3484,7 @@ main (int argc, char **argv)
 
 #if REGRESSION_TEST
     case CMD_TEST:
+      main_config ();
       ret = xd3_selftest ();
       break;
 #endif

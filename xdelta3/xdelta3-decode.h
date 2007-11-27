@@ -970,11 +970,16 @@ xd3_decode_input (xd3_stream *stream)
 	{
 	  int i;
 
-	  if ((ret = xd3_decode_bytes (stream, stream->dec_cksum, & stream->dec_cksumbytes, 4))) { return ret; }
+	  if ((ret = xd3_decode_bytes (stream, stream->dec_cksum,
+				       & stream->dec_cksumbytes, 4)))
+	    {
+	      return ret;
+	    }
 
 	  for (i = 0; i < 4; i += 1)
 	    {
-	      stream->dec_adler32 = (stream->dec_adler32 << 8) | stream->dec_cksum[i];
+	      stream->dec_adler32 =
+		(stream->dec_adler32 << 8) | stream->dec_cksum[i];
 	    }
 	}
 
