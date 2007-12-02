@@ -630,6 +630,7 @@ const char* xd3_strerror (int ret)
     case XD3_WINFINISH: return "XD3_WINFINISH";
     case XD3_TOOFARBACK: return "XD3_TOOFARBACK";
     case XD3_INTERNAL: return "XD3_INTERNAL";
+    case XD3_INVALID_INPUT: return "XD3_INVALID_INPUT";
     }
   return NULL;
 }
@@ -3259,7 +3260,7 @@ xd3_emit_hdr (xd3_stream *stream)
 {
   int  ret;
   int  use_secondary = stream->sec_type != NULL;
-  int  use_adler32   = stream->flags & XD3_ADLER32;
+  int  use_adler32   = stream->flags & (XD3_ADLER32 | XD3_ADLER32_RECODE);
   int  vcd_source    = xd3_encoder_used_source (stream);
   uint win_ind = 0;
   uint del_ind = 0;
@@ -3273,16 +3274,21 @@ xd3_emit_hdr (xd3_stream *stream)
     {
       uint hdr_ind = 0;
       int use_appheader  = stream->enc_appheader != NULL;
-      int use_gencodetbl = GENERIC_ENCODE_TABLES && (stream->code_table_desc != & __rfc3284_code_table_desc);
+      int use_gencodetbl = GENERIC_ENCODE_TABLES &&
+	(stream->code_table_desc != & __rfc3284_code_table_desc);
 
       if (use_secondary)  { hdr_ind |= VCD_SECONDARY; }
       if (use_gencodetbl) { hdr_ind |= VCD_CODETABLE; }
       if (use_appheader)  { hdr_ind |= VCD_APPHEADER; }
 
-      if ((ret = xd3_emit_byte (stream, & HDR_TAIL (stream), VCDIFF_MAGIC1)) != 0 ||
-	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), VCDIFF_MAGIC2)) != 0 ||
-	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), VCDIFF_MAGIC3)) != 0 ||
-	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), VCDIFF_VERSION)) != 0 ||
+      if ((ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				VCDIFF_MAGIC1)) != 0 ||
+	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				VCDIFF_MAGIC2)) != 0 ||
+	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				VCDIFF_MAGIC3)) != 0 ||
+	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				VCDIFF_VERSION)) != 0 ||
 	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), hdr_ind)) != 0)
 	{
 	  return ret;
@@ -3291,7 +3297,8 @@ xd3_emit_hdr (xd3_stream *stream)
       /* Secondary compressor ID */
 #if SECONDARY_ANY
       if (use_secondary &&
-	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->sec_type->id)))
+	  (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				stream->sec_type->id)))
 	{
 	  return ret;
 	}
@@ -3303,15 +3310,20 @@ xd3_emit_hdr (xd3_stream *stream)
 	  usize_t code_table_size;
 	  const uint8_t *code_table_data;
 
-	  if ((ret = stream->comp_table_func (stream, & code_table_data, & code_table_size)))
+	  if ((ret = stream->comp_table_func (stream, & code_table_data,
+					      & code_table_size)))
 	    {
 	      return ret;
 	    }
 
-	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream), code_table_size + 2)) ||
-	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->code_table_desc->near_modes)) ||
-	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream), stream->code_table_desc->same_modes)) ||
-	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), code_table_data, code_table_size)))
+	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream),
+				    code_table_size + 2)) ||
+	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				    stream->code_table_desc->near_modes)) ||
+	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
+				    stream->code_table_desc->same_modes)) ||
+	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream),
+				     code_table_data, code_table_size)))
 	    {
 	      return ret;
 	    }
@@ -3320,8 +3332,10 @@ xd3_emit_hdr (xd3_stream *stream)
       /* Application header */
       if (use_appheader)
 	{
-	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream), stream->enc_appheadsz)) ||
-	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), stream->enc_appheader,
+	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream),
+				    stream->enc_appheadsz)) ||
+	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream),
+				     stream->enc_appheader,
 				     stream->enc_appheadsz)))
 	    {
 	      return ret;
@@ -3339,9 +3353,12 @@ xd3_emit_hdr (xd3_stream *stream)
 
 #     define ENCODE_SECONDARY_SECTION(UPPER,LOWER) \
              ((stream->flags & XD3_SEC_NO ## UPPER) == 0 && \
-              (ret = xd3_encode_secondary (stream, & UPPER ## _HEAD (stream), & UPPER ## _TAIL (stream), \
+              (ret = xd3_encode_secondary (stream, \
+					   & UPPER ## _HEAD (stream), \
+					   & UPPER ## _TAIL (stream), \
 					& xd3_sec_ ## LOWER (stream), \
-				        & stream->sec_ ## LOWER, & LOWER ## _sec)))
+				        & stream->sec_ ## LOWER, \
+					   & LOWER ## _sec)))
 
       if (ENCODE_SECONDARY_SECTION (DATA, data) ||
 	  ENCODE_SECONDARY_SECTION (INST, inst) ||
@@ -3361,7 +3378,10 @@ xd3_emit_hdr (xd3_stream *stream)
   if (use_adler32) { win_ind |= VCD_ADLER32; }
 
   /* window indicator */
-  if ((ret = xd3_emit_byte (stream, & HDR_TAIL (stream), win_ind))) { return ret; }
+  if ((ret = xd3_emit_byte (stream, & HDR_TAIL (stream), win_ind)))
+    {
+      return ret;
+    }
 
   /* source window */
   if (vcd_source)
@@ -3401,14 +3421,26 @@ xd3_emit_hdr (xd3_stream *stream)
   if (use_adler32)
     {
       uint8_t  send[4];
-      uint32_t a32 = adler32 (1L, stream->next_in, stream->avail_in);
+      uint32_t a32;
+
+      if (stream->flags & XD3_ADLER32)
+	{
+	  a32 = adler32 (1L, stream->next_in, stream->avail_in);
+	}
+      else
+	{
+	  a32 = stream->recode_adler32;
+	}
 
       send[0] = (a32 >> 24);
       send[1] = (a32 >> 16);
       send[2] = (a32 >> 8);
       send[3] = (a32 & 0xff);
 
-      if ((ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), send, 4))) { return ret; }
+      if ((ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), send, 4)))
+	{
+	  return ret;
+	}
     }
 
   return 0;

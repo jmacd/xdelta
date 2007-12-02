@@ -373,6 +373,7 @@ typedef enum
 				    * algorithm", instead use greedy
 				    * matching.  Greedy is off by
 				    * default. */
+  XD3_ADLER32_RECODE = (1 << 15),  /* used by "recode". */
 
   /* 4 bits to set the compression level the same as the command-line
    * setting -1 through -9 (-0 corresponds to the XD3_NOCOMPRESS flag,
@@ -813,6 +814,8 @@ struct _xd3_stream
 					 head of chain */
   xd3_output       *enc_tails[4];     /* array of encoded outputs:
 					 tail of chain */
+  uint32_t          recode_adler32;   /* set the adler32 checksum
+				       * during "recode". */
 
   xd3_rlist         iopt_used;        /* instruction optimizing buffer */
   xd3_rlist         iopt_free;
@@ -1148,15 +1151,15 @@ void xd3_consume_output (xd3_stream  *stream)
 
 /* These are set for each XD3_WINFINISH return. */
 static inline
-int     xd3_encoder_used_source (xd3_stream *stream) {
+int xd3_encoder_used_source (xd3_stream *stream) {
   return stream->src != NULL && stream->src->srclen > 0;
 }
 static inline
-xoff_t  xd3_encoder_srcbase (xd3_stream *stream) {
+xoff_t xd3_encoder_srcbase (xd3_stream *stream) {
   return stream->src->srcbase;
 }
 static inline
-usize_t  xd3_encoder_srclen (xd3_stream *stream) {
+usize_t xd3_encoder_srclen (xd3_stream *stream) {
   return stream->src->srclen;
 }
 

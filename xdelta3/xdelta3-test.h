@@ -73,9 +73,9 @@ static int do_cmd (xd3_stream *stream, const char *buf)
 	}
       return XD3_INTERNAL;
     }
-  DOT ();
   return 0;
 }
+
 static int do_fail (xd3_stream *stream, const char *buf)
 {
   int ret;
@@ -86,7 +86,6 @@ static int do_fail (xd3_stream *stream, const char *buf)
       DP(RINT "command was %s", buf);
       return XD3_INTERNAL;
     }
-  DOT ();
   return 0;
 }
 
@@ -1197,7 +1196,6 @@ sec_dist_func11 (xd3_stream *stream, xd3_output *data)
   return 0;
 }
 
-
 static int
 test_secondary_decode (xd3_stream         *stream,
 		       const xd3_sec_type *sec,
@@ -1283,14 +1281,18 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 	  dec_output = NULL;
 	  dec_correct = NULL;
 
-	  if (in_head == NULL || out_head == NULL || enc_stream == NULL) { goto nomem; }
+	  if (in_head == NULL || out_head == NULL || enc_stream == NULL)
+	    {
+	      goto nomem;
+	    }
 
 	  if ((ret = sec_dists[test_i] (stream, in_head))) { goto fail; }
 
 	  sec->init (enc_stream);
 
 	  /* Encode data */
-	  if ((ret = sec->encode (stream, enc_stream, in_head, out_head, & cfg)))
+	  if ((ret = sec->encode (stream, enc_stream,
+				  in_head, out_head, & cfg)))
 	    {
 	      DP(RINT "test %u: encode: %s", test_i, stream->msg);
 	      goto fail;
@@ -1304,10 +1306,14 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 
 	  if ((dec_input   = xd3_alloc (stream, compress_size, 1)) == NULL ||
 	      (dec_output  = xd3_alloc (stream, input_size, 1)) == NULL ||
-	      (dec_correct = xd3_alloc (stream, input_size, 1)) == NULL) { goto nomem; }
+	      (dec_correct = xd3_alloc (stream, input_size, 1)) == NULL)
+	    {
+	      goto nomem;
+	    }
 
 	  /* Fill the compressed data array */
-	  for (p_off = 0, p = out_head; p != NULL; p_off += p->next, p = p->next_page)
+	  for (p_off = 0, p = out_head; p != NULL;
+	       p_off += p->next, p = p->next_page)
 	    {
 	      memcpy (dec_input + p_off, p->base, p->next);
 	    }
@@ -1315,15 +1321,17 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 	  CHECK(p_off == compress_size);
 
 	  /* Fill the input data array */
-	  for (p_off = 0, p = in_head; p != NULL; p_off += p->next, p = p->next_page)
+	  for (p_off = 0, p = in_head; p != NULL;
+	       p_off += p->next, p = p->next_page)
 	    {
 	      memcpy (dec_correct + p_off, p->base, p->next);
 	    }
 
 	  CHECK(p_off == input_size);
 
-	  if ((ret = test_secondary_decode (stream, sec, input_size, compress_size,
-					    dec_input, dec_correct, dec_output)))
+	  if ((ret = test_secondary_decode (stream, sec, input_size,
+					    compress_size, dec_input,
+					    dec_correct, dec_output)))
 	    {
 	      DP(RINT "test %u: decode: %s", test_i, stream->msg);
 	      goto fail;
@@ -1342,7 +1350,8 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
 
 		if ((ret = test_secondary_decode (stream, sec, input_size,
 						  compress_size, dec_input,
-						  dec_correct, dec_output)) == 0)
+						  dec_correct, dec_output))
+		    == 0)
 		  {
 		    /*DP(RINT "test %u: decode single-bit [%u/%u]
 		      error non-failure", test_i, i/8, i%8);*/
@@ -1385,7 +1394,8 @@ IF_DJW (static int test_secondary_huff (xd3_stream *stream, int gp)
  TEST INSTRUCTION TABLE
  ***********************************************************************/
 
-/* Test that xd3_choose_instruction() does the right thing for its code table. */
+/* Test that xd3_choose_instruction() does the right thing for its code
+ * table. */
 static int
 test_choose_instruction (xd3_stream *stream, int ignore)
 {
@@ -1695,7 +1705,49 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
   return 0;
 }
 
-#if 0
+static int
+check_vcdiff_header (xd3_stream *stream,
+		     const char *input,
+		     const char *line_start,
+		     const char *matches,
+		     int yes_or_no)
+{
+  int ret;
+  char vcmd[TESTBUFSIZE], gcmd[TESTBUFSIZE];
+
+  sprintf (vcmd, "%s printhdr -f %s %s",
+	   program_name, input, TEST_RECON2_FILE);
+
+  if ((ret = system (vcmd)) != 0)
+    {
+      DP(RINT "xdelta3: printhdr command: %s\n", vcmd);
+      stream->msg = "printhdr cmd failed";
+      return XD3_INTERNAL;
+    }
+
+  sprintf (gcmd, "grep \"%s.*%s.*\" %s > /dev/null",
+	   line_start, matches, TEST_RECON2_FILE);
+
+  if (yes_or_no)
+    {
+      if ((ret = do_cmd (stream, gcmd)))
+	{
+	  DP(RINT "xdelta3: %s\n", gcmd);
+	  return ret;
+	}
+    }
+  else
+    {
+      if ((ret = do_fail (stream, gcmd)))
+	{
+	  DP(RINT "xdelta3: %s\n", gcmd);
+	  return ret;
+	}
+    }
+
+  return 0;
+}
+
 static int
 test_recode_command2 (xd3_stream *stream, int has_source,
 		      int variant, int change)
@@ -1712,7 +1764,7 @@ test_recode_command2 (xd3_stream *stream, int has_source,
   int recoded_apphead = change_apphead ? !has_apphead : has_apphead;
   int recoded_secondary = change_secondary ? !has_secondary : has_secondary;
 
-  char ecmd[TESTBUFSIZE], rcmd[TESTBUFSIZE];
+  char ecmd[TESTBUFSIZE], rcmd[TESTBUFSIZE], dcmd[TESTBUFSIZE];
   xoff_t tsize, ssize;
   int ret;
 
@@ -1723,12 +1775,10 @@ test_recode_command2 (xd3_stream *stream, int has_source,
       return ret;
     }
 
-  ecmd[0] = 0;
-  rcmd[0] = 0;
-
+  /* First encode */
   sprintf (ecmd, "%s %s -f ", program_name, test_softcfg_str);
   strcat (ecmd, has_adler32 ? "" : "-n ");
-  strcat (ecmd, has_apphead ? "-A=test_apphead " : "-A= ");
+  strcat (ecmd, has_apphead ? "-A=encode_apphead " : "-A= ");
   strcat (ecmd, has_secondary ? "-S djw " : "-S none ");
 
   if (has_source)
@@ -1747,6 +1797,115 @@ test_recode_command2 (xd3_stream *stream, int has_source,
       DP(RINT "xdelta3: encode command: %s\n", ecmd);
       stream->msg = "encode cmd failed";
       return XD3_INTERNAL;
+    }
+
+  /* Now recode */
+  sprintf (rcmd, "%s recode %s -f ", program_name, test_softcfg_str);
+  strcat (rcmd, recoded_adler32 ? "" : "-n ");
+  strcat (rcmd, !change_apphead ? "" :
+	  (recoded_apphead ? "-A=recode_apphead " : "-A= "));
+  strcat (rcmd, recoded_secondary ? "-S djw " : "-S none ");
+  strcat (rcmd, TEST_DELTA_FILE);
+  strcat (rcmd, " ");
+  strcat (rcmd, TEST_COPY_FILE);
+
+  if ((ret = system (rcmd)) != 0)
+    {
+      DP(RINT "xdelta3: recode command: %s\n", rcmd);
+      stream->msg = "recode cmd failed";
+      return XD3_INTERNAL;
+    }
+
+  /* Check recode changes. */
+  if ((ret = check_vcdiff_header (stream,
+				  TEST_COPY_FILE,
+				  "VCDIFF window indicator",
+				  "VCD_SOURCE",
+				  has_source))) { return ret; }
+
+  if ((ret = check_vcdiff_header (stream,
+				  TEST_COPY_FILE,
+				  "VCDIFF header indicator",
+				  "VCD_SECONDARY",
+				  recoded_secondary))) { return ret; }
+
+  if ((ret = check_vcdiff_header (stream,
+				  TEST_COPY_FILE,
+				  "VCDIFF window indicator",
+				  "VCD_ADLER32",
+				  /* Recode can't generate an adler32
+				   * checksum, it can only preserve it or
+				   * remove it. */
+				  has_adler32 && recoded_adler32)))
+    {
+      return ret;
+    }
+
+  if (!change_apphead)
+    {
+      if ((ret = check_vcdiff_header (stream,
+				      TEST_COPY_FILE,
+				      "VCDIFF header indicator",
+				      "VCD_APPHEADER",
+				      has_apphead)))
+	{
+	  return ret;
+	}
+      if ((ret = check_vcdiff_header (stream,
+				      TEST_COPY_FILE,
+				      "VCDIFF application header",
+				      "encode_apphead",
+				      has_apphead)))
+	{
+	  return ret;
+	}
+    }
+  else
+    {
+      if ((ret = check_vcdiff_header (stream,
+				      TEST_COPY_FILE,
+				      "VCDIFF header indicator",
+				      "VCD_APPHEADER",
+				      recoded_apphead)))
+	{
+	  return ret;
+	}
+      if (recoded_apphead &&
+	  (ret = check_vcdiff_header (stream,
+				      TEST_COPY_FILE,
+				      "VCDIFF application header",
+				      "recode_apphead",
+				      1)))
+	{
+	  return ret;
+	}
+    }
+
+  /* Now decode */
+  sprintf (dcmd, "%s -fd ", program_name);
+  
+  if (has_source)
+    {
+      strcat (dcmd, "-s ");
+      strcat (dcmd, TEST_SOURCE_FILE);
+      strcat (dcmd, " ");
+    }
+
+  strcat (dcmd, TEST_COPY_FILE);
+  strcat (dcmd, " ");
+  strcat (dcmd, TEST_RECON_FILE);
+
+  if ((ret = system (dcmd)) != 0)
+    {
+      DP(RINT "xdelta3: decode command: %s\n", dcmd);
+      stream->msg = "decode cmd failed";
+      return XD3_INTERNAL;
+    }
+
+  /* Now compare. */
+  if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE)))
+    {
+      return ret;
     }
 
   return 0;
@@ -1786,7 +1945,6 @@ test_recode_command (xd3_stream *stream, int ignore)
 
   return 0;
 }
-#endif
 
 /***********************************************************************
  EXTERNAL I/O DECOMPRESSION/RECOMPRESSION
@@ -2550,10 +2708,6 @@ xd3_selftest (void)
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);
 
   IF_FGK (DO_TEST (decompress_single_bit_error, XD3_SEC_FGK, 3));
-
-  /* TODO: 2007.11.27 NOTE: Expected non-failures is 8 for optimized builds
-   * and 17 for debug builds, which is either a gcc bug or an xdelta bug
-   * related to DJW, but I'm not sure which.  Will investigate further. */
   IF_DJW (DO_TEST (decompress_single_bit_error, XD3_SEC_DJW, 8));
 
   /* There are many expected non-failures for ALT_CODE_TABLE because
@@ -2569,7 +2723,7 @@ xd3_selftest (void)
   DO_TEST (stdout_behavior, 0, 0);
   DO_TEST (no_output, 0, 0);
   DO_TEST (command_line_arguments, 0, 0);
-  //DO_TEST (recode_command, 0, 0);
+  DO_TEST (recode_command, 0, 0);
 
 #if EXTERNAL_COMPRESSION
   DO_TEST (source_decompression, 0, 0);

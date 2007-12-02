@@ -1406,6 +1406,7 @@ static int
 main_recode_func (xd3_stream* stream, main_file *ofile)
 {
   int ret;
+  xd3_source decode_source;
 
   XD3_ASSERT(stream->dec_state == DEC_FINISH);
   XD3_ASSERT(recode_stream->enc_state == ENC_INIT ||
@@ -1428,6 +1429,36 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
   // This jumps to xd3_emit_hdr()
   recode_stream->enc_state = ENC_FLUSH;
   recode_stream->avail_in = stream->dec_tgtlen;
+
+  if (xd3_decoder_needs_source (stream))
+    {
+      recode_stream->src = & decode_source;
+      decode_source.srclen = stream->dec_cpylen;
+      decode_source.srcbase = stream->dec_cpyoff;
+    }
+
+  if (option_use_checksum &&
+      (stream->dec_win_ind & VCD_ADLER32) != 0)
+    {
+      recode_stream->flags |= XD3_ADLER32_RECODE;
+      recode_stream->recode_adler32 = stream->dec_adler32;
+    }
+
+  if (option_use_appheader != 0 &&
+      option_appheader != NULL)
+    {
+      xd3_set_appheader (recode_stream, option_appheader,
+			 strlen (option_appheader));
+    }
+  else if (option_use_appheader != 0 &&
+	   option_appheader == NULL)
+    {
+      if (stream->dec_appheader != NULL)
+	{
+	  xd3_set_appheader (recode_stream,
+			     stream->dec_appheader, stream->dec_appheadsz);
+	}
+    }
 
   // Output loop
   for (;;)
@@ -1640,9 +1671,11 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 	  close (outpipefd[PIPE_WRITE_FD]) ||
 	  close (inpipefd[PIPE_READ_FD]) ||
 	  close (inpipefd[PIPE_WRITE_FD]) ||
-	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname, decomp->decomp_options, NULL))
+	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname,
+		  decomp->decomp_options, NULL))
 	{
-	  XPR(NT "child process %s failed to execute: %s\n", decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
+	  XPR(NT "child process %s failed to execute: %s\n",
+	      decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
 	}
 
       _exit (127);
@@ -1920,9 +1953,11 @@ main_recompress_output (main_file *ofile)
 	  dup2 (pipefd[PIPE_READ_FD], STDIN_FILENO) < 0 ||
 	  close (pipefd[PIPE_READ_FD]) ||
 	  close (pipefd[PIPE_WRITE_FD]) ||
-	  execlp (recomp->recomp_cmdname, recomp->recomp_cmdname, recomp->recomp_options, NULL))
+	  execlp (recomp->recomp_cmdname, recomp->recomp_cmdname,
+		  recomp->recomp_options, NULL))
 	{
-	  XPR(NT "child process %s failed to execute: %s\n", recomp->recomp_cmdname, xd3_mainerror (get_errno ()));
+	  XPR(NT "child process %s failed to execute: %s\n",
+	      recomp->recomp_cmdname, xd3_mainerror (get_errno ()));
 	}
 
       _exit (127);
@@ -2081,7 +2116,8 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 	}
       else
 	{
-	  sprintf ((char*)appheader_used, "%s/%s/%s/%s", iname, icomp, sname, scomp);
+	  sprintf ((char*)appheader_used, "%s/%s/%s/%s",
+		   iname, icomp, sname, scomp);
 	}
     }
 
@@ -2092,11 +2128,15 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 #endif
 
 static void
-main_get_appheader_params (main_file *file, char **parsed, int output, const char *type,
+main_get_appheader_params (main_file *file, char **parsed,
+			   int output, const char *type,
 			   main_file *other)
 {
-  /* Set the filename if it was not specified.  If output, option_stdout (-c) overrides. */
-  if (file->filename == NULL && ! (output && option_stdout) && strcmp (parsed[0], "-") != 0)
+  /* Set the filename if it was not specified.  If output, option_stdout (-c)
+   * overrides. */
+  if (file->filename == NULL &&
+      ! (output && option_stdout) &&
+      strcmp (parsed[0], "-") != 0)
     {
       file->filename = parsed[0];
 
@@ -2114,7 +2154,8 @@ main_get_appheader_params (main_file *file, char **parsed, int output, const cha
 	  int dlen = last_slash - other->filename;
 
 	  XD3_ASSERT(file->filename_copy == NULL);
-	  file->filename_copy = (char*) main_malloc(dlen + 2 + strlen(file->filename));
+	  file->filename_copy =
+	    (char*) main_malloc(dlen + 2 + strlen(file->filename));
 
 	  strncpy(file->filename_copy, other->filename, dlen);
 	  file->filename_copy[dlen] = '/';
@@ -2227,7 +2268,10 @@ main_open_output (xd3_stream *stream, main_file *ofile)
     {
       XSTDOUT_XF (ofile);
 
-      if (option_verbose > 1) { XPR(NT "using standard output: %s\n", ofile->filename); }
+      if (option_verbose > 1)
+	{
+	  XPR(NT "using standard output: %s\n", ofile->filename);
+	}
     }
   else
     {
