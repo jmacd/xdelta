@@ -55,7 +55,8 @@
 
 #define DJW_MAX_CODELEN      20 /* Maximum length of an alphabet code. */
 
-/* [RUN_0, RUN_1, 1-DJW_MAX_CODELEN] */
+/* Code lengths are themselves code-length encoded, so the total number of
+ * codes is: [RUN_0, RUN_1, 1-DJW_MAX_CODELEN] */
 #define DJW_TOTAL_CODES      (DJW_MAX_CODELEN+2)
 
 #define RUN_0                0 /* Symbols used in MTF+1/2 coding. */
@@ -313,6 +314,8 @@ heap_check (uint *heap, djw_heapen *ents, uint heap_last)
     {
       /* Heap property: child not less than parent */
       XD3_ASSERT (! heap_less (& ents[heap[i]], & ents[heap[i/2]]));
+
+      IF_DEBUG1 (DP(RINT "heap[%d] = %u\n", i, ents[heap[i]].freq));
     }
 }
 #endif
@@ -398,6 +401,8 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
   for (i = 0; i < asize; i += 1)
     {
       ents[i+1].freq = freq[i];
+      IF_DEBUG1 (DP(RINT "ents[%d] = freq[%d] = %d\n",
+			i+1, i, freq[i]));
     }
 
  again:
@@ -454,9 +459,9 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
       h1->parent = h2->parent = ents_size;
 
       heap_insert (heap, ents, ++heap_last, ents_size++);
-
-      IF_DEBUG (heap_check (heap, ents, heap_last));
     }
+
+  IF_DEBUG (heap_check (heap, ents, heap_last));
 
   /* Now compute prefix code lengths, counting parents. */
   for (i = 1; i < asize+1; i += 1)
@@ -559,7 +564,8 @@ djw_compute_mtf_1_2 (djw_prefix  *prefix,
   usize_t mtf_i = 0;
   int mtf_run = 0;
 
-  memset (freq_out, 0, sizeof (freq_out[0]) * (nsym+1));
+  /* This +2 is for the RUN_0, RUN_1 codes */
+  memset (freq_out, 0, sizeof (freq_out[0]) * (nsym+2));
 
   for (i = 0; i < size; )
     {
@@ -1339,8 +1345,8 @@ djw_build_decoder (xd3_stream    *stream,
 {
   int i, l;
   const uint8_t *ci;
-  uint nr_clen [DJW_MAX_CODELEN+2];
-  uint tmp_base[DJW_MAX_CODELEN+2];
+  uint nr_clen [DJW_TOTAL_CODES];
+  uint tmp_base[DJW_TOTAL_CODES];
   int min_clen;
   int max_clen;
 
@@ -1533,8 +1539,8 @@ djw_decode_1_2 (xd3_stream     *stream,
 		const uint     *minlen,
 		const uint     *maxlen,
 		uint8_t        *mtfvals,
-		usize_t          elts,
-		usize_t          skip_offset,
+		usize_t         elts,
+		usize_t         skip_offset,
 		uint8_t        *values)
 {
   usize_t n = 0, rep = 0, mtf = 0, s = 0;
@@ -1608,7 +1614,7 @@ djw_decode_prefix (xd3_stream     *stream,
 		   const uint     *cl_minlen,
 		   const uint     *cl_maxlen,
 		   uint8_t        *cl_mtf,
-		   usize_t          groups,
+		   usize_t         groups,
 		   uint8_t        *clen)
 {
   return djw_decode_1_2 (stream, bstate, input, input_end,
@@ -1676,8 +1682,8 @@ xd3_decode_huff (xd3_stream     *stream,
   /* Outer scope: per-group symbol decoder tables. */
   {
     uint8_t inorder[DJW_MAX_GROUPS][ALPHABET_SIZE];
-    uint    base   [DJW_MAX_GROUPS][DJW_MAX_CODELEN+2];
-    uint    limit  [DJW_MAX_GROUPS][DJW_MAX_CODELEN+2];
+    uint    base   [DJW_MAX_GROUPS][DJW_TOTAL_CODES];
+    uint    limit  [DJW_MAX_GROUPS][DJW_TOTAL_CODES];
     uint    minlen [DJW_MAX_GROUPS];
     uint    maxlen [DJW_MAX_GROUPS];
 
