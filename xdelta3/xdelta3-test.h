@@ -27,11 +27,11 @@
 static const usize_t TWO_MEGS_AND_DELTA = (2 << 20) + (1 << 10);
 static const usize_t ADDR_CACHE_ROUNDS = 10000;
 
-static const usize_t TEST_FILE_MEAN    = 16384;
-static const double TEST_ADD_MEAN     = 16;
-static const double TEST_ADD_MAX      = 256;
+static const usize_t TEST_FILE_MEAN   = 16384;
+static const double TEST_ADD_MEAN     = 128;
+static const double TEST_ADD_MAX      = 512;
 static const double TEST_ADD_RATIO    = 0.1;
-static const double TEST_EPSILON      = 0.55;
+static const double TEST_EPSILON      = 0.25;
 
 #define TESTBUFSIZE (1024 * 16)
 
@@ -50,8 +50,8 @@ static int test_exponential_dist (usize_t mean, usize_t max);
 #define CHECK(cond) if (!(cond)) { DP(RINT "check failure: " #cond); abort(); }
 
 /* Use a fixed soft config so that test values are fixed.  See also
-   test_compress_text(). */
-static const char* test_softcfg_str = "-C64,64,4,128,16,8,128";
+ * test_compress_text(). */
+static const char* test_softcfg_str = "-C9,3,4,8,2,36,70";
 
 /***********************************************************************
  TEST HELPERS
@@ -129,22 +129,6 @@ test_random_numbers (xd3_stream *stream, int ignore)
   return XD3_INTERNAL;
 }
 
-static int
-test_setup (void)
-{
-  static int x = 0;
-  x++;
-  //DP(RINT "test setup: %d", x);
-  sprintf (TEST_TARGET_FILE, "/tmp/xdtest.target.%d", x);
-  sprintf (TEST_SOURCE_FILE, "/tmp/xdtest.source.%d", x);
-  sprintf (TEST_DELTA_FILE, "/tmp/xdtest.delta.%d", x);
-  sprintf (TEST_RECON_FILE, "/tmp/xdtest.recon.%d", x);
-  sprintf (TEST_RECON2_FILE, "/tmp/xdtest.recon2.%d", x);
-  sprintf (TEST_COPY_FILE, "/tmp/xdtest.copy.%d", x);
-  sprintf (TEST_NOPERM_FILE, "/tmp/xdtest.noperm.%d", x);
-  return 0;
-}
-
 static void
 test_unlink (char* file)
 {
@@ -163,8 +147,6 @@ test_unlink (char* file)
 static void
 test_cleanup (void)
 {
-  static int x = 0;
-  x++;
   test_unlink (TEST_TARGET_FILE);
   test_unlink (TEST_SOURCE_FILE);
   test_unlink (TEST_DELTA_FILE);
@@ -175,66 +157,116 @@ test_cleanup (void)
 }
 
 static int
+test_setup (void)
+{
+  static int x = 0;
+  x++;
+  sprintf (TEST_TARGET_FILE, "/tmp/xdtest.target.%d", x);
+  sprintf (TEST_SOURCE_FILE, "/tmp/xdtest.source.%d", x);
+  sprintf (TEST_DELTA_FILE, "/tmp/xdtest.delta.%d", x);
+  sprintf (TEST_RECON_FILE, "/tmp/xdtest.recon.%d", x);
+  sprintf (TEST_RECON2_FILE, "/tmp/xdtest.recon2.%d", x);
+  sprintf (TEST_COPY_FILE, "/tmp/xdtest.copy.%d", x);
+  sprintf (TEST_NOPERM_FILE, "/tmp/xdtest.noperm.%d", x);
+  test_cleanup();
+  return 0;
+}
+
+static int
 test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 {
-  usize_t ts = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN;
-  usize_t ss = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN;
-  uint8_t *buf = malloc (ts + ss), *sbuf = buf /*, *tbuf = buf + ss*/;
+  usize_t ts = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
+  usize_t ss = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
+  uint8_t *buf = malloc (ts + ss), *sbuf = buf, *tbuf = buf + ss;
   usize_t sadd = 0, sadd_max = ss * TEST_ADD_RATIO;
-  FILE  *tf /*, *sf*/;
+  FILE  *tf = NULL, *sf = NULL;
   usize_t i, j;
   int ret;
 
   if (buf == NULL) { return ENOMEM; }
 
-  if ((tf = fopen (TEST_TARGET_FILE, "w")) == NULL)
+  if ((tf = fopen (TEST_TARGET_FILE, "w")) == NULL ||
+      (ss_out != NULL && (sf = fopen (TEST_SOURCE_FILE, "w")) == NULL))
     {
       stream->msg = "write failed";
       ret = get_errno ();
       goto failure;
+    }
+
+  if (ss_out != NULL)
+    {
+      for (i = 0; i < ss; )
+	{
+	  sbuf[i++] = rand ();
+	}
     }
 
   /* Then modify the data to produce copies, everything not copied is
    * an add.  The following logic produces the TEST_ADD_RATIO.  The
    * variable SADD contains the number of adds so far, which should
    * not exceed SADD_MAX. */
-  for (i = 0; i < ss; )
+
+  /* DP(RINT "ss = %u ts = %u\n", ss, ts); */
+  for (i = 0; i < ts; )
     {
-      usize_t left = ss - i;
-      usize_t next = test_exponential_dist (TEST_ADD_MEAN, TEST_ADD_MAX);
-      usize_t add_left = sadd_max - sadd;
-      double add_prob = (left == 0) ? 0 : (add_left / left);
+      size_t left = ts - i;
+      size_t next = test_exponential_dist (TEST_ADD_MEAN, TEST_ADD_MAX);
+      size_t add_left = sadd_max - sadd;
+      double add_prob = (left == 0) ? 0 : (add_left / (double) left);
+      int do_copy;
 
       next = min (left, next);
+      do_copy = (next > add_left || (rand() / (double)RAND_MAX) >= add_prob);
 
-      if (i > 0 && (next > add_left || (rand() / (double)RAND_MAX) >= add_prob))
+      if (ss_out == NULL)
+	{
+	  do_copy &= (i > 0);
+	}
+      else
+	{
+	  do_copy &= (ss - next) > 0;
+	}
+
+      if (do_copy)
 	{
 	  /* Copy */
-	  usize_t offset = rand () % i;
+	  size_t offset = rand () % ((ss_out == NULL) ? i : (ss - next));
+	  /* DP(RINT "[%u] copy %u at %u ", i, next, offset); */
 
 	  for (j = 0; j < next; j += 1)
 	    {
-	      sbuf[i++] = sbuf[offset + j];
+	      char c = ((ss_out == NULL) ? tbuf : sbuf)[offset + j];
+	      /* DP(RINT "%x%x", (c >> 4) & 0xf, c & 0xf); */
+	      tbuf[i++] = c;
 	    }
+	  /* DP(RINT "\n"); */
 	}
       else
 	{
 	  /* Add */
+	  /* DP(RINT "[%u] add %u ", i, next); */
 	  for (j = 0; j < next; j += 1)
 	    {
-	      sbuf[i++] = rand ();
+	      char c = rand ();
+	      /* DP(RINT "%x%x", (c >> 4) & 0xf, c & 0xf); */
+	      tbuf[i++] = c;
 	    }
+	  /* DP(RINT "\n"); */
+	  sadd += next;
 	}
     }
 
-  if ((fwrite (sbuf, 1, ss, tf) != ss))
+  /* DP(RINT "sadd = %u max = %u\n", sadd, sadd_max); */
+
+  if ((fwrite (tbuf, 1, ts, tf) != ts) ||
+      (ss_out != NULL && (fwrite (sbuf, 1, ss, sf) != ss)))
     {
       stream->msg = "write failed";
       ret = get_errno ();
       goto failure;
     }
 
-  if ((ret = fclose (tf)) /* || (ret = fclose (sf))*/)
+  if ((ret = fclose (tf)) || (ss_out != NULL && (ret = fclose (sf))))
     {
       stream->msg = "close failed";
       ret = get_errno ();
@@ -840,7 +872,8 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
   int non_failures = 0;
   int cksum = (stream->flags & XD3_ADLER32) != 0;
 
-#if 1
+//#define DEBUG_TEST_FAILURES
+#ifndef DEBUG_TEST_FAILURES
 #define TEST_FAILURES()
 #else
   /* For checking non-failure cases by hand, enable this macro and run
@@ -883,7 +916,9 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
       /*stream->msg = "without error: encode failure";*/
       return ret;
     }
-  if ((ret = test_decompress_text (stream, encoded, encoded_size, sizeof (test_text) / 4)))
+
+  if ((ret = test_decompress_text (stream, encoded, encoded_size,
+				   sizeof (test_text) / 4)))
     {
       /*stream->msg = "without error: decode failure";*/
       return ret;
@@ -900,7 +935,9 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
 				       encoded_size, sizeof (test_text))) == 0)
 	{
 	  non_failures += 1;
-	  /*DP(RINT "%u[%u] non-failure %u\n", i/8, i%8, non_failures);*/
+#ifdef DEBUG_TEST_FAILURES
+	  DP(RINT "%u[%u] non-failure %u\n", i/8, i%8, non_failures);
+#endif
 	  TEST_FAILURES();
 	}
       else
@@ -931,7 +968,8 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
   /* Check expected non-failures */
   if (non_failures != expected_non_failures)
     {
-      DP(RINT "non-failures %u; expected %u", non_failures, expected_non_failures);
+      DP(RINT "non-failures %u; expected %u",
+	 non_failures, expected_non_failures);
       stream->msg = "incorrect";
       return XD3_INTERNAL;
     }
@@ -1589,8 +1627,10 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       test_setup ();
       if ((ret = test_make_inputs (stream, NULL, & tsize))) { return ret; }
 
-      sprintf (ecmd, cmdpairs[2*i], program_name, test_softcfg_str, TEST_TARGET_FILE, TEST_DELTA_FILE);
-      sprintf (dcmd, cmdpairs[2*i+1], program_name, TEST_DELTA_FILE, TEST_RECON_FILE);
+      sprintf (ecmd, cmdpairs[2*i], program_name,
+	       test_softcfg_str, TEST_TARGET_FILE, TEST_DELTA_FILE);
+      sprintf (dcmd, cmdpairs[2*i+1], program_name,
+	       TEST_DELTA_FILE, TEST_RECON_FILE);
 
       /* Encode and decode. */
       if ((ret = system (ecmd)) != 0)
@@ -1623,23 +1663,26 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       /* Check that it is not too small, not too large. */
       if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
 	{
-	  DP(RINT "xdelta3: test encode with size ratio %.3f, expected < %.3f (%"Q"u, %"Q"u)\n",
+	  DP(RINT "xdelta3: test encode with size ratio %.4f, "
+	     "expected < %.4f (%"Q"u, %"Q"u)\n",
 	    ratio, TEST_ADD_RATIO + TEST_EPSILON, dsize, tsize);
 	  stream->msg = "strange encoding";
 	  return XD3_INTERNAL;
 	}
 
-      if (ratio <= TEST_ADD_RATIO - TEST_EPSILON)
+      if (ratio <= TEST_ADD_RATIO * (1.0 - TEST_EPSILON))
 	{
-	  DP(RINT "xdelta3: test encode with size ratio %.3f, expected > %.3f\n",
+	  DP(RINT "xdelta3: test encode with size ratio %.4f, "
+	     "expected > %.4f\n",
 	    ratio, TEST_ADD_RATIO - TEST_EPSILON);
 	  stream->msg = "strange encoding";
 	  return XD3_INTERNAL;
 	}
 
-      /* Also check that compare_files works.  The delta and original should not be
-       * identical. */
-      if ((ret = compare_files (stream, TEST_DELTA_FILE, TEST_TARGET_FILE)) == 0)
+      /* Also check that compare_files works.  The delta and original should
+       * not be identical. */
+      if ((ret = compare_files (stream, TEST_DELTA_FILE,
+				TEST_TARGET_FILE)) == 0)
 	{
 	  stream->msg = "broken compare_files";
 	  return XD3_INTERNAL;
@@ -1651,6 +1694,99 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 
   return 0;
 }
+
+#if 0
+static int
+test_recode_command2 (xd3_stream *stream, int has_source,
+		      int variant, int change)
+{
+  int has_adler32 = (variant & 0x1) != 0;
+  int has_apphead = (variant & 0x2) != 0;
+  int has_secondary = (variant & 0x4) != 0;
+
+  int change_adler32 = (change & 0x1) != 0;
+  int change_apphead = (change & 0x2) != 0;
+  int change_secondary = (change & 0x4) != 0;
+
+  int recoded_adler32 = change_adler32 ? !has_adler32 : has_adler32;
+  int recoded_apphead = change_apphead ? !has_apphead : has_apphead;
+  int recoded_secondary = change_secondary ? !has_secondary : has_secondary;
+
+  char ecmd[TESTBUFSIZE], rcmd[TESTBUFSIZE];
+  xoff_t tsize, ssize;
+  int ret;
+
+  test_setup ();
+
+  if ((ret = test_make_inputs (stream, has_source ? & ssize : NULL, & tsize)))
+    {
+      return ret;
+    }
+
+  ecmd[0] = 0;
+  rcmd[0] = 0;
+
+  sprintf (ecmd, "%s %s -f ", program_name, test_softcfg_str);
+  strcat (ecmd, has_adler32 ? "" : "-n ");
+  strcat (ecmd, has_apphead ? "-A=test_apphead " : "-A= ");
+  strcat (ecmd, has_secondary ? "-S djw " : "-S none ");
+
+  if (has_source)
+    {
+      strcat (ecmd, "-s ");
+      strcat (ecmd, TEST_SOURCE_FILE);
+      strcat (ecmd, " ");
+    }
+
+  strcat (ecmd, TEST_TARGET_FILE);
+  strcat (ecmd, " ");
+  strcat (ecmd, TEST_DELTA_FILE);
+
+  if ((ret = system (ecmd)) != 0)
+    {
+      DP(RINT "xdelta3: encode command: %s\n", ecmd);
+      stream->msg = "encode cmd failed";
+      return XD3_INTERNAL;
+    }
+
+  return 0;
+}  
+
+static int
+test_recode_command (xd3_stream *stream, int ignore)
+{
+  /* Things to test:
+   * - with and without a source file (recode does not change)
+   * 
+   * (recode may or may not change -- 8 variations)
+   * - with and without adler32
+   * - with and without app header
+   * - with and without secondary
+   */
+  int has_source;
+  int variant;
+  int change;
+  int ret;
+
+  for (has_source = 0; has_source < 2; has_source++)
+    {
+      for (variant = 0; variant < 8; variant++)
+	{
+	  for (change = 0; change < 8; change++)
+	    {
+	      if ((ret = test_recode_command2 (stream, has_source,
+					       variant, change)))
+		{
+		  return ret;
+		}
+	    }
+	  DOT ();
+	}
+    }
+
+  return 0;
+}
+#endif
 
 /***********************************************************************
  EXTERNAL I/O DECOMPRESSION/RECOMPRESSION
@@ -1786,25 +1922,27 @@ test_source_decompression (xd3_stream *stream, int ignore)
   if ((ret = test_save_copy (TEST_TARGET_FILE))) { return ret; }
 
   /* Compress the target. */
-  sprintf (buf, "%s %s < %s > %s", ext->recomp_cmdname, ext->recomp_options, TEST_TARGET_FILE, TEST_SOURCE_FILE);
+  sprintf (buf, "%s %s < %s > %s", ext->recomp_cmdname,
+	   ext->recomp_options, TEST_TARGET_FILE, TEST_SOURCE_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Copy back to the source. */
   sprintf (buf, "cp -f %s %s", TEST_SOURCE_FILE, TEST_TARGET_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  /* Now the two identical files are compressed.  Delta-encode the target, with decompression. */
+  /* Now the two identical files are compressed.  Delta-encode the target,
+   * with decompression. */
   sprintf (buf, "%s -eq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  /* Decode the delta file with recompression disabled, should get an uncompressed file
-   * out. */
+  /* Decode the delta file with recompression disabled, should get an
+   * uncompressed file out. */
   sprintf (buf, "%s -dq -R -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (stream, TEST_COPY_FILE, TEST_RECON_FILE))) { return ret; }
 
-  /* Decode the delta file with recompression, should get a compressed file out.  But we
-   * can't compare compressed files directly. */
+  /* Decode the delta file with recompression, should get a compressed file
+   * out.  But we can't compare compressed files directly. */
   sprintf (buf, "%s -dqf -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   sprintf (buf, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options, TEST_RECON_FILE, TEST_RECON2_FILE);
@@ -1815,8 +1953,8 @@ test_source_decompression (xd3_stream *stream, int ignore)
   sprintf (buf, "%s -feqD -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  /* Decode the delta file with recompression enabled, it doesn't matter, should get the
-   * compressed file out. */
+  /* Decode the delta file with recompression enabled, it doesn't matter,
+   * should get the compressed file out. */
   sprintf (buf, "%s -fdq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE))) { return ret; }
@@ -1849,15 +1987,18 @@ test_force_behavior (xd3_stream *stream, int ignore)
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Encode to delta file */
-  sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e %s %s", program_name,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Encode again, should fail. */
-  sprintf (buf, "%s -e %s %s ", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -q -e %s %s ", program_name,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* Force it, should succeed. */
-  sprintf (buf, "%s -f -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -f -e %s %s", program_name,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup();
   return 0;
@@ -1877,15 +2018,18 @@ test_stdout_behavior (xd3_stream *stream, int ignore)
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Without -c, encode writes to delta file */
-  sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e %s %s", program_name,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* With -c, encode writes to stdout */
-  sprintf (buf, "%s -e -c %s > %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e -c %s > %s", program_name,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  /* Without -c, decode writes to target file name, but it fails because the file exists. */
-  sprintf (buf, "%s -d %s ", program_name, TEST_DELTA_FILE);
+  /* Without -c, decode writes to target file name, but it fails because the
+   * file exists. */
+  sprintf (buf, "%s -q -d %s ", program_name, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* With -c, decode writes to stdout */
@@ -1905,24 +2049,30 @@ test_no_output (xd3_stream *stream, int ignore)
 
   test_setup ();
 
-  sprintf (buf, "touch %s && chmod 0000 %s", TEST_NOPERM_FILE, TEST_NOPERM_FILE);
+  sprintf (buf, "touch %s && chmod 0000 %s",
+	   TEST_NOPERM_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
   /* Try no_output encode w/out unwritable output file */
-  sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_NOPERM_FILE);
+  sprintf (buf, "%s -q -f -e %s %s", program_name,
+	   TEST_TARGET_FILE, TEST_NOPERM_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
-  sprintf (buf, "%s -J -e %s %s", program_name, TEST_TARGET_FILE, TEST_NOPERM_FILE);
+  sprintf (buf, "%s -J -e %s %s", program_name,
+	   TEST_TARGET_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Now really write the delta to test decode no-output */
-  sprintf (buf, "%s -e %s %s", program_name, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e %s %s", program_name,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  sprintf (buf, "%s -d %s %s", program_name, TEST_DELTA_FILE, TEST_NOPERM_FILE);
+  sprintf (buf, "%s -q -f -d %s %s", program_name,
+	   TEST_DELTA_FILE, TEST_NOPERM_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
-  sprintf (buf, "%s -J -d %s %s", program_name, TEST_DELTA_FILE, TEST_NOPERM_FILE);
+  sprintf (buf, "%s -J -d %s %s", program_name,
+	   TEST_DELTA_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup ();
   return 0;
@@ -2419,6 +2569,7 @@ xd3_selftest (void)
   DO_TEST (stdout_behavior, 0, 0);
   DO_TEST (no_output, 0, 0);
   DO_TEST (command_line_arguments, 0, 0);
+  //DO_TEST (recode_command, 0, 0);
 
 #if EXTERNAL_COMPRESSION
   DO_TEST (source_decompression, 0, 0);
@@ -2427,8 +2578,7 @@ xd3_selftest (void)
 
 #endif /* WIN32 */
 
-  /* This test takes a while.
-   */
+  /* This test takes a while. */
   DO_TEST (compressed_stream_overflow, 0, 0);
 
 failure:

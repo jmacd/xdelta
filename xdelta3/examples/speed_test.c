@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   int repeat, level;
   char *from, *to;
   uint8_t *from_buf = NULL, *to_buf = NULL, *delta_buf = NULL;
-  size_t from_len, to_len, delta_alloc, delta_size = 0;
+  size_t from_len = 0, to_len, delta_alloc, delta_size = 0;
   long start, finish;
   int i, ret;
   int flags;
@@ -36,7 +36,8 @@ int main(int argc, char **argv) {
   to = argv[4];
   flags = (level << XD3_COMPLEVEL_SHIFT) & XD3_COMPLEVEL_MASK;
 
-  if ((ret = read_whole_file(from, &from_buf, &from_len)) ||
+  if ((strcmp(from, "null") != 0 &&
+       (ret = read_whole_file(from, &from_buf, &from_len))) ||
       (ret = read_whole_file(to, &to_buf, &to_len))) {
     fprintf(stderr, "read_whole_file error\n");
     goto exit;
@@ -48,7 +49,8 @@ int main(int argc, char **argv) {
   start = get_millisecs_now();
 
   for (i = 0; i < repeat; ++i) {
-    delta_size = bench_speed(from_buf, from_len, to_buf, to_len, delta_buf, delta_alloc, flags);
+    delta_size = bench_speed(from_buf, from_len,
+			     to_buf, to_len, delta_buf, delta_alloc, flags);
   }
 
   finish = get_millisecs_now();

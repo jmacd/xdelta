@@ -2313,9 +2313,10 @@ xd3_config_stream(xd3_stream *stream,
   /* Initial setup: no error checks yet */
   memset (stream, 0, sizeof (*stream));
 
-  stream->winsize   = config->winsize   ? config->winsize : XD3_DEFAULT_WINSIZE;
-  stream->sprevsz   = config->sprevsz   ? config->sprevsz : XD3_DEFAULT_SPREVSZ;
-  stream->srcwin_maxsz = config->srcwin_maxsz ? config->srcwin_maxsz : XD3_DEFAULT_SRCWINSZ;
+  stream->winsize = config->winsize ? config->winsize : XD3_DEFAULT_WINSIZE;
+  stream->sprevsz = config->sprevsz ? config->sprevsz : XD3_DEFAULT_SPREVSZ;
+  stream->srcwin_maxsz = config->srcwin_maxsz ?
+    config->srcwin_maxsz : XD3_DEFAULT_SRCWINSZ;
 
   if (config->iopt_size == 0)
     {
@@ -2389,7 +2390,8 @@ xd3_config_stream(xd3_stream *stream,
   }
 
   /* Check sprevsz */
-  if (smatcher->small_chain == 1)
+  if (smatcher->small_chain == 1 &&
+      smatcher->small_lchain == 1)
     {
       stream->sprevsz = 0;
     }
@@ -3939,9 +3941,7 @@ xd3_process_memory (int            is_encode,
       config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
       config.iopt_size = max(config.iopt_size, 128U);
-      config.sprevsz = XD3_DEFAULT_SPREVSZ;
-
-      while (config.sprevsz / 2 > input_size) { config.sprevsz /= 2; }
+      config.sprevsz = xd3_pow2_roundup (config.winsize);
     }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)
@@ -4076,20 +4076,21 @@ xd3_string_match_init (xd3_stream *stream)
 	{
 	  /* The target hash table is reinitialized once per window. */
 	  /* TODO: This would not have to be reinitialized if absolute
-	   * offsets were being stored, as we would do for VCD_TARGET
-	   * encoding. */
+	   * offsets were being stored. */
 	  if (stream->small_reset)
 	    {
 	      stream->small_reset = 0;
-	      memset (stream->small_table, 0, sizeof (usize_t) * stream->small_hash.size);
+	      memset (stream->small_table, 0,
+		      sizeof (usize_t) * stream->small_hash.size);
 	    }
 
 	  return 0;
 	}
 
-      if ((stream->small_table = (usize_t*) xd3_alloc0 (stream,
-							stream->small_hash.size,
-							sizeof (usize_t))) == NULL)
+      if ((stream->small_table =
+	   (usize_t*) xd3_alloc0 (stream,
+				  stream->small_hash.size,
+				  sizeof (usize_t))) == NULL)
 	{
 	  return ENOMEM;
 	}
@@ -4098,9 +4099,10 @@ xd3_string_match_init (xd3_stream *stream)
       if (stream->smatcher.small_lchain > 1 ||
 	  stream->smatcher.small_chain > 1)
 	{
-	  if ((stream->small_prev = (xd3_slist*) xd3_alloc (stream,
-							    stream->sprevsz,
-							    sizeof (xd3_slist))) == NULL)
+	  if ((stream->small_prev =
+	       (xd3_slist*) xd3_alloc (stream,
+				       stream->sprevsz,
+				       sizeof (xd3_slist))) == NULL)
 	    {
 	      return ENOMEM;
 	    }
@@ -4111,8 +4113,8 @@ xd3_string_match_init (xd3_stream *stream)
 }
 
 #if XD3_USE_LARGEFILE64
-/* This function handles the 32/64bit ambiguity -- file positions are 64bit but the hash
- * table for source-offsets is 32bit. */
+/* This function handles the 32/64bit ambiguity -- file positions are 64bit
+ * but the hash table for source-offsets is 32bit. */
 static xoff_t
 xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 {

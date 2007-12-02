@@ -38,7 +38,8 @@
 
  David J. Wheeler
  Program bred3.c, bexp3 and accompanying documents bred3.ps, huff.ps.
- This contains the idea behind the multi-table Huffman and 1-2 coding techniques.
+ This contains the idea behind the multi-table Huffman and 1-2 coding
+ techniques.
  ftp://ftp.cl.cam.ac.uk/users/djw3/
 
 */
@@ -54,16 +55,24 @@
 
 #define DJW_MAX_CODELEN      20 /* Maximum length of an alphabet code. */
 
-#define DJW_TOTAL_CODES      (DJW_MAX_CODELEN+2) /* [RUN_0, RUN_1, 1-DJW_MAX_CODELEN] */
+/* [RUN_0, RUN_1, 1-DJW_MAX_CODELEN] */
+#define DJW_TOTAL_CODES      (DJW_MAX_CODELEN+2)
 
 #define RUN_0                0 /* Symbols used in MTF+1/2 coding. */
 #define RUN_1                1
 
-#define DJW_BASIC_CODES      5  /* Number of code lengths always encoded (djw_encode_basic array) */
+/* Number of code lengths always encoded (djw_encode_basic array) */
+#define DJW_BASIC_CODES      5  
 #define DJW_RUN_CODES        2  /* Number of run codes */
-#define DJW_EXTRA_12OFFSET   (DJW_BASIC_CODES + DJW_RUN_CODES)  /* Offset of extra codes */
-#define DJW_EXTRA_CODES      15 /* Number of optionally encoded code lengths (djw_encode_extra array) */
-#define DJW_EXTRA_CODE_BITS  4  /* Number of bits to code [0-DJW_EXTRA_CODES] */
+
+/* Offset of extra codes */
+#define DJW_EXTRA_12OFFSET   (DJW_BASIC_CODES + DJW_RUN_CODES)
+
+/* Number of optionally encoded code lengths (djw_encode_extra array) */
+#define DJW_EXTRA_CODES      15
+
+/* Number of bits to code [0-DJW_EXTRA_CODES] */
+#define DJW_EXTRA_CODE_BITS  4  
 
 #define DJW_MAX_GROUPS       8  /* Max number of group coding tables */
 #define DJW_GROUP_BITS       3  /* Number of bits to code [1-DJW_MAX_GROUPS] */
@@ -72,19 +81,27 @@
 #define DJW_SECTORSZ_BITS     5  /* Number of bits to code group size */
 #define DJW_SECTORSZ_MAX      ((1 << DJW_SECTORSZ_BITS) * DJW_SECTORSZ_MULT)
 
-#define DJW_MAX_ITER         6  /* Maximum number of iterations to find group tables. */
-#define DJW_MIN_IMPROVEMENT  20 /* Minimum number of bits an iteration must reduce coding by. */
+/* Maximum number of iterations to find group tables. */
+#define DJW_MAX_ITER         6
+/* Minimum number of bits an iteration must reduce coding by. */
+#define DJW_MIN_IMPROVEMENT  20 
 
-#define DJW_MAX_CLCLEN       15 /* Maximum code length of a prefix code length */
-#define DJW_CLCLEN_BITS      4  /* Number of bits to code [0-DJW_MAX_CLCLEN] */
+/* Maximum code length of a prefix code length */
+#define DJW_MAX_CLCLEN       15
+
+/* Number of bits to code [0-DJW_MAX_CLCLEN] */
+#define DJW_CLCLEN_BITS      4  
 
 #define DJW_MAX_GBCLEN       7  /* Maximum code length of a group selector */
-#define DJW_GBCLEN_BITS      3  /* Number of bits to code [0-DJW_MAX_GBCLEN]
-				 * @!@ Actually, should never have zero code lengths here, or
-				 * else a group went unused.  Write a test for this: if a group
-				 * goes unused, eliminate it? */
 
-#define EFFICIENCY_BITS      16 /* It has to save at least this many bits... */
+/* Number of bits to code [0-DJW_MAX_GBCLEN]
+ * TODO: Actually, should never have zero code lengths here, or else a group
+ * went unused.  Write a test for this: if a group goes unused, eliminate
+ * it? */
+#define DJW_GBCLEN_BITS      3  
+
+/* It has to save at least this many bits... */
+#define EFFICIENCY_BITS      16
 
 typedef struct _djw_stream   djw_stream;
 typedef struct _djw_heapen   djw_heapen;
@@ -271,7 +288,10 @@ heap_extract (uint *heap, const djw_heapen *ents, uint heap_last)
       if (pc > heap_last) { break; }
 
       /* See if second child is smaller. */
-      if (pc < heap_last && heap_less (& ents[heap[pc+1]], & ents[heap[pc]])) { pc += 1; }
+      if (pc < heap_last && heap_less (& ents[heap[pc+1]], & ents[heap[pc]]))
+	{
+	  pc += 1;
+	}
 
       /* If pc is not smaller than p, heap property re-established. */
       if (! heap_less (& ents[heap[pc]], & ents[heap[p]])) { break; }
@@ -314,7 +334,8 @@ djw_update_mtf (uint8_t *mtf, usize_t mtf_i)
 }
 
 static inline void
-djw_update_1_2 (int *mtf_run, usize_t *mtf_i, uint8_t *mtfsym, djw_weight *freq)
+djw_update_1_2 (int *mtf_run, usize_t *mtf_i,
+		uint8_t *mtfsym, djw_weight *freq)
 {
   int code;
   
@@ -340,8 +361,14 @@ djw_init_clen_mtf_1_2 (uint8_t *clmtf)
   int i, cl_i = 0;
 
   clmtf[cl_i++] = 0;
-  for (i = 0; i < DJW_BASIC_CODES; i += 1) { clmtf[cl_i++] = djw_encode_12basic[i]; }
-  for (i = 0; i < DJW_EXTRA_CODES; i += 1) { clmtf[cl_i++] = djw_encode_12extra[i]; }
+  for (i = 0; i < DJW_BASIC_CODES; i += 1)
+    {
+      clmtf[cl_i++] = djw_encode_12basic[i];
+    }
+  for (i = 0; i < DJW_EXTRA_CODES; i += 1)
+    {
+      clmtf[cl_i++] = djw_encode_12extra[i];
+    }
 }
 
 /*********************************************************************/
@@ -351,10 +378,11 @@ djw_init_clen_mtf_1_2 (uint8_t *clmtf)
 static usize_t
 djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
 {
-  /* Heap with 0th entry unused, prefix tree with up to ALPHABET_SIZE-1 internal nodes,
-   * never more than ALPHABET_SIZE entries actually in the heap (minimum weight subtrees
-   * during prefix construction).  First ALPHABET_SIZE entries are the actual symbols,
-   * next ALPHABET_SIZE-1 are internal nodes. */
+  /* Heap with 0th entry unused, prefix tree with up to ALPHABET_SIZE-1
+   * internal nodes, never more than ALPHABET_SIZE entries actually in the
+   * heap (minimum weight subtrees during prefix construction).  First
+   * ALPHABET_SIZE entries are the actual symbols, next ALPHABET_SIZE-1 are
+   * internal nodes. */
   djw_heapen ents[ALPHABET_SIZE * 2];
   uint heap[ALPHABET_SIZE + 1];
 
@@ -380,8 +408,8 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
   overflow  = 0;
   total_bits = 0;
 
-  /* 0th entry terminates the while loop in heap_insert (it's the parent of the smallest
-   * element, always less-than) */
+  /* 0th entry terminates the while loop in heap_insert (it's the parent of
+   * the smallest element, always less-than) */
   heap[0] = 0;
   ents[0].depth = 0;
   ents[0].freq  = 0;
@@ -403,7 +431,8 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
   /* Must be at least one symbol, or else we can't get here. */
   XD3_ASSERT (heap_last != 0);
 
-  /* If there is only one symbol, fake a second to prevent zero-length codes. */
+  /* If there is only one symbol, fake a second to prevent zero-length
+   * codes. */
   if (heap_last == 1)
     {
       /* Pick either the first or last symbol. */
@@ -456,13 +485,14 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, int asize, int maxlen)
     {
       IF_DEBUG1 (if (first_bits != total_bits)
       {
-	DP(RINT "code length overflow changed %u bits\n", (usize_t)(total_bits - first_bits));
+	DP(RINT "code length overflow changed %u bits\n",
+	   (usize_t)(total_bits - first_bits));
       });
       return total_bits;
     }
 
-  /* OPT: There is a non-looping way to fix overflow shown in zlib, but this is easier
-   * (for now), as done in bzip2. */
+  /* OPT: There is a non-looping way to fix overflow shown in zlib, but this
+   * is easier (for now), as done in bzip2. */
   for (i = 1; i < asize+1; i += 1)
     {
       ents[i].freq = ents[i].freq / 2 + 1;
@@ -509,7 +539,7 @@ djw_build_codes (uint *codes, const uint8_t *clen, int asize, int abs_max)
   IF_DEBUG1 ({
       for (i = 0; i < asize; i += 1)
 	{
-	  DP(RINT "code[%d] = %d\n", i, codes[i]);
+	  DP(RINT "code[%d] = %u\n", i, codes[i]);
 	}
     });
 }
@@ -533,19 +563,12 @@ djw_compute_mtf_1_2 (djw_prefix  *prefix,
 
   for (i = 0; i < size; )
     {
-      /* OPT: Bzip optimizes this algorithm a little by effectively checking j==0 before
-       * the MTF update. */
+      /* OPT: Bzip optimizes this algorithm a little by effectively checking
+       * j==0 before the MTF update. */
       sym = prefix->symbol[i++];
 
       for (j = 0; mtf[j] != sym; j += 1) { }
 
-      /* TODO: This assertion was firing in 3.0q due to the wrong value of
-       * DJW_MAX_CODELEN, which disabled the code-length overflow logic.
-       * Bug fix has been confirmed. . */
-      if (j > nsym)
-	{
-	  abort();
-	}
       XD3_ASSERT (j <= nsym);
 
       for (k = j; k >= 1; k -= 1) { mtf[k] = mtf[k-1]; }
@@ -818,7 +841,9 @@ xd3_encode_howmany_groups (xd3_stream *stream,
   (*ret_sector_size) = cfg_sector_size;
 
   XD3_ASSERT (cfg_groups > 0 && cfg_groups <= DJW_MAX_GROUPS);
-  XD3_ASSERT (cfg_groups == 1 || (cfg_sector_size >= DJW_SECTORSZ_MULT && cfg_sector_size <= DJW_SECTORSZ_MAX));
+  XD3_ASSERT (cfg_groups == 1 ||
+	      (cfg_sector_size >= DJW_SECTORSZ_MULT &&
+	       cfg_sector_size <= DJW_SECTORSZ_MAX));
 
   return 0;
 }
@@ -839,7 +864,7 @@ xd3_encode_huff (xd3_stream   *stream,
   usize_t     input_bytes;
   usize_t     initial_offset = output->next;
   djw_weight  real_freq[ALPHABET_SIZE];
-  uint8_t    *gbest = NULL; /* Dynamic allocations: could put these in djw_stream. */
+  uint8_t    *gbest = NULL;
   uint8_t    *gbest_mtf = NULL;
 
   input_bytes = djw_count_freqs (real_freq, input);
@@ -847,7 +872,8 @@ xd3_encode_huff (xd3_stream   *stream,
 
   XD3_ASSERT (input_bytes > 0);
 
-  if ((ret = xd3_encode_howmany_groups (stream, cfg, input_bytes, & groups, & sector_size)))
+  if ((ret = xd3_encode_howmany_groups (stream, cfg, input_bytes,
+					& groups, & sector_size)))
     {
       return ret;
     }
@@ -1020,7 +1046,8 @@ xd3_encode_huff (xd3_stream   *stream,
       memset (evolve_freq, 0, sizeof (evolve_freq[0]) * groups);
       IF_DEBUG1 (memset (gcount, 0, sizeof (gcount[0]) * groups));
 
-      /* For each input page (loop is irregular to allow non-pow2-size group size. */
+      /* For each input page (loop is irregular to allow non-pow2-size group
+       * size. */
       in = input;
       p  = in->base;
 
@@ -1328,10 +1355,11 @@ djw_build_decoder (xd3_stream    *stream,
   ci = clen;
   do
     {
-      /* Caller _must_ check that values are in-range.  Most of the time
-       * the caller decodes a specific number of bits, which imply the max value, and the
-       * other time the caller decodes a huffman value, which must be in-range.  Therefore,
-       * its an assertion and this function cannot otherwise fail. */
+      /* Caller _must_ check that values are in-range.  Most of the time the
+       * caller decodes a specific number of bits, which imply the max value,
+       * and the other time the caller decodes a huffman value, which must be
+       * in-range.  Therefore, its an assertion and this function cannot
+       * otherwise fail. */
       XD3_ASSERT (*ci <= abs_max);
 
       nr_clen[*ci++]++;
@@ -1458,7 +1486,10 @@ djw_decode_clclen (xd3_stream     *stream,
 
   /* How many extra code lengths to encode. */
   if ((ret = xd3_decode_bits (stream, bstate, input,
-			      input_end, DJW_EXTRA_CODE_BITS, & num_codes))) { return ret; }
+			      input_end, DJW_EXTRA_CODE_BITS, & num_codes)))
+    {
+      return ret;
+    }
 
   num_codes += DJW_EXTRA_12OFFSET;
 
@@ -1466,7 +1497,10 @@ djw_decode_clclen (xd3_stream     *stream,
   for (i = 0; i < num_codes; i += 1)
     {
       if ((ret = xd3_decode_bits (stream, bstate, input,
-				  input_end, DJW_CLCLEN_BITS, & value))) { return ret; }
+				  input_end, DJW_CLCLEN_BITS, & value)))
+	{
+	  return ret;
+	}
 
       cl_clen[i] = value;
     }
@@ -1479,7 +1513,8 @@ djw_decode_clclen (xd3_stream     *stream,
 
   /* Build the code-length decoder. */
   djw_build_decoder (stream, DJW_TOTAL_CODES, DJW_MAX_CLCLEN,
-		     cl_clen, cl_inorder, cl_base, cl_limit, cl_minlen, cl_maxlen);
+		     cl_clen, cl_inorder, cl_base,
+		     cl_limit, cl_minlen, cl_maxlen);
 
   /* Initialize the MTF state. */
   djw_init_clen_mtf_1_2 (cl_mtf);
@@ -1507,8 +1542,8 @@ djw_decode_1_2 (xd3_stream     *stream,
   
   while (n < elts)
     {
-      /* Special case inside generic code: CLEN only: If not the first group, we already
-       * know the zero frequencies. */
+      /* Special case inside generic code: CLEN only: If not the first group,
+       * we already know the zero frequencies. */
       if (skip_offset != 0 && n >= skip_offset && values[n-skip_offset] == 0)
 	{
 	  values[n++] = 0;
@@ -1577,7 +1612,8 @@ djw_decode_prefix (xd3_stream     *stream,
 		   uint8_t        *clen)
 {
   return djw_decode_1_2 (stream, bstate, input, input_end,
-			 cl_inorder, cl_base, cl_limit, cl_minlen, cl_maxlen, cl_mtf,
+			 cl_inorder, cl_base, cl_limit,
+			 cl_minlen, cl_maxlen, cl_mtf,
 			 ALPHABET_SIZE * groups, ALPHABET_SIZE, clen);
 }
 
@@ -1608,7 +1644,10 @@ xd3_decode_huff (xd3_stream     *stream,
 
   /* Decode: number of groups */
   if ((ret = xd3_decode_bits (stream, & bstate, & input,
-			      input_end, DJW_GROUP_BITS, & groups))) { goto fail; }
+			      input_end, DJW_GROUP_BITS, & groups)))
+    {
+      goto fail;
+    }
 
   groups += 1;
 
@@ -1616,7 +1655,8 @@ xd3_decode_huff (xd3_stream     *stream,
     {
       /* Decode: group size */
       if ((ret = xd3_decode_bits (stream, & bstate, & input,
-				  input_end, DJW_SECTORSZ_BITS, & sector_size))) { goto fail; }
+				  input_end, DJW_SECTORSZ_BITS,
+				  & sector_size))) { goto fail; }
       
       sector_size = (sector_size + 1) * DJW_SECTORSZ_MULT;
     }
@@ -1628,9 +1668,10 @@ xd3_decode_huff (xd3_stream     *stream,
 
   sectors = 1 + (output_bytes - 1) / sector_size;
 
-  /* @!@ In the case of groups==1, lots of extra stack space gets used here.  Could
-   * dynamically allocate this memory, which would help with excess parameter passing,
-   * too.  Passing too many parameters in this file, simplify it! */
+  /* TODO: In the case of groups==1, lots of extra stack space gets used here.
+   * Could dynamically allocate this memory, which would help with excess
+   * parameter passing, too.  Passing too many parameters in this file,
+   * simplify it! */
 
   /* Outer scope: per-group symbol decoder tables. */
   {
@@ -1689,25 +1730,34 @@ xd3_decode_huff (xd3_stream     *stream,
 	      usize_t value;
 
 	      if ((ret = xd3_decode_bits (stream, & bstate, & input,
-					  input_end, DJW_GBCLEN_BITS, & value))) { goto fail; }
+					  input_end, DJW_GBCLEN_BITS,
+					  & value))) { goto fail; }
 
 	      sel_clen[gp] = value;
 	      sel_mtf[gp]  = gp;
 	    }
 
-	  if ((sel_group = xd3_alloc (stream, sectors, 1)) == NULL) { ret = ENOMEM; goto fail; }
+	  if ((sel_group = xd3_alloc (stream, sectors, 1)) == NULL)
+	    {
+	      ret = ENOMEM;
+	      goto fail;
+	    }
 
 	  djw_build_decoder (stream, groups+1, DJW_MAX_GBCLEN, sel_clen,
-			     sel_inorder, sel_base, sel_limit, & sel_minlen, & sel_maxlen);
+			     sel_inorder, sel_base, sel_limit,
+			     & sel_minlen, & sel_maxlen);
 
 	  if ((ret = djw_decode_1_2 (stream, & bstate, & input, input_end,
-				     sel_inorder, sel_base, sel_limit, & sel_minlen, & sel_maxlen, sel_mtf,
+				     sel_inorder, sel_base,
+				     sel_limit, & sel_minlen,
+				     & sel_maxlen, sel_mtf,
 				     sectors, 0, sel_group))) { goto fail; }
 	}
 
       /* Now decode each sector. */
       {
-	uint8_t *gp_inorder = inorder[0]; /* Initialize for (groups==1) case. */
+	/* Initialize for (groups==1) case. */
+	uint8_t *gp_inorder = inorder[0]; 
 	uint    *gp_base    = base[0];
 	uint    *gp_limit   = limit[0];
 	uint     gp_minlen  = minlen[0];
@@ -1740,9 +1790,14 @@ xd3_decode_huff (xd3_stream     *stream,
 	      {
 		usize_t sym;
 
-		if ((ret = djw_decode_symbol (stream, & bstate, & input, input_end,
-					      gp_inorder, gp_base, gp_limit, gp_minlen, gp_maxlen,
-					      & sym, ALPHABET_SIZE))) { goto fail; }
+		if ((ret = djw_decode_symbol (stream, & bstate,
+					      & input, input_end,
+					      gp_inorder, gp_base,
+					      gp_limit, gp_minlen, gp_maxlen,
+					      & sym, ALPHABET_SIZE)))
+		  {
+		    goto fail;
+		  }
 
 		*output++ = sym;
 	      }
@@ -1752,7 +1807,8 @@ xd3_decode_huff (xd3_stream     *stream,
     }
   }
 
-  IF_REGRESSION (if ((ret = xd3_test_clean_bits (stream, & bstate))) { goto fail; });
+  IF_REGRESSION (if ((ret = xd3_test_clean_bits (stream, & bstate)))
+		   { goto fail; });
   XD3_ASSERT (ret == 0);
 
  fail:

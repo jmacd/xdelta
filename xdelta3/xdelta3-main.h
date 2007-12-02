@@ -662,7 +662,8 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
 #define XOPEN_MODE   (xfile->mode == XO_READ ? 0 : 0666)
 
 #define XF_ERROR(op, name, ret) \
-  XPR(NT "file %s failed: %s: %s: %s\n", (op), XOPEN_OPNAME, (name), xd3_mainerror (ret))
+  do { if (!option_quiet) { XPR(NT "file %s failed: %s: %s: %s\n", (op), \
+       XOPEN_OPNAME, (name), xd3_mainerror (ret)); } } while (0)
 
 #if XD3_STDIO
 #define XFNO(f) fileno(f->file)
@@ -811,23 +812,32 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
   int ret = 0;
 #if XD3_WIN32
   LARGE_INTEGER li;
-  if (GetFileSizeEx(xfile->file, &li) == 0) {
-	  ret = get_errno ();
-  } else {
+  if (GetFileSizeEx(xfile->file, &li) == 0)
+    {
+      ret = get_errno ();
+    }
+  else
+    {
       *size = li.QuadPart;
-  }
+    }
 #else
   struct stat sbuf;
   if (fstat (XFNO (xfile), & sbuf) < 0)
     {
       ret = get_errno ();
-      if (err_ifnoseek) { XF_ERROR ("stat", xfile->filename, ret); }
+      if (err_ifnoseek)
+	{
+	  XF_ERROR ("stat", xfile->filename, ret);
+	}
       return ret;
     }
 
   if (! S_ISREG (sbuf.st_mode))
     {
-      if (err_ifnoseek) { XPR(NT "source file must be seekable: %s\n", xfile->filename); }
+      if (err_ifnoseek)
+	{
+	  XPR(NT "source file must be seekable: %s\n", xfile->filename);
+	}
       return ESPIPE;
     }
   (*size) = sbuf.st_size;
@@ -2224,7 +2234,11 @@ main_open_output (xd3_stream *stream, main_file *ofile)
       /* Stat the file to check for overwrite. */
       if (option_force == 0 && main_file_exists (ofile))
 	{
-	  XPR(NT "to overwrite output file specify -f: %s\n", ofile->filename);
+	  if (!option_quiet)
+	    {
+	      XPR(NT "to overwrite output file specify -f: %s\n",
+		  ofile->filename);
+	    }
 	  return EEXIST;
 	}
 
@@ -2879,12 +2893,15 @@ main_input (xd3_cmd     cmd,
 	  {
 	    if (option_no_output == 0)
 	      {
-		/* Defer opening the output file until the stream produces its first
-		 * output for both encoder and decoder, this way we delay long enough for
-		 * the decoder to receive the application header.  (Or longer if there are
-		 * skipped windows, but I can't think of any reason not to delay open.) */
+		/* Defer opening the output file until the stream produces its
+		 * first output for both encoder and decoder, this way we
+		 * delay long enough for the decoder to receive the
+		 * application header.  (Or longer if there are skipped
+		 * windows, but I can't think of any reason not to delay
+		 * open.) */
 
-		if (! main_file_isopen (ofile) && (ret = main_open_output (& stream, ofile)) != 0)
+		if (! main_file_isopen (ofile) &&
+		    (ret = main_open_output (& stream, ofile)) != 0)
 		  {
 		    return EXIT_FAILURE;
 		  }
@@ -2992,7 +3009,8 @@ done:
 	  return EXIT_FAILURE;
 	}
 
-      /* Have to close the output before calling main_external_compression_finish, or else it hangs. */
+      /* Have to close the output before calling
+       * main_external_compression_finish, or else it hangs. */
       if (main_file_close (ofile) != 0)
 	{
 	  return EXIT_FAILURE;
@@ -3297,8 +3315,9 @@ main (int argc, char **argv)
 	  else if (strcmp (my_optstr, "recode") == 0) { cmd = CMD_RECODE; }
 #endif
 
-	  /* If no option was found and still no command, let the default command be
-	   * encode.  The remaining args are treated as filenames. */
+	  /* If no option was found and still no command, let the default
+	   * command be encode.  The remaining args are treated as
+	   * filenames. */
 	  if (cmd == CMD_NONE)
 	    {
 	      cmd = CMD_DEFAULT;
@@ -3440,8 +3459,8 @@ main (int argc, char **argv)
   sfile.flags    = RD_FIRST;
   sfile.filename = option_source_filename;
 
-  /* The infile takes the next argument, if there is one.  But if not, infile is set to
-   * stdin. */
+  /* The infile takes the next argument, if there is one.  But if not, infile
+   * is set to stdin. */
   if (argc > 0)
     {
       ifile.filename = argv[0];
@@ -3456,8 +3475,9 @@ main (int argc, char **argv)
       XSTDIN_XF (& ifile);
     }
 
-  /* The ofile takes the following argument, if there is one.  But if not, it is left NULL
-   * until the application header is processed.  It will be set in main_open_output. */
+  /* The ofile takes the following argument, if there is one.  But if not, it
+   * is left NULL until the application header is processed.  It will be set
+   * in main_open_output. */
   if (argc > 1)
     {
       /* Check for conflicting arguments. */

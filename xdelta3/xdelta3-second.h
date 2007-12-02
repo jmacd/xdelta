@@ -25,12 +25,12 @@ static inline void xd3_bit_state_encode_init (bit_state *bits)
   bits->cur_mask = 1;
 }
 
-static inline int xd3_decode_bits     (xd3_stream     *stream,
-				       bit_state      *bits,
-				       const uint8_t **input,
-				       const uint8_t  *input_max,
-				       usize_t          nbits,
-				       usize_t         *valuep)
+static inline int xd3_decode_bits (xd3_stream     *stream,
+				   bit_state      *bits,
+				   const uint8_t **input,
+				   const uint8_t  *input_max,
+				   usize_t         nbits,
+				   usize_t        *valuep)
 {
   usize_t value = 0;
   usize_t vmask = 1 << nbits;
@@ -75,9 +75,9 @@ static inline int xd3_decode_bits     (xd3_stream     *stream,
 }
 
 #if REGRESSION_TEST
-/* There may be extra bits at the end of secondary decompression, this macro checks for
- * non-zero bits.  This is overly strict, but helps pass the single-bit-error regression
- * test. */
+/* There may be extra bits at the end of secondary decompression, this macro
+ * checks for non-zero bits.  This is overly strict, but helps pass the
+ * single-bit-error regression test. */
 static int
 xd3_test_clean_bits (xd3_stream *stream, bit_state *bits)
 {
@@ -125,11 +125,16 @@ xd3_decode_secondary (xd3_stream      *stream,
   uint8_t *out_used;
   int ret;
 
-  if ((sec_stream = xd3_get_secondary (stream, sec_streamp)) == NULL) { return ENOMEM; }
+  if ((sec_stream = xd3_get_secondary (stream, sec_streamp)) == NULL)
+    {
+      return ENOMEM;
+    }
 
   /* Decode the size, allocate the buffer. */
-  if ((ret = xd3_read_size (stream, & sect->buf, sect->buf_max, & dec_size)) ||
-      (ret = xd3_decode_allocate (stream, dec_size, & sect->copied2, & sect->alloc2)))
+  if ((ret = xd3_read_size (stream, & sect->buf,
+			    sect->buf_max, & dec_size)) ||
+      (ret = xd3_decode_allocate (stream, dec_size,
+				  & sect->copied2, & sect->alloc2)))
     {
       return ret;
     }
@@ -138,7 +143,10 @@ xd3_decode_secondary (xd3_stream      *stream,
 
   if ((ret = stream->sec_type->decode (stream, sec_stream,
 				       & sect->buf, sect->buf_max,
-				       & out_used, out_used + dec_size))) { return ret; }
+				       & out_used, out_used + dec_size)))
+    {
+      return ret;
+    }
 
   if (sect->buf != sect->buf_max)
     {
@@ -152,7 +160,7 @@ xd3_decode_secondary (xd3_stream      *stream,
       return XD3_INTERNAL;
     }
 
-  sect->buf     = sect->copied2;
+  sect->buf = sect->copied2;
   sect->buf_max = sect->copied2 + dec_size;
   sect->size = dec_size;
 
@@ -160,10 +168,10 @@ xd3_decode_secondary (xd3_stream      *stream,
 }
 
 #if XD3_ENCODER
-static inline int xd3_encode_bit       (xd3_stream      *stream,
-					xd3_output     **output,
-					bit_state       *bits,
-					int              bit)
+static inline int xd3_encode_bit (xd3_stream      *stream,
+				  xd3_output     **output,
+				  bit_state       *bits,
+				  int              bit)
 {
   int ret;
 
@@ -175,7 +183,10 @@ static inline int xd3_encode_bit       (xd3_stream      *stream,
   /* OPT: Might help to buffer more than 8 bits at once. */
   if (bits->cur_mask == 0x80)
     {
-      if ((ret = xd3_emit_byte (stream, output, bits->cur_byte)) != 0) { return ret; }
+      if ((ret = xd3_emit_byte (stream, output, bits->cur_byte)) != 0)
+	{
+	  return ret;
+	}
 
       bits->cur_mask = 1;
       bits->cur_byte = 0;
@@ -188,18 +199,19 @@ static inline int xd3_encode_bit       (xd3_stream      *stream,
   return 0;
 }
 
-static inline int xd3_flush_bits       (xd3_stream      *stream,
-					xd3_output     **output,
-					bit_state       *bits)
+static inline int xd3_flush_bits (xd3_stream      *stream,
+				  xd3_output     **output,
+				  bit_state       *bits)
 {
-  return (bits->cur_mask == 1) ? 0 : xd3_emit_byte (stream, output, bits->cur_byte);
+  return (bits->cur_mask == 1) ? 0 :
+    xd3_emit_byte (stream, output, bits->cur_byte);
 }
 
-static inline int xd3_encode_bits      (xd3_stream      *stream,
-					xd3_output     **output,
-					bit_state       *bits,
-					usize_t           nbits,
-					usize_t           value)
+static inline int xd3_encode_bits (xd3_stream      *stream,
+				   xd3_output     **output,
+				   bit_state       *bits,
+				   usize_t           nbits,
+				   usize_t           value)
 {
   int ret;
   usize_t mask = 1 << nbits;
@@ -212,7 +224,10 @@ static inline int xd3_encode_bits      (xd3_stream      *stream,
     {
       mask >>= 1;
 
-      if ((ret = xd3_encode_bit (stream, output, bits, value & mask))) { return ret; }
+      if ((ret = xd3_encode_bit (stream, output, bits, value & mask)))
+	{
+	  return ret;
+	}
     }
   while (mask != 1);
 
@@ -242,18 +257,25 @@ xd3_encode_secondary (xd3_stream      *stream,
 
   if (orig_size < SECONDARY_MIN_INPUT) { return 0; }
 
-  if ((sec_stream = xd3_get_secondary (stream, sec_streamp)) == NULL) { return ENOMEM; }
+  if ((sec_stream = xd3_get_secondary (stream, sec_streamp)) == NULL)
+    {
+      return ENOMEM;
+    }
 
   tmp_head = xd3_alloc_output (stream, NULL);
 
-  /* Encode the size, encode the data.  @@ Encoding the size makes it
+  /* Encode the size, encode the data.  Encoding the size makes it
    * simpler, but is a little gross.  Should not need the entire
    * section in contiguous memory, but it is much easier this way. */
   if ((ret = xd3_emit_size (stream, & tmp_head, orig_size)) ||
-      (ret = stream->sec_type->encode (stream, sec_stream, *head, tmp_head, cfg))) { goto getout; }
+      (ret = stream->sec_type->encode (stream, sec_stream, *head,
+				       tmp_head, cfg)))
+    {
+      goto getout;
+    }
 
-  /* If the secondary compressor determines its no good, it returns
-     XD3_NOSECOND. */
+  /* If the secondary compressor determines it's no good, it returns
+   * XD3_NOSECOND. */
 
   /* Setup tmp_tail, comp_size */
   tmp_tail  = tmp_head;
@@ -272,7 +294,7 @@ xd3_encode_secondary (xd3_stream      *stream,
     {
       IF_DEBUG1(DP(RINT "secondary saved %u bytes: %u -> %u (%0.2f%%)\n",
 		   orig_size - comp_size, orig_size, comp_size,
-		   100.0 * (double) comp_size / (double) orig_size));
+	       100.0 * (double) comp_size / (double) orig_size));
 
       xd3_free_output (stream, *head);
 

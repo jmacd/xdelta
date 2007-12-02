@@ -16,10 +16,12 @@ static int read_whole_file(const char *name,
   file.filename = name;
   ret = main_file_open(&file, name, XO_READ);
   if (ret != 0) {
+    fprintf(stderr, "open failed\n");
     goto exit;
   }
-  ret = main_file_stat(&file, &len, 1);
+  ret = main_file_stat(&file, &len, 0);
   if (ret != 0) {
+    fprintf(stderr, "stat failed\n");
     goto exit;
   }
   

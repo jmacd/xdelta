@@ -145,7 +145,7 @@ static const uint16_t __single_hash[256] =
 static inline usize_t
 xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum)
 {
-  return (cksum ^ (cksum >> cfg->shift)) & cfg->mask;
+  return (cksum >> cfg->shift) ^ (cksum & cfg->mask);
 }
 
 /***********************************************************************
@@ -205,8 +205,9 @@ xd3_size_log2 (usize_t slots)
     {
       if (slots < (1U << i))
 	{
-	  bits = i-1; /* TODO: this is compaction=1 in checksum_test.cc and
-		       * should not be fixed at 1. */
+	  /* TODO: this is compaction=1 in checksum_test.cc and maybe should
+	   * not be fixed at -1. */
+	  bits = i - 1; 
 	  break;
 	}
     }
