@@ -2561,6 +2561,11 @@ xd3_set_source (xd3_stream *stream,
       src->shiftby = shiftby;
       src->maskby = (1 << shiftby) - 1;
     }
+  else
+    {
+      src->shiftby = 0;
+      src->maskby = 0;
+    }
 
   xd3_blksize_div (src->size, src, &blk_num, &tail_size);
   src->blocks  = blk_num + (tail_size > 0);
