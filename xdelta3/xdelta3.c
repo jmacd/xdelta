@@ -1122,7 +1122,8 @@ xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_ri
 }
 #else /* GENERIC_ENCODE_TABLES */
 
-/* This version of xd3_choose_instruction is hard-coded for the default table. */
+/* This version of xd3_choose_instruction is hard-coded for the default
+   table. */
 static void
 xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 {
@@ -1303,9 +1304,10 @@ xd3_compute_alternate_table_encoding (xd3_stream *stream, const uint8_t **data, 
 	  return ret;
 	}
 
-      /* During development of a new code table, enable this variable to print the new
-       * static contents and determine its size.  At run time the table will be filled in
-       * appropriately, but at least it should have the proper size beforehand. */
+      /* During development of a new code table, enable this variable to print
+       * the new static contents and determine its size.  At run time the
+       * table will be filled in appropriately, but at least it should have
+       * the proper size beforehand. */
 #if GENERIC_ENCODE_TABLES_COMPUTE_PRINT
       {
 	int i;
@@ -1337,8 +1339,9 @@ xd3_compute_alternate_table_encoding (xd3_stream *stream, const uint8_t **data, 
 
 #endif /* XD3_ENCODER */
 
-/* This function generates the 1536-byte string specified in sections 5.4 and 7 of
- * rfc3284, which is used to represent a code table within a VCDIFF file. */
+/* This function generates the 1536-byte string specified in sections 5.4 and
+ * 7 of rfc3284, which is used to represent a code table within a VCDIFF
+ * file. */
 void xd3_compute_code_table_string (const xd3_dinst *code_table, uint8_t *str)
 {
   int i, s;

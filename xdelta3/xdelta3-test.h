@@ -1680,7 +1680,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	  return XD3_INTERNAL;
 	}
 
-      if (ratio <= TEST_ADD_RATIO * (1.0 - TEST_EPSILON))
+      if (ratio <= TEST_ADD_RATIO * (1.0 - 2 * TEST_EPSILON))
 	{
 	  DP(RINT "xdelta3: test encode with size ratio %.4f, "
 	     "expected > %.4f\n",
@@ -2402,8 +2402,8 @@ static const string_match_test match_tests[] =
   { "123 23 XYZ 123 XYZ", SM_NONE, "C11/4@0" },
   { "123 23 XYZ 123 XYZ", SM_LAZY, "C11/4@0 C12/6@4" },
 
-  /* trylazy: no lazy matches unless there are at least two characters beyond the first
-   * match */
+  /* trylazy: no lazy matches unless there are at least two characters beyond
+   * the first match */
   { "2123_121212",   SM_LAZY, "C7/4@5" },
   { "2123_1212123",  SM_LAZY, "C7/4@5" },
   { "2123_1212123_", SM_LAZY, "C7/4@5 C8/5@0" },
@@ -2416,12 +2416,12 @@ static const string_match_test match_tests[] =
   /* lazy run: check a run overlapped by a longer copy */
   { "11111112 111111112 1", SM_LAZY, "C1/6@0 R9/8 C10/10@0" },
 
-  /* lazy match: match_length,run_l >= min_match tests, shouldn't get any copies within
-   * the run, no run within the copy */
+  /* lazy match: match_length,run_l >= min_match tests, shouldn't get any
+   * copies within the run, no run within the copy */
   { "^________^________  ", SM_LAZY, "R1/8 C9/9@0" },
 
-  /* chain depth: it only goes back 10. this checks that the 10th match hits and the 11th
-   * misses. */
+  /* chain depth: it only goes back 10. this checks that the 10th match hits
+   * and the 11th misses. */
   { "1234 1234_1234-1234=1234+1234[1234]1234{1234}1234<1234 ", SM_NONE,
     "C5/4@0 C10/4@5 C15/4@10 C20/4@15 C25/4@20 C30/4@25 C35/4@30 C40/4@35 C45/4@40 C50/5@0" },
   { "1234 1234_1234-1234=1234+1234[1234]1234{1234}1234<1234>1234 ", SM_NONE,
