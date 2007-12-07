@@ -194,7 +194,6 @@ xd3_scksum (const uint8_t *seg, const int ln)
 #define xd3_scksum(seg,ln) xd3_lcksum(seg,ln)
 #endif
 
-#if XD3_ENCODER
 static usize_t
 xd3_size_log2 (usize_t slots)
 {
@@ -214,7 +213,6 @@ xd3_size_log2 (usize_t slots)
 
   return bits;
 }
-#endif
 
 static void
 xd3_size_hashtable (xd3_stream    *stream,

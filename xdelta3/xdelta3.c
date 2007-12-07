@@ -2411,6 +2411,7 @@ xd3_config_stream(xd3_stream *stream,
     }
 
   /* Default scanner settings. */
+#if XD3_ENCODER
   switch (config->smatch_cfg)
     {
       IF_BUILD_SOFT(case XD3_SMATCH_SOFT:
@@ -2480,6 +2481,7 @@ xd3_config_stream(xd3_stream *stream,
 			   break;)
 	}
     }
+#endif
 
   return 0;
 }
@@ -2599,8 +2601,9 @@ xd3_close_stream (xd3_stream *stream)
 
       if (stream->enc_state == ENC_POSTWIN)
 	{
+#if XD3_ENCODER
 	  xd3_encode_reset (stream);
-
+#endif
 	  stream->current_window += 1;
 	  stream->enc_state = ENC_INPUT;
 	}

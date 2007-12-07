@@ -341,7 +341,7 @@ static int
 main_version (void)
 {
   /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, Joshua MacDonald\n\");" $ */
-  DP(RINT "Xdelta version 3.0s, Copyright (C) 2007, Joshua MacDonald\n");
+  DP(RINT "Xdelta version 3.0t, Copyright (C) 2007, Joshua MacDonald\n");
   DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   DP(RINT "This is free software, and you are welcome to redistribute it\n");
   DP(RINT "under certain conditions; see \"COPYING\" for details.\n");

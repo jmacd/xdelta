@@ -90,18 +90,10 @@
  * output counts, the xoff_t type is used.  The decoder and encoder
  * generally check for overflow of the xoff_t size (this is tested at
  * the 32bit boundary [xdelta3-test.h]).
- *
- * As of 3.0r, a 64bit xoff_t is ~33% slower on a 32bit platform.
- * TODO: fix this.
  */
 #ifndef _WIN32
-typedef unsigned int    usize_t;
-typedef u_int8_t        uint8_t;
-typedef u_int16_t       uint16_t;
-#ifndef __uint32_t_defined
-typedef unsigned int uint32_t;
-#endif
-typedef long long unsigned int uint64_t;
+#include <stdint.h>
+typedef unsigned int usize_t;
 #else
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

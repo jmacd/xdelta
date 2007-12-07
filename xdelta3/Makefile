@@ -1,5 +1,17 @@
 # xdelta 3 - delta compression tools and library
-# Copyright (C) 2001, 2003, 2004, 2005, 2006.  Joshua P. MacDonald
+# Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
+
+UNAME = $(shell uname)
+CYGWIN = $(findstring CYGWIN, $(UNAME))
+PYVER = 2.5
+
+ifeq ("$(CYGWIN)", "")
+SWIGTGT = xdelta3module.so
+PYTGT = build/lib.linux-i686-$(PYVER)/xdelta3main.so
+else
+SWIGTGT = xdelta3module.dll
+PYTGT = build/lib.cygwin-1.5.24-i686-$(PYVER)/xdelta3main.dll
+endif
 
 SOURCES = xdelta3-cfgs.h \
 	  xdelta3-decode.h \
@@ -20,7 +32,6 @@ TARGETS = xdelta3-debug \
 	  xdelta3-debug3 \
 	  xdelta3.o \
 	  xdelta3_wrap.o \
-	  xdelta3module.so \
 	  xdelta3-32 \
 	  xdelta3-64 \
 	  xdelta3-everything \
@@ -29,7 +40,7 @@ TARGETS = xdelta3-debug \
 	  xdelta3-Op \
 	  xdelta3-decoder xdelta3-decoder-nomain.o \
 	  xdelta3-nosec.o xdelta3-all.o xdelta3-fgk.o \
-	  xdelta3-noext xdelta3-tools xdelta3-tune \
+	  xdelta3-noext xdelta3-tools \
 	  xdelta3-notools \
 	  xdelta3_wrap.c xdelta3.py \
 	  $(PYTGT) $(SWIGTGT)
@@ -38,11 +49,12 @@ PYTHON = python
 
 WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 
-#SWIGTGT = xdelta3module.so
-SWIGTGT = xdelta3module.dll
+CFLAGS= -Wall -Wshadow -fno-builtin
 
-#PYTGT = build/lib.linux-i686-2.4/xdelta3main.so
-PYTGT = build/lib.cygwin-1.5.24-i686-2.4/xdelta3main.dll
+# $Format: "REL=$Xdelta3Version$" $
+REL=3.0t
+
+RELDIR = xdelta$(REL)
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
@@ -61,10 +73,6 @@ SWIG_FLAGS = -DXD3_DEBUG=0 \
 	      -DSECONDARY_DJW=1 \
 	      -DVCDIFF_TOOLS=1 \
 	      -DSWIG_MODULE=1
-
-# $Format: "REL=$Xdelta3Version$" $
-REL=3.0t_pre0
-RELDIR = xdelta$(REL)
 
 all: xdelta3-debug xdelta3
 
@@ -108,7 +116,7 @@ wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
 	$(WIXDIR)/light.exe xdelta3.wixobj -out xdelta3.msi
 
 xdelta3: $(SOURCES)
-	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3 \
+	$(CC) $(CFLAGS) -O3 xdelta3.c -lm -o xdelta3 \
 	      -DGENERIC_ENCODE_TABLES=0 \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
@@ -120,7 +128,7 @@ xdelta3: $(SOURCES)
 	      -DXD3_USE_LARGEFILE64=1
 
 xdelta3-debug: $(SOURCES)
-	$(CC) -g -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3-debug \
+	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug \
 		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
@@ -132,7 +140,7 @@ xdelta3-debug: $(SOURCES)
 		-DXD3_USE_LARGEFILE64=1
 
 xdelta3-32: $(SOURCES)
-	$(CC) -O3 -Wall -Wshadow -fno-builtin xdelta3.c -lm -o xdelta3-32 \
+	$(CC) -O3 $(CFLAGS) xdelta3.c -lm -o xdelta3-32 \
 	      -DXD3_DEBUG=1 \
 	      -DXD3_USE_LARGEFILE64=0 \
 	      -DREGRESSION_TEST=1 \
@@ -142,7 +150,7 @@ xdelta3-32: $(SOURCES)
 	      -DXD3_POSIX=1
 
 xdelta3-debug2: $(SOURCES)
-	$(CC) -g -Wall -Wshadow \
+	$(CC) -g $(CFLAGS) \
 		xdelta3.c -o xdelta3-debug2 \
 		-DXD3_DEBUG=2 \
 		-DXD3_MAIN=1 \
@@ -155,8 +163,16 @@ xdelta3-debug2: $(SOURCES)
 		-lm
 
 xdelta3-debug3: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-debug3 -DXD3_MAIN=1 -DGENERIC_ENCODE_TABLES=1 \
-		-DXD3_USE_LARGEFILE64=1 -DXD3_STDIO=1 -DREGRESSION_TEST=1 -DXD3_DEBUG=3 -DSECONDARY_DJW=1 -DSECONDARY_FGK=1 -lm
+	$(CC) -g $(CFLAGS) xdelta3.c -o xdelta3-debug3 \
+		-DXD3_MAIN=1 \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DXD3_USE_LARGEFILE64=1 \
+		-DXD3_STDIO=1 \
+		-DREGRESSION_TEST=1 \
+		-DXD3_DEBUG=3 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-lm
 
 $(PYTGT): $(SOURCES) setup.py
 	$(PYTHON) setup.py install --verbose --compile --force
@@ -165,61 +181,99 @@ xdelta3_wrap.c xdelta3.py: xdelta3.swig
 	swig -python xdelta3.swig
 
 xdelta3.o: $(SOURCES)
-	$(CC) -O3 -Wall -Wshadow -fno-builtin -c xdelta3.c $(SWIG_FLAGS) -o xdelta3.o
+	$(CC) -O3 $(CFLAGS) -c xdelta3.c $(SWIG_FLAGS) -o xdelta3.o
 
 xdelta3_wrap.o: xdelta3_wrap.c
-	$(CC) $(SWIG_FLAGS) \
+	$(CC) -O3 $(CFLAGS) $(SWIG_FLAGS) \
 	      -DHAVE_CONFIG_H \
-	      -I/usr/include/python2.5 \
-	      -I/usr/lib/python2.5/config \
+	      -I/usr/include/python$(PYVER) \
+	      -I/usr/lib/python$(PYVER)/config \
 	      -fpic \
-	      -c -O3 -fno-builtin xdelta3_wrap.c
+	      -c xdelta3_wrap.c
 
 xdelta3module.dll: xdelta3_wrap.o xdelta3.o
-	gcc -shared -Wl,--enable-auto-image-base xdelta3.o xdelta3_wrap.o -L/usr/lib/python2.5/config -lpython2.5 -o xdelta3module.dll
-	cp $(SWIGTGT) /usr/lib/python2.5/site-packages
+	gcc -shared -Wl,--enable-auto-image-base \
+		xdelta3.o \
+		xdelta3_wrap.o \
+		-L/usr/lib/python$(PYVER)/config \
+		-lpython$(PYVER) \
+		-o xdelta3module.dll
+	cp $(SWIGTGT) /usr/lib/python$(PYVER)/site-packages
 
 xdelta3module.so: xdelta3_wrap.o xdelta3.o
-	ld -shared xdelta3.o xdelta3_wrap.o -o xdelta3module.so /usr/lib/libpython2.4.so -lgcc_s -lc
+	ld -shared xdelta3.o xdelta3_wrap.o \
+		-o xdelta3module.so \
+		/usr/lib/libpython$(PYVER).so \
+		-lc
 
 xdelta3-decoder: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow xdelta3.c \
+	$(CC) -O3 -Wall -Wshadow xdelta3.c \
 	    -DXD3_ENCODER=0 -DXD3_MAIN=1 -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 \
 	    -DXD3_STDIO=1 -DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0 \
 	    -o xdelta3-decoder
 
 xdelta3-decoder-nomain.o: $(SOURCES) linkxd3lib.c
-	$(CC) -O2 -Wall -Wshadow xdelta3.c linkxd3lib.c \
+	$(CC) -O3 -Wall -Wshadow xdelta3.c linkxd3lib.c \
 	    -DXD3_ENCODER=0 -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 \
 	    -o xdelta3-decoder-nomain.o
 	strip xdelta3-decoder-nomain.o
 
 xdelta3-O++: $(SOURCES)
-	$(CXX) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-O++ -DXD3_MAIN=1 -DSECONDARY_DJW=1 -DREGRESSION_TEST=1 -lm
+	$(CXX) -g -O3 $(CFLAGS) xdelta3.c \
+		-o xdelta3-O++ \
+		-DXD3_MAIN=1 \
+		-DSECONDARY_DJW=1 \
+		-DREGRESSION_TEST=1 \
+		-lm
 
 xdelta3-Op: $(SOURCES)
-	$(CC) -g -O2 -Wall -Wshadow xdelta3.c -o xdelta3-Op -DXD3_POSIX=1 -DXD3_MAIN=1 -DREGRESSION_TEST=1 -lm
+	$(CC) -g -O3 $(CFLAGS) xdelta3.c \
+		-o xdelta3-Op \
+		-DXD3_POSIX=1 \
+		-DXD3_MAIN=1 \
+		-DREGRESSION_TEST=1 \
+		-lm
 
 xdelta3-64: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-64 -DXD3_POSIX=1 -DXD3_MAIN=1 -DREGRESSION_TEST=1 \
-					-DXD3_DEBUG=0 -DXD3_USE_LARGEFILE64=1 -lm
+	$(CC) -g $(CFLAGS) \
+		xdelta3.c \
+		-o xdelta3-64 \
+		-DXD3_POSIX=1 \
+		-DXD3_MAIN=1 \
+		-DREGRESSION_TEST=1 \
+		-DXD3_DEBUG=0 \
+		-DXD3_USE_LARGEFILE64=1 \
+		-lm
 
 xdelta3-64-O: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow xdelta3.c -o xdelta3-64-O -DXD3_POSIX=1 -DXD3_MAIN=1 \
-					-DXD3_USE_LARGEFILE64=1 -lm
+	$(CC) -O3 $(CFLAGS) \
+		xdelta3.c \
+		-o xdelta3-64-O \
+		-DXD3_POSIX=1 \
+		-DXD3_MAIN=1 \
+		-DXD3_USE_LARGEFILE64=1 \
+		-lm
 
 xdelta3-everything: $(SOURCES)
-	$(CC) -g -Wall -Wshadow xdelta3.c -o xdelta3-everything \
-					-DXD3_MAIN=1 -DVCDIFF_TOOLS=1 -DREGRESSION_TEST=1 \
-					-DSECONDARY_FGK=1 -DSECONDARY_DJW=1 \
-					-DGENERIC_ENCODE_TABLES=1 \
-					-DGENERIC_ENCODE_TABLES_COMPUTE=1 \
-					-DXD3_POSIX=1 \
-					-DEXTERNAL_COMPRESSION=1 \
-					-DXD3_DEBUG=1 -lm
+	$(CC) -g $(CFLAGS) \
+		xdelta3.c \
+		-o xdelta3-everything \
+		-DXD3_MAIN=1 \
+		-DVCDIFF_TOOLS=1 \
+		-DREGRESSION_TEST=1 \
+		-DSECONDARY_FGK=1 \
+		-DSECONDARY_DJW=1 \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DGENERIC_ENCODE_TABLES_COMPUTE=1 \
+		-DXD3_POSIX=1 \
+		-DEXTERNAL_COMPRESSION=1 \
+		-DXD3_DEBUG=1 \
+		-lm
 
 xdelta3-Opg: $(SOURCES)
-	$(CC) -pg -g -O3 -fno-builtin -Wall -Wshadow xdelta3.c -o xdelta3-Opg \
+	$(CC) -pg -g -O3 $(CFLAGS) \
+		xdelta3.c \
+		-o xdelta3-Opg \
 		-DXD3_MAIN=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
@@ -228,19 +282,19 @@ xdelta3-Opg: $(SOURCES)
 		-DREGRESSION_TEST=1
 
 xdelta3-nosec.o: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 -o xdelta3-nosec.o
+	$(CC) -O3 $(CFLAGS) -c xdelta3.c -DSECONDARY_FGK=0 -DSECONDARY_DJW=0 -o xdelta3-nosec.o
 
 xdelta3-all.o: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=1 -DSECONDARY_DJW=1 -o xdelta3-all.o
+	$(CC) -O3 $(CFLAGS) -c xdelta3.c -DSECONDARY_FGK=1 -DSECONDARY_DJW=1 -o xdelta3-all.o
 
 xdelta3-fgk.o: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow -c xdelta3.c -DSECONDARY_FGK=1 -DSECONDARY_DJW=0 -o xdelta3-fgk.o
+	$(CC) -O3 $(CFLAGS) -c xdelta3.c -DSECONDARY_FGK=1 -DSECONDARY_DJW=0 -o xdelta3-fgk.o
 
 xdelta3-noext: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow xdelta3.c -DXD3_MAIN=1 -DEXTERNAL_COMPRESSION=0 -o xdelta3-noext
+	$(CC) -O3 $(CFLAGS) xdelta3.c -DXD3_MAIN=1 -DEXTERNAL_COMPRESSION=0 -o xdelta3-noext
 
 xdelta3-tools: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow xdelta3.c -DXD3_MAIN=1 -o xdelta3-tools
+	$(CC) -O3 $(CFLAGS) xdelta3.c -DXD3_MAIN=1 -o xdelta3-tools
 
 xdelta3-notools: $(SOURCES)
-	$(CC) -O2 -Wall -Wshadow xdelta3.c -DXD3_MAIN=1 -DVCDIFF_TOOLS=0 -o xdelta3-notools
+	$(CC) -O3 $(CFLAGS) xdelta3.c -DXD3_MAIN=1 -DVCDIFF_TOOLS=0 -o xdelta3-notools
