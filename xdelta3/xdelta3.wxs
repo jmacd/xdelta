@@ -3,7 +3,7 @@
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2003/01/wi'>
    <Product Id='$(var.PRODUCT_ID)'
-            Name='Xdelta 3.0s'
+            Name='Xdelta 3.0t'
             Language='1033'
             Codepage='1252'
             Version='3.0.1.1'
@@ -11,7 +11,7 @@
 
             <Package Id='$(var.PACKAGE_ID)'
                      Keywords='Installer'
-                     Description='Xdelta 3.0s'
+                     Description='Xdelta 3.0t'
                      Comments='http://xdelta.org'
                      Manufacturer='Josh.MacDonald@Gmail.Com'
                      InstallerVersion='300'
@@ -19,7 +19,7 @@
                      Compressed='yes' />
 
             <Media Id='1'
-                   Cabinet='xdelta30s.cab'
+                   Cabinet='xdelta30t.cab'
                    EmbedCab='yes' />
 
             <Directory Id='TARGETDIR' Name='SourceDir'>
@@ -30,8 +30,8 @@
             <Component Id='Main'
                        Guid='$(var.COMPONENT_ID)'>
               <File Id='XdeltaEXE'
-                    Name='xdelt30s'
-                    LongName='xdelta30s.exe'
+                    Name='xdelt30t'
+                    LongName='xdelta30t.exe'
                     DiskId='1'
                     Source='G:\jmacd\svn\xdelta3\Release\xdelta3.exe'
                     Vital='yes'>
@@ -73,15 +73,15 @@
             <Component Id='Source'
                        Guid='$(var.SOURCE_ID)'>
               <File Id='Source'
-                    Name='xdelt30s.zip'
-                    LongName='xdelta3.0s.zip'
+                    Name='xdelt30t.zip'
+                    LongName='xdelta3.0t.zip'
                     DiskId='1'
-                    Source='G:\jmacd\svn\xdelta3\xdelta3.0s.zip'
+                    Source='G:\jmacd\svn\xdelta3\xdelta3.0t.zip'
                     Vital='yes'>
                 <Shortcut Id="startupmenuSource"
                           Directory="ProgramMenuDir"
-                          Name="xdelt30s.zip"
-                          LongName="xdelta3.0s.zip"
+                          Name="xdelt30t.zip"
+                          LongName="xdelta3.0t.zip"
                           />
               </File>
             </Component>
@@ -91,8 +91,8 @@
 
               <Directory Id="ProgramMenuFolder" Name="PMenu" LongName="Programs">
 	        <Directory Id="ProgramMenuDir"
-                           Name="xdelt30s"
-                           LongName="Xdelta 3.0s">
+                           Name="xdelt30t"
+                           LongName="Xdelta 3.0t">
                 </Directory>
               </Directory>
 
