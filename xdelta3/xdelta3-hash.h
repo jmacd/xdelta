@@ -85,7 +85,7 @@ static const uint32_t hash_multiplier_powers[64] = {
 
 #if ARITH_SMALL_CKSUM
 #define SMALL_CKSUM_UPDATE(cksum,base,look) \
-  (cksum) = ((*(uint32_t*)(base+1)) * 1597334677U)
+  (cksum) = (uint32_t) ((*(uint32_t*)(base+1)) * (uint32_t)1597334677U)
 #else
 #define SMALL_CKSUM_UPDATE LARGE_CKSUM_UPDATE
 #endif
@@ -182,10 +182,10 @@ xd3_lcksum (const uint8_t *seg, const int ln)
 #endif
 
 #if ARITH_SMALL_CKSUM
-static inline usize_t
+static inline uint32_t
 xd3_scksum (const uint8_t *seg, const int ln)
 {
-  usize_t c;
+  uint32_t c;
   /* The -1 is because UPDATE operates on seg[1..ln] */
   SMALL_CKSUM_UPDATE (c,(seg-1),ln);
   return c;
@@ -194,6 +194,7 @@ xd3_scksum (const uint8_t *seg, const int ln)
 #define xd3_scksum(seg,ln) xd3_lcksum(seg,ln)
 #endif
 
+#if XD3_ENCODER
 static usize_t
 xd3_size_log2 (usize_t slots)
 {
@@ -226,5 +227,6 @@ xd3_size_hashtable (xd3_stream    *stream,
   cfg->mask  = (cfg->size - 1);
   cfg->shift = 32 - bits;
 }
+#endif
 
 #endif

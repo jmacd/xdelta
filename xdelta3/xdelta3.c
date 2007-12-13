@@ -378,7 +378,8 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define VCD_HERE       1     /* 2nd address mode */
 
 #define CODE_TABLE_STRING_SIZE (6 * 256) /* Should fit a code table string. */
-#define CODE_TABLE_VCDIFF_SIZE (6 * 256) /* Should fit a compressed code table string */
+#define CODE_TABLE_VCDIFF_SIZE (6 * 256) /* Should fit a compressed code
+					  * table string */
 
 #define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK)
 
@@ -386,7 +387,8 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 				 * compressor alphabet. */
 
 #define HASH_PERMUTE       1    /* The input is permuted by random nums */
-#define ARITH_SMALL_CKSUM  1    /* Simple small checksum function -- faster than RK */
+#define ARITH_SMALL_CKSUM  1    /* Simple small checksum function --
+				 * faster than RK/adler32 */
 #define ADLER_LARGE_CKSUM  1    /* Adler checksum vs. RK checksum */
 
 #define HASH_CKOFFSET      1U   /* Table entries distinguish "no-entry" from
@@ -518,8 +520,10 @@ static int         xd3_emit_bytes (xd3_stream     *stream,
 				   const uint8_t  *base,
 				   usize_t          size);
 
-static int         xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, uint code);
-static int         xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint code);
+static int         xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
+				    xd3_rinst *second, uint code);
+static int         xd3_emit_single (xd3_stream *stream, xd3_rinst *single,
+				    uint code);
 
 static usize_t      xd3_sizeof_output (xd3_output *output);
 static void        xd3_encode_reset (xd3_stream *stream);
@@ -528,19 +532,23 @@ static int         xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos);
 static int         xd3_source_extend_match (xd3_stream *stream);
 static int         xd3_srcwin_setup (xd3_stream *stream);
 static usize_t     xd3_iopt_last_matched (xd3_stream *stream);
-static int         xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num);
+static int         xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output,
+				      uint32_t num);
 
 static usize_t xd3_smatch (xd3_stream *stream,
 			   usize_t base,
 			   usize_t scksum,
 			   usize_t *match_offset);
 static int xd3_string_match_init (xd3_stream *stream);
-static usize_t xd3_scksum (const uint8_t *seg, const int ln);
+static uint32_t xd3_scksum (const uint8_t *seg, const int ln);
 static int xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp);
-static int xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point);
+static int xd3_srcwin_move_point (xd3_stream *stream,
+				  usize_t *next_move_point);
 
-static int xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c);
-static usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum);
+static int xd3_emit_run (xd3_stream *stream, usize_t pos,
+			 usize_t size, uint8_t run_c);
+static usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg,
+				  const usize_t cksum);
 static xoff_t xd3_source_cksum_offset(xd3_stream *stream, usize_t low);
 static void xd3_scksum_insert (xd3_stream *stream,
 			       usize_t inx,
@@ -1610,6 +1618,7 @@ static unsigned long adler32 (unsigned long adler, const uint8_t *buf, usize_t l
  Run-length function
  ***********************************************************************/
 
+#if XD3_ENCODER
 static int
 xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp)
 {
@@ -1626,6 +1635,7 @@ xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp)
 
   return run_l;
 }
+#endif
 
 /***********************************************************************
  Basic encoder/decoder functions
@@ -5007,7 +5017,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   usize_t         next_move_point;
 
   /* If there will be no compression due to settings or short input,
-     skip it entirely. */
+   * skip it entirely. */
   if (! (DO_SMALL || DO_LARGE || DO_RUN) ||
       stream->input_position + SLOOK > stream->avail_in) { goto loopnomore; }
 
@@ -5029,7 +5039,9 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
    * of length 8 at the next position. */
   if (xd3_iopt_last_matched (stream) > stream->input_position)
     {
-      stream->min_match = max(MIN_MATCH, 1 + xd3_iopt_last_matched(stream) - stream->input_position);
+      stream->min_match = max(MIN_MATCH,
+			      1 + xd3_iopt_last_matched(stream) -
+			      stream->input_position);
     }
   else
     {
@@ -5072,7 +5084,8 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
    * that there is enough leftover data to consider lazy matching.
    * "Enough" is set to 2 since the next match will start at the next
    * offset, it must match two extra characters. */
-#define TRYLAZYLEN(LEN,POS,MAX) ((MAXLAZY) > 0 && (LEN) < (MAXLAZY) && (POS) + (LEN) <= (MAX) - 2)
+#define TRYLAZYLEN(LEN,POS,MAX) ((MAXLAZY) > 0 && (LEN) < (MAXLAZY) \
+				 && (POS) + (LEN) <= (MAX) - 2)
 
   /* HANDLELAZY: This statement is called each time an instruciton is
    * emitted (three cases).  If the instruction is large enough, the
@@ -5107,7 +5120,8 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  /* Output a RUN instruction. */
 	  if (run_l >= stream->min_match && run_l >= MIN_RUN)
 	    {
-	      if ((ret = xd3_emit_run (stream, stream->input_position, run_l, run_c))) { return ret; }
+	      if ((ret = xd3_emit_run (stream, stream->input_position,
+				       run_l, run_c))) { return ret; }
 
 	      HANDLELAZY (run_l);
 	    }
@@ -5134,7 +5148,8 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	       * permit a new source window. */
 	      xoff_t adj_offset =
 		xd3_source_cksum_offset(stream,
-					stream->large_table[linx] - HASH_CKOFFSET);
+					stream->large_table[linx] -
+					HASH_CKOFFSET);
 	      if (xd3_source_match_setup (stream, adj_offset) == 0)
 		{
 		  if ((ret = xd3_source_extend_match (stream)))
@@ -5142,7 +5157,8 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 		      return ret;
 		    }
 
-		  /* Update stream position.  match_fwd is zero if no match. */
+		  /* Update stream position.  match_fwd is zero if no
+		   * match. */
 		  if (stream->match_fwd > 0)
 		    {
 		      HANDLELAZY (stream->match_fwd);
@@ -5180,7 +5196,8 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	    {
 	      IF_DEBUG1 ({
 		static int x = 0;
-		DP(RINT "[target match:%d] <inp %u %u>  <cpy %u %u> (-%d) [ %u bytes ]\n",
+		DP(RINT "[target match:%d] <inp %u %u>  <cpy %u %u> "
+		   "(-%d) [ %u bytes ]\n",
 		   x++,
 		   stream->input_position,
 		   stream->input_position + match_length,
@@ -5191,10 +5208,14 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	      });
 
 	      if ((ret = xd3_found_match (stream,
-					/* decoder position */ stream->input_position,
-					/* length */ match_length,
-					/* address */ match_offset,
-					/* is_source */ 0))) { return ret; }
+					  /* decoder position */
+					  stream->input_position,
+					  /* length */ match_length,
+					  /* address */ match_offset,
+					  /* is_source */ 0)))
+		{
+		  return ret;
+		}
 
 	      /* Copy instruction. */
 	      HANDLELAZY (match_length);
