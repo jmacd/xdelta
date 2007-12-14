@@ -1179,7 +1179,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
-      uint code = stream->inst_sect.buf[0];
+      usize_t code = stream->inst_sect.buf[0];
       const uint8_t *addr_before = stream->addr_sect.buf;
       const uint8_t *inst_before = stream->inst_sect.buf;
       usize_t addr_bytes;

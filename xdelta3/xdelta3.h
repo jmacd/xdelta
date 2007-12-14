@@ -125,11 +125,7 @@ typedef uint64_t xoff_t;
 #define Q "I64"
 #endif
 #else
-#ifndef __uint32_t_defined
-typedef unsigned int xoff_t;
-#else
 typedef uint32_t xoff_t;
-#endif
 #define SIZEOF_XOFF_T 4
 #define SIZEOF_USIZE_T 4
 #define Q
@@ -571,8 +567,8 @@ struct _xd3_desect
 /* the VCDIFF address cache, see the RFC */
 struct _xd3_addr_cache
 {
-  uint     s_near;
-  uint     s_same;
+  usize_t  s_near;
+  usize_t  s_same;
   usize_t  next_slot;  /* the circular index for near */
   usize_t *near_array; /* array of size s_near        */
   usize_t *same_array; /* array of size s_same*256    */
@@ -592,13 +588,13 @@ struct _xd3_smatcher
 {
   const char        *name;
   int             (*string_match) (xd3_stream  *stream);
-  uint               large_look;
-  uint               large_step;
-  uint               small_look;
-  uint               small_chain;
-  uint               small_lchain;
-  uint               max_lazy;
-  uint               long_enough;
+  usize_t            large_look;
+  usize_t            large_step;
+  usize_t            small_look;
+  usize_t            small_chain;
+  usize_t            small_lchain;
+  usize_t            max_lazy;
+  usize_t            long_enough;
 };
 
 /* hash table size & power-of-two hash function. */
@@ -732,9 +728,9 @@ struct _xd3_stream
 					 size (power of 2) */
   usize_t           sprevmask;        /* small string, previous window
 					 size mask */
-  uint              iopt_size;
-  uint              iopt_unlimited;
-  uint              srcwin_maxsz;
+  usize_t           iopt_size;
+  usize_t           iopt_unlimited;
+  usize_t           srcwin_maxsz;
 
   /* general configuration */
   xd3_getblk_func  *getblk;           /* set nxtblk, nxtblkno to scanblkno */
@@ -827,14 +823,14 @@ struct _xd3_stream
 
   /* decoder stuff */
   xd3_decode_state  dec_state;        /* current DEC_XXX value */
-  uint              dec_hdr_ind;      /* VCDIFF header indicator */
-  uint              dec_win_ind;      /* VCDIFF window indicator */
-  uint              dec_del_ind;      /* VCDIFF delta indicator */
+  usize_t           dec_hdr_ind;      /* VCDIFF header indicator */
+  usize_t           dec_win_ind;      /* VCDIFF window indicator */
+  usize_t           dec_del_ind;      /* VCDIFF delta indicator */
 
   uint8_t           dec_magic[4];     /* First four bytes */
   usize_t           dec_magicbytes;   /* Magic position. */
 
-  uint              dec_secondid;     /* Optional secondary compressor ID. */
+  usize_t           dec_secondid;     /* Optional secondary compressor ID. */
 
   uint32_t          dec_codetblsz;    /* Optional code table: length. */
   uint8_t          *dec_codetbl;      /* Optional code table: storage. */

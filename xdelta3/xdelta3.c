@@ -525,9 +525,9 @@ static int         xd3_emit_bytes (xd3_stream     *stream,
 				   usize_t          size);
 
 static int         xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
-				    xd3_rinst *second, uint code);
+				    xd3_rinst *second, usize_t code);
 static int         xd3_emit_single (xd3_stream *stream, xd3_rinst *single,
-				    uint code);
+				    usize_t code);
 
 static usize_t      xd3_sizeof_output (xd3_output *output);
 static void        xd3_encode_reset (xd3_stream *stream);
@@ -1646,7 +1646,7 @@ xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp)
  ***********************************************************************/
 
 static inline int
-xd3_decode_byte (xd3_stream *stream, uint *val)
+xd3_decode_byte (xd3_stream *stream, usize_t *val)
 {
   if (stream->avail_in == 0)
     {
@@ -1759,7 +1759,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define DECODE_INTEGER_TYPE(PART,OFLOW)                                \
   while (stream->avail_in != 0)                                        \
     {                                                                  \
-      uint next = stream->next_in[0];                                  \
+      usize_t next = stream->next_in[0];                                  \
                                                                        \
       DECODE_INPUT(1);                                                 \
                                                                        \
@@ -1785,7 +1785,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define READ_INTEGER_TYPE(TYPE, OFLOW)                                 \
   TYPE val = 0;                                                        \
   const uint8_t *inp = (*inpp);                                        \
-  uint next;                                                           \
+  usize_t next;                                                           \
                                                                        \
   do                                                                   \
     {                                                                  \
@@ -2017,10 +2017,12 @@ xd3_encode_address (xd3_stream *stream, usize_t addr, usize_t here, uint8_t* mod
 #endif
 
 static int
-xd3_decode_address (xd3_stream *stream, usize_t here, uint mode, const uint8_t **inpp, const uint8_t *max, uint32_t *valp)
+xd3_decode_address (xd3_stream *stream, usize_t here,
+		    usize_t mode, const uint8_t **inpp,
+		    const uint8_t *max, uint32_t *valp)
 {
   int ret;
-  uint same_start = 2 + stream->acache.s_near;
+  usize_t same_start = 2 + stream->acache.s_near;
 
   if (mode < same_start)
     {
@@ -3194,7 +3196,7 @@ xd3_iopt_last_matched (xd3_stream *stream)
  ***********************************************************/
 
 static int
-xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint code)
+xd3_emit_single (xd3_stream *stream, xd3_rinst *single, usize_t code)
 {
   int has_size = stream->code_table[code].size1 == 0;
   int ret;
@@ -3216,7 +3218,7 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint code)
 }
 
 static int
-xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, uint code)
+xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, usize_t code)
 {
   int ret;
 
@@ -3287,8 +3289,8 @@ xd3_emit_hdr (xd3_stream *stream)
   int  use_secondary = stream->sec_type != NULL;
   int  use_adler32   = stream->flags & (XD3_ADLER32 | XD3_ADLER32_RECODE);
   int  vcd_source    = xd3_encoder_used_source (stream);
-  uint win_ind = 0;
-  uint del_ind = 0;
+  usize_t win_ind = 0;
+  usize_t del_ind = 0;
   usize_t enc_len;
   usize_t tgt_len;
   usize_t data_len;
@@ -3297,7 +3299,7 @@ xd3_emit_hdr (xd3_stream *stream)
 
   if (stream->current_window == 0)
     {
-      uint hdr_ind = 0;
+      usize_t hdr_ind = 0;
       int use_appheader  = stream->enc_appheader != NULL;
       int use_gencodetbl = GENERIC_ENCODE_TABLES &&
 	(stream->code_table_desc != & __rfc3284_code_table_desc);
