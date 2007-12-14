@@ -1115,6 +1115,38 @@ main_set_secondary_flags (xd3_config *config)
 
 #if VCDIFF_TOOLS
 
+#if defined(_WIN32) || defined(__DJGPP__)
+/* According to the internet, Windows vsnprintf() differs from most
+ * Unix implementations regarding the terminating 0 when the boundary
+ * condition is met. It doesn't matter here, we don't rely on the
+ * trailing 0.  Besides, both Windows and DJGPP vsnprintf return -1
+ * upon truncation, which isn't C99 compliant. To overcome this,
+ * recent MinGW runtimes provided their own vsnprintf (notice the
+ * absence of the '_' prefix) but they were initially buggy.  So,
+ * always use the native '_'-prefixed version with Win32. */
+#include <stdarg.h>
+#ifdef _WIN32
+#define vsnprintf_func _vsnprintf
+#else
+#define vsnprintf_func  vsnprintf
+#endif
+
+int
+snprintf_func (char *str, int n, char *fmt, ...)
+{
+  va_list a;
+  int ret;
+  va_start (a, fmt);
+  ret = vsnprintf_func (str, n, fmt, a);
+  va_end (a);
+  if (ret < 0)
+      ret = n;
+  return ret;
+}
+#else
+#define snprintf_func snprintf
+#endif
+
 /* The following macros let VCDIFF printing something printf-like with
  * main_file_write(), e.g.,:
  *
@@ -1128,24 +1160,6 @@ main_set_secondary_flags (xd3_config *config)
   || (ret = main_file_write(xfile, xfile->snprintf_buf,        \
 			    ret, "print")) != 0)	       \
   { return ret; } } while (0)
-
-#ifdef WIN32
-/* According to the internet, Windows vsnprintf() differs from most
- * Unix implementations regarding the terminating 0 when the boundary
- * condition is met. It doesn't matter here, we don't rely on the
- * trailing 0. */
-#include <stdarg.h>
-int
-snprintf (char *str, int n, char *fmt, ...)
-{
-  va_list a;
-  int ret;
-  va_start (a, fmt);
-  ret = vsnprintf (str, n, fmt, a);
-  va_end (a);
-  return ret;
-}
-#endif
 
 static int
 main_print_overflow (int x)
@@ -3369,7 +3383,8 @@ main (int argc, char **argv)
 	  if (*my_optarg == 0)
 	    {
 	      /* Condition 4-5 */
-	      int have_arg = my_optind < (argc - 1) && *argv[my_optind+1] != '-';
+	      int have_arg = (my_optind < (argc - 1) &&
+			      *argv[my_optind+1] != '-');
 
 	      if (! have_arg)
 		{
@@ -3424,8 +3439,10 @@ main (int argc, char **argv)
 #endif
 #if VCDIFF_TOOLS
 	  else if (strcmp (my_optstr, "printhdr") == 0) { cmd = CMD_PRINTHDR; }
-	  else if (strcmp (my_optstr, "printhdrs") == 0) { cmd = CMD_PRINTHDRS; }
-	  else if (strcmp (my_optstr, "printdelta") == 0) { cmd = CMD_PRINTDELTA; }
+	  else if (strcmp (my_optstr, "printhdrs") == 0)
+	    { cmd = CMD_PRINTHDRS; }
+	  else if (strcmp (my_optstr, "printdelta") == 0)
+	    { cmd = CMD_PRINTDELTA; }
 	  else if (strcmp (my_optstr, "recode") == 0) { cmd = CMD_RECODE; }
 #endif
 
