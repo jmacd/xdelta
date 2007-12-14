@@ -43,7 +43,7 @@
 #if HASH_PERMUTE == 0
 #define PERMUTE(x) (x)
 #else
-#define PERMUTE(x) (__single_hash[(uint)x])
+#define PERMUTE(x) (__single_hash[(uint32_t)x])
 
 static const uint16_t __single_hash[256] =
 {

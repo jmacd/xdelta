@@ -1837,7 +1837,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define IF_SIZEOF64(x) if (num < (1ULL << (7 * (x)))) return (x);
 
 #if USE_UINT32
-static inline uint
+static inline uint32_t
 xd3_sizeof_uint32_t (uint32_t num)
 {
   IF_SIZEOF32(1);
@@ -1881,7 +1881,7 @@ xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
 		   const uint8_t *max, uint64_t *valp)
 { READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
 
-static uint
+static uint32_t
 xd3_sizeof_uint64_t (uint64_t num)
 {
   IF_SIZEOF64(1);
