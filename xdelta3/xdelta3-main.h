@@ -168,6 +168,7 @@ typedef enum
   CMD_PRINTHDRS,
   CMD_PRINTDELTA,
   CMD_RECODE,
+  CMD_MERGE,
 #if XD3_ENCODER
   CMD_ENCODE,
 #endif
@@ -188,6 +189,8 @@ typedef struct _main_file        main_file;
 typedef struct _main_extcomp     main_extcomp;
 typedef struct _main_blklru      main_blklru;
 typedef struct _main_blklru_list main_blklru_list;
+typedef struct _main_merge       main_merge;
+typedef struct _main_merge_list  main_merge_list;
 
 /* The main_file object supports abstract system calls like open,
  * close, read, write, seek, stat.  The program uses these to
@@ -257,9 +260,24 @@ struct _main_blklru
 /* ... represented as a list (no cache index). */
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
-// TODO:
-// struct _main_state
-// {
+// Merge state:
+
+struct _main_merge_list
+{
+  main_merge_list  *next;
+  main_merge_list  *prev;
+};
+
+struct _main_merge
+{
+  const char *filename;
+  main_merge_list  link;
+};
+
+XD3_MAKELIST(main_merge_list,main_merge,link);
+
+// TODO: really need to put options in a struct so that internal
+// callers can easily reset state.
 
 /* Program options: various command line flags and options. */
 static int         option_stdout             = 0;
@@ -2771,12 +2789,15 @@ main_input (xd3_cmd     cmd,
 	  return EXIT_FAILURE;
 	}
 
-      // TODO: main_set_appheader (recode_stream)
-
       ifile->flags |= RD_NONEXTERNAL;
       input_func    = xd3_decode_input;
       output_func   = main_recode_func;
       break;
+
+    case CMD_MERGE:
+      XPR(NT "merge not implemented\n");
+      return EXIT_FAILURE;
+      //break;
 #endif
 #if XD3_ENCODER
     case CMD_ENCODE:
@@ -3296,12 +3317,14 @@ xd3_main_cmdline (int argc, char **argv)
 main (int argc, char **argv)
 #endif
 {
+  static const char *flags =
+    "0123456789cdefhnqvDJNORTVs:m:B:C:E:F:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
   main_file ifile;
   main_file ofile;
   main_file sfile;
-  static const char *flags =
-    "0123456789cdefhnqvDJNORTVs:B:C:E:F:I:L:O:M:P:W:A::S::";
+  main_merge_list merge_order;
+  main_merge *merge;
   int my_optind;
   char *my_optarg;
   char *my_optstr;
@@ -3320,12 +3343,14 @@ main (int argc, char **argv)
   main_file_init (& ifile);
   main_file_init (& ofile);
   main_file_init (& sfile);
+  main_merge_list_init (& merge_order);
 
   reset_defaults();
 
   free_argv = NULL;
   free_value = NULL;
-  setup_environment(argc, argv, &env_argc, &env_argv, &free_argv, &free_value);
+  setup_environment(argc, argv, &env_argc, &env_argv,
+		    &free_argv, &free_value);
   cmd = CMD_NONE;
   sfilename = NULL;
   my_optind = 1;
@@ -3334,6 +3359,7 @@ main (int argc, char **argv)
   program_name = env_argv[0];
   extcomp_types[0].recomp_cmdname = program_name;
   extcomp_types[0].decomp_cmdname = program_name;
+
  takearg:
   my_optarg = NULL;
   my_optstr = argv[my_optind];
@@ -3444,6 +3470,7 @@ main (int argc, char **argv)
 	  else if (strcmp (my_optstr, "printdelta") == 0)
 	    { cmd = CMD_PRINTDELTA; }
 	  else if (strcmp (my_optstr, "recode") == 0) { cmd = CMD_RECODE; }
+	  else if (strcmp (my_optstr, "merge") == 0) { cmd = CMD_MERGE; }
 #endif
 
 	  /* If no option was found and still no command, let the default
@@ -3562,6 +3589,16 @@ main (int argc, char **argv)
 
 	  sfilename = my_optarg;
 	  break;
+	case 'm':
+	  if ((merge = (main_merge*)
+	       main_malloc (sizeof (main_merge))) == NULL)
+	    {
+	      goto cleanup;
+	    }
+	  main_merge_list_push_back (& merge_order, merge);
+	  merge->filename = my_optarg;
+	  // TODO: more cleanup
+	  break;
 
 	case 'V':
 	  ret = main_version (); goto exit;
@@ -3582,7 +3619,6 @@ main (int argc, char **argv)
   if (argc > 2)
     {
       XPR(NT "too many filenames: %s ...\n", argv[2]);
-      ret = EXIT_FAILURE;
       goto cleanup;
     }
 
@@ -3629,6 +3665,7 @@ main (int argc, char **argv)
 #if XD3_ENCODER
     case CMD_ENCODE:
     case CMD_RECODE:
+    case CMD_MERGE:
 #endif
     case CMD_DECODE:
       ret = main_input (cmd, & ifile, & ofile, & sfile);
@@ -3669,6 +3706,12 @@ main (int argc, char **argv)
   main_file_cleanup (& ofile);
   main_file_cleanup (& sfile);
 
+  while (! main_merge_list_empty (& merge_order))
+    {
+      merge = main_merge_list_pop_front (& merge_order);
+      main_free (merge);
+    }
+
   main_free (free_argv);
   main_free (free_value);
 
@@ -3700,6 +3743,7 @@ main_help (void)
   DP(RINT "    printhdr    print information about the first window\n");
   DP(RINT "    printhdrs   print information about all windows\n");
   DP(RINT "    recode      encode with new application/secondary settings\n");
+  DP(RINT "    merge       merge VCDIFF inputs (see below)\n");
 #endif
   DP(RINT "standard options:\n");
   DP(RINT "   -0 .. -9     compression level\n");
@@ -3730,10 +3774,13 @@ main_help (void)
   DP(RINT "   -A [apphead] disable/provide application header (encode)\n");
   DP(RINT "   -J           disable output (check/compute only)\n");
   DP(RINT "   -T           use alternate code table (test)\n");
+  DP(RINT "   -m           arguments for \"merge\"\n");
 
   DP(RINT "the XDELTA environment variable may contain extra args:\n");
   DP(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
   DP(RINT "   tar --use-compress-program=xdelta3 \\\n");
-  DP(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y/\n");
+  DP(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y\n");
+  DP(RINT "the \"merge\" command combines VCDIFF inputs as follows:\n");
+  DP(RINT "   xdelta3 merge -m 1.vcdiff -m 2.vcdiff 3.vcdiff merged.vcdiff\n");
   return EXIT_FAILURE;
 }
