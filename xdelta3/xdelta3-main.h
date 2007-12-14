@@ -50,7 +50,7 @@
  * again with a more general error message.
  */
 
-/******************************************************************************************/
+/*********************************************************************/
 
 #ifndef XD3_POSIX
 #define XD3_POSIX 0
@@ -90,7 +90,8 @@ const char* xd3_mainerror(int err_num);
 
 /* this is used as in XPR(NT XD3_LIB_ERRMSG (stream, ret)) to print an
  * error message from the library. */
-#define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", xd3_errstring (stream), xd3_mainerror (ret)
+#define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", \
+    xd3_errstring (stream), xd3_mainerror (ret)
 
 #include <stdio.h>  /* fprintf */
 
@@ -205,9 +206,12 @@ struct _main_file
 #endif
 
   int                 mode;          /* XO_READ and XO_WRITE */
-  const char         *filename;      /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
-  char               *filename_copy; /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
-  const char         *realname;      /* File name or /dev/stdin, /dev/stdout, /dev/stderr. */
+  const char         *filename;      /* File name or /dev/stdin,
+				      * /dev/stdout, /dev/stderr. */
+  char               *filename_copy; /* File name or /dev/stdin,
+				      * /dev/stdout, /dev/stderr. */
+  const char         *realname;      /* File name or /dev/stdin,
+				      * /dev/stdout, /dev/stderr. */
   const main_extcomp *compressor;    /* External compression struct. */
   int                 flags;         /* RD_FIRST, RD_NONEXTERNAL, ... */
   xoff_t              nread;         /* for input position */
@@ -270,7 +274,7 @@ static int         option_use_checksum       = 1;
 static int         option_use_altcodetable   = 0;
 static char*       option_smatch_config      = NULL;
 static int         option_no_compress        = 0;
-static int         option_no_output          = 0; /* do not open or write output */
+static int         option_no_output          = 0; /* do not write output */
 static const char *option_source_filename    = NULL;
 
 static int         option_level              = XD3_DEFAULT_LEVEL;
@@ -304,7 +308,7 @@ static usize_t           lru_size = 0;
 static main_blklru      *lru = NULL;  /* array of lru_size elts */
 static main_blklru_list  lru_list;
 static main_blklru_list  lru_free;
-static int               do_not_lru = 0;  /* set to avoid lru, instead discard oldest */
+static int               do_not_lru = 0;  /* set to avoid lru */
 
 static int lru_hits   = 0;
 static int lru_misses = 0;
@@ -316,18 +320,19 @@ static int allow_fake_source = 0;
 /* State for xdelta3 recode */
 static xd3_stream *recode_stream = NULL;
 
-/* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is false just so
- * the program knows the mapping of IDENT->NAME. */
+/* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
+ * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
   /* The entry for xdelta3 must be 0 because the program_name is set there. */
-  { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3, RD_NONEXTERNAL },
+  { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3,
+    RD_NONEXTERNAL },
   { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
 
   /* TODO: add commandline support for magic-less formats */
-  /*{ "lzma",     "-cf",   "lzma",       "-dcf",   "M", "]\000",        2, 0 },*/
+  /*{ "lzma", "-cf",   "lzma", "-dcf",   "M", "]\000", 2, 0 },*/
 };
 
 // };
@@ -504,7 +509,8 @@ xd3_mainerror(int err_num) {
 		return x;
 	}
 	memset (err_buf, 0, 256);
-	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM |
+		       FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, err_num,
 		MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
 		err_buf, 256, NULL);
@@ -658,7 +664,8 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
 
 #define XOPEN_OPNAME (xfile->mode == XO_READ ? "read" : "write")
 #define XOPEN_STDIO  (xfile->mode == XO_READ ? "rb" : "wb")
-#define XOPEN_POSIX  (xfile->mode == XO_READ ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC)
+#define XOPEN_POSIX  (xfile->mode == XO_READ ? \
+		      O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC)
 #define XOPEN_MODE   (xfile->mode == XO_READ ? 0 : 0666)
 
 #define XF_ERROR(op, name, ret) \
@@ -672,13 +679,17 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
 
 #elif XD3_POSIX
 #define XFNO(f) f->file
-#define XSTDOUT_XF(f) { (f)->file = STDOUT_FILENO; (f)->filename = "/dev/stdout"; }
-#define XSTDIN_XF(f)  { (f)->file = STDIN_FILENO;  (f)->filename = "/dev/stdin"; }
+#define XSTDOUT_XF(f) \
+  { (f)->file = STDOUT_FILENO; (f)->filename = "/dev/stdout"; }
+#define XSTDIN_XF(f) \
+  { (f)->file = STDIN_FILENO;  (f)->filename = "/dev/stdin"; }
 
 #elif XD3_WIN32
 #define XFNO(f) -1
-#define XSTDOUT_XF(f) { (f)->file = winStartupInfo.hStdOutput; (f)->filename = "(stdout)"; }
-#define XSTDIN_XF(f)  { (f)->file = winStartupInfo.hStdInput;  (f)->filename = "(stdin)"; }
+#define XSTDOUT_XF(f) \
+  { (f)->file = winStartupInfo.hStdOutput; (f)->filename = "(stdout)"; }
+#define XSTDIN_XF(f)  \
+  { (f)->file = winStartupInfo.hStdInput;  (f)->filename = "(stdin)"; }
 #endif
 
 static void
@@ -794,7 +805,8 @@ main_file_open (main_file *xfile, const char* name, int mode)
 	  (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
 	  FILE_SHARE_READ,
 	  NULL,
-	  (mode == XO_READ) ? OPEN_EXISTING : (option_force ? CREATE_ALWAYS : CREATE_NEW),
+	  (mode == XO_READ) ? OPEN_EXISTING :
+			   (option_force ? CREATE_ALWAYS : CREATE_NEW),
 	  FILE_ATTRIBUTE_NORMAL,
 	  NULL);
   if (xfile->file == INVALID_HANDLE_VALUE) {
@@ -860,7 +872,8 @@ main_file_exists (main_file *xfile)
 typedef int (xd3_posix_func) (int fd, uint8_t *buf, usize_t size);
 
 static int
-xd3_posix_io (int fd, uint8_t *buf, usize_t size, xd3_posix_func *func, usize_t *nread)
+xd3_posix_io (int fd, uint8_t *buf, usize_t size,
+	      xd3_posix_func *func, usize_t *nread)
 {
   int ret;
   usize_t nproc = 0;
@@ -931,7 +944,8 @@ main_file_read (main_file   *ifile,
     }
   else
     {
-      if (option_verbose > 3) { XPR(NT "main read: %s: %u\n", ifile->filename, (*nread)); }
+      if (option_verbose > 3) { XPR(NT "main read: %s: %u\n",
+				    ifile->filename, (*nread)); }
       ifile->nread += (*nread);
     }
 
@@ -971,7 +985,8 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
     }
   else
     {
-      if (option_verbose > 3) { XPR(NT "main write: %s: %u\n", ofile->filename, size); }
+      if (option_verbose > 3) { XPR(NT "main write: %s: %u\n",
+				    ofile->filename, size); }
       ofile->nwrite += size;
     }
 
@@ -987,7 +1002,8 @@ main_file_seek (main_file *xfile, xoff_t pos)
   if (fseek (xfile->file, pos, SEEK_SET) != 0) { ret = get_errno (); }
 
 #elif XD3_POSIX
-  if ((xoff_t) lseek (xfile->file, pos, SEEK_SET) != pos) { ret = get_errno (); }
+  if ((xoff_t) lseek (xfile->file, pos, SEEK_SET) != pos)
+    { ret = get_errno (); }
 
 #elif XD3_WIN32
   LARGE_INTEGER move, out;
@@ -1014,7 +1030,8 @@ main_write_output (xd3_stream* stream, main_file *ofile)
   int ret;
 
   if (stream->avail_out > 0 &&
-      (ret = main_file_write (ofile, stream->next_out, stream->avail_out, "write failed")))
+      (ret = main_file_write (ofile, stream->next_out,
+			      stream->avail_out, "write failed")))
     {
       return ret;
     }
@@ -1296,7 +1313,9 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 	      main_file i, o, s;
 	      XD3_ASSERT (apphead != NULL);
 	      VC(UT "VCDIFF application header:    ")VE;
-	      if ((ret = main_file_write (xfile, apphead, appheadsz, "print")) != 0) { return ret; }
+	      if ((ret = main_file_write (xfile, apphead,
+					  appheadsz, "print")) != 0)
+		{ return ret; }
 	      VC(UT "\n")VE;
 
 	      main_file_init (& i);
@@ -1305,8 +1324,10 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 	      option_quiet = 1;
 	      main_get_appheader (stream, &i, & o, & s);
 	      option_quiet = sq;
-	      if ((ret = main_print_vcdiff_file (xfile, & o, "output"))) { return ret; }
-	      if ((ret = main_print_vcdiff_file (xfile, & s, "source"))) { return ret; }
+	      if ((ret = main_print_vcdiff_file (xfile, & o, "output")))
+		{ return ret; }
+	      if ((ret = main_print_vcdiff_file (xfile, & s, "source")))
+		{ return ret; }
 	      main_file_cleanup (& i);
 	      main_file_cleanup (& o);
 	      main_file_cleanup (& s);
@@ -1328,7 +1349,8 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if ((stream->dec_win_ind & VCD_ADLER32) != 0)
     {
-      VC(UT "VCDIFF adler32 checksum:      %08X\n", (usize_t)stream->dec_adler32)VE;
+      VC(UT "VCDIFF adler32 checksum:      %08X\n",
+	 (usize_t)stream->dec_adler32)VE;
     }
 
   if (stream->dec_del_ind != 0)
@@ -1348,16 +1370,23 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if (SRCORTGT (stream->dec_win_ind))
     {
-      VC(UT "VCDIFF copy window length:    %u\n", (usize_t)stream->dec_cpylen)VE;
-      VC(UT "VCDIFF copy window offset:    %"Q"u\n", stream->dec_cpyoff)VE;
+      VC(UT "VCDIFF copy window length:    %u\n",
+	 (usize_t)stream->dec_cpylen)VE;
+      VC(UT "VCDIFF copy window offset:    %"Q"u\n",
+	 stream->dec_cpyoff)VE;
     }
 
-  VC(UT "VCDIFF delta encoding length: %u\n", (usize_t)stream->dec_enclen)VE;
-  VC(UT "VCDIFF target window length:  %u\n", (usize_t)stream->dec_tgtlen)VE;
+  VC(UT "VCDIFF delta encoding length: %u\n",
+     (usize_t)stream->dec_enclen)VE;
+  VC(UT "VCDIFF target window length:  %u\n",
+     (usize_t)stream->dec_tgtlen)VE;
 
-  VC(UT "VCDIFF data section length:   %u\n", (usize_t)stream->data_sect.size)VE;
-  VC(UT "VCDIFF inst section length:   %u\n", (usize_t)stream->inst_sect.size)VE;
-  VC(UT "VCDIFF addr section length:   %u\n", (usize_t)stream->addr_sect.size)VE;
+  VC(UT "VCDIFF data section length:   %u\n",
+     (usize_t)stream->data_sect.size)VE;
+  VC(UT "VCDIFF inst section length:   %u\n",
+     (usize_t)stream->inst_sect.size)VE;
+  VC(UT "VCDIFF addr section length:   %u\n",
+     (usize_t)stream->addr_sect.size)VE;
 
   ret = 0;
   if ((stream->flags & XD3_JUST_HDR) != 0)
@@ -1536,7 +1565,8 @@ main_pipe_write (int outfd, uint8_t *exist_buf, usize_t remain)
 {
   int ret;
 
-  if ((ret = xd3_posix_io (outfd, exist_buf, remain, (xd3_posix_func*) &write, NULL)))
+  if ((ret = xd3_posix_io (outfd, exist_buf, remain,
+			   (xd3_posix_func*) &write, NULL)))
     {
       XPR(NT "pipe write failed: %s", xd3_mainerror (ret));
       return ret;
@@ -1617,7 +1647,8 @@ main_pipe_copier (uint8_t    *pipe_buf,
 	  break;
 	}
 
-      if ((ret = main_file_read (ifile, pipe_buf, pipe_bufsize, & nread, "pipe read failed")) < 0)
+      if ((ret = main_file_read (ifile, pipe_buf, pipe_bufsize,
+				 & nread, "pipe read failed")) < 0)
 	{
 	  return ret;
 	}
@@ -1641,9 +1672,10 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 			     usize_t                 pipe_avail,
 			     usize_t                *nread)
 {
-  int outpipefd[2], inpipefd[2];  /* The two pipes: input and output file descriptors. */
-  int input_fd = -1;              /* The resulting input_fd (output of decompression). */
-  pid_t decomp_id, copier_id;     /* The two subprocs. */
+  /* The two pipes: input and output file descriptors. */
+  int outpipefd[2], inpipefd[2];
+  int input_fd = -1;  /* The resulting input_fd (output of decompression). */
+  pid_t decomp_id, copier_id;  /* The two subprocs. */
   int ret;
 
   outpipefd[0] = outpipefd[1] = -1;
@@ -1695,10 +1727,12 @@ main_input_decompress_setup (const main_extcomp     *decomp,
       int exitval = 0;
 
       if (close (inpipefd[PIPE_READ_FD]) ||
-	  main_pipe_copier (pipe_buf, pipe_bufsize, pipe_avail, ifile, inpipefd[PIPE_WRITE_FD]) ||
+	  main_pipe_copier (pipe_buf, pipe_bufsize, pipe_avail,
+			    ifile, inpipefd[PIPE_WRITE_FD]) ||
 	  close (inpipefd[PIPE_WRITE_FD]))
 	{
-	  XPR(NT "child copier process failed: %s\n", xd3_mainerror (get_errno ()));
+	  XPR(NT "child copier process failed: %s\n",
+	      xd3_mainerror (get_errno ()));
 	  exitval = 1;
 	}
 
@@ -1707,7 +1741,8 @@ main_input_decompress_setup (const main_extcomp     *decomp,
 
   ext_subprocs[1] = copier_id;
 
-  /* The parent closes both pipes after duplicating the output of compression. */
+  /* The parent closes both pipes after duplicating the output of
+   * compression. */
   input_fd = dup (outpipefd[PIPE_READ_FD]);
 
   if (input_fd < 0 ||
@@ -1736,7 +1771,8 @@ main_input_decompress_setup (const main_extcomp     *decomp,
   ifile->compressor = decomp;
 
   /* Now the input file is decompressed. */
-  return main_file_read (ifile, input_buf, input_bufsize, nread, "input decompression failed");
+  return main_file_read (ifile, input_buf, input_bufsize,
+			 nread, "input decompression failed");
 
  pipe_cleanup:
   close (input_fd);
@@ -1787,7 +1823,8 @@ main_decompress_input_check (main_file   *ifile,
       if ((check_nread > decomp->magic_size) &&
 	  /* The following expr skips decompression if we are trying
 	   * to read a VCDIFF input and that is the magic number. */
-	  !((decomp->flags & RD_NONEXTERNAL) && (ifile->flags & RD_NONEXTERNAL)) &&
+	  !((decomp->flags & RD_NONEXTERNAL) &&
+	    (ifile->flags & RD_NONEXTERNAL)) &&
 	  memcmp (check_buf, decomp->magic, decomp->magic_size) == 0)
 	{
 	  if (! option_quiet)
@@ -1840,7 +1877,10 @@ main_decompress_source (main_file *sfile, xd3_source *source)
   /* Make a template for mkstmp() */
   if (tmpdir == NULL) { tmpdir = "/tmp"; }
   if ((tmpname =
-       (char*) main_malloc (strlen (tmpdir) + sizeof (tmpl) + 1)) == NULL) { return ENOMEM; }
+       (char*) main_malloc (strlen (tmpdir) + sizeof (tmpl) + 1)) == NULL)
+    {
+      return ENOMEM;
+    }
   sprintf (tmpname, "%s%s", tmpdir, tmpl);
 
   XD3_ASSERT (ext_tmpfile == NULL);
@@ -1849,7 +1889,8 @@ main_decompress_source (main_file *sfile, xd3_source *source)
   /* Open the output FD. */
   if ((output_fd = mkstemp (tmpname)) < 0)
     {
-      XPR(NT "mkstemp failed: %s: %s", tmpname, xd3_mainerror (ret = get_errno ()));
+      XPR(NT "mkstemp failed: %s: %s",
+	  tmpname, xd3_mainerror (ret = get_errno ()));
       goto cleanup;
     }
 
@@ -1886,7 +1927,8 @@ main_decompress_source (main_file *sfile, xd3_source *source)
       /* Setup pipes: write to the output file, read from the pipe. */
       if (dup2 (input_fd, STDIN_FILENO) < 0 ||
 	  dup2 (output_fd, STDOUT_FILENO) < 0 ||
-	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname, decomp->decomp_options, NULL))
+	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname,
+		  decomp->decomp_options, NULL))
 	{
 	  XPR(NT "child process %s failed to execute: %s\n",
 		   decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
@@ -2323,7 +2365,8 @@ main_open_output (xd3_stream *stream, main_file *ofile)
  * application header is received.  Stream may be NULL, in which case
  * xd3_set_source is not called. */
 static int
-main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *source)
+main_set_source (xd3_stream *stream, int cmd,
+		 main_file *sfile, xd3_source *source)
 {
   int ret = 0;
   usize_t i;
@@ -2448,7 +2491,8 @@ main_set_source (xd3_stream *stream, int cmd, main_file *sfile, xd3_source *sour
       XPR(NT "source block size: %u\n", source->blksize);
     }
 
-  if ((lru = (main_blklru*) main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
+  if ((lru = (main_blklru*)
+       main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
     {
       ret = ENOMEM;
       goto error;
@@ -2610,13 +2654,14 @@ main_getblk_func (xd3_stream *stream,
     {
       if (blru->blkno != (xoff_t)-1)
 	{
-	  XPR(NT "source block %"Q"u ejects %"Q"u (lru_hits=%u, lru_misses=%u, lru_filled=%u)\n",
+	  XPR(NT "source block %"Q"u ejects %"Q"u (lru_hits=%u, "
+	      "lru_misses=%u, lru_filled=%u)\n",
 	      blkno, blru->blkno, lru_hits, lru_misses, lru_filled);
 	}
       else
 	{
-	  XPR(NT "source block %"Q"u read (lru_hits=%u, lru_misses=%u, lru_filled=%u)\n",
-					  blkno, lru_hits, lru_misses, lru_filled);
+	  XPR(NT "source block %"Q"u read (lru_hits=%u, lru_misses=%u, "
+	      "lru_filled=%u)\n", blkno, lru_hits, lru_misses, lru_filled);
 	}
     }
 
@@ -2769,11 +2814,16 @@ main_input (xd3_cmd     cmd,
 	      stream_flags |= XD3_NOCOMPRESS;
 	      config.smatch_cfg = XD3_SMATCH_FASTEST;
 	    }
-	  else if (option_level == 1) { config.smatch_cfg = XD3_SMATCH_FASTEST; }
-	  else if (option_level == 2) { config.smatch_cfg = XD3_SMATCH_FASTER; }
-	  else if (option_level <= 5) { config.smatch_cfg = XD3_SMATCH_FAST; }
-	  else if (option_level == 6) { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
-	  else                        { config.smatch_cfg = XD3_SMATCH_SLOW; }
+	  else if (option_level == 1)
+	    { config.smatch_cfg = XD3_SMATCH_FASTEST; }
+	  else if (option_level == 2)
+	    { config.smatch_cfg = XD3_SMATCH_FASTER; }
+	  else if (option_level <= 5)
+	    { config.smatch_cfg = XD3_SMATCH_FAST; }
+	  else if (option_level == 6)
+	    { config.smatch_cfg = XD3_SMATCH_DEFAULT; }
+	  else
+	    { config.smatch_cfg = XD3_SMATCH_SLOW; }
 	}
       break;
 #endif
@@ -2841,7 +2891,8 @@ main_input (xd3_cmd     cmd,
 
       try_read = (usize_t) min ((xoff_t) config.winsize, input_remain);
 
-      if ((ret = main_read_primary_input (ifile, main_bdata, try_read, & nread)))
+      if ((ret = main_read_primary_input (ifile, main_bdata,
+					  try_read, & nread)))
 	{
 	  return EXIT_FAILURE;
 	}
@@ -2881,9 +2932,10 @@ main_input (xd3_cmd     cmd,
 	  {
 	    XD3_ASSERT (stream.current_window == 0);
 
-	    /* Need to process the appheader as soon as possible.  It may contain a
-	     * suggested default filename/decompression routine for the ofile, and it may
-	     * contain default/decompression routine for the sources. */
+	    /* Need to process the appheader as soon as possible.  It may
+	     * contain a suggested default filename/decompression routine for
+	     * the ofile, and it may contain default/decompression routine for
+	     * the sources. */
 	    if (cmd == CMD_DECODE)
 	      {
 		int have_src = sfile->filename != NULL;
@@ -2895,14 +2947,15 @@ main_input (xd3_cmd     cmd,
 
 		recv_src = sfile->filename != NULL;
 
-		/* Check if the user expected a source to be required although it was not. */
+		/* Check if the user expected a source to be required although
+		 * it was not. */
 		if (have_src && ! need_src && ! option_quiet)
 		  {
-		    XPR(NT "warning: output window %"Q"u does not copy source\n", stream.current_window);
+		    XPR(NT "warning: output window %"Q"u does not "
+			"copy source\n", stream.current_window);
 		  }
 
 		/* Check if we have no source name and need one. */
-		/* TODO: this doesn't fire due to cpyblocks_ calculation check? */
 		if (need_src && ! recv_src)
 		  {
 		    XPR(NT "input requires a source file, use -s\n");
@@ -2910,7 +2963,8 @@ main_input (xd3_cmd     cmd,
 		  }
 
 		/* Now open the source file. */
-		if (need_src && (ret = main_set_source (& stream, cmd, sfile, & source)))
+		if (need_src &&
+		    (ret = main_set_source (& stream, cmd, sfile, & source)))
 		  {
 		    return EXIT_FAILURE;
 		  }
@@ -2920,7 +2974,8 @@ main_input (xd3_cmd     cmd,
 		     cmd == CMD_PRINTDELTA ||
 		     cmd == CMD_RECODE)
 	      {
-		if (xd3_decoder_needs_source (& stream) && sfile->filename == NULL)
+		if (xd3_decoder_needs_source (& stream) &&
+		    sfile->filename == NULL)
 		  {
 		    allow_fake_source = 1;
 		    sfile->filename = "<placeholder>";
@@ -2951,7 +3006,8 @@ main_input (xd3_cmd     cmd,
 		  {
 		    return EXIT_FAILURE;
 		  }
-		if ((ret = output_func (& stream, ofile)) && (ret != PRINTHDR_SPECIAL))
+		if ((ret = output_func (& stream, ofile)) &&
+		    (ret != PRINTHDR_SPECIAL))
 		  {
 		    return EXIT_FAILURE;
 		  }
@@ -2972,21 +3028,25 @@ main_input (xd3_cmd     cmd,
 	  {
 	    if (IS_ENCODE (cmd) || cmd == CMD_DECODE || cmd == CMD_RECODE)
 	      {
-		if (! option_quiet && IS_ENCODE (cmd) && main_file_isopen (sfile))
+		if (! option_quiet && IS_ENCODE (cmd) &&
+		    main_file_isopen (sfile))
 		  {
 		    /* Warn when no source copies are found */
 		    if (! xd3_encoder_used_source (& stream))
 		      {
-			XPR(NT "warning: input window %"Q"u..%"Q"u has no source copies\n",
+			XPR(NT "warning: input window %"Q"u..%"Q"u has "
+			    "no source copies\n",
 			    stream.current_window * option_winsize,
 			    (stream.current_window+1) * option_winsize);
 		      }
 
-		    /* Limited instruction buffer size affects source copies */
-		    if (option_verbose > 1 && stream.i_slots_used > stream.iopt_size)
+		    /* Limited i-buffer size affects source copies */
+		    if (option_verbose > 1 &&
+			stream.i_slots_used > stream.iopt_size)
 		      {
-			XPR(NT "warning: input position %"Q"u overflowed instruction buffer, "
-			    "needed %u (vs. %u), consider raising -I\n",
+			XPR(NT "warning: input position %"Q"u overflowed "
+			    "instruction buffer, needed %u (vs. %u), "
+			    "consider raising -I\n",
 			    stream.current_window * option_winsize,
 			    stream.i_slots_used, stream.iopt_size);
 		      }
@@ -2998,14 +3058,17 @@ main_input (xd3_cmd     cmd,
 		    char rdb[32], wdb[32];
 		    char trdb[32], twdb[32];
 		    long millis = get_millisecs_since ();
-		    usize_t this_read = (usize_t)(stream.total_in - last_total_in);
-		    usize_t this_write = (usize_t)(stream.total_out - last_total_out);
+		    usize_t this_read = (usize_t)(stream.total_in -
+						  last_total_in);
+		    usize_t this_write = (usize_t)(stream.total_out -
+						   last_total_out);
 		    last_total_in = stream.total_in;
 		    last_total_out = stream.total_out;
 
 		    if (option_verbose > 1)
 		      {
-			XPR(NT "%"Q"u: in %s (%s): out %s (%s): total in %s: out %s: %s\n",
+			XPR(NT "%"Q"u: in %s (%s): out %s (%s): "
+			    "total in %s: out %s: %s\n",
 			    stream.current_window,
 			    main_format_bcnt (this_read, rdb),
 			    main_format_rate (this_read, millis, rrateavg),
@@ -3017,7 +3080,8 @@ main_input (xd3_cmd     cmd,
 		      }
 		    else
 		      {
-			XPR(NT "%"Q"u: in %s: out %s: total in %s: out %s: %s\n",
+			XPR(NT "%"Q"u: in %s: out %s: total in %s: "
+			    "out %s: %s\n",
  			    stream.current_window,
 			    main_format_bcnt (this_read, rdb),
 			    main_format_bcnt (this_write, wdb),
@@ -3089,8 +3153,10 @@ done:
 
   if (option_verbose > 2)
     {
-      XPR(NT "source copies: %"Q"u (%"Q"u bytes)\n", stream.n_scpy, stream.l_scpy);
-      XPR(NT "target copies: %"Q"u (%"Q"u bytes)\n", stream.n_tcpy, stream.l_tcpy);
+      XPR(NT "source copies: %"Q"u (%"Q"u bytes)\n",
+	  stream.n_scpy, stream.l_scpy);
+      XPR(NT "target copies: %"Q"u (%"Q"u bytes)\n",
+	  stream.n_tcpy, stream.l_tcpy);
       XPR(NT "adds: %"Q"u (%"Q"u bytes)\n", stream.n_add, stream.l_add);
       XPR(NT "runs: %"Q"u (%"Q"u bytes)\n", stream.n_run, stream.l_run);
     }
@@ -3220,7 +3286,8 @@ main (int argc, char **argv)
   main_file ifile;
   main_file ofile;
   main_file sfile;
-  static const char *flags = "0123456789cdefhnqvDJNORTVs:B:C:E:F:I:L:O:M:P:W:A::S::";
+  static const char *flags =
+    "0123456789cdefhnqvDJNORTVs:B:C:E:F:I:L:O:M:P:W:A::S::";
   int my_optind;
   char *my_optarg;
   char *my_optstr;
@@ -3256,11 +3323,12 @@ main (int argc, char **argv)
  takearg:
   my_optarg = NULL;
   my_optstr = argv[my_optind];
-  /* This doesn't use getopt() because it makes trouble for -P & python which reenter
-   * main() and thus care about freeing all memory.  I never had much trust for getopt
-   * anyway, it's too opaque.  This implements a fairly standard non-long-option getopt
-   * with support for named operations (e.g., "xdelta3 [encode|decode|printhdr...] < in >
-   * out"). */
+
+  /* This doesn't use getopt() because it makes trouble for -P & python which
+   * reenter main() and thus care about freeing all memory.  I never had much
+   * trust for getopt anyway, it's too opaque.  This implements a fairly
+   * standard non-long-option getopt with support for named operations (e.g.,
+   * "xdelta3 [encode|decode|printhdr...] < in > out"). */
   if (my_optstr)
     {
       if (*my_optstr == '-')    { my_optstr += 1; }
@@ -3273,12 +3341,12 @@ main (int argc, char **argv)
       my_optarg = NULL;
       if ((ret = *my_optstr++) == 0) { my_optind += 1; goto takearg; }
 
-      /* Option handling: first check for one ':' following the option in flags, then
-       * check for two.  The syntax allows:
+      /* Option handling: first check for one ':' following the option in
+       * flags, then check for two.  The syntax allows:
        *
        * 1. -Afoo                   defines optarg="foo"
        * 2. -A foo                  defines optarg="foo"
-       * 3. -A ""                   defines optarg="" (allows optional empty-string)
+       * 3. -A ""                   defines optarg="" (allows empty-string)
        * 4. -A [EOA or -moreargs]   error (mandatory case)
        * 5. -A [EOA -moreargs]      defines optarg=NULL (optional case)
        * 6. -A=foo                  defines optarg="foo"
@@ -3529,7 +3597,8 @@ main (int argc, char **argv)
       /* Check for conflicting arguments. */
       if (option_stdout && ! option_quiet)
 	{
-	  XPR(NT "warning: -c option overrides output filename: %s\n", argv[1]);
+	  XPR(NT "warning: -c option overrides output filename: %s\n",
+	      argv[1]);
 	}
 
       if (! option_stdout) { ofile.filename = argv[1]; }
@@ -3603,7 +3672,8 @@ main_help (void)
   DP(RINT "special command names:\n");
   DP(RINT "    config      prints xdelta3 configuration\n");
   DP(RINT "    decode      decompress the input\n");
-  DP(RINT "    encode      compress the input%s\n", XD3_ENCODER ? "" : " [Not compiled]");
+  DP(RINT "    encode      compress the input%s\n",
+     XD3_ENCODER ? "" : " [Not compiled]");
 #if REGRESSION_TEST
   DP(RINT "    test        run the builtin tests\n");
 #endif
@@ -3618,7 +3688,8 @@ main_help (void)
   DP(RINT "   -0 .. -9     compression level\n");
   DP(RINT "   -c           use stdout\n");
   DP(RINT "   -d           decompress\n");
-  DP(RINT "   -e           compress%s\n", XD3_ENCODER ? "" : " [Not compiled]");
+  DP(RINT "   -e           compress%s\n",
+     XD3_ENCODER ? "" : " [Not compiled]");
   DP(RINT "   -f           force overwrite\n");
   DP(RINT "   -h           show help\n");
   DP(RINT "   -q           be quiet\n");
