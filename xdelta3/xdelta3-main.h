@@ -1153,7 +1153,7 @@ snprintf_func (char *str, int n, char *fmt, ...)
  *   VC(UT "trying to be portable: %d\n", x)VE;
  */
 #define SNPRINTF_BUFSIZE 1024
-#define VC do { if (((ret = snprintf
+#define VC do { if (((ret = snprintf_func
 #define UT (char*)xfile->snprintf_buf, SNPRINTF_BUFSIZE,
 #define VE ) >= SNPRINTF_BUFSIZE			       \
   && (ret = main_print_overflow(ret)) != 0)		       \
