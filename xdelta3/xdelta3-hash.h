@@ -36,60 +36,6 @@
 #define SMALL_HASH_DEBUG2(s,inp)
 #endif /* XD3_DEBUG */
 
-/* Update the run-length state */
-#define NEXTRUN(c) do { if ((c) == run_c) { run_l += 1; } \
-  else { run_c = (c); run_l = 1; } } while (0)
-
-/* Update the checksum state. */
-#if ADLER_LARGE_CKSUM
-#define LARGE_CKSUM_UPDATE(cksum,base,look)                              \
-  do {                                                                   \
-    uint32_t old_c = PERMUTE((base)[0]);                                    \
-    uint32_t new_c = PERMUTE((base)[(look)]);                               \
-    uint32_t low   = (((cksum) & 0xffff) - old_c + new_c) & 0xffff;         \
-    uint32_t high  = (((cksum) >> 16) - (old_c * (look)) + low) & 0xffff;   \
-    (cksum) = (high << 16) | low;                                        \
-  } while (0)
-#else
-
-// This is a table of powers of 1597334677 (a good MLCG multiplier for 32-bit
-// modular arithmetic).  TODO: add citation for "linear congruential
-// generators of different sizes and good lattice structure"
-static const uint32_t hash_multiplier = 1597334677U;
-static const uint32_t hash_multiplier_powers[64] = {
-  1U,          1597334677U, 1664532153U, 1152009645U, 
-  438510001U,  2554380293U, 2226829033U, 2237430173U, 
-  785718369U,  1614047349U, 2189918233U, 3004453517U, 
-  2504269841U, 1873956325U, 3298675273U, 184041597U, 
-  412048577U,  513892437U,  1512523129U, 420197229U, 
-  3195470449U, 3365769157U, 782672297U,  1830755165U, 
-  3607904545U, 2926038069U, 2592473U,    2764040269U, 
-  2237745361U, 1146488229U, 3329146121U, 975735357U, 
-  4047063425U, 3720555541U, 992599097U,  2284876077U, 
-  1371042609U, 2776575877U, 857709673U,  1933315357U, 
-  18085345U,   3544121333U, 2019536281U, 657247757U, 
-  3376546193U, 235703653U,  3581067209U, 1515267069U, 
-  2578040385U, 3954624469U, 25854713U,   2236907245U, 
-  3587404785U, 2101452613U, 498181929U,  2150584029U, 
-  1830304417U, 3629515701U, 1929108569U, 4095149005U, 
-  3948038737U, 2377245989U, 565564041U,  309202365U, 
-};
-
-#define LARGE_CKSUM_UPDATE(cksum,base,look) \
-  do { \
-    cksum = (cksum * hash_multiplier) - \
-      (hash_multiplier_powers[look] * PERMUTE(base[0])) + \
-      PERMUTE(base[look]); \
-  } while (0)
-#endif
-
-#if ARITH_SMALL_CKSUM
-#define SMALL_CKSUM_UPDATE(cksum,base,look) \
-  (cksum) = (uint32_t) ((*(uint32_t*)(base+1)) * (uint32_t)1597334677U)
-#else
-#define SMALL_CKSUM_UPDATE LARGE_CKSUM_UPDATE
-#endif
-
 /***********************************************************************
  Permute stuff
  ***********************************************************************/
@@ -136,6 +82,50 @@ static const uint16_t __single_hash[256] =
   0x6d71, 0xe37d, 0xb697, 0x2c4f, 0x4373, 0x9102, 0x075d, 0x8e25,
   0x1672, 0xec28, 0x6acb, 0x86cc, 0x186e, 0x9414, 0xd674, 0xd1a5
 };
+#endif
+
+/* Update the checksum state. */
+#if ADLER_LARGE_CKSUM
+inline uint32_t
+xd3_large_cksum_update (uint32_t cksum,
+			const uint8_t *base,
+			int look) {
+  uint32_t old_c = PERMUTE(base[0]);
+  uint32_t new_c = PERMUTE(base[look]);
+  uint32_t low   = ((cksum & 0xffff) - old_c + new_c) & 0xffff;
+  uint32_t high  = ((cksum >> 16) - (old_c * look) + low) & 0xffff;
+  return (high << 16) | low;
+}
+#else
+
+// This is a table of powers of 1597334677 (a good MLCG multiplier for 32-bit
+// modular arithmetic).  TODO: add citation for "linear congruential
+// generators of different sizes and good lattice structure"
+static const uint32_t hash_multiplier = 1597334677U;
+
+// TODO: revisit this topic
+#endif
+
+#if ARITH_SMALL_CKSUM
+#if UNALIGNED_OK
+inline uint32_t
+xd3_small_cksum_update (uint32_t ignore,
+			const uint8_t *base,
+			int look) {
+  return (*(uint32_t*)(base+1)) * (uint32_t)1597334677U;
+}
+#else
+inline uint32_t
+xd3_small_cksum_update (uint32_t ignore,
+			const uint8_t *base,
+			const int look) {
+  uint32_t x;
+  memcpy(&x, base+1, 4);
+  return x * (uint32_t)1597334677U;
+}
+#endif
+#else
+#define xd3_small_cksum_update xd3_large_cksum_update
 #endif
 
 /***********************************************************************
@@ -187,7 +177,7 @@ xd3_scksum (const uint8_t *seg, const int ln)
 {
   uint32_t c;
   /* The -1 is because UPDATE operates on seg[1..ln] */
-  SMALL_CKSUM_UPDATE (c,(seg-1),ln);
+  c = xd3_small_cksum_update (c, seg-1, ln);
   return c;
 }
 #else

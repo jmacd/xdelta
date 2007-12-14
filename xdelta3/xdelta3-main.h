@@ -1773,7 +1773,9 @@ main_decompress_input_check (main_file   *ifile,
   usize_t check_nread;
   uint8_t check_buf[XD3_ALLOCSIZE];
 
-  if ((ret = main_file_read (ifile, check_buf, min (input_size, XD3_ALLOCSIZE), & check_nread, "input read failed")))
+  if ((ret = main_file_read (ifile, check_buf,
+			     min (input_size, XD3_ALLOCSIZE),
+			     & check_nread, "input read failed")))
     {
       return ret;
     }

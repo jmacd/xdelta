@@ -135,8 +135,20 @@ typedef uint32_t xoff_t;
 #define Q
 #endif
 
-#define USE_UINT32 (SIZEOF_USIZE_T == 4 || SIZEOF_XOFF_T == 4 || REGRESSION_TEST)
-#define USE_UINT64 (SIZEOF_USIZE_T == 8 || SIZEOF_XOFF_T == 8 || REGRESSION_TEST)
+#define USE_UINT32 (SIZEOF_USIZE_T == 4 || \
+		    SIZEOF_XOFF_T == 4 || REGRESSION_TEST)
+#define USE_UINT64 (SIZEOF_USIZE_T == 8 || \
+		    SIZEOF_XOFF_T == 8 || REGRESSION_TEST)
+
+/* TODO: probably should do something better here. */
+#ifndef UNALIGNED_OK
+#if defined(__i386__) || defined(__i486__) || defined(__i586__) || \
+  defined(__i686__) || defined(_X86_) || defined(__x86_64__)
+#define UNALIGNED_OK 1
+#else
+#define UNALIGNED_OK 0
+#endif
+#endif
 
 /**********************************************************************/
 
@@ -196,10 +208,6 @@ typedef uint32_t xoff_t;
 
 #if XD3_DEBUG
 #include <stdio.h>
-#endif
-
-#ifndef UNALIGNED_OK
-#define UNALIGNED_OK 1
 #endif
 
 /* XPRINT.  Debug output and VCDIFF_TOOLS functions report to stderr.

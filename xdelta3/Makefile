@@ -121,7 +121,6 @@ xdelta3: $(SOURCES)
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
-	      -DUNALIGNED_OK=1 \
 	      -DXD3_DEBUG=0 \
 	      -DXD3_MAIN=1 \
 	      -DXD3_POSIX=1 \
@@ -133,7 +132,6 @@ xdelta3-debug: $(SOURCES)
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
-		-DUNALIGNED_OK=1 \
 		-DXD3_DEBUG=1 \
 		-DXD3_MAIN=1 \
 		-DXD3_STDIO=1 \

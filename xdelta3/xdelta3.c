@@ -473,6 +473,10 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
   stream->next_in  += (n);          \
   } while (0)
 
+/* Update the run-length state */
+#define NEXTRUN(c) do { if ((c) == run_c) { run_l += 1; } \
+  else { run_c = (c); run_l = 1; } } while (0)
+
 /* This CPP-conditional stuff can be cleaned up... */
 #if XD3_DEBUG
 #define IF_DEBUG(x) x
@@ -3003,7 +3007,7 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 
 	  /* Try to balance the length of both instructions, but avoid
 	   * making both longer than MAX_MATCH_SPLIT . */
-	  average = (gap) / 2;
+	  average = gap / 2;
 	  newsize = min (MAX_MATCH_SPLIT, gap - average);
 
 	  /* Should be possible to simplify this code. */
@@ -5240,11 +5244,14 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	}
 
       /* Compute next RUN, CKSUM */
-      if (DO_RUN)   { NEXTRUN (inp[SLOOK]); }
-      if (DO_SMALL) { SMALL_CKSUM_UPDATE (scksum, inp, SLOOK); }
+      if (DO_RUN) { NEXTRUN (inp[SLOOK]); }
+      if (DO_SMALL)
+	{
+	  scksum = xd3_small_cksum_update (scksum, inp, SLOOK);
+	}
       if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in))
 	{
-	  LARGE_CKSUM_UPDATE (lcksum, inp, LLOOK);
+	  lcksum = xd3_large_cksum_update (lcksum, inp, LLOOK);
 	}
     }
 

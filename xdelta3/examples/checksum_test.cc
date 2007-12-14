@@ -167,7 +167,7 @@ struct adler32_cksum {
     }
 
     Word incr(const uint8_t *ptr) {
-	LARGE_CKSUM_UPDATE(incr_state, ptr - 1, cksum_size);
+	incr_state = xd3_large_cksum_update (incr_state, ptr - 1, cksum_size);
 	return incr_state;
     }
 
