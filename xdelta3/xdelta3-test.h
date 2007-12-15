@@ -1764,7 +1764,7 @@ test_recode_command2 (xd3_stream *stream, int has_source,
   int recoded_apphead = change_apphead ? !has_apphead : has_apphead;
   int recoded_secondary = change_secondary ? !has_secondary : has_secondary;
 
-  char ecmd[TESTBUFSIZE], rcmd[TESTBUFSIZE], dcmd[TESTBUFSIZE];
+  char ecmd[TESTBUFSIZE], recmd[TESTBUFSIZE], dcmd[TESTBUFSIZE];
   xoff_t tsize, ssize;
   int ret;
 
@@ -1800,18 +1800,18 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     }
 
   /* Now recode */
-  sprintf (rcmd, "%s recode %s -f ", program_name, test_softcfg_str);
-  strcat (rcmd, recoded_adler32 ? "" : "-n ");
-  strcat (rcmd, !change_apphead ? "" :
+  sprintf (recmd, "%s recode %s -f ", program_name, test_softcfg_str);
+  strcat (recmd, recoded_adler32 ? "" : "-n ");
+  strcat (recmd, !change_apphead ? "" :
 	  (recoded_apphead ? "-A=recode_apphead " : "-A= "));
-  strcat (rcmd, recoded_secondary ? "-S djw " : "-S none ");
-  strcat (rcmd, TEST_DELTA_FILE);
-  strcat (rcmd, " ");
-  strcat (rcmd, TEST_COPY_FILE);
+  strcat (recmd, recoded_secondary ? "-S djw " : "-S none ");
+  strcat (recmd, TEST_DELTA_FILE);
+  strcat (recmd, " ");
+  strcat (recmd, TEST_COPY_FILE);
 
-  if ((ret = system (rcmd)) != 0)
+  if ((ret = system (recmd)) != 0)
     {
-      DP(RINT "xdelta3: recode command: %s\n", rcmd);
+      DP(RINT "xdelta3: recode command: %s\n", recmd);
       stream->msg = "recode cmd failed";
       return XD3_INTERNAL;
     }

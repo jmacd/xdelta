@@ -16,25 +16,26 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* To know more about Xdelta, start by reading xdelta3.c.  If you are
- * ready to use the API, continue reading here.  There are two
- * interfaces -- xd3_encode_input and xd3_decode_input -- plus a dozen
- * or so related calls.  This interface is styled after Zlib. */
-
 #ifndef _XDELTA3_HASH_H_
 #define _XDELTA3_HASH_H_
 
 #if XD3_DEBUG
 #define SMALL_HASH_DEBUG1(s,inp)                                  \
-  usize_t debug_hval = xd3_checksum_hash (& (s)->small_hash,       \
-         xd3_scksum ((inp), (s)->smatcher.small_look))
+  usize_t debug_state;                                            \
+  usize_t debug_hval = xd3_checksum_hash (& (s)->small_hash,      \
+              xd3_scksum (&debug_state, (inp), (s)->smatcher.small_look))
 #define SMALL_HASH_DEBUG2(s,inp)                                  \
   XD3_ASSERT (debug_hval == xd3_checksum_hash (& (s)->small_hash, \
-	 xd3_scksum ((inp), (s)->smatcher.small_look)))
+              xd3_scksum (&debug_state, (inp), (s)->smatcher.small_look)))
 #else
 #define SMALL_HASH_DEBUG1(s,inp)
 #define SMALL_HASH_DEBUG2(s,inp)
 #endif /* XD3_DEBUG */
+
+/* This is a good hash multiplier for 32-bit LCGs: see "linear
+ * congruential generators of different sizes and good lattice
+ * structure" */
+static const uint32_t hash_multiplier = 1597334677U;
 
 /***********************************************************************
  Permute stuff
@@ -97,35 +98,48 @@ xd3_large_cksum_update (uint32_t cksum,
   return (high << 16) | low;
 }
 #else
-
-// This is a table of powers of 1597334677 (a good MLCG multiplier for 32-bit
-// modular arithmetic).  TODO: add citation for "linear congruential
-// generators of different sizes and good lattice structure"
-static const uint32_t hash_multiplier = 1597334677U;
-
 // TODO: revisit this topic
 #endif
 
-#if ARITH_SMALL_CKSUM
+/* Note: small cksum is hard-coded for 4 bytes */
 #if UNALIGNED_OK
-inline uint32_t
-xd3_small_cksum_update (uint32_t ignore,
+static inline uint32_t
+xd3_scksum (uint32_t *state,
+            const uint8_t *base,
+            const int look)
+{
+  (*state) = *(uint32_t*)base;
+  return (*state) * hash_multiplier;
+}
+static inline uint32_t
+xd3_small_cksum_update (uint32_t *state,
 			const uint8_t *base,
-			int look) {
-  return (*(uint32_t*)(base+1)) * (uint32_t)1597334677U;
+			int look)
+{
+  (*state) = *(uint32_t*)(base+1);
+  return (*state) * hash_multiplier;
 }
 #else
-inline uint32_t
-xd3_small_cksum_update (uint32_t ignore,
-			const uint8_t *base,
-			const int look) {
-  uint32_t x;
-  memcpy(&x, base+1, 4);
-  return x * (uint32_t)1597334677U;
+static inline uint32_t
+xd3_scksum (uint32_t *state,
+            const uint8_t *base,
+            const int look)
+{
+  (*state) = (base[0] << 24 |
+              base[1] << 16 |
+              base[2] << 8 |
+              base[3]);
+  return (*state) * hash_multiplier;
 }
-#endif
-#else
-#define xd3_small_cksum_update xd3_large_cksum_update
+static inline uint32_t
+xd3_small_cksum_update (uint32_t *state,
+			const uint8_t *base,
+			const int look)
+{
+  (*state) <<= 8;
+  (*state) |= base[4];
+  return (*state) * hash_multiplier;
+}
 #endif
 
 /***********************************************************************
@@ -169,19 +183,6 @@ xd3_lcksum (const uint8_t *seg, const int ln)
   }
   return h;
 }
-#endif
-
-#if ARITH_SMALL_CKSUM
-static inline uint32_t
-xd3_scksum (const uint8_t *seg, const int ln)
-{
-  uint32_t c;
-  /* The -1 is because UPDATE operates on seg[1..ln] */
-  c = xd3_small_cksum_update (c, seg-1, ln);
-  return c;
-}
-#else
-#define xd3_scksum(seg,ln) xd3_lcksum(seg,ln)
 #endif
 
 #if XD3_ENCODER

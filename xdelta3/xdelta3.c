@@ -387,8 +387,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 				 * compressor alphabet. */
 
 #define HASH_PERMUTE       1    /* The input is permuted by random nums */
-#define ARITH_SMALL_CKSUM  1    /* Simple small checksum function --
-				 * faster than RK/adler32 */
 #define ADLER_LARGE_CKSUM  1    /* Adler checksum vs. RK checksum */
 
 #define HASH_CKOFFSET      1U   /* Table entries distinguish "no-entry" from
@@ -544,7 +542,7 @@ static usize_t xd3_smatch (xd3_stream *stream,
 			   usize_t scksum,
 			   usize_t *match_offset);
 static int xd3_string_match_init (xd3_stream *stream);
-static uint32_t xd3_scksum (const uint8_t *seg, const int ln);
+static uint32_t xd3_scksum (uint32_t *state, const uint8_t *seg, const int ln);
 static int xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp);
 static int xd3_srcwin_move_point (xd3_stream *stream,
 				  usize_t *next_move_point);
@@ -4794,7 +4792,8 @@ xd3_verify_small_state (xd3_stream    *stream,
 			const uint8_t *inp,
 			uint32_t          x_cksum)
 {
-  uint32_t cksum = xd3_scksum (inp, stream->smatcher.small_look);
+  uint32_t state;
+  uint32_t cksum = xd3_scksum (&state, inp, stream->smatcher.small_look);
 
   XD3_ASSERT (cksum == x_cksum);
 }
@@ -5012,6 +5011,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 
   const uint8_t *inp;
   uint32_t       scksum = 0;
+  uint32_t       scksum_state;
   uint32_t       lcksum = 0;
   usize_t         sinx;
   usize_t         linx;
@@ -5060,7 +5060,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   /* Small match state. */
   if (DO_SMALL)
     {
-      scksum = xd3_scksum (inp, SLOOK);
+      scksum = xd3_scksum (&scksum_state, inp, SLOOK);
     }
 
   /* Run state. */
@@ -5249,7 +5249,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
       if (DO_RUN) { NEXTRUN (inp[SLOOK]); }
       if (DO_SMALL)
 	{
-	  scksum = xd3_small_cksum_update (scksum, inp, SLOOK);
+	  scksum = xd3_small_cksum_update (&scksum_state, inp, SLOOK);
 	}
       if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in))
 	{
