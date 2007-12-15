@@ -84,6 +84,10 @@
 #define XD3_DEFAULT_SECONDARY_LEVEL 6
 #endif
 
+#ifndef XD3_USE_LARGEFILE64
+#define XD3_USE_LARGEFILE64 1
+#endif
+
 /* Sizes and addresses within VCDIFF windows are represented as usize_t
  *
  * For source-file offsets and total file sizes, total input and
@@ -96,19 +100,33 @@
 typedef unsigned int usize_t;
 #else
 #define WIN32_LEAN_AND_MEAN
+#if XD3_USE_LARGEFILE64
+/* 64 bit file offsets: uses GetFileSizeEx and
+ * SetFilePointerEx. requires WinME, or Win2000
+ * and or newer version of WinNT */
+#define WINVER		0x0500
+#define _WIN32_WINNT	0x0500
+#else
+/* 32 bit (DWORD) file offsets: uses GetFileSize
+ * and SetFilePointer. compatible with win95-98
+ * and WinNT4 */
+#define WINVER		0x0400
+#define _WIN32_WINNT	0x0400
+#endif
 #include <windows.h>
-#define inline
-typedef unsigned int   uint;
-typedef signed int     ssize_t;
 typedef unsigned int   usize_t;
+#ifdef _MSC_VER
+#define inline
+typedef signed int     ssize_t;
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned long  uint32_t;
 typedef ULONGLONG      uint64_t;
+#else
+/* mingw32, lcc and watcom
+ * provide a proper header */
+#include <stdint.h>
 #endif
-
-#ifndef XD3_USE_LARGEFILE64
-#define XD3_USE_LARGEFILE64 1
 #endif
 
 /* TODO: note that SIZEOF_USIZE_T is never set to 8, although it should be for

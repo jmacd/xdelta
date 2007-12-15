@@ -106,7 +106,9 @@ const char* xd3_mainerror(int err_num);
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() and fstat() */
 #else
+#if defined(_MSC_VER)
 #define strtoll _strtoi64
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifndef WIFEXITED
@@ -841,6 +843,7 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
 {
   int ret = 0;
 #if XD3_WIN32
+# if (_WIN32_WINNT >= 0x0500)
   LARGE_INTEGER li;
   if (GetFileSizeEx(xfile->file, &li) == 0)
     {
@@ -850,6 +853,16 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
     {
       *size = li.QuadPart;
     }
+# else
+  DWORD filesize = GetFileSize(xfile->file, NULL);
+  if (filesize == INVALID_FILE_SIZE)
+    {
+      ret = GetLastError();
+      if (ret != NO_ERROR)
+	return ret;
+    }
+  *size = filesize;
+# endif
 #else
   struct stat sbuf;
   if (fstat (XFNO (xfile), & sbuf) < 0)
@@ -1024,11 +1037,19 @@ main_file_seek (main_file *xfile, xoff_t pos)
     { ret = get_errno (); }
 
 #elif XD3_WIN32
+# if (_WIN32_WINNT >= 0x0500)
   LARGE_INTEGER move, out;
   move.QuadPart = pos;
   if (SetFilePointerEx(xfile->file, move, &out, FILE_BEGIN) == 0) {
 	  ret = get_errno ();
   }
+# else
+  if (SetFilePointer(xfile->file, (LONG)pos, NULL, FILE_BEGIN) ==
+					INVALID_SET_FILE_POINTER)
+  {
+	  ret = get_errno ();
+  }
+# endif
 #endif
 
   if (ret)
