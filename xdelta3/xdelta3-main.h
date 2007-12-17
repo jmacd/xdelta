@@ -1609,7 +1609,7 @@ main_init_merge_state (xd3_stream *stream, main_merge *merge)
 static int
 main_merge_arguments (main_merge_list* merges)
 {
-  int ret;
+/*  int ret; */
   main_merge *merge = NULL;
 
   if (main_merge_list_empty (merges))
@@ -1623,10 +1623,10 @@ main_merge_arguments (main_merge_list* merges)
     {
       DP(RINT "TODO MERGE FILE: %s\n", merge->filename);
 
-      if ((ret = main_init_merge_state (stream, NULL)))
-        {
-          return ret;
-        }
+/*       if ((ret = main_init_merge_state (NULL, NULL))) */
+/*         { */
+/*           return ret; */
+/*         } */
 
       merge = main_merge_list_next (merge);
     }
