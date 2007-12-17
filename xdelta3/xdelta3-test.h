@@ -1565,12 +1565,13 @@ test_compressed_stream_overflow (xd3_stream *stream, int ignore)
     {
       ret = test_streaming (stream, buf, buf + (1 << 20), buf + (2 << 20), (1 << 12) + 1);
 
-      if (ret == XD3_INTERNAL && MSG_IS ("decoder file offset overflow"))
+      if (ret == XD3_INVALID_INPUT && MSG_IS ("decoder file offset overflow"))
 	{
 	  ret = 0;
 	}
       else
 	{
+          XPR(NT XD3_LIB_ERRMSG (stream, ret));
 	  stream->msg = "expected overflow condition";
 	  ret = XD3_INTERNAL;
 	  goto fail;
@@ -2715,9 +2716,6 @@ xd3_selftest (void)
   IF_GENCODETBL (
 	 DO_TEST (decompress_single_bit_error, XD3_ALT_CODE_TABLE, 224));
 
-  IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));
-  IF_FGK (DO_TEST (secondary_fgk, 0, 1));
-
 #ifndef WIN32
   DO_TEST (force_behavior, 0, 0);
   DO_TEST (stdout_behavior, 0, 0);
@@ -2732,7 +2730,9 @@ xd3_selftest (void)
 
 #endif /* WIN32 */
 
-  /* This test takes a while. */
+  IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));
+  IF_FGK (DO_TEST (secondary_fgk, 0, 1));
+
   DO_TEST (compressed_stream_overflow, 0, 0);
 
 failure:

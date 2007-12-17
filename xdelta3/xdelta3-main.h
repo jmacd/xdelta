@@ -262,7 +262,7 @@ struct _main_blklru
 /* ... represented as a list (no cache index). */
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
-// Merge state:
+/* Merge state: */
 
 struct _main_merge_list
 {
@@ -273,6 +273,7 @@ struct _main_merge_list
 struct _main_merge
 {
   const char *filename;
+  xoff_t source_size;
   main_merge_list  link;
 };
 
@@ -384,6 +385,7 @@ main_config (void)
   DP(RINT "REGRESSION_TEST=%d\n", REGRESSION_TEST);
   DP(RINT "SECONDARY_DJW=%d\n", SECONDARY_DJW);
   DP(RINT "SECONDARY_FGK=%d\n", SECONDARY_FGK);
+  DP(RINT "UNALIGNED_OK=%d\n", UNALIGNED_OK);
   DP(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
   DP(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
   DP(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
@@ -1579,6 +1581,77 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
     }
 }
 #endif /* VCDIFF_TOOLS */
+
+/*******************************************************************
+ VCDIFF merging
+ ******************************************************************/
+
+#if XD3_ENCODER
+/* The first stream in merge order sets the source of the merged
+ * output.  This is where we initialize the static merge_state
+ * variable w/ the initial source information. */
+static int
+main_init_merge_state (xd3_stream *stream, main_merge *merge)
+{
+  if (! xd3_decoder_needs_source (stream))
+    {
+      DP(RINT "cannot merge inputs which do not have a source file\n");
+      return XD3_INVALID;
+    }
+
+  merge->source_size = stream->src->size;
+
+  return 0;
+}
+
+/* This processes the sequence of -m arguments.  The final input
+ * is processed as part of the ordinary main_input() loop. */
+static int
+main_merge_arguments (main_merge_list* merges)
+{
+  int ret;
+  main_merge *merge = NULL;
+
+  if (main_merge_list_empty (merges))
+    {
+      return 0;
+    }
+
+  merge = main_merge_list_front (merges);
+
+  while (!main_merge_list_end (merges, merge))
+    {
+      DP(RINT "TODO MERGE FILE: %s\n", merge->filename);
+
+      if ((ret = main_init_merge_state (stream, NULL)))
+        {
+          return ret;
+        }
+
+      merge = main_merge_list_next (merge);
+    }
+
+  return 0;
+}
+
+/* This processes each window of the final merge input.  This routine
+ * does not output, it buffers the entire delta into memory. */
+static int
+main_merge_func (xd3_stream* stream, main_file *no_write)
+{
+  int ret;
+
+  if ((ret = main_init_merge_state (stream, NULL)))
+    {
+      return ret;
+    }
+
+  // TODO HERE YOU ARE
+  //if ((ret = xd3_n
+
+  return 0;
+}
+#endif
 
 /*******************************************************************
  Input decompression, output recompression
@@ -2788,7 +2861,8 @@ main_input (xd3_cmd     cmd,
       break;
 
     case CMD_RECODE:
-      // No source will be read
+    case CMD_MERGE:
+      /* No source will be read */
       stream_flags |= XD3_ADLER32_NOVER | XD3_SKIP_EMIT;
 
       XD3_ASSERT (recode_stream == NULL);
@@ -2812,14 +2886,11 @@ main_input (xd3_cmd     cmd,
 
       ifile->flags |= RD_NONEXTERNAL;
       input_func    = xd3_decode_input;
-      output_func   = main_recode_func;
+      if (cmd == CMD_RECODE) { output_func = main_recode_func; }
+      else                   { output_func = main_merge_func; }
       break;
+#endif /* VCDIFF_TOOLS */
 
-    case CMD_MERGE:
-      XPR(NT "merge not implemented\n");
-      return EXIT_FAILURE;
-      //break;
-#endif
 #if XD3_ENCODER
     case CMD_ENCODE:
       do_not_lru  = 1;
@@ -3618,7 +3689,6 @@ main (int argc, char **argv)
 	    }
 	  main_merge_list_push_back (& merge_order, merge);
 	  merge->filename = my_optarg;
-	  // TODO: more cleanup
 	  break;
 
 	case 'V':
@@ -3678,6 +3748,12 @@ main (int argc, char **argv)
       if (! option_stdout) { ofile.filename = argv[1]; }
     }
 
+  if (cmd == CMD_MERGE &&
+      (ret = main_merge_arguments (&merge_order)))
+    {
+      goto cleanup;
+    }
+
   switch (cmd)
     {
     case CMD_PRINTHDR:
@@ -3729,6 +3805,7 @@ main (int argc, char **argv)
 
   while (! main_merge_list_empty (& merge_order))
     {
+      /* TODO: More merge cleanup, once implemented. */
       merge = main_merge_list_pop_front (& merge_order);
       main_free (merge);
     }

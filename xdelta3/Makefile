@@ -138,7 +138,7 @@ xdelta3-debug: $(SOURCES)
 		-DXD3_USE_LARGEFILE64=1
 
 xdelta3-32: $(SOURCES)
-	$(CC) -O3 $(CFLAGS) xdelta3.c -lm -o xdelta3-32 \
+	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-32 \
 	      -DXD3_DEBUG=1 \
 	      -DXD3_USE_LARGEFILE64=0 \
 	      -DREGRESSION_TEST=1 \
