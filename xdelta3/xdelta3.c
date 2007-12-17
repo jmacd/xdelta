@@ -3575,7 +3575,7 @@ xd3_encode_init_buffers (xd3_stream *stream)
     }
 
   return 0;
-}  
+}
 
 /* This function allocates all memory initially used by the encoder. */
 int

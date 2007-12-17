@@ -1065,8 +1065,8 @@ int     xd3_config_stream (xd3_stream    *stream,
  * resources it supplied. */
 int     xd3_close_stream (xd3_stream    *stream);
 
-/* This unconditionally closes/frees the stream, future close() will
-   succeed. */
+/* This arranges for closes the stream to succeed.  Does not free the
+ * stream.*/
 void    xd3_abort_stream (xd3_stream    *stream);
 
 /* xd3_free_stream frees all memory allocated for the stream.  The

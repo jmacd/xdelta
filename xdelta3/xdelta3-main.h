@@ -273,7 +273,7 @@ struct _main_merge_list
 struct _main_merge
 {
   const char *filename;
-  xoff_t source_size;
+  //xoff_t source_size;
   main_merge_list  link;
 };
 
@@ -338,8 +338,11 @@ static int lru_filled = 0;
 /* Hacks for VCDIFF tools */
 static int allow_fake_source = 0;
 
-/* State for xdelta3 recode */
+/* recode_stream is used by both recode/merge */
 static xd3_stream *recode_stream = NULL;
+
+/* used by merge command */
+static main_merge recode_merge;
 
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
  * false just so the program knows the mapping of IDENT->NAME. */
@@ -358,6 +361,8 @@ static main_extcomp extcomp_types[] =
 
 // };
 
+static int main_input (xd3_cmd cmd, main_file *ifile,
+                       main_file *ofile, main_file *sfile);
 static void main_get_appheader (xd3_stream *stream, main_file *ifile,
 				main_file *output, main_file *sfile);
 
@@ -773,6 +778,8 @@ main_file_close (main_file *xfile)
 static void
 main_file_cleanup (main_file *xfile)
 {
+  XD3_ASSERT (xfile != NULL);
+
   if (main_file_isopen (xfile))
     {
       main_file_close (xfile);
@@ -1587,6 +1594,43 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
  ******************************************************************/
 
 #if XD3_ENCODER
+/* Modifies static state. */
+static int
+main_init_recode_stream (void)
+{
+  int ret;
+  int stream_flags = XD3_ADLER32_NOVER | XD3_SKIP_EMIT;
+  int recode_flags;
+  xd3_config recode_config;
+
+  XD3_ASSERT (recode_stream == NULL);
+
+  if ((recode_stream = (xd3_stream*)
+       main_malloc(sizeof(xd3_stream))) == NULL)
+    {
+      return ENOMEM;
+    }
+
+  recode_flags = (stream_flags & XD3_SEC_TYPE);
+
+  recode_config.alloc = main_alloc;
+  recode_config.freef = main_free1;
+
+  xd3_init_config(&recode_config, recode_flags);
+
+  if ((ret = main_set_secondary_flags (&recode_config)) ||
+      (ret = xd3_config_stream (recode_stream, &recode_config)) ||
+      (ret = xd3_encode_init_buffers (recode_stream)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (recode_stream, ret));
+      xd3_free_stream (recode_stream);
+      recode_stream = NULL;
+      return ret;
+    }
+
+  return 0;
+}
+
 /* The first stream in merge order sets the source of the merged
  * output.  This is where we initialize the static merge_state
  * variable w/ the initial source information. */
@@ -1599,8 +1643,6 @@ main_init_merge_state (xd3_stream *stream, main_merge *merge)
       return XD3_INVALID;
     }
 
-  merge->source_size = stream->src->size;
-
   return 0;
 }
 
@@ -1609,7 +1651,7 @@ main_init_merge_state (xd3_stream *stream, main_merge *merge)
 static int
 main_merge_arguments (main_merge_list* merges)
 {
-/*  int ret; */
+  int ret;
   main_merge *merge = NULL;
 
   if (main_merge_list_empty (merges))
@@ -1621,12 +1663,37 @@ main_merge_arguments (main_merge_list* merges)
 
   while (!main_merge_list_end (merges, merge))
     {
-      DP(RINT "TODO MERGE FILE: %s\n", merge->filename);
+      main_file mfile;
+      main_file_init (& mfile);
+      mfile.filename = merge->filename;
+      mfile.flags = RD_NONEXTERNAL;
 
-/*       if ((ret = main_init_merge_state (NULL, NULL))) */
-/*         { */
-/*           return ret; */
-/*         } */
+      if ((ret = main_file_open (& mfile, merge->filename, XO_READ)))
+        {
+          return ret;
+        }
+
+      ret = main_input (CMD_MERGE, &mfile, NULL, NULL);
+
+      main_file_cleanup (& mfile);
+
+      if (recode_stream != NULL)
+        {
+          xd3_free_stream (recode_stream);
+          main_free (recode_stream);
+          recode_stream = NULL;
+        }
+
+      if (main_bdata != NULL)
+        {
+          main_free (main_bdata);
+          main_bdata = NULL;
+        }
+
+      if (ret != 0)
+        {
+          return ret;
+        }
 
       merge = main_merge_list_next (merge);
     }
@@ -1641,13 +1708,14 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 {
   int ret;
 
-  if ((ret = main_init_merge_state (stream, NULL)))
+  if ((ret = main_init_merge_state (stream, &recode_merge)))
     {
       return ret;
     }
 
   // TODO HERE YOU ARE
-  //if ((ret = xd3_n
+  // Need a new in-memory representation for whole deltas
+  // xd3_merge_decode()
 
   return 0;
 }
@@ -2823,10 +2891,6 @@ main_input (xd3_cmd     cmd,
   xoff_t     last_total_out = 0;
   long       start_time;
   int        stdout_only = 0;
-#if VCDIFF_TOOLS
-  int        recode_flags;
-  xd3_config recode_config;
-#endif
   int (*input_func) (xd3_stream*);
   int (*output_func) (xd3_stream*, main_file *);
 
@@ -2864,28 +2928,14 @@ main_input (xd3_cmd     cmd,
     case CMD_MERGE:
       /* No source will be read */
       stream_flags |= XD3_ADLER32_NOVER | XD3_SKIP_EMIT;
-
-      XD3_ASSERT (recode_stream == NULL);
-      recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream));
-
-      recode_flags = (stream_flags & XD3_SEC_TYPE);
-
-      recode_config.alloc = main_alloc;
-      recode_config.freef = main_free1;
-
-      xd3_init_config(&recode_config, recode_flags);
-
-      if ((ret = main_set_secondary_flags (&recode_config)) ||
-	  (ret = xd3_config_stream (recode_stream, &recode_config)) ||
-	  (ret = xd3_encode_init_buffers (recode_stream)))
-	{
-
-	  XPR(NT XD3_LIB_ERRMSG (recode_stream, ret));
-	  return EXIT_FAILURE;
-	}
-
       ifile->flags |= RD_NONEXTERNAL;
-      input_func    = xd3_decode_input;
+      input_func = xd3_decode_input;
+
+      if ((ret = main_init_recode_stream ()))
+        {
+	  return EXIT_FAILURE;
+        }
+
       if (cmd == CMD_RECODE) { output_func = main_recode_func; }
       else                   { output_func = main_merge_func; }
       break;
@@ -3128,22 +3178,25 @@ main_input (xd3_cmd     cmd,
 		 * windows, but I can't think of any reason not to delay
 		 * open.) */
 
-		if (! main_file_isopen (ofile) &&
-		    (ret = main_open_output (& stream, ofile)) != 0)
-		  {
-		    return EXIT_FAILURE;
-		  }
-		if ((ret = output_func (& stream, ofile)) &&
-		    (ret != PRINTHDR_SPECIAL))
-		  {
-		    return EXIT_FAILURE;
-		  }
-		if (ret == PRINTHDR_SPECIAL)
-		  {
-		    xd3_abort_stream (& stream);
-		    ret = EXIT_SUCCESS;
-		    goto done;
-		  }
+		if (ofile != NULL)
+                  {
+                    if ((! main_file_isopen (ofile) &&
+                         (ret = main_open_output (& stream, ofile)) != 0))
+                      {
+                        return EXIT_FAILURE;
+                      }
+                    if ((ret = output_func (& stream, ofile)) &&
+                        (ret != PRINTHDR_SPECIAL))
+                      {
+                        return EXIT_FAILURE;
+                      }
+                    if (ret == PRINTHDR_SPECIAL)
+                      {
+                        xd3_abort_stream (& stream);
+                        ret = EXIT_SUCCESS;
+                        goto done;
+                      }
+                  }
 		ret = 0;
 	      }
 
@@ -3231,14 +3284,17 @@ main_input (xd3_cmd     cmd,
 done:
   /* Close the inputs. (ifile must be open, sfile may be open) */
   main_file_close (ifile);
-  main_file_close (sfile);
+  if (sfile != NULL)
+    {
+      main_file_close (sfile);
+    }
 
   /* If output file is not open yet because of delayed-open, it means
    * we never encountered a window in the delta, but it could have had
    * a VCDIFF header?  TODO: solve this elsewhere.  For now, it prints
    * "nothing to output" below, but the check doesn't happen in case
    * of option_no_output.  */
-  if (! option_no_output)
+  if (! option_no_output && ofile != NULL)
     {
       if (!stdout_only && ! main_file_isopen (ofile))
 	{
@@ -3268,17 +3324,17 @@ done:
       return EXIT_FAILURE;
     }
 
-  if (option_verbose > 1)
+  if (option_verbose > 1 && cmd == CMD_ENCODE)
     {
       XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
       XPR(NT "target hash table size: %u\n", stream.small_hash.size);
-      if (sfile->filename != NULL)
+      if (sfile != NULL && sfile->filename != NULL)
 	{
 	  XPR(NT "source hash table size: %u\n", stream.large_hash.size);
 	}
     }
 
-  if (option_verbose > 2)
+  if (option_verbose > 2 && cmd == CMD_ENCODE)
     {
       XPR(NT "source copies: %"Q"u (%"Q"u bytes)\n",
 	  stream.n_scpy, stream.l_scpy);
@@ -3294,10 +3350,11 @@ done:
     {
       char tm[32];
       long end_time = get_millisecs_now ();
-      XPR(NT "finished in %s; input %"Q"u output %"Q"u bytes  (%0.2f%%)\n",
+      xoff_t nwrite = ofile != NULL ? ofile->nwrite : 0;
+
+      XPR(NT "finished in %s; input %"Q"u  output %"Q"u bytes  (%0.2f%%)\n",
 	  main_format_millis (end_time - start_time, tm),
-	  ifile->nread, ofile->nwrite,
-	  100.0 * ofile->nwrite / ifile->nread);
+	  ifile->nread, nwrite, 100.0 * nwrite / ifile->nread);
     }
 
   return EXIT_SUCCESS;
