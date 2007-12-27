@@ -343,8 +343,10 @@ typedef enum {
 } xd3_secondary_flags;
 
 typedef enum {
-  DATA_SECTION, /* These indicate which section to the secondary compressor. */
-  INST_SECTION, /* The header section is not compressed, therefore not listed here. */
+  DATA_SECTION, /* These indicate which section to the secondary
+                 * compressor. */
+  INST_SECTION, /* The header section is not compressed, therefore not
+                 * listed here. */
   ADDR_SECTION,
 } xd3_section_type;
 
@@ -353,7 +355,8 @@ typedef enum
   XD3_NOOP = 0,
   XD3_ADD  = 1,
   XD3_RUN  = 2,
-  XD3_CPY  = 3, /* XD3_CPY rtypes are represented as (XD3_CPY + copy-mode value) */
+  XD3_CPY  = 3, /* XD3_CPY rtypes are represented as (XD3_CPY +
+                 * copy-mode value) */
 } xd3_rtype;
 
 /***********************************************************************/
@@ -2270,6 +2273,9 @@ xd3_free_stream (xd3_stream *stream)
     }
 #endif
 
+  xd3_free (stream, stream->whole_target_adds);
+  xd3_free (stream, stream->whole_target_inst);
+
   XD3_ASSERT (stream->alloc_cnt == stream->free_cnt);
 
   memset (stream, 0, sizeof (xd3_stream));
@@ -3205,27 +3211,37 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, usize_t code)
 	       single->size,
 	       code));
 
-  if ((ret = xd3_emit_byte (stream, & INST_TAIL (stream), code))) { return ret; }
+  if ((ret = xd3_emit_byte (stream, & INST_TAIL (stream), code)))
+    {
+      return ret;
+    }
 
   if (has_size)
     {
-      if ((ret = xd3_emit_size (stream, & INST_TAIL (stream), single->size))) { return ret; }
+      if ((ret = xd3_emit_size (stream, & INST_TAIL (stream), single->size)))
+        {
+          return ret;
+        }
     }
 
   return 0;
 }
 
 static int
-xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, usize_t code)
+xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
+                 xd3_rinst *second, usize_t code)
 {
   int ret;
 
-  /* All double instructions use fixed sizes, so all we need to do is output the
-   * instruction code, no sizes. */
+  /* All double instructions use fixed sizes, so all we need to do is
+   * output the instruction code, no sizes. */
   XD3_ASSERT (stream->code_table[code].size1 != 0 &&
 	      stream->code_table[code].size2 != 0);
 
-  if ((ret = xd3_emit_byte (stream, & INST_TAIL (stream), code))) { return ret; }
+  if ((ret = xd3_emit_byte (stream, & INST_TAIL (stream), code)))
+    {
+      return ret;
+    }
 
   IF_DEBUG1 (DP(RINT "[emit2]: %u %s (%u) %s (%u) code %u\n",
 	       first->pos,
@@ -3238,8 +3254,8 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first, xd3_rinst *second, usize_
   return 0;
 }
 
-/* This enters a potential run instruction into the iopt buffer.  The position argument is
- * relative to the target window. */
+/* This enters a potential run instruction into the iopt buffer.  The
+ * position argument is relative to the target window. */
 static int
 xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
 {

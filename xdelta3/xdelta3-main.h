@@ -341,9 +341,6 @@ static int allow_fake_source = 0;
 /* recode_stream is used by both recode/merge */
 static xd3_stream *recode_stream = NULL;
 
-/* used by merge command */
-static main_merge recode_merge;
-
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
@@ -1162,6 +1159,7 @@ main_set_secondary_flags (xd3_config *config)
  *****************************************************************/
 
 #if VCDIFF_TOOLS
+#include "xdelta3-merge.h"
 
 #if defined(_WIN32) || defined(__DJGPP__)
 /* According to the internet, Windows vsnprintf() differs from most
@@ -1521,7 +1519,7 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
   recode_stream->enc_state = ENC_FLUSH;
   recode_stream->avail_in = stream->dec_tgtlen;
 
-  if (xd3_decoder_needs_source (stream))
+  if (SRCORTGT (stream->dec_win_ind))
     {
       recode_stream->src = & decode_source;
       decode_source.srclen = stream->dec_cpylen;
@@ -1593,7 +1591,7 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
  VCDIFF merging
  ******************************************************************/
 
-#if XD3_ENCODER
+#if VCDIFF_TOOLS
 /* Modifies static state. */
 static int
 main_init_recode_stream (void)
@@ -1626,21 +1624,6 @@ main_init_recode_stream (void)
       xd3_free_stream (recode_stream);
       recode_stream = NULL;
       return ret;
-    }
-
-  return 0;
-}
-
-/* The first stream in merge order sets the source of the merged
- * output.  This is where we initialize the static merge_state
- * variable w/ the initial source information. */
-static int
-main_init_merge_state (xd3_stream *stream, main_merge *merge)
-{
-  if (! xd3_decoder_needs_source (stream))
-    {
-      DP(RINT "cannot merge inputs which do not have a source file\n");
-      return XD3_INVALID;
     }
 
   return 0;
@@ -1708,17 +1691,65 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 {
   int ret;
 
-  if ((ret = main_init_merge_state (stream, &recode_merge)))
+  if (! xd3_decoder_needs_source (stream))
+    {
+      DP(RINT "cannot merge inputs which do not have a source file\n");
+      return XD3_INVALID;
+    }
+
+  if ((ret = xd3_whole_append_window (stream)))
     {
       return ret;
     }
 
-  // TODO HERE YOU ARE
-  // Need a new in-memory representation for whole deltas
-  // xd3_merge_decode()
-
   return 0;
 }
+
+#if MERGE_IN_PROGRESS
+/* This is called after all windows have been read, as a final step in
+ * main_input().  This is only called for the final merge step. */
+static int
+main_merge_output (xd3_stream *stream)
+{
+  int inst_pos = 0;
+  xoff_t output_pos = 0;
+  usize_t window_pos = 0;
+
+  while (output_pos < option_winsize)
+    {
+      xd3_winst *inst = &stream->whole_target_inst[inst_pos];
+      usize_t take = min(inst->size, option_winsize - output_pos);
+
+      switch (inst->type)
+        {
+        case XD3_RUN:
+          if ((ret = xd3_emit_run (recode_stream, window_pos, take,
+                                   stream->whole_target_adds[inst->addr])))
+            {
+              return ret;
+            }
+          break;
+
+        case XD3_ADD:
+          /* Adds are implicit, put them into the input buffer. */
+          memcpy (main_bdata, stream->whole_target_adds + inst->addr, take);
+          break;
+
+        default: /* XD3_COPY + mode */
+          if ((ret = xd3_found_match (stream, window_pos, take, inst->addr,
+                                      IS_SOURCE)))
+            {
+              return ret;
+            }
+          break;
+        }
+
+      //xd3_avail_input (recode_stream, main_bdata,
+    }
+  return 0;
+}
+#endif
+
 #endif
 
 /*******************************************************************
@@ -3318,6 +3349,14 @@ done:
     }
 #endif
 
+#if MERGE_IN_PROGRESS
+  if (cmd == CMD_MERGE &&
+      (ret = main_merge_output (& stream)))
+    {
+      return EXIT_FAILURE;
+    }
+#endif
+
   if ((ret = xd3_close_stream (& stream)))
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
@@ -3841,13 +3880,6 @@ main (int argc, char **argv)
       break;
     }
 
-#if EXTERNAL_COMPRESSION
-  if (ext_tmpfile != NULL)
-    {
-      unlink (ext_tmpfile);
-    }
-#endif
-
   if (0)
     {
     cleanup:
@@ -3855,6 +3887,13 @@ main (int argc, char **argv)
     exit:
       (void)0;
     }
+
+#if EXTERNAL_COMPRESSION
+  if (ext_tmpfile != NULL)
+    {
+      unlink (ext_tmpfile);
+    }
+#endif
 
   main_file_cleanup (& ifile);
   main_file_cleanup (& ofile);

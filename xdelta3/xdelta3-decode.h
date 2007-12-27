@@ -19,6 +19,9 @@
 #ifndef _XDELTA3_DECODE_H_
 #define _XDELTA3_DECODE_H_
 
+#define SRCORTGT(x) ((((x) & VCD_SRCORTGT) == VCD_SOURCE) ? \
+                     VCD_SOURCE : ((((x) & VCD_SRCORTGT) == \
+                                    VCD_TARGET) ? VCD_TARGET : 0))
 
 /* Return true if the caller must provide a source.  Theoretically,
  * this has to be checked after every window.  It could be that the
@@ -75,6 +78,7 @@ xd3_decode_setup_buffers (xd3_stream *stream)
 	  stream->space_out = 0;
 	}
 
+      // TODO: VCD_TARGET mode, this is broken
       stream->dec_cpyaddrbase = stream->dec_lastwin +
 	(usize_t) (stream->dec_cpyoff - stream->dec_laststart);
     }
@@ -399,7 +403,10 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	      {
 		/* For VCD_TARGET we know the entire range is
 		 * in-memory, as established by
-		 * decode_setup_buffers. */
+		 * decode_setup_buffers.
+                 *
+                 * TODO: this is totally bogus, VCD_TARGET won't work.
+                 */
 		src = stream->dec_cpyaddrbase + inst->addr;
 		inst->type = XD3_NOOP;
 		inst->size = 0;
@@ -734,9 +741,6 @@ xd3_decode_input (xd3_stream *stream)
            ((ret = xd3_decode_size (stream, & (x))) != 0) ) { return ret; } \
       stream->dec_state = (nstate); \
       } while (0)
-
-#define SRCORTGT(x) (((x) & VCD_SRCORTGT) == VCD_SOURCE || \
-		     ((x) & VCD_SRCORTGT) == VCD_TARGET)
 
   switch (stream->dec_state)
     {

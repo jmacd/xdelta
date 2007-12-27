@@ -234,6 +234,7 @@ typedef struct _xd3_smatcher           xd3_smatcher;
 typedef struct _xd3_rinst              xd3_rinst;
 typedef struct _xd3_dinst              xd3_dinst;
 typedef struct _xd3_hinst              xd3_hinst;
+typedef struct _xd3_winst              xd3_winst;
 typedef struct _xd3_rpage              xd3_rpage;
 typedef struct _xd3_addr_cache         xd3_addr_cache;
 typedef struct _xd3_output             xd3_output;
@@ -549,8 +550,17 @@ struct _xd3_dinst
 struct _xd3_hinst
 {
   uint8_t     type;
-  uint32_t    size;
-  uint32_t    addr;
+  usize_t     size;
+  usize_t     addr;
+};
+
+/* the form of a whole-file instruction */
+struct _xd3_winst
+{
+  uint8_t type;  /* RUN, ADD, COPY */
+  uint8_t mode;  /* 0, VCD_SOURCE, VCD_TARGET */
+  usize_t size;
+  xoff_t  addr;
 };
 
 /* used by the encoder to buffer output in sections.  list of blocks. */
@@ -567,7 +577,7 @@ struct _xd3_desect
 {
   const uint8_t *buf;
   const uint8_t *buf_max;
-  uint32_t       size;
+  usize_t       size;
   usize_t        pos;
 
   /* used in xdelta3-decode.h */
@@ -847,11 +857,11 @@ struct _xd3_stream
 
   usize_t           dec_secondid;     /* Optional secondary compressor ID. */
 
-  uint32_t          dec_codetblsz;    /* Optional code table: length. */
+  usize_t           dec_codetblsz;    /* Optional code table: length. */
   uint8_t          *dec_codetbl;      /* Optional code table: storage. */
   usize_t           dec_codetblbytes; /* Optional code table: position. */
 
-  uint32_t          dec_appheadsz;    /* Optional application header:
+  usize_t          dec_appheadsz;    /* Optional application header:
 					 size. */
   uint8_t          *dec_appheader;    /* Optional application header:
 					 storage */
@@ -860,14 +870,14 @@ struct _xd3_stream
 
   usize_t            dec_cksumbytes;   /* Optional checksum: position. */
   uint8_t           dec_cksum[4];     /* Optional checksum: storage. */
-  uint32_t          dec_adler32;      /* Optional checksum: value. */
+  usize_t          dec_adler32;      /* Optional checksum: value. */
 
-  uint32_t           dec_cpylen;       /* length of copy window
+  usize_t           dec_cpylen;       /* length of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
   xoff_t             dec_cpyoff;       /* offset of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
-  uint32_t           dec_enclen;       /* length of delta encoding */
-  uint32_t           dec_tgtlen;       /* length of target window */
+  usize_t           dec_enclen;       /* length of delta encoding */
+  usize_t           dec_tgtlen;       /* length of target window */
 
 #if USE_UINT64
   uint64_t          dec_64part;       /* part of a decoded uint64_t */
@@ -876,26 +886,42 @@ struct _xd3_stream
   uint32_t          dec_32part;       /* part of a decoded uint32_t */
 #endif
 
-  xoff_t            dec_winstart;     /* offset of the start of current target window */
-  xoff_t            dec_window_count; /* == current_window + 1 in DEC_FINISH */
-  usize_t            dec_winbytes;     /* bytes of the three sections so far consumed */
+  xoff_t            dec_winstart;     /* offset of the start of
+                                         current target window */
+  xoff_t            dec_window_count; /* == current_window + 1 in
+                                         DEC_FINISH */
+  usize_t            dec_winbytes;     /* bytes of the three sections
+                                          so far consumed */
   usize_t            dec_hdrsize;      /* VCDIFF + app header size */
 
-  const uint8_t    *dec_tgtaddrbase;  /* Base of decoded target addresses (addr >= dec_cpylen). */
-  const uint8_t    *dec_cpyaddrbase;  /* Base of decoded copy addresses (addr < dec_cpylen). */
+  const uint8_t    *dec_tgtaddrbase;  /* Base of decoded target
+                                         addresses (addr >=
+                                         dec_cpylen). */
+  const uint8_t    *dec_cpyaddrbase;  /* Base of decoded copy
+                                         addresses (addr <
+                                         dec_cpylen). */
 
-  usize_t            dec_position;     /* current decoder position counting the cpylen offset */
-  usize_t            dec_maxpos;       /* maximum decoder position counting the cpylen offset */
+  usize_t            dec_position;     /* current decoder position
+                                          counting the cpylen
+                                          offset */
+  usize_t            dec_maxpos;       /* maximum decoder position
+                                          counting the cpylen
+                                          offset */
   xd3_hinst         dec_current1;     /* current instruction */
   xd3_hinst         dec_current2;     /* current instruction */
 
   uint8_t          *dec_buffer;       /* Decode buffer */
-  uint8_t          *dec_lastwin;      /* In case of VCD_TARGET, the last target window. */
-  usize_t            dec_lastlen;      /* length of the last target window */
-  xoff_t            dec_laststart;    /* offset of the start of last target window */
-  usize_t            dec_lastspace;    /* allocated space of last target window, for reuse */
+  uint8_t          *dec_lastwin;      /* In case of VCD_TARGET, the
+                                         last target window. */
+  usize_t            dec_lastlen;      /* length of the last target
+                                          window */
+  xoff_t            dec_laststart;    /* offset of the start of last
+                                         target window */
+  usize_t            dec_lastspace;    /* allocated space of last
+                                          target window, for reuse */
 
-  xd3_desect        inst_sect;        /* staging area for decoding window sections */
+  xd3_desect        inst_sect;        /* staging area for decoding
+                                         window sections */
   xd3_desect        addr_sect;
   xd3_desect        data_sect;
 
@@ -910,6 +936,15 @@ struct _xd3_stream
   xd3_sec_stream     *sec_stream_d;
   xd3_sec_stream     *sec_stream_i;
   xd3_sec_stream     *sec_stream_a;
+
+  /* state for reconstructing whole files (e.g., for merge), this only
+   * supports loading USIZE_T_MAX instructions, adds, etc. */
+  usize_t whole_target_addslen;
+  uint8_t *whole_target_adds;
+  usize_t  whole_target_adds_alloc;
+  usize_t whole_target_instlen;
+  xd3_winst *whole_target_inst;
+  usize_t  whole_target_inst_alloc;
 
   /* statistics */
   xoff_t            n_scpy;
@@ -933,9 +968,9 @@ struct _xd3_stream
 #endif
 };
 
-/******************************************************************************************
+/**************************************************************************
  PUBLIC FUNCTIONS
- ******************************************************************************************/
+ **************************************************************************/
 
 /* This function configures an xd3_stream using the provided in-memory
  * input buffer, source buffer, output buffer, and flags.  The output
@@ -1022,14 +1057,22 @@ int     xd3_decode_stream (xd3_stream    *stream,
  *
  * Return values:
  *
- *   XD3_INPUT:  the process requires more input: call xd3_avail_input() then repeat
- *   XD3_OUTPUT: the process has more output: read stream->next_out, stream->avail_out,
- *               then call xd3_consume_output(), then repeat
- *   XD3_GOTHEADER: (decoder-only) notification returned following the VCDIFF header and
- *               first window header.  the decoder may use the header to configure itself.
- *   XD3_WINSTART: a general notification returned once for each window except the 0-th
- *               window, which is implied by XD3_GOTHEADER.  It is recommended to
- *               use a switch-stmt such as:
+ *   XD3_INPUT: the process requires more input: call
+ *               xd3_avail_input() then repeat
+ *
+ *   XD3_OUTPUT: the process has more output: read stream->next_out,
+ *               stream->avail_out, then call xd3_consume_output(),
+ *               then repeat
+ *
+ *   XD3_GOTHEADER: (decoder-only) notification returned following the
+ *               VCDIFF header and first window header.  the decoder
+ *               may use the header to configure itself.
+ *
+ *   XD3_WINSTART: a general notification returned once for each
+ *               window except the 0-th window, which is implied by
+ *               XD3_GOTHEADER.  It is recommended to use a
+ *               switch-stmt such as:
+ *
  *                 ...
  *               again:
  *                 switch ((ret = xd3_decode_input (stream))) {
@@ -1043,11 +1086,14 @@ int     xd3_decode_stream (xd3_stream    *stream,
  *                      goto again;
  *                    }
  *                    ...
- *   XD3_WINFINISH: a general notification, following the complete input & output of a
- *               window.  at this point, stream->total_in and stream->total_out are
- *               consistent for either encoding or decoding.
- *   XD3_GETSRCBLK: If the xd3_getblk() callback is NULL, this value is returned to
- *               initiate a non-blocking source read.
+ *
+ *   XD3_WINFINISH: a general notification, following the complete
+ *               input & output of a window.  at this point,
+ *               stream->total_in and stream->total_out are consistent
+ *               for either encoding or decoding.
+ *
+ *   XD3_GETSRCBLK: If the xd3_getblk() callback is NULL, this value
+ *               is returned to initiate a non-blocking source read.
  */
 int     xd3_decode_input  (xd3_stream    *stream);
 int     xd3_encode_input  (xd3_stream    *stream);

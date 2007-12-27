@@ -20,6 +20,7 @@ SOURCES = xdelta3-cfgs.h \
 	  xdelta3-hash.h \
 	  xdelta3-list.h \
 	  xdelta3-main.h \
+	  xdelta3-merge.h \
 	  xdelta3-python.h \
 	  xdelta3-second.h \
 	  xdelta3-test.h \
