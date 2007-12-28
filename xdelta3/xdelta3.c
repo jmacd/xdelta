@@ -4701,12 +4701,12 @@ xd3_smatch (xd3_stream *stream,
 	    usize_t scksum,
 	    usize_t *match_offset)
 {
-  usize_t         cmp_len;
-  usize_t         match_length = 0;
-  usize_t         chain        = (stream->min_match == MIN_MATCH ?
-				  stream->smatcher.small_chain :
-				  stream->smatcher.small_lchain);
-  const uint8_t *inp_max      = stream->next_in + stream->avail_in;
+  usize_t cmp_len;
+  usize_t match_length = 0;
+  usize_t chain = (stream->min_match == MIN_MATCH ?
+                   stream->smatcher.small_chain :
+                   stream->smatcher.small_lchain);
+  const uint8_t *inp_max = stream->next_in + stream->avail_in;
   const uint8_t *inp;
   const uint8_t *ref;
 
@@ -4717,6 +4717,9 @@ xd3_smatch (xd3_stream *stream,
   base -= HASH_CKOFFSET;
 
  again:
+
+  IF_DEBUG1 (DP(RINT "smatch at base=%u inp=%u cksum=%u\n", base,
+                stream->input_position, scksum));
 
   /* For small matches, we can always go to the end-of-input because
    * the matching position must be less than the input position. */
@@ -4759,24 +4762,34 @@ xd3_smatch (xd3_stream *stream,
   while (--chain != 0)
     {
       /* Calculate the previous offset. */
-      usize_t last_pos = stream->small_prev[base & stream->sprevmask].last_pos;
+      usize_t prev_pos = stream->small_prev[base & stream->sprevmask].last_pos;
+      usize_t diff_pos;
 
-      if (last_pos == 0)
-	{
-	  break;
-	}
+       if (prev_pos == 0)
+ 	{
+ 	  break;
+ 	}
 
-      last_pos -= HASH_CKOFFSET;
-      base = last_pos;
+      prev_pos -= HASH_CKOFFSET;
 
-      /* Stop if the position is wrong (because the lists are not
-       * re-initialized across input windows). */
-      if (base < stream->input_position)
-	{
-	  goto again;
-	}
+      if (prev_pos > base)
+        {
+          break;
+        }
 
-      break;
+      base = prev_pos;
+
+      XD3_ASSERT (stream->input_position > base);
+      diff_pos = stream->input_position - base;
+
+      /* Stop searching if we go beyond sprevsz, since those entries
+       * are for unrelated checksum entries. */
+      if (diff_pos & ~stream->sprevmask)
+        {
+          break;
+        }
+
+      goto again;
     }
 
  done:
