@@ -870,7 +870,7 @@ struct _xd3_stream
 
   usize_t            dec_cksumbytes;   /* Optional checksum: position. */
   uint8_t           dec_cksum[4];     /* Optional checksum: storage. */
-  usize_t          dec_adler32;      /* Optional checksum: value. */
+  uint32_t          dec_adler32;      /* Optional checksum: value. */
 
   usize_t           dec_cpylen;       /* length of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
