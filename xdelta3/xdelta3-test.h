@@ -474,7 +474,7 @@ test_decode_integer_end_of_input (xd3_stream *stream, int unused)
     { \
       const uint8_t *max; \
       const uint8_t *inp; \
-      TYPE val; \
+      TYPE val;			\
  \
       DOT (); \
       rbuf->next = 0; \

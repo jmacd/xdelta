@@ -1760,7 +1760,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define DECODE_INTEGER_TYPE(PART,OFLOW)                                \
   while (stream->avail_in != 0)                                        \
     {                                                                  \
-      usize_t next = stream->next_in[0];                                  \
+      usize_t next = stream->next_in[0];                               \
                                                                        \
       DECODE_INPUT(1);                                                 \
                                                                        \
@@ -1786,7 +1786,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define READ_INTEGER_TYPE(TYPE, OFLOW)                                 \
   TYPE val = 0;                                                        \
   const uint8_t *inp = (*inpp);                                        \
-  usize_t next;                                                           \
+  usize_t next;                                                        \
                                                                        \
   do                                                                   \
     {                                                                  \

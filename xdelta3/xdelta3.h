@@ -550,8 +550,8 @@ struct _xd3_dinst
 struct _xd3_hinst
 {
   uint8_t     type;
-  usize_t     size;
-  usize_t     addr;
+  uint32_t    size;  /* TODO: why decode breaks if this is usize_t? */
+  uint32_t    addr;  /* TODO: why decode breaks if this is usize_t? */
 };
 
 /* the form of a whole-file instruction */
@@ -577,7 +577,7 @@ struct _xd3_desect
 {
   const uint8_t *buf;
   const uint8_t *buf_max;
-  usize_t       size;
+  uint32_t       size;  /* TODO: why decode breaks if this is usize_t? */
   usize_t        pos;
 
   /* used in xdelta3-decode.h */
@@ -857,11 +857,13 @@ struct _xd3_stream
 
   usize_t           dec_secondid;     /* Optional secondary compressor ID. */
 
-  usize_t           dec_codetblsz;    /* Optional code table: length. */
+  /* TODO: why decode breaks if this is usize_t? */
+  uint32_t          dec_codetblsz;    /* Optional code table: length. */
   uint8_t          *dec_codetbl;      /* Optional code table: storage. */
   usize_t           dec_codetblbytes; /* Optional code table: position. */
 
-  usize_t          dec_appheadsz;    /* Optional application header:
+  /* TODO: why decode breaks if this is usize_t? */
+  uint32_t          dec_appheadsz;    /* Optional application header:
 					 size. */
   uint8_t          *dec_appheader;    /* Optional application header:
 					 storage */
@@ -872,12 +874,15 @@ struct _xd3_stream
   uint8_t           dec_cksum[4];     /* Optional checksum: storage. */
   uint32_t          dec_adler32;      /* Optional checksum: value. */
 
-  usize_t           dec_cpylen;       /* length of copy window
+  /* TODO: why decode breaks if this is usize_t? */
+  uint32_t           dec_cpylen;       /* length of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
   xoff_t             dec_cpyoff;       /* offset of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
-  usize_t           dec_enclen;       /* length of delta encoding */
-  usize_t           dec_tgtlen;       /* length of target window */
+  /* TODO: why decode breaks if this is usize_t? */
+  uint32_t           dec_enclen;       /* length of delta encoding */
+  /* TODO: why decode breaks if this is usize_t? */
+  uint32_t           dec_tgtlen;       /* length of target window */
 
 #if USE_UINT64
   uint64_t          dec_64part;       /* part of a decoded uint64_t */
