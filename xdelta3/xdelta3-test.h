@@ -2683,6 +2683,15 @@ xd3_selftest (void)
 
   int ret;
 
+#ifndef WIN32
+  if (getuid() == 0)
+    {
+      DP(RINT "This test should not be run as root.\n");
+      ret = XD3_INVALID;
+      goto failure;
+    }
+#endif
+
   DO_TEST (random_numbers, 0, 0);
   DO_TEST (decode_integer_end_of_input, 0, 0);
   DO_TEST (decode_integer_overflow, 0, 0);
