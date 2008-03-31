@@ -1908,6 +1908,16 @@ xd3_sizeof_uint64_t (uint64_t num)
 static int
 xd3_alloc_cache (xd3_stream *stream)
 {
+  if (stream->acache.near_array != NULL)
+    {
+      xd3_free (stream, stream->acache.near_array);
+    }
+
+  if (stream->acache.same_array != NULL)
+    {
+      xd3_free (stream, stream->acache.same_array);
+    }
+
   if (((stream->acache.s_near > 0) &&
        (stream->acache.near_array = (usize_t*)
 	xd3_alloc (stream, stream->acache.s_near, sizeof (usize_t)))
@@ -2087,6 +2097,8 @@ xd3_alloc (xd3_stream *stream,
   if (a != NULL)
     {
       IF_DEBUG (stream->alloc_cnt += 1);
+      IF_DEBUG1 (DP(RINT "[stream %p malloc] size %u ptr %p\n", 
+		    stream, elts * size, a));
     }
   else
     {
@@ -2104,6 +2116,8 @@ xd3_free (xd3_stream *stream,
     {
       IF_DEBUG (stream->free_cnt += 1);
       XD3_ASSERT (stream->free_cnt <= stream->alloc_cnt);
+      IF_DEBUG1 (DP(RINT "[stream %p free] %p\n", 
+		    stream, ptr));
       stream->free (stream->opaque, ptr);
     }
 }
@@ -2781,10 +2795,11 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	    stream->l_tcpy += inst->size;
 	  }
 
-	XD3_ASSERT (inst->size >= MIN_MATCH);
-
+	/* Note: used to assert inst->size >= MIN_MATCH, but not true
+	 * for merge operations & identical match heuristics. */
 	/* the "here" position is always offset by taroff */
-	if ((ret = xd3_encode_address (stream, addr, inst->pos + stream->taroff, & inst->type)))
+	if ((ret = xd3_encode_address (stream, addr, inst->pos + stream->taroff, 
+				       & inst->type)))
 	  {
 	    return ret;
 	  }
@@ -3262,8 +3277,6 @@ xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
   xd3_rinst* ri;
   int ret;
 
-  XD3_ASSERT (pos + size <= stream->avail_in);
-
   if ((ret = xd3_iopt_get_slot (stream, & ri))) { return ret; }
 
   ri->type = XD3_RUN;
@@ -3282,8 +3295,6 @@ xd3_found_match (xd3_stream *stream, usize_t pos,
 {
   xd3_rinst* ri;
   int ret;
-
-  XD3_ASSERT (pos + size <= stream->avail_in);
 
   if ((ret = xd3_iopt_get_slot (stream, & ri))) { return ret; }
 
@@ -3574,12 +3585,43 @@ xd3_alloc_iopt (xd3_stream *stream, int elts)
   return 0;
 }
 
-/* This function allocates the encoder output buffers. */
+/* This function allocates all memory initially used by the encoder. */
 static int
-xd3_encode_init_buffers (xd3_stream *stream)
+xd3_encode_init (xd3_stream *stream, int full_init)
 {
   int i;
 
+  if (full_init)
+    {
+      int large_comp = (stream->src != NULL);
+      int small_comp = ! (stream->flags & XD3_NOCOMPRESS);
+
+      /* Memory allocations for checksum tables are delayed until
+       * xd3_string_match_init in the first call to string_match--that way
+       * identical or short inputs require no table allocation. */
+      if (large_comp)
+	{
+	  usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_step);
+
+	  xd3_size_hashtable (stream,
+			      hash_values,
+			      & stream->large_hash);
+	}
+
+      if (small_comp)
+	{
+	  /* TODO: This is under devel: used to have min(sprevsz) here, which sort
+	   * of makes sense, but observed fast performance w/ larger tables, which
+	   * also sort of makes sense. @@@ */
+	  usize_t hash_values = stream->winsize;
+
+	  xd3_size_hashtable (stream,
+			      hash_values,
+			      & stream->small_hash);
+	}
+    }
+
+  /* data buffers */
   for (i = 0; i < ENC_SECTS; i += 1)
     {
       if ((stream->enc_heads[i] =
@@ -3589,43 +3631,6 @@ xd3_encode_init_buffers (xd3_stream *stream)
 	  return ENOMEM;
 	}
     }
-
-  return 0;
-}
-
-/* This function allocates all memory initially used by the encoder. */
-int
-xd3_encode_init (xd3_stream *stream)
-{
-  int large_comp = (stream->src != NULL);
-  int small_comp = ! (stream->flags & XD3_NOCOMPRESS);
-
-  /* Memory allocations for checksum tables are delayed until
-   * xd3_string_match_init in the first call to string_match--that way
-   * identical or short inputs require no table allocation. */
-  if (large_comp)
-    {
-      usize_t hash_values = (stream->srcwin_maxsz / stream->smatcher.large_step);
-
-      xd3_size_hashtable (stream,
-			  hash_values,
-			  & stream->large_hash);
-    }
-
-  if (small_comp)
-    {
-      /* TODO: This is under devel: used to have min(sprevsz) here, which sort
-       * of makes sense, but observed fast performance w/ larger tables, which
-       * also sort of makes sense. @@@ */
-      usize_t hash_values = stream->winsize;
-
-      xd3_size_hashtable (stream,
-			  hash_values,
-			  & stream->small_hash);
-    }
-
-  /* data buffers */
-  if (xd3_encode_init_buffers(stream) != 0) { goto fail; }
 
   /* iopt buffer */
   xd3_rlist_init (& stream->iopt_used);
@@ -3646,6 +3651,18 @@ xd3_encode_init (xd3_stream *stream)
  fail:
 
   return ENOMEM;
+}
+
+int
+xd3_encode_init_full (xd3_stream *stream)
+{
+  return xd3_encode_init (stream, 1);
+}
+
+int
+xd3_encode_init_partial (xd3_stream *stream)
+{
+  return xd3_encode_init (stream, 0);
 }
 
 /* Called after the ENC_POSTOUT state, this puts the output buffers
@@ -3708,7 +3725,7 @@ xd3_encode_input (xd3_stream *stream)
     {
     case ENC_INIT:
       /* Only reached on first time through: memory setup. */
-      if ((ret = xd3_encode_init (stream))) { return ret; }
+      if ((ret = xd3_encode_init_full (stream))) { return ret; }
 
       stream->enc_state = ENC_INPUT;
 

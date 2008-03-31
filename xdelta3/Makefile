@@ -3,6 +3,7 @@
 
 UNAME = $(shell uname)
 CYGWIN = $(findstring CYGWIN, $(UNAME))
+DARWIN = $(findstring Darwin, $(UNAME))
 PYVER = 2.5
 
 ifeq ("$(CYGWIN)", "")
@@ -50,6 +51,7 @@ PYTHON = python
 
 WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 
+# -arch x86_64
 CFLAGS= -Wall -Wshadow -fno-builtin
 
 # $Format: "REL=$Xdelta3Version$" $
@@ -67,7 +69,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi \
 	README readme.txt
 
-SWIG_FLAGS = -DXD3_DEBUG=0 \
+SWIG_FLAGS = -DXD3_DEBUG=1 \
 	      -DEXTERNAL_COMPRESSION=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
 	      -DGENERIC_ENCODE_TABLES=1 \
@@ -199,11 +201,17 @@ xdelta3module.dll: xdelta3_wrap.o xdelta3.o
 		-o xdelta3module.dll
 	cp $(SWIGTGT) /usr/lib/python$(PYVER)/site-packages
 
+ifeq ("$(DARWIN)", "")
 xdelta3module.so: xdelta3_wrap.o xdelta3.o
 	ld -shared xdelta3.o xdelta3_wrap.o \
 		-o xdelta3module.so \
 		/usr/lib/libpython$(PYVER).so \
 		-lc
+else
+xdelta3module.so: xdelta3_wrap.o xdelta3.o
+	gcc -Wl,-F. -bundle -undefined dynamic_lookup $(CFLAGS) \
+		xdelta3.o xdelta3_wrap.o -o xdelta3module.so
+endif
 
 xdelta3-decoder: $(SOURCES)
 	$(CC) -O3 -Wall -Wshadow xdelta3.c \

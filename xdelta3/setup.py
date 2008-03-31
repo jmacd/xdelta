@@ -46,6 +46,7 @@ xdelta3_ext = Extension('xdelta3main',
                         extra_compile_args = [ '-O3',
                                                '-g',
                                                '-fno-builtin',
+                                               # '-arch', 'x86_64',
                                                ])
 
 # $Format: "REL='$Xdelta3Version$'" $

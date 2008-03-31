@@ -576,7 +576,7 @@ static int
 test_forward_match (xd3_stream *stream, int unused)
 {
   int i;
-  char buf1[256], buf2[256];
+  uint8_t buf1[256], buf2[256];
 
   memset(buf1, 0, 256);
   memset(buf2, 0, 256);
@@ -615,7 +615,7 @@ test_address_cache (xd3_stream *stream, int unused)
   stream->acache.s_near = stream->code_table_desc->near_modes;
   stream->acache.s_same = stream->code_table_desc->same_modes;
 
-  if ((ret = xd3_encode_init (stream))) { return ret; }
+  if ((ret = xd3_encode_init_partial (stream))) { return ret; }
 
   addrs = xd3_alloc (stream, sizeof (usize_t), ADDR_CACHE_ROUNDS);
   modes = xd3_alloc (stream, sizeof (uint8_t), ADDR_CACHE_ROUNDS);
@@ -758,7 +758,7 @@ test_compress_text (xd3_stream  *stream,
 
   (*encoded_size) = 0;
 
-  xd3_set_appheader (stream, test_apphead, strlen (test_apphead));
+  xd3_set_appheader (stream, test_apphead, strlen ((char*) test_apphead));
 
   if ((ret = xd3_encode_stream (stream, test_text, sizeof (test_text),
 				encoded, encoded_size, 4*sizeof (test_text)))) { goto fail; }
@@ -830,8 +830,8 @@ test_decompress_text (xd3_stream *stream, uint8_t *enc, usize_t enc_size, usize_
 
   if ((ret = xd3_get_appheader (stream, & apphead, & apphead_size))) { goto fail; }
 
-  if (apphead_size != strlen (test_apphead) ||
-      memcmp (apphead, test_apphead, strlen (test_apphead)) != 0)
+  if (apphead_size != strlen ((char*) test_apphead) ||
+      memcmp (apphead, test_apphead, strlen ((char*) test_apphead)) != 0)
     {
       stream->msg = "incorrect appheader";
       ret = XD3_INTERNAL;
@@ -2459,7 +2459,7 @@ test_string_matching (xd3_stream *stream, int ignore)
       config.smatcher_soft.long_enough  = 10;
 
       if ((ret = xd3_config_stream (stream, & config))) { return ret; }
-      if ((ret = xd3_encode_init (stream))) { return ret; }
+      if ((ret = xd3_encode_init_full (stream))) { return ret; }
 
       xd3_avail_input (stream, (uint8_t*)test->input, len);
 
@@ -2686,7 +2686,7 @@ xd3_selftest (void)
 #ifndef WIN32
   if (getuid() == 0)
     {
-      DP(RINT "This test should not be run as root.\n");
+      DP(RINT "xdelta3: This test should not be run as root.\n");
       ret = XD3_INVALID;
       goto failure;
     }

@@ -1,6 +1,6 @@
 #!/usr/bin/python2.5
 # xdelta 3 - delta compression tools and library
-# Copyright (C) 2003, 2006, 2007.  Joshua P. MacDonald
+# Copyright (C) 2003, 2006, 2007, 2008.  Joshua P. MacDonald
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 # TODO: test 1.5 vs. greedy
 
 import os, sys, math, re, time, types, array, random
-import xdelta3main
 import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
@@ -27,7 +26,10 @@ import xdelta3
 #SAMPLEDIR = "/tmp/WESNOTH_tmp/diff"
 
 #RCSDIR = 'G:/jmacd/PRCS_copy'
-SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+#SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
+
+#RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/net/x25'
+RCSDIR = '/Users/jmacd/src/ftp.kernel.org'
 
 #
 MIN_SIZE       = 0
@@ -37,8 +39,6 @@ TIME_TOO_SHORT = 0.050
 SKIP_TRIALS    = 2
 MIN_TRIALS     = 3
 MAX_TRIALS     = 15
-
-SKIP_DECODE = 1
 
 # 10 = fast 1.5 = slow
 MIN_STDDEV_PCT = 1.5
@@ -57,7 +57,7 @@ MAX_RUN = 1000 * 1000 * 10
 
 # Testwide defaults
 ALL_ARGS = [
-    # -v
+    '-vv'
     ]
 
 # The first 7 args go to -C
@@ -231,11 +231,6 @@ class TimedTest:
                                        lambda x: x.Encode(self.target, self.source, DFILE))
         self.encode_size = runnable.EncodeSize(DFILE)
 
-        if SKIP_DECODE:
-            self.decode_time = StatList([1, 1], 'not decoded')
-            return
-        #end
-
         self.decode_time = self.DoTest(RFILE,
                                        lambda x: x.Decode(DFILE, self.source, RFILE),
                                        )
@@ -404,9 +399,10 @@ class Xdelta3Runner:
 
     def Main(self, args):
         try:
-            xdelta3main.main(args)
+            #print 'Run %s' % (' '.join(args))
+            xdelta3.xd3_main_cmdline(args)
         except Exception, e:
-            raise CommandError(args, "xdelta3.main exception")
+            raise CommandError(args, "xdelta3.main exception: %s" % e)
         #end
     #end
 #end
@@ -904,10 +900,7 @@ class RandomTest:
     #end
 
     def __str__(self):
-        decodestr = ''
-        if not SKIP_DECODE:
-            decodestr = ' %.6f' % self.decodetime
-        #end
+        decodestr = ' %.6f' % self.decodetime
         return 'time %.6f%s size %d%s << %s >>%s' % (
             self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
             self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
@@ -1202,19 +1195,20 @@ if __name__ == "__main__":
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
 
-        #rcsf = GetTestRcsFiles()
+        rcsf = GetTestRcsFiles()
         #generator = rcsf.Generator()
 
-        sample = SampleDataTest([SAMPLEDIR])
-        generator = sample.Generator()
+        #sample = SampleDataTest([SAMPLEDIR])
+        #generator = sample.Generator()
 
-        rand = random.Random(135135135135135)
-        RunTestLoop(rand, generator, TEST_ROUNDS)
+        #rand = random.Random(135135135135135)
+        #RunTestLoop(rand, generator, TEST_ROUNDS)
 
         #RunSpeedTest()
 
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9']))
-        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
+        x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
+        x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-1', '-S', 'djw']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-T']))
 
         #x1r = rcsf.AllPairsByDate(Xdelta1RunClass())

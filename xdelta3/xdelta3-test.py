@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.5
 # xdelta 3 - delta compression tools and library
 # Copyright (C) 2003, 2006, 2007.  Joshua P. MacDonald
 #
@@ -142,6 +142,14 @@ assert result1 == 0 and result9 == 0
 assert len(level1) > len(level9)
 
 #
-#
+# Issue 65
+print 'encode: 65 ...'
+source = 'Hello World' 
+target = 'Hello everyone' 
+result, patch = xdelta3.xd3_encode_memory(target, source, len(target))
+assert result != 0
+
+result, patch = xdelta3.xd3_encode_memory(target, source, 2 * len(target))
+assert result == 0
 
 print 'PASS'

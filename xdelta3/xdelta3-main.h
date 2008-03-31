@@ -1538,7 +1538,7 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
       option_appheader != NULL)
     {
       xd3_set_appheader (recode_stream, option_appheader,
-			 strlen (option_appheader));
+			 strlen ((char*) option_appheader));
     }
   else if (option_use_appheader != 0 &&
 	   option_appheader == NULL)
@@ -1619,7 +1619,7 @@ main_init_recode_stream (void)
 
   if ((ret = main_set_secondary_flags (&recode_config)) ||
       (ret = xd3_config_stream (recode_stream, &recode_config)) ||
-      (ret = xd3_encode_init_buffers (recode_stream)))
+      (ret = xd3_encode_init_partial (recode_stream)))
     {
       XPR(NT XD3_LIB_ERRMSG (recode_stream, ret));
       xd3_free_stream (recode_stream);
@@ -1706,47 +1706,141 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
   return 0;
 }
 
+
+#define MERGE_IN_PROGRESS 0
 #if MERGE_IN_PROGRESS
 /* This is called after all windows have been read, as a final step in
  * main_input().  This is only called for the final merge step. */
 static int
-main_merge_output (xd3_stream *stream)
+main_merge_output (xd3_stream *stream, main_file *ofile)
 {
-  int inst_pos = 0;
+  int ret;
+  usize_t inst_pos = 0;
   xoff_t output_pos = 0;
-  usize_t window_pos = 0;
+  xd3_source recode_source;
 
-  while (output_pos < option_winsize)
+  /* Enter the ENC_INPUT state and bypass the next_in == NULL test
+   * and (leftover) input buffering logic. */
+  XD3_ASSERT(recode_stream->enc_state == ENC_INIT);
+  recode_stream->enc_state = ENC_INPUT;
+  recode_stream->next_in = main_bdata;
+  recode_stream->flags |= XD3_FLUSH;
+
+  while (inst_pos < stream->whole_target_instlen)
     {
-      xd3_winst *inst = &stream->whole_target_inst[inst_pos];
-      usize_t take = min(inst->size, option_winsize - output_pos);
+      xoff_t window_srcmin = XOFF_T_MAX;
+      xoff_t window_srcmax = 0;
+      usize_t window_pos = 0;
 
-      switch (inst->type)
-        {
-        case XD3_RUN:
-          if ((ret = xd3_emit_run (recode_stream, window_pos, take,
-                                   stream->whole_target_adds[inst->addr])))
-            {
-              return ret;
-            }
-          break;
+      XD3_ASSERT (recode_stream->enc_state == ENC_INPUT);
 
-        case XD3_ADD:
-          /* Adds are implicit, put them into the input buffer. */
-          memcpy (main_bdata, stream->whole_target_adds + inst->addr, take);
-          break;
+      if ((ret = xd3_encode_input (recode_stream)) != XD3_WINSTART)
+	{
+	  XPR(NT "invalid merge state: %s\n", xd3_mainerror (ret));
+	  return XD3_INVALID;
+	}
 
-        default: /* XD3_COPY + mode */
-          if ((ret = xd3_found_match (stream, window_pos, take, inst->addr,
-                                      IS_SOURCE)))
-            {
-              return ret;
-            }
-          break;
-        }
+      /* TODO: The inner loop termination condition can be used to
+       * change window sizes, however keeping the last delta in the
+       * chain's window size allows re-using its adler32 checksums.
+       * For now this will change window size and not use adler32. */
+      while (window_pos < option_winsize &&
+	     inst_pos < stream->whole_target_instlen)
+	{
+	  xd3_winst *inst = &stream->whole_target_inst[inst_pos];
+	  usize_t take = min(inst->size, option_winsize - window_pos);
 
-      //xd3_avail_input (recode_stream, main_bdata,
+	  switch (inst->type)
+	    {
+	    case XD3_RUN:
+	      if ((ret = xd3_emit_run (recode_stream, window_pos, take,
+				       stream->whole_target_adds[inst->addr])))
+		{
+		  return ret;
+		}
+	      break;
+
+	    case XD3_ADD:
+	      /* Adds are implicit, put them into the input buffer. */
+	      memcpy (main_bdata + window_pos, 
+		      stream->whole_target_adds + inst->addr, take);
+	      break;
+
+	    default: /* XD3_COPY + copy mode */
+	      window_srcmin = min(window_srcmin, inst->addr);
+	      window_srcmax = max(window_srcmax, inst->addr + take);
+	      if ((ret = xd3_found_match (recode_stream, window_pos, take, inst->addr,
+					  inst->mode == VCD_SOURCE)))
+		{
+		  return ret;
+		}
+	      break;
+	    }
+
+	  window_pos += take;
+	  output_pos += take;
+
+	  if (take == inst->size)
+	    {
+	      inst_pos += 1;
+	    }
+	  else
+	    {
+	      /* Modify the instruction for the next pass. */
+	      /* TODO: this seems to be broken, as initial testing indicates. */
+	      if (inst->type != XD3_RUN)
+		{
+		  inst->addr += take;
+		}
+	      inst->size -= take;
+	    }
+	}
+
+      xd3_avail_input (recode_stream, main_bdata, window_pos);
+
+      recode_stream->enc_state = ENC_INSTR;
+      recode_stream->srcwin_decided = 1;
+      recode_stream->src = &recode_source;
+      recode_source.srclen = window_srcmax - window_srcmin;
+      recode_source.srcbase = window_srcmin;
+      recode_stream->taroff = recode_source.srclen;
+
+      for (;;)
+	{
+	  switch ((ret = xd3_encode_input (recode_stream)))
+	    {
+	    case XD3_INPUT: {
+	      goto done_window;
+	    }
+	    case XD3_OUTPUT: {
+	      /* main_file_write below */
+	      break;
+	    }
+	    case XD3_GOTHEADER:
+	    case XD3_WINSTART:
+	    case XD3_WINFINISH: {
+	      /* ignore */
+	      continue;
+	    }
+	    case XD3_GETSRCBLK:
+	    case 0: {
+	      return XD3_INTERNAL;
+	    }
+	    default:
+	      return ret;
+	    }
+
+	  if ((ret = main_write_output(recode_stream, ofile)))
+	    {
+	      return ret;
+	    }
+
+	  xd3_consume_output (recode_stream);
+	}
+    done_window:
+      (void) 0;
     }
+
   return 0;
 }
 #endif
@@ -3158,7 +3252,7 @@ main_input (xd3_cmd     cmd,
 
 		/* Check if the user expected a source to be required although
 		 * it was not. */
-		if (have_src && ! need_src && ! option_quiet)
+		if (have_src && ! need_src && option_verbose)
 		  {
 		    XPR(NT "warning: output window %"Q"u does not "
 			"copy source\n", stream.current_window);
@@ -3244,7 +3338,7 @@ main_input (xd3_cmd     cmd,
 		    main_file_isopen (sfile))
 		  {
 		    /* Warn when no source copies are found */
-		    if (! xd3_encoder_used_source (& stream))
+		    if (option_verbose && ! xd3_encoder_used_source (& stream))
 		      {
 			XPR(NT "warning: input window %"Q"u..%"Q"u has "
 			    "no source copies\n",
@@ -3321,6 +3415,14 @@ done:
       main_file_close (sfile);
     }
 
+#if MERGE_IN_PROGRESS
+  if (cmd == CMD_MERGE &&
+      (ret = main_merge_output (& stream, ofile)))
+    {
+      return EXIT_FAILURE;
+    }
+#endif
+
   /* If output file is not open yet because of delayed-open, it means
    * we never encountered a window in the delta, but it could have had
    * a VCDIFF header?  TODO: solve this elsewhere.  For now, it prints
@@ -3346,14 +3448,6 @@ done:
   if ((ret = main_external_compression_finish ()))
     {
       XPR(NT "external compression commands failed\n");
-      return EXIT_FAILURE;
-    }
-#endif
-
-#if MERGE_IN_PROGRESS
-  if (cmd == CMD_MERGE &&
-      (ret = main_merge_output (& stream)))
-    {
       return EXIT_FAILURE;
     }
 #endif
@@ -3659,7 +3753,9 @@ main (int argc, char **argv)
 	  else if (strcmp (my_optstr, "printdelta") == 0)
 	    { cmd = CMD_PRINTDELTA; }
 	  else if (strcmp (my_optstr, "recode") == 0) { cmd = CMD_RECODE; }
+#if MERGE_IN_PROGRESS
 	  else if (strcmp (my_optstr, "merge") == 0) { cmd = CMD_MERGE; }
+#endif
 #endif
 
 	  /* If no option was found and still no command, let the default
@@ -3778,6 +3874,7 @@ main (int argc, char **argv)
 
 	  sfilename = my_optarg;
 	  break;
+#if MERGE_IN_PROGRESS
 	case 'm':
 	  if ((merge = (main_merge*)
 	       main_malloc (sizeof (main_merge))) == NULL)
@@ -3787,7 +3884,7 @@ main (int argc, char **argv)
 	  main_merge_list_push_back (& merge_order, merge);
 	  merge->filename = my_optarg;
 	  break;
-
+#endif
 	case 'V':
 	  ret = main_version (); goto exit;
 	default:
@@ -3902,7 +3999,6 @@ main (int argc, char **argv)
 
   while (! main_merge_list_empty (& merge_order))
     {
-      /* TODO: More merge cleanup, once implemented. */
       merge = main_merge_list_pop_front (& merge_order);
       main_free (merge);
     }

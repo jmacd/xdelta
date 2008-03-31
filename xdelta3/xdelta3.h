@@ -1159,13 +1159,13 @@ int     xd3_decoder_needs_source (xd3_stream *stream);
 /* To generate a VCDIFF encoded delta with xd3_encode_init() from
  * another format, use:
  *
- *   xd3_encode_init() -- initialze encoder state
+ *   xd3_encode_init_partial() -- initialze encoder state (w/o hash tables)
  *   xd3_init_cache() -- reset VCDIFF address cache
  *   xd3_found_match() -- to report a copy instruction
  *
  * set stream->enc_state to ENC_INSTR and call xd3_encode_input as usual.
  */
-int xd3_encode_init (xd3_stream *stream);
+int xd3_encode_init_partial (xd3_stream *stream);
 void xd3_init_cache (xd3_addr_cache* acache);
 int xd3_found_match (xd3_stream *stream,
 		     usize_t pos, usize_t size,
