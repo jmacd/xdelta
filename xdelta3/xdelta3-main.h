@@ -314,7 +314,7 @@ static int         option_recompress_outputs = 1;
 /* This is for comparing "printdelta" output without attention to
  * copy-instruction modes. */
 #if VCDIFF_TOOLS
-static int option_print_cpymode = 1; /* Note: see reset_defaults(). */ 
+static int option_print_cpymode = 0; /* Note: see reset_defaults(). */ 
 #endif
 
 /* Static variables */
@@ -446,7 +446,7 @@ reset_defaults(void)
   option_recompress_outputs = 1;
 #endif
 #if VCDIFF_TOOLS
-  option_print_cpymode = 1;
+  option_print_cpymode = 0;
 #endif
   option_level = XD3_DEFAULT_LEVEL;
   option_iopt_size = XD3_DEFAULT_IOPT_SIZE;
@@ -1243,7 +1243,8 @@ main_print_window (xd3_stream* stream, main_file *xfile)
       addr_bytes = stream->addr_sect.buf - addr_before;
       inst_bytes = stream->inst_sect.buf - inst_before;
 
-      VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, code,
+      VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, 
+	 option_print_cpymode ? code : 0,
 	 xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
 	 (usize_t) stream->dec_current1.size)VE;
 
@@ -1251,7 +1252,8 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	{
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-6u", (usize_t)stream->dec_current1.addr)VE;
+	      VC(UT " @%-"Q"6u", 
+		 stream->dec_cpyoff + stream->dec_current1.addr)VE;
 	    }
 	  else
 	    {
@@ -1270,7 +1272,8 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
 	  if (stream->dec_current2.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-6u", (usize_t)stream->dec_current2.addr)VE;
+	      VC(UT " @%-6"Q"u", 
+		 stream->dec_cpyoff + stream->dec_current2.addr)VE;
 	    }
 
 	  size += stream->dec_current2.size;
@@ -1707,7 +1710,7 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 }
 
 
-#define MERGE_IN_PROGRESS 0
+#define MERGE_IN_PROGRESS 1
 #if MERGE_IN_PROGRESS
 /* This is called after all windows have been read, as a final step in
  * main_input().  This is only called for the final merge step. */
@@ -1728,6 +1731,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 
   while (inst_pos < stream->whole_target_instlen)
     {
+      xoff_t window_start = output_pos;
       xoff_t window_srcmin = XOFF_T_MAX;
       xoff_t window_srcmax = 0;
       usize_t window_pos = 0;
@@ -1749,6 +1753,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	{
 	  xd3_winst *inst = &stream->whole_target_inst[inst_pos];
 	  usize_t take = min(inst->size, option_winsize - window_pos);
+	  xoff_t addr;
 
 	  switch (inst->type)
 	    {
@@ -1767,10 +1772,21 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	      break;
 
 	    default: /* XD3_COPY + copy mode */
-	      window_srcmin = min(window_srcmin, inst->addr);
-	      window_srcmax = max(window_srcmax, inst->addr + take);
-	      if ((ret = xd3_found_match (recode_stream, window_pos, take, inst->addr,
-					  inst->mode == VCD_SOURCE)))
+	      if (inst->mode != 0)
+		{
+		  window_srcmin = min(window_srcmin, inst->addr);
+		  window_srcmax = max(window_srcmax, inst->addr + take);
+		  addr = inst->addr;
+		}
+	      else 
+		{
+		  XD3_ASSERT (inst->addr >= window_start);
+		  addr = inst->addr - window_start;
+		}
+	      IF_DEBUG1 (DP(RINT "[merge copy] winpos %u take %u addr %"Q"u mode %u\n",
+			    window_pos, take, addr, inst->mode));
+	      if ((ret = xd3_found_match (recode_stream, window_pos, take, 
+					  addr, inst->mode != 0)))
 		{
 		  return ret;
 		}
@@ -1787,7 +1803,6 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  else
 	    {
 	      /* Modify the instruction for the next pass. */
-	      /* TODO: this seems to be broken, as initial testing indicates. */
 	      if (inst->type != XD3_RUN)
 		{
 		  inst->addr += take;

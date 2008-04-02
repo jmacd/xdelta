@@ -1111,7 +1111,13 @@ xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_ri
 	inst->code1 = 2 + desc->add_sizes + (1 + desc->cpy_sizes) * mode;
 
 	/* Now if the copy is short enough for an immediate instruction. */
-	if (inst->size < MIN_MATCH + desc->cpy_sizes)
+	if (inst->size < MIN_MATCH + desc->cpy_sizes &&
+	    /* TODO: there needs to be a more comprehensive test for this
+	     * boundary condition, merge is now exercising code in which
+	     * size < MIN_MATCH is possible and it's unclear if the above
+	     * size < (MIN_MATCH + cpy_sizes) should be a <= from inspection
+	     * of the default table version below. */
+	    inst->size >= MIN_MATCH)
 	  {
 	    inst->code1 += inst->size + 1 - MIN_MATCH;
 
@@ -1172,7 +1178,7 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 
 	inst->code1 = 19 + 16 * mode;
 
-	if (inst->size <= 18)
+	if (inst->size <= 18 && inst->size >= 4)
 	  {
 	    inst->code1 += inst->size - 3;
 

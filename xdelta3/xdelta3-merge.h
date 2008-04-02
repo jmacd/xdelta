@@ -93,7 +93,7 @@ xd3_whole_append_inst (xd3_stream *stream,
 
   winst = &stream->whole_target_inst[stream->whole_target_instlen++];
   winst->type = inst->type;
-  winst->mode = SRCORTGT (stream->dec_win_ind);
+  winst->mode = 0;
   winst->size = inst->size;
 
   switch (inst->type)
@@ -114,7 +114,15 @@ xd3_whole_append_inst (xd3_stream *stream,
       break;
 
     default:
-      winst->addr = stream->dec_cpyoff + inst->addr;
+      if (inst->addr < stream->dec_cpylen)
+	{
+	  winst->mode = SRCORTGT (stream->dec_win_ind);
+	  winst->addr = stream->dec_cpyoff + inst->addr;
+	}
+      else
+	{
+	  winst->addr = stream->total_out + inst->addr - stream->dec_cpylen;
+	}
       break;
     }
 
