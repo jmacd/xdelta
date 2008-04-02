@@ -314,7 +314,7 @@ static int         option_recompress_outputs = 1;
 /* This is for comparing "printdelta" output without attention to
  * copy-instruction modes. */
 #if VCDIFF_TOOLS
-static int option_print_cpymode = 0; /* Note: see reset_defaults(). */ 
+static int option_print_cpymode = 1; /* Note: see reset_defaults(). */ 
 #endif
 
 /* Static variables */
@@ -323,6 +323,7 @@ IF_DEBUG(static int main_mallocs = 0;)
 static char*          program_name = NULL;
 static uint8_t*       appheader_used = NULL;
 static uint8_t*       main_bdata = NULL;
+static usize_t        main_bsize = 0;
 
 /* The LRU: obviously this is shared by all callers. */
 static usize_t           lru_size = 0;
@@ -430,6 +431,7 @@ reset_defaults(void)
   program_name = NULL;
   appheader_used = NULL;
   main_bdata = NULL;
+  main_bsize = 0;
   lru_size = 0;
   lru = NULL;
   do_not_lru = 0;
@@ -446,7 +448,7 @@ reset_defaults(void)
   option_recompress_outputs = 1;
 #endif
 #if VCDIFF_TOOLS
-  option_print_cpymode = 0;
+  option_print_cpymode = 1;
 #endif
   option_level = XD3_DEFAULT_LEVEL;
   option_iopt_size = XD3_DEFAULT_IOPT_SIZE;
@@ -1675,6 +1677,7 @@ main_merge_arguments (main_merge_list* merges)
         {
           main_free (main_bdata);
           main_bdata = NULL;
+	  main_bsize = 0;
         }
 
       if (ret != 0)
@@ -1710,8 +1713,6 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 }
 
 
-#define MERGE_IN_PROGRESS 1
-#if MERGE_IN_PROGRESS
 /* This is called after all windows have been read, as a final step in
  * main_input().  This is only called for the final merge step. */
 static int
@@ -1744,15 +1745,23 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  return XD3_INVALID;
 	}
 
-      /* TODO: The inner loop termination condition can be used to
-       * change window sizes, however keeping the last delta in the
-       * chain's window size allows re-using its adler32 checksums.
-       * For now this will change window size and not use adler32. */
-      while (window_pos < option_winsize &&
+      if (main_bsize < stream->dec_tgtlen)
+	{
+	  main_free (main_bdata);
+	  main_bdata = NULL;
+	  main_bsize = 0;
+	  if ((main_bdata = (uint8_t*) main_malloc (stream->dec_tgtlen)) == NULL)
+	    {
+	      return ENOMEM;
+	    }
+	  main_bsize = stream->dec_tgtlen;
+	}
+
+      while (window_pos < stream->dec_tgtlen &&
 	     inst_pos < stream->whole_target_instlen)
 	{
 	  xd3_winst *inst = &stream->whole_target_inst[inst_pos];
-	  usize_t take = min(inst->size, option_winsize - window_pos);
+	  usize_t take = min(inst->size, stream->dec_tgtlen - window_pos);
 	  xoff_t addr;
 
 	  switch (inst->type)
@@ -1858,8 +1867,6 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 
   return 0;
 }
-#endif
-
 #endif
 
 /*******************************************************************
@@ -2861,21 +2868,24 @@ main_set_source (xd3_stream *stream, int cmd,
   return ret;
 }
 
-static void
-main_set_winsize (main_file *ifile) {
+static usize_t
+main_get_winsize (main_file *ifile) {
   xoff_t file_size;
+  usize_t size = option_winsize;
 
   if (main_file_stat (ifile, &file_size, 0) == 0)
     {
-      option_winsize = (usize_t) min(file_size, (xoff_t) option_winsize);
+      size = (usize_t) min(file_size, (xoff_t) size);
     }
 
-  option_winsize = max(option_winsize, XD3_ALLOCSIZE);
+  size = max(size, XD3_ALLOCSIZE);
 
   if (option_verbose > 1)
     {
-      XPR(NT "input window size: %u\n", option_winsize);
+      XPR(NT "input window size: %u\n", size);
     }
+
+  return size;
 }
 
 /*******************************************************************
@@ -3025,6 +3035,7 @@ main_input (xd3_cmd     cmd,
   int        ret;
   xd3_stream stream;
   usize_t    nread;
+  usize_t    winsize;
   int        stream_flags = 0;
   xd3_config config;
   xd3_source source;
@@ -3156,9 +3167,9 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 
-  main_set_winsize (ifile);
+  main_bsize = winsize = main_get_winsize (ifile);
 
-  if ((main_bdata = (uint8_t*) main_malloc (option_winsize)) == NULL)
+  if ((main_bdata = (uint8_t*) main_malloc (winsize)) == NULL)
     {
       return EXIT_FAILURE;
     }
@@ -3174,7 +3185,7 @@ main_input (xd3_cmd     cmd,
 	}
     }
 
-  config.winsize = option_winsize;
+  config.winsize = winsize;
   config.srcwin_maxsz = option_srcwinsz;
   config.getblk = main_getblk_func;
   config.flags = stream_flags;
@@ -3357,8 +3368,8 @@ main_input (xd3_cmd     cmd,
 		      {
 			XPR(NT "warning: input window %"Q"u..%"Q"u has "
 			    "no source copies\n",
-			    stream.current_window * option_winsize,
-			    (stream.current_window+1) * option_winsize);
+			    stream.current_window * winsize,
+			    (stream.current_window+1) * winsize);
 		      }
 
 		    /* Limited i-buffer size affects source copies */
@@ -3368,7 +3379,7 @@ main_input (xd3_cmd     cmd,
 			XPR(NT "warning: input position %"Q"u overflowed "
 			    "instruction buffer, needed %u (vs. %u), "
 			    "consider raising -I\n",
-			    stream.current_window * option_winsize,
+			    stream.current_window * winsize,
 			    stream.i_slots_used, stream.iopt_size);
 		      }
 		  }
@@ -3430,13 +3441,11 @@ done:
       main_file_close (sfile);
     }
 
-#if MERGE_IN_PROGRESS
   if (cmd == CMD_MERGE &&
       (ret = main_merge_output (& stream, ofile)))
     {
       return EXIT_FAILURE;
     }
-#endif
 
   /* If output file is not open yet because of delayed-open, it means
    * we never encountered a window in the delta, but it could have had
@@ -3524,6 +3533,7 @@ main_cleanup (void)
 
   main_free (main_bdata);
   main_bdata = NULL;
+  main_bsize = 0;
 
 #if EXTERNAL_COMPRESSION
   main_free (ext_tmpfile);
@@ -3768,9 +3778,7 @@ main (int argc, char **argv)
 	  else if (strcmp (my_optstr, "printdelta") == 0)
 	    { cmd = CMD_PRINTDELTA; }
 	  else if (strcmp (my_optstr, "recode") == 0) { cmd = CMD_RECODE; }
-#if MERGE_IN_PROGRESS
 	  else if (strcmp (my_optstr, "merge") == 0) { cmd = CMD_MERGE; }
-#endif
 #endif
 
 	  /* If no option was found and still no command, let the default
@@ -3889,7 +3897,6 @@ main (int argc, char **argv)
 
 	  sfilename = my_optarg;
 	  break;
-#if MERGE_IN_PROGRESS
 	case 'm':
 	  if ((merge = (main_merge*)
 	       main_malloc (sizeof (main_merge))) == NULL)
@@ -3899,7 +3906,6 @@ main (int argc, char **argv)
 	  main_merge_list_push_back (& merge_order, merge);
 	  merge->filename = my_optarg;
 	  break;
-#endif
 	case 'V':
 	  ret = main_version (); goto exit;
 	default:
