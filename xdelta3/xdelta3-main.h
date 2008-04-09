@@ -170,6 +170,7 @@ typedef enum
   CMD_PRINTHDRS,
   CMD_PRINTDELTA,
   CMD_RECODE,
+  CMD_MERGE_ARG,
   CMD_MERGE,
 #if XD3_ENCODER
   CMD_ENCODE,
@@ -273,7 +274,7 @@ struct _main_merge_list
 struct _main_merge
 {
   const char *filename;
-  //xoff_t source_size;
+
   main_merge_list  link;
 };
 
@@ -320,10 +321,10 @@ static int option_print_cpymode = 1; /* Note: see reset_defaults(). */
 /* Static variables */
 IF_DEBUG(static int main_mallocs = 0;)
 
-static char*          program_name = NULL;
-static uint8_t*       appheader_used = NULL;
-static uint8_t*       main_bdata = NULL;
-static usize_t        main_bsize = 0;
+static char*           program_name = NULL;
+static uint8_t*        appheader_used = NULL;
+static uint8_t*        main_bdata = NULL;
+static usize_t         main_bsize = 0;
 
 /* The LRU: obviously this is shared by all callers. */
 static usize_t           lru_size = 0;
@@ -339,8 +340,11 @@ static int lru_filled = 0;
 /* Hacks for VCDIFF tools */
 static int allow_fake_source = 0;
 
-/* recode_stream is used by both recode/merge */
+/* recode_stream is used by both recode/merge for reading vcdiff inputs */
 static xd3_stream *recode_stream = NULL;
+
+/* merge_stream is used by merge commands for storing the source encoding */
+static xd3_stream *merge_stream = NULL;
 
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
  * false just so the program knows the mapping of IDENT->NAME. */
@@ -470,7 +474,7 @@ static void*
 main_malloc (usize_t size)
 {
   void *r = main_malloc1 (size);
-   if (r) { IF_DEBUG (main_mallocs += 1); }
+  if (r) { IF_DEBUG (main_mallocs += 1); }
   return r;
 }
 
@@ -555,10 +559,6 @@ get_millisecs_now (void)
 
   return (tv.tv_sec) * 1000L + (tv.tv_usec) / 1000;
 #else
-  // Found this in an example on www.codeproject.com
-  // It doesn't matter that the offset is Jan 1, 1601
-  // Result is the numbre of 100 nanosecond units
-  // 100ns * 10,000 = 1ms
   SYSTEMTIME st;
   FILETIME ft;
   __int64 *pi = (__int64*)&ft;
@@ -1077,6 +1077,11 @@ main_write_output (xd3_stream* stream, main_file *ofile)
 {
   int ret;
 
+  if (option_no_output)
+    {
+      return 0;
+    }
+
   if (stream->avail_out > 0 &&
       (ret = main_file_write (ofile, stream->next_out,
 			      stream->avail_out, "write failed")))
@@ -1339,6 +1344,11 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 {
   int ret;
 
+  if (option_no_output)
+    {
+      return 0;
+    }
+
   if (xfile->snprintf_buf == NULL)
     {
       if ((xfile->snprintf_buf = main_malloc(SNPRINTF_BUFSIZE)) == NULL)
@@ -1583,7 +1593,7 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
 	  return ret;
 	}
 
-      if ((ret = main_write_output(recode_stream, ofile)))
+      if ((ret = main_write_output (recode_stream, ofile)))
 	{
 	  return ret;
 	}
@@ -1609,8 +1619,7 @@ main_init_recode_stream (void)
 
   XD3_ASSERT (recode_stream == NULL);
 
-  if ((recode_stream = (xd3_stream*)
-       main_malloc(sizeof(xd3_stream))) == NULL)
+  if ((recode_stream = (xd3_stream*) main_malloc(sizeof(xd3_stream))) == NULL)
     {
       return ENOMEM;
     }
@@ -1624,7 +1633,8 @@ main_init_recode_stream (void)
 
   if ((ret = main_set_secondary_flags (&recode_config)) ||
       (ret = xd3_config_stream (recode_stream, &recode_config)) ||
-      (ret = xd3_encode_init_partial (recode_stream)))
+      (ret = xd3_encode_init_partial (recode_stream)) ||
+      (ret = xd3_whole_state_init (recode_stream)))
     {
       XPR(NT XD3_LIB_ERRMSG (recode_stream, ret));
       xd3_free_stream (recode_stream);
@@ -1640,16 +1650,24 @@ main_init_recode_stream (void)
 static int
 main_merge_arguments (main_merge_list* merges)
 {
-  int ret;
+  int ret = 0;
+  int count = 0;
   main_merge *merge = NULL;
+  xd3_stream merge_input;
 
   if (main_merge_list_empty (merges))
     {
       return 0;
     }
 
-  merge = main_merge_list_front (merges);
+  if ((ret = xd3_config_stream (& merge_input, NULL)) ||
+      (ret = xd3_whole_state_init (& merge_input))) 
+    {
+      XPR(NT XD3_LIB_ERRMSG (& merge_input, ret));
+      return ret;
+    }
 
+  merge = main_merge_list_front (merges);
   while (!main_merge_list_end (merges, merge))
     {
       main_file mfile;
@@ -1659,10 +1677,38 @@ main_merge_arguments (main_merge_list* merges)
 
       if ((ret = main_file_open (& mfile, merge->filename, XO_READ)))
         {
-          return ret;
+          goto error;
         }
 
-      ret = main_input (CMD_MERGE, &mfile, NULL, NULL);
+      ret = main_input (CMD_MERGE_ARG, & mfile, NULL, NULL);
+
+      if (ret == 0)
+	{
+	  if (count++ == 0)
+	    {
+	      /* The first merge source is the next merge input. */
+	      xd3_swap_whole_state (& recode_stream->whole_target, 
+				    & merge_input.whole_target);
+	    }
+	  else
+	    {
+	      xd3_stream tmp_stream;
+	      memset (& tmp_stream, 0, sizeof (tmp_stream));
+	      ret = xd3_merge_inputs (& tmp_stream, 
+				      & merge_input.whole_target,
+				      & recode_stream->whole_target);
+	      if (ret != 0) 
+		{
+		  XPR(NT XD3_LIB_ERRMSG (&tmp_stream, ret));
+		}
+
+	      /* the output is in tmp_stream.whole_state, swap into input */
+	      xd3_swap_whole_state (& merge_input.whole_target,
+				    & tmp_stream.whole_target);
+	      /* total allocation counts are preserved */
+	      xd3_free_stream (& tmp_stream);
+	    }
+	}
 
       main_file_cleanup (& mfile);
 
@@ -1682,13 +1728,33 @@ main_merge_arguments (main_merge_list* merges)
 
       if (ret != 0)
         {
-          return ret;
+	  goto error;
         }
 
       merge = main_merge_list_next (merge);
     }
 
-  return 0;
+  XD3_ASSERT (merge_stream == NULL);
+
+  if ((merge_stream = (xd3_stream*) main_malloc (sizeof(xd3_stream))) == NULL)
+    {
+      ret = ENOMEM;
+      goto error;
+    }
+
+  if ((ret = xd3_config_stream (merge_stream, NULL)) ||
+      (ret = xd3_whole_state_init (merge_stream)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (& merge_input, ret));
+      goto error;
+    }
+
+  xd3_swap_whole_state (& merge_stream->whole_target, 
+			& merge_input.whole_target);
+  ret = 0;
+ error:
+  xd3_free_stream (& merge_input);
+  return ret;
 }
 
 /* This processes each window of the final merge input.  This routine
@@ -1730,7 +1796,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   recode_stream->next_in = main_bdata;
   recode_stream->flags |= XD3_FLUSH;
 
-  while (inst_pos < stream->whole_target_instlen)
+  while (inst_pos < stream->whole_target.instlen)
     {
       xoff_t window_start = output_pos;
       xoff_t window_srcmin = XOFF_T_MAX;
@@ -1758,9 +1824,9 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	}
 
       while (window_pos < stream->dec_tgtlen &&
-	     inst_pos < stream->whole_target_instlen)
+	     inst_pos < stream->whole_target.instlen)
 	{
-	  xd3_winst *inst = &stream->whole_target_inst[inst_pos];
+	  xd3_winst *inst = &stream->whole_target.inst[inst_pos];
 	  usize_t take = min(inst->size, stream->dec_tgtlen - window_pos);
 	  xoff_t addr;
 
@@ -1768,7 +1834,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	    {
 	    case XD3_RUN:
 	      if ((ret = xd3_emit_run (recode_stream, window_pos, take,
-				       stream->whole_target_adds[inst->addr])))
+				       stream->whole_target.adds[inst->addr])))
 		{
 		  return ret;
 		}
@@ -1777,7 +1843,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	    case XD3_ADD:
 	      /* Adds are implicit, put them into the input buffer. */
 	      memcpy (main_bdata + window_pos, 
-		      stream->whole_target_adds + inst->addr, take);
+		      stream->whole_target.adds + inst->addr, take);
 	      break;
 
 	    default: /* XD3_COPY + copy mode */
@@ -2650,6 +2716,11 @@ main_open_output (xd3_stream *stream, main_file *ofile)
 {
   int ret;
 
+  if (option_no_output)
+    {
+      return 0;
+    }
+
   if (ofile->filename == NULL)
     {
       XSTDOUT_XF (ofile);
@@ -3078,6 +3149,7 @@ main_input (xd3_cmd     cmd,
 
     case CMD_RECODE:
     case CMD_MERGE:
+    case CMD_MERGE_ARG:
       /* No source will be read */
       stream_flags |= XD3_ADLER32_NOVER | XD3_SKIP_EMIT;
       ifile->flags |= RD_NONEXTERNAL;
@@ -3321,36 +3393,33 @@ main_input (xd3_cmd     cmd,
 
 	case XD3_OUTPUT:
 	  {
-	    if (option_no_output == 0)
+	    /* Defer opening the output file until the stream produces its
+	     * first output for both encoder and decoder, this way we
+	     * delay long enough for the decoder to receive the
+	     * application header.  (Or longer if there are skipped
+	     * windows, but I can't think of any reason not to delay
+	     * open.) */
+	    if (ofile != NULL &&
+		! main_file_isopen (ofile) &&
+		(ret = main_open_output (& stream, ofile)) != 0)
 	      {
-		/* Defer opening the output file until the stream produces its
-		 * first output for both encoder and decoder, this way we
-		 * delay long enough for the decoder to receive the
-		 * application header.  (Or longer if there are skipped
-		 * windows, but I can't think of any reason not to delay
-		 * open.) */
-
-		if (ofile != NULL)
-                  {
-                    if ((! main_file_isopen (ofile) &&
-                         (ret = main_open_output (& stream, ofile)) != 0))
-                      {
-                        return EXIT_FAILURE;
-                      }
-                    if ((ret = output_func (& stream, ofile)) &&
-                        (ret != PRINTHDR_SPECIAL))
-                      {
-                        return EXIT_FAILURE;
-                      }
-                    if (ret == PRINTHDR_SPECIAL)
-                      {
-                        xd3_abort_stream (& stream);
-                        ret = EXIT_SUCCESS;
-                        goto done;
-                      }
-                  }
-		ret = 0;
+		return EXIT_FAILURE;
 	      }
+	    
+	    if ((ret = output_func (& stream, ofile)) &&
+		(ret != PRINTHDR_SPECIAL))
+	      {
+		return EXIT_FAILURE;
+	      }
+
+	    if (ret == PRINTHDR_SPECIAL)
+	      {
+		xd3_abort_stream (& stream);
+		ret = EXIT_SUCCESS;
+		goto done;
+	      }
+
+	    ret = 0;
 
 	    xd3_consume_output (& stream);
 	    goto again;
@@ -3557,6 +3626,13 @@ main_cleanup (void)
       xd3_free_stream (recode_stream);
       main_free (recode_stream);
       recode_stream = NULL;
+    }
+
+  if (merge_stream != NULL)
+    {
+      xd3_free_stream (merge_stream);
+      main_free (merge_stream);
+      merge_stream = NULL;
     }
 
   XD3_ASSERT (main_mallocs == 0);

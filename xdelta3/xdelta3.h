@@ -248,6 +248,7 @@ typedef struct _xd3_config             xd3_config;
 typedef struct _xd3_code_table_desc    xd3_code_table_desc;
 typedef struct _xd3_code_table_sizes   xd3_code_table_sizes;
 typedef struct _xd3_slist              xd3_slist;
+typedef struct _xd3_whole_state        xd3_whole_state;
 
 /* The stream configuration has three callbacks functions, all of
  * which may be supplied with NULL values.  If config->getblk is
@@ -636,6 +637,16 @@ struct _xd3_slist
   usize_t     last_pos;
 };
 
+/* whole state for, e.g., merge */
+struct _xd3_whole_state {
+  usize_t addslen;
+  uint8_t *adds;
+  usize_t  adds_alloc;
+  usize_t instlen;
+  xd3_winst *inst;
+  usize_t  inst_alloc;
+};
+
 /********************************************************************
  public types
  *******************************************************************/
@@ -944,12 +955,7 @@ struct _xd3_stream
 
   /* state for reconstructing whole files (e.g., for merge), this only
    * supports loading USIZE_T_MAX instructions, adds, etc. */
-  usize_t whole_target_addslen;
-  uint8_t *whole_target_adds;
-  usize_t  whole_target_adds_alloc;
-  usize_t whole_target_instlen;
-  xd3_winst *whole_target_inst;
-  usize_t  whole_target_inst_alloc;
+  xd3_whole_state     whole_target;
 
   /* statistics */
   xoff_t            n_scpy;
