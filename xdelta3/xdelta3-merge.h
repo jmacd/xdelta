@@ -191,12 +191,13 @@ xd3_whole_append_window (xd3_stream *stream)
 }
 
 /* xd3_merge_inputs() applies *input to *source, returns its result in
- * tmp_stream. */
+ * stream. */
 int xd3_merge_inputs (xd3_stream *stream, 
 		      xd3_whole_state *source,
 		      xd3_whole_state *input)
 {
   DP(RINT "Merge inputs!\n");
+  
   return 0;
 }
 

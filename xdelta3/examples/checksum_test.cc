@@ -590,7 +590,7 @@ void print_array(const char *tname) {
 int main(int argc, char** argv) {
   int i;
   uint8_t *buf = NULL;
-  usize_t buf_len = 0;
+  size_t buf_len = 0;
   int ret;
 
   if (argc <= 1) {

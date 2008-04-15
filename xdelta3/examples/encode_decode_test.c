@@ -65,7 +65,7 @@ int code (
     Input_Buf_Read = fread(Input_Buf, 1, BufSize, InFile);
     if (Input_Buf_Read < BufSize)
     {
-      xd3_set_flags(&stream, XD3_FLUSH);
+      xd3_set_flags(&stream, XD3_FLUSH | stream.flags);
     }
     xd3_avail_input(&stream, Input_Buf, Input_Buf_Read);
 
@@ -156,11 +156,21 @@ int main(int argc, char* argv[])
   FILE* OutFile;
   int r;
 
+  if (argc != 3) {
+    fprintf (stderr, "usage: %s source input output\n", argv[0]);
+    return 1;
+  }
+
+  char *input = argv[2];
+  char *source = argv[1];
+  const char *output = "encoded.testdata";
+  const char *decoded = "decoded.testdata";
+
   /* Encode */
 
-  InFile = fopen("input.txt", "rb");
-  SrcFile = fopen("source.txt", "rb");
-  OutFile = fopen("encoded.txt", "wb");
+  InFile = fopen(input, "rb");
+  SrcFile = fopen(source, "rb");
+  OutFile = fopen(output, "wb");
 
   r = code (1, InFile, SrcFile, OutFile, 0x1000);
 
@@ -168,14 +178,16 @@ int main(int argc, char* argv[])
   fclose(SrcFile);
   fclose(InFile);
 
-  if (r)
+  if (r) {
+    fprintf (stderr, "Encode error: %d\n", r);
     return r;
+  }
 
   /* Decode */
 
-  InFile = fopen("encoded.txt", "rb");
-  SrcFile = fopen("source.txt", "rb");
-  OutFile = fopen("decoded.txt", "wb");
+  InFile = fopen(output, "rb");
+  SrcFile = fopen(source, "rb");
+  OutFile = fopen(decoded, "wb");
 
   r = code (0, InFile, SrcFile, OutFile, 0x1000);
 
@@ -183,8 +195,10 @@ int main(int argc, char* argv[])
   fclose(SrcFile);
   fclose(InFile);
 
-  if (r)
+  if (r) {
+    fprintf (stderr, "Decode error: %d\n", r);
     return r;
+  }
 
   return 0;
 }

@@ -1816,7 +1816,8 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  main_free (main_bdata);
 	  main_bdata = NULL;
 	  main_bsize = 0;
-	  if ((main_bdata = (uint8_t*) main_malloc (stream->dec_tgtlen)) == NULL)
+	  if ((main_bdata = (uint8_t*) 
+	       main_malloc (stream->dec_tgtlen)) == NULL)
 	    {
 	      return ENOMEM;
 	    }
@@ -3510,11 +3511,13 @@ done:
       main_file_close (sfile);
     }
 
+#if VCDIFF_TOOLS
   if (cmd == CMD_MERGE &&
       (ret = main_merge_output (& stream, ofile)))
     {
       return EXIT_FAILURE;
     }
+#endif /* VCDIFF_TOOLS */
 
   /* If output file is not open yet because of delayed-open, it means
    * we never encountered a window in the delta, but it could have had
@@ -4039,11 +4042,13 @@ main (int argc, char **argv)
       if (! option_stdout) { ofile.filename = argv[1]; }
     }
 
+#if VCDIFF_TOOLS
   if (cmd == CMD_MERGE &&
       (ret = main_merge_arguments (&merge_order)))
     {
       goto cleanup;
     }
+#endif /* VCDIFF_TOOLS */
 
   switch (cmd)
     {

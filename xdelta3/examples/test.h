@@ -11,7 +11,7 @@ static int read_whole_file(const char *name,
   main_file file;
   int ret;
   xoff_t len;
-  size_t nread;
+  usize_t nread;
   main_file_init(&file);
   file.filename = name;
   ret = main_file_open(&file, name, XO_READ);

@@ -62,6 +62,8 @@ process_page (int            is_encode,
   context_t *ctx = calloc(SPACE_MAX, 1);
   int ret;
 
+  memset (&config, 0, sizeof(config));
+
   if (ctx == NULL)
     {
       printf("calloc failed\n");
@@ -142,7 +144,8 @@ int test(int stride, int encode_flags)
 			   &output_size, OUTPUT_MAX,
 			   encode_flags)) != 0)
     {
-      fprintf (stderr, "encode failed: stride %u flags 0x%x\n", stride, encode_flags);
+      fprintf (stderr, "encode failed: stride %u flags 0x%x\n", 
+	       stride, encode_flags);
       return ret;
     }
 
@@ -153,7 +156,7 @@ int test(int stride, int encode_flags)
 			   0)) != 0)
     {
       fprintf (stderr, "decode failed: stride %u output_size %u flags 0x%x\n",
-	      stride, output_size, encode_flags);
+	       stride, output_size, encode_flags);
       return ret;
     }
 
@@ -172,7 +175,8 @@ int test(int stride, int encode_flags)
 	}
     }
 
-  fprintf(stderr, "stride %d flags 0x%x size %u ", stride, encode_flags, output_size);
+  fprintf(stderr, "stride %d flags 0x%x size %u ", 
+	  stride, encode_flags, output_size);
   fprintf(stderr, "%s\n", (ret == 0) ? "OK" : "FAIL");
 
   return 0;

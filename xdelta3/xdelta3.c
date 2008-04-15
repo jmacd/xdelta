@@ -3813,7 +3813,16 @@ xd3_encode_input (xd3_stream *stream)
 		      return ret;
 		    }
 
-		  stream->input_position += stream->match_fwd;
+		  /* The search has to make forward progress here
+		   * or else it can get stuck in a match-backward
+		   * (getsrcblk) then match-forward (getsrcblk),
+		   * find insufficient match length, then repeat
+		   * exactly the same search. */
+		  if (stream->match_fwd != 0) {
+		    stream->input_position += stream->match_fwd;
+		  } else {
+		    stream->input_position += 1;
+		  }
 		}
 
 	    case MATCH_SEARCHING:
@@ -4741,7 +4750,7 @@ xd3_smatch (xd3_stream *stream,
 
  again:
 
-  IF_DEBUG1 (DP(RINT "smatch at base=%u inp=%u cksum=%u\n", base,
+  IF_DEBUG2 (DP(RINT "smatch at base=%u inp=%u cksum=%u\n", base,
                 stream->input_position, scksum));
 
   /* For small matches, we can always go to the end-of-input because
