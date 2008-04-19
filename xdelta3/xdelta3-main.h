@@ -1694,10 +1694,11 @@ main_merge_arguments (main_merge_list* merges)
 	    {
 	      xd3_stream tmp_stream;
 	      memset (& tmp_stream, 0, sizeof (tmp_stream));
-	      ret = xd3_merge_inputs (& tmp_stream, 
-				      & merge_input.whole_target,
-				      & recode_stream->whole_target);
-	      if (ret != 0) 
+	      if ((ret = xd3_config_stream (& tmp_stream, NULL)) ||
+		  (ret = xd3_whole_state_init (& tmp_stream)) ||
+		  (ret = xd3_merge_inputs (& tmp_stream, 
+					   & merge_input.whole_target,
+					   & recode_stream->whole_target)))
 		{
 		  XPR(NT XD3_LIB_ERRMSG (&tmp_stream, ret));
 		}
@@ -1788,6 +1789,17 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   usize_t inst_pos = 0;
   xoff_t output_pos = 0;
   xd3_source recode_source;
+
+  /* merge_stream is set if there were arguments.  this stream's input
+   * needs to be applied to the merge_stream source. */
+  if (merge_stream != NULL &&
+      (ret = xd3_merge_inputs (stream, 
+			       & merge_stream->whole_target, 
+			       & stream->whole_target)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (stream, ret));
+      return ret;
+    }
 
   /* Enter the ENC_INPUT state and bypass the next_in == NULL test
    * and (leftover) input buffering logic. */

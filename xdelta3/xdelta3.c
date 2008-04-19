@@ -3817,7 +3817,13 @@ xd3_encode_input (xd3_stream *stream)
 		   * or else it can get stuck in a match-backward
 		   * (getsrcblk) then match-forward (getsrcblk),
 		   * find insufficient match length, then repeat
-		   * exactly the same search. */
+		   * exactly the same search. 
+		   *
+		   * TODO: would be better to solve this be remebering
+		   * the previous address and avoiding long matches 
+		   * in xd3_string_match(), since there could still be
+		   * a small match at ths position.  Write a test
+		   * that reproduces the above scenario. */
 		  if (stream->match_fwd != 0) {
 		    stream->input_position += stream->match_fwd;
 		  } else {

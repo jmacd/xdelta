@@ -197,6 +197,8 @@ int xd3_merge_inputs (xd3_stream *stream,
 		      xd3_whole_state *input)
 {
   DP(RINT "Merge inputs!\n");
+
+  xd3_swap_whole_state (&stream->whole_target, input);
   
   return 0;
 }
