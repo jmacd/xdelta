@@ -19,6 +19,10 @@
 #ifndef _XDELTA3_MERGE_H_
 #define _XDELTA3_MERGE_H_
 
+int xd3_merge_inputs (xd3_stream *stream, 
+		      xd3_whole_state *source,
+		      xd3_whole_state *input);
+
 static int
 xd3_whole_state_init (xd3_stream *stream)
 {
@@ -190,13 +194,39 @@ xd3_whole_append_window (xd3_stream *stream)
   return 0;
 }
 
+/* xd3_merge_input_output applies *source to *stream, returns the
+ * result in stream. */
+int xd3_merge_input_output (xd3_stream *stream,
+			    xd3_whole_state *source)
+{
+  int ret;
+  xd3_stream tmp_stream;
+  memset (& tmp_stream, 0, sizeof (tmp_stream));
+  if ((ret = xd3_config_stream (& tmp_stream, NULL)) ||
+      (ret = xd3_whole_state_init (& tmp_stream)) ||
+      (ret = xd3_merge_inputs (& tmp_stream, 
+			       source,
+			       & stream->whole_target)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (&tmp_stream, ret));
+      return ret;
+    }
+
+  /* the output is in tmp_stream.whole_state, swap into input */
+  xd3_swap_whole_state (& stream->whole_target,
+			& tmp_stream.whole_target);
+  /* total allocation counts are preserved */
+  xd3_free_stream (& tmp_stream);
+  return 0;
+}
+
 /* xd3_merge_inputs() applies *input to *source, returns its result in
- * stream. */
+ * stream.  In certain cases, input == stream->whole_target. */
 int xd3_merge_inputs (xd3_stream *stream, 
 		      xd3_whole_state *source,
 		      xd3_whole_state *input)
 {
-  DP(RINT "Merge inputs!\n");
+
 
   xd3_swap_whole_state (&stream->whole_target, input);
   

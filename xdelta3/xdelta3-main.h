@@ -1692,22 +1692,13 @@ main_merge_arguments (main_merge_list* merges)
 	    }
 	  else
 	    {
-	      xd3_stream tmp_stream;
-	      memset (& tmp_stream, 0, sizeof (tmp_stream));
-	      if ((ret = xd3_config_stream (& tmp_stream, NULL)) ||
-		  (ret = xd3_whole_state_init (& tmp_stream)) ||
-		  (ret = xd3_merge_inputs (& tmp_stream, 
-					   & merge_input.whole_target,
-					   & recode_stream->whole_target)))
-		{
-		  XPR(NT XD3_LIB_ERRMSG (&tmp_stream, ret));
-		}
+	      /* Merge the recode_stream with merge_input. */
+	      ret = xd3_merge_input_output (recode_stream,
+					    & merge_input.whole_target);
 
-	      /* the output is in tmp_stream.whole_state, swap into input */
-	      xd3_swap_whole_state (& merge_input.whole_target,
-				    & tmp_stream.whole_target);
-	      /* total allocation counts are preserved */
-	      xd3_free_stream (& tmp_stream);
+	      /* Save the next merge source in merge_input. */
+	      xd3_swap_whole_state (& recode_stream->whole_target,
+				    & merge_input.whole_target);
 	    }
 	}
 
@@ -1792,10 +1783,9 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 
   /* merge_stream is set if there were arguments.  this stream's input
    * needs to be applied to the merge_stream source. */
-  if (merge_stream != NULL &&
-      (ret = xd3_merge_inputs (stream, 
-			       & merge_stream->whole_target, 
-			       & stream->whole_target)))
+  if ((merge_stream != NULL) &&
+      (ret = xd3_merge_input_output (stream, 
+				     & merge_stream->whole_target)))
     {
       XPR(NT XD3_LIB_ERRMSG (stream, ret));
       return ret;
