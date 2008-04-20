@@ -3519,6 +3519,12 @@ done:
     {
       return EXIT_FAILURE;
     }
+
+  if (cmd == CMD_MERGE_ARG)
+    {
+      xd3_swap_whole_state (& stream.whole_target,
+			    & recode_stream->whole_target);
+    }
 #endif /* VCDIFF_TOOLS */
 
   /* If output file is not open yet because of delayed-open, it means

@@ -562,6 +562,7 @@ struct _xd3_winst
   uint8_t mode;  /* 0, VCD_SOURCE, VCD_TARGET */
   usize_t size;
   xoff_t  addr;
+  xoff_t  position;  /* absolute position of this inst */
 };
 
 /* used by the encoder to buffer output in sections.  list of blocks. */
@@ -645,6 +646,7 @@ struct _xd3_whole_state {
   usize_t instlen;
   xd3_winst *inst;
   usize_t  inst_alloc;
+  xoff_t length;
 };
 
 /********************************************************************
