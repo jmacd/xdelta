@@ -822,6 +822,8 @@ struct _xd3_stream
   xoff_t             match_srcpos;     /* current match source
 					  position relative to
 					  srcbase */
+  xoff_t             match_last_srcpos;  /* previously attempted
+					  * srcpos, to avoid loops. */
   xoff_t             match_minaddr;    /* smallest matching address to
 				       * set window params (reset each
 				       * window xd3_encode_reset) */

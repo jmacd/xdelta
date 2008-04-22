@@ -3818,17 +3818,8 @@ xd3_encode_input (xd3_stream *stream)
 		   * (getsrcblk) then match-forward (getsrcblk),
 		   * find insufficient match length, then repeat
 		   * exactly the same search. 
-		   *
-		   * TODO: would be better to solve this be remebering
-		   * the previous address and avoiding long matches 
-		   * in xd3_string_match(), since there could still be
-		   * a small match at ths position.  Write a test
-		   * that reproduces the above scenario. */
-		  if (stream->match_fwd != 0) {
-		    stream->input_position += stream->match_fwd;
-		  } else {
-		    stream->input_position += 1;
-		  }
+		   */
+		  stream->input_position += stream->match_fwd;
 		}
 
 	    case MATCH_SEARCHING:
@@ -4337,6 +4328,15 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   stream->match_back    = 0;
   stream->match_fwd     = 0;
 
+  /* This avoids a loop.  TODO: if ever duplicates are added to the
+   * source hash table, this logic won't suffice to avoid loops. 
+   * TODO: how can you test this in a unittest?  Need to search for
+   * hash collisions, I suppose. */
+  if (srcpos != 0 && srcpos == stream->match_last_srcpos)
+    {
+      goto bad;
+    }
+
   /* Going backwards, the 1.5-pass algorithm allows some
    * already-matched input may be covered by a longer source match.
    * The greedy algorithm does not allow this. */
@@ -4355,8 +4355,6 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
        * when a covering source match is found. */
       greedy_or_not = stream->unencoded_offset;
     }
-
-
 
   /* Backward target match limit. */
   XD3_ASSERT (stream->input_position >= greedy_or_not);
@@ -4419,6 +4417,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
  good:
   stream->match_state  = MATCH_BACKWARD;
   stream->match_srcpos = srcpos;
+  stream->match_last_srcpos = srcpos;
   return 0;
 
  bad:
