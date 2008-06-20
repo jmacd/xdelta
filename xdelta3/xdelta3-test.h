@@ -16,6 +16,74 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* The code in this file is being gradually migrated to
+ * xdelta3-test2.h, which has a more solid foundation.  That file is
+ * included immediatly after this random number generator code, which
+ * is all that is currently shared by the two files. */
+
+/* This is public-domain Mersenne Twister code,
+ * attributed to Michael Brundage.  Thanks!
+ * http://www.qbrundage.com/michaelb/pubs/essays/random_number_generation.html
+ */
+#define MT_LEN          624
+#define MT_IA           397
+#define MT_IB           (MT_LEN - MT_IA)
+#define UPPER_MASK      0x80000000
+#define LOWER_MASK      0x7FFFFFFF
+#define MATRIX_A        0x9908B0DF
+#define TWIST(b,i,j)    ((b)[i] & UPPER_MASK) | ((b)[j] & LOWER_MASK)
+#define MAGIC(s)        (((s)&1)*MATRIX_A)
+
+struct mtrand_ {
+  int mt_index;
+  usize_t mt_buffer[MT_LEN];
+};
+
+typedef struct mtrand_ mtrand;
+
+static void mt_init (mtrand *mt, int seed) {
+  int i;
+  srand (seed);
+  for (i = 0; i < MT_LEN; i++)
+    {
+      mt->mt_buffer[i] = rand ();
+    }
+  mt->mt_index = 0;
+}
+
+static usize_t mt_random (mtrand *mt) {
+  usize_t * b = mt->mt_buffer;
+  int idx = mt->mt_index;
+  usize_t s;
+  int i;
+	
+  if (idx == MT_LEN*sizeof(usize_t))
+    {
+      idx = 0;
+      i = 0;
+      for (; i < MT_IB; i++) {
+	s = TWIST(b, i, i+1);
+	b[i] = b[i + MT_IA] ^ (s >> 1) ^ MAGIC(s);
+      }
+      for (; i < MT_LEN-1; i++) {
+	s = TWIST(b, i, i+1);
+	b[i] = b[i - MT_IB] ^ (s >> 1) ^ MAGIC(s);
+      }
+        
+      s = TWIST(b, MT_LEN-1, 0);
+      b[MT_LEN-1] = b[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
+    }
+  mt->mt_index = idx + sizeof(usize_t);
+  return *(usize_t *)((unsigned char *)b + idx);
+}
+
+static mtrand static_mtrand;
+
+#include "xdelta3-test2.h"
+
+/* Everything below this line is old!  The tests are still good, but
+ * better tests are being written in xdelta3-test2.h. */
+
 #include <math.h>
 
 #ifndef WIN32
@@ -90,13 +158,14 @@ static int do_fail (xd3_stream *stream, const char *buf)
 }
 
 static int
-test_exponential_dist (usize_t mean, usize_t max)
+test_exponential_dist (usize_t mean, usize_t max_value)
 {
   double mean_d = mean;
-  double erand  = log (1.0 / (rand () / (double)RAND_MAX));
+  double erand  = log (1.0 / (mt_random (&static_mtrand) / 
+			      (double)USIZE_T_MAX));
   usize_t x = (usize_t) (mean_d * erand + 0.5);
 
-  return min (x, max);
+  return min (x, max_value);
 }
 
 /* Test that the exponential distribution actually produces its mean. */
@@ -108,7 +177,9 @@ test_random_numbers (xd3_stream *stream, int ignore)
   usize_t mean = 50;
   usize_t n_rounds = 10000;
   double average, error;
-  double allowed_error = 1.0;
+  double allowed_error = 2.0;
+
+  mt_init (& static_mtrand, 0x9f73f7fc);
 
   for (i = 0; i < n_rounds; i += 1)
     {
@@ -120,10 +191,10 @@ test_random_numbers (xd3_stream *stream, int ignore)
 
   if (error < allowed_error && error > -allowed_error)
     {
-      /*DP(RINT "error is %f\n", error);*/
       return 0;
     }
 
+  DP(RINT "error is %f\n", error);
   stream->msg = "random distribution looks broken";
   return XD3_INTERNAL;
 }
@@ -135,9 +206,9 @@ test_unlink (char* file)
   while (unlink (file) != 0)
     {
       if (errno == ENOENT)
-	    {
-	      break;
-	    }
+	{
+	  break;
+	}
       sprintf (buf, "rm -f %s", file);
       system (buf);
     }
@@ -174,8 +245,8 @@ test_setup (void)
 static int
 test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 {
-  usize_t ts = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
-  usize_t ss = (rand () % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
+  usize_t ts = (mt_random (&static_mtrand) % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
+  usize_t ss = (mt_random (&static_mtrand) % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
   uint8_t *buf = malloc (ts + ss), *sbuf = buf, *tbuf = buf + ss;
   usize_t sadd = 0, sadd_max = ss * TEST_ADD_RATIO;
   FILE  *tf = NULL, *sf = NULL;
@@ -196,7 +267,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
     {
       for (i = 0; i < ss; )
 	{
-	  sbuf[i++] = rand ();
+	  sbuf[i++] = mt_random (&static_mtrand);
 	}
     }
 
@@ -215,7 +286,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       int do_copy;
 
       next = min (left, next);
-      do_copy = (next > add_left || (rand() / (double)RAND_MAX) >= add_prob);
+      do_copy = (next > add_left || (mt_random (&static_mtrand) / (double)USIZE_T_MAX) >= add_prob);
 
       if (ss_out == NULL)
 	{
@@ -229,7 +300,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       if (do_copy)
 	{
 	  /* Copy */
-	  size_t offset = rand () % ((ss_out == NULL) ? i : (ss - next));
+	  size_t offset = mt_random (&static_mtrand) % ((ss_out == NULL) ? i : (ss - next));
 	  /* DP(RINT "[%u] copy %u at %u ", i, next, offset); */
 
 	  for (j = 0; j < next; j += 1)
@@ -246,7 +317,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 	  /* DP(RINT "[%u] add %u ", i, next); */
 	  for (j = 0; j < next; j += 1)
 	    {
-	      char c = rand ();
+	      char c = mt_random (&static_mtrand);
 	      /* DP(RINT "%x%x", (c >> 4) & 0xf, c & 0xf); */
 	      tbuf[i++] = c;
 	    }
@@ -625,7 +696,7 @@ test_address_cache (xd3_stream *stream, int unused)
 
   addrs[0] = 0;
 
-  srand (0x9f73f7fc);
+  mt_init (& static_mtrand, 0x9f73f7fc);
 
   /* First pass: encode addresses */
   xd3_init_cache (& stream->acache);
@@ -637,9 +708,9 @@ test_address_cache (xd3_stream *stream, int unused)
       usize_t prev_i;
       usize_t nearby;
 
-      p         = (rand () / (double)RAND_MAX);
-      prev_i    = rand () % offset;
-      nearby    = (rand () % 256) % offset, 1;
+      p         = (mt_random (&static_mtrand) / (double)USIZE_T_MAX);
+      prev_i    = mt_random (&static_mtrand) % offset;
+      nearby    = (mt_random (&static_mtrand) % 256) % offset, 1;
       nearby    = max (1U, nearby);
 
       if (p < 0.1)      { addr = addrs[offset-nearby]; }
@@ -1081,7 +1152,7 @@ sec_dist_func6 (xd3_stream *stream, xd3_output *data)
   int i, ret, x;
   for (i = 0; i < ALPHABET_SIZE*20; i += 1)
     {
-      x = rand () % (ALPHABET_SIZE/2);
+      x = mt_random (&static_mtrand) % (ALPHABET_SIZE/2);
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
     }
   return 0;
@@ -1094,7 +1165,7 @@ sec_dist_func7 (xd3_stream *stream, xd3_output *data)
   int i, ret, x;
   for (i = 0; i < ALPHABET_SIZE*20; i += 1)
     {
-      x = rand () % ALPHABET_SIZE;
+      x = mt_random (&static_mtrand) % ALPHABET_SIZE;
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
     }
   return 0;
@@ -1272,7 +1343,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
       DP(RINT "\n...");
       for (test_i = 0; test_i < SIZEOF_ARRAY (sec_dists); test_i += 1)
 	{
-	  srand (0x84687674);
+	  mt_init (& static_mtrand, 0x9f73f7fc);
 
 	  in_head  = xd3_alloc_output (stream, NULL);
 	  out_head = xd3_alloc_output (stream, NULL);
@@ -1631,7 +1702,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
   xoff_t dsize;
   double ratio;
 
-  srand (0x89162337);
+  mt_init (& static_mtrand, 0x9f73f7fc);
 
   for (i = 0; i < pairs; i += 1)
     {
@@ -2019,7 +2090,7 @@ test_externally_compressed_io (xd3_stream *stream, int ignore)
   int i, ret;
   char buf[TESTBUFSIZE];
 
-  srand (0x91723913);
+  mt_init (& static_mtrand, 0x9f73f7fc);
 
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
@@ -2069,7 +2140,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
   char buf[TESTBUFSIZE];
   const main_extcomp *ext;
 
-  srand (0x9ff56acb);
+  mt_init (& static_mtrand, 0x9f73f7fc);
 
   test_setup ();
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
@@ -2265,7 +2336,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   usize_t delpos = 0, recsize;
   xd3_config config;
 
-  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = rand (); }
+  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = mt_random (&static_mtrand); }
 
   stream->winsize = IDB_WINSZ;
 
@@ -2669,16 +2740,27 @@ xd3_selftest (void)
     xd3_stream stream;                                                \
     xd3_config config;                                                \
     xd3_init_config (& config, flags);                                \
-    DP(RINT "xdelta3: testing " #fn "%s...",                           \
+    DP(RINT "xdelta3: testing " #fn "%s...",                          \
              flags ? (" (" #flags ")") : "");                         \
     if ((ret = xd3_config_stream (& stream, & config) == 0) &&        \
         (ret = test_ ## fn (& stream, arg)) == 0) {                   \
-      DP(RINT " success\n");                                           \
+      DP(RINT " success\n");                                          \
     } else {                                                          \
-      DP(RINT " failed: %s: %s\n", xd3_errstring (& stream),           \
+      DP(RINT " failed: %s: %s\n", xd3_errstring (& stream),          \
                xd3_mainerror (ret)); }                                \
     xd3_free_stream (& stream);                                       \
     if (ret != 0) { goto failure; }                                   \
+  } while (0)
+
+#define DO_TEST2(fn)                                                  \
+  do {                                                                \
+    DP(RINT "xdelta3: testing " #fn "%s...");                         \
+    if ((ret = test_ ## fn ()) == 0) {				      \
+      DP(RINT " success\n");                                          \
+    } else {                                                          \
+      DP(RINT " failed!\n");                                          \
+    }                                                                 \
+    if (ret != 0) { goto failure; }		                      \
   } while (0)
 
   int ret;
@@ -2713,6 +2795,8 @@ xd3_selftest (void)
 
   DO_TEST (iopt_flush_instructions, 0, 0);
   DO_TEST (source_cksum_offset, 0, 0);
+
+  DO_TEST2 (merge_command);
 
   DO_TEST (decompress_single_bit_error, 0, 3);
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);
