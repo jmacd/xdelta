@@ -16,11 +16,6 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* The code in this file is being gradually migrated to
- * xdelta3-test2.h, which has a more solid foundation.  That file is
- * included immediatly after this random number generator code, which
- * is all that is currently shared by the two files. */
-
 /* This is public-domain Mersenne Twister code,
  * attributed to Michael Brundage.  Thanks!
  * http://www.qbrundage.com/michaelb/pubs/essays/random_number_generation.html
@@ -79,11 +74,6 @@ static usize_t mt_random (mtrand *mt) {
 
 static mtrand static_mtrand;
 
-#include "xdelta3-test2.h"
-
-/* Everything below this line is old!  The tests are still good, but
- * better tests are being written in xdelta3-test2.h. */
-
 #include <math.h>
 
 #ifndef WIN32
@@ -120,6 +110,8 @@ static int test_exponential_dist (usize_t mean, usize_t max);
 /* Use a fixed soft config so that test values are fixed.  See also
  * test_compress_text(). */
 static const char* test_softcfg_str = "-C9,3,4,8,2,36,70";
+
+static int test_setup (void);
 
 /***********************************************************************
  TEST HELPERS
@@ -172,14 +164,14 @@ test_exponential_dist (usize_t mean, usize_t max_value)
 static int
 test_random_numbers (xd3_stream *stream, int ignore)
 {
-  int i;
+  usize_t i;
   usize_t sum = 0;
   usize_t mean = 50;
-  usize_t n_rounds = 10000;
+  usize_t n_rounds = 1000000;
   double average, error;
-  double allowed_error = 2.0;
+  double allowed_error = 0.1;
 
-  mt_init (& static_mtrand, 0x9f73f7fc);
+  mt_init (& static_mtrand, 0x9f73f7fe);
 
   for (i = 0; i < n_rounds; i += 1)
     {
@@ -194,7 +186,7 @@ test_random_numbers (xd3_stream *stream, int ignore)
       return 0;
     }
 
-  DP(RINT "error is %f\n", error);
+  /*DP(RINT "error is %f\n", error);*/
   stream->msg = "random distribution looks broken";
   return XD3_INTERNAL;
 }
@@ -247,7 +239,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 {
   usize_t ts = (mt_random (&static_mtrand) % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
   usize_t ss = (mt_random (&static_mtrand) % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
-  uint8_t *buf = malloc (ts + ss), *sbuf = buf, *tbuf = buf + ss;
+  uint8_t *buf = (uint8_t*) malloc (ts + ss), *sbuf = buf, *tbuf = buf + ss;
   usize_t sadd = 0, sadd_max = ss * TEST_ADD_RATIO;
   FILE  *tf = NULL, *sf = NULL;
   usize_t i, j;
@@ -463,7 +455,7 @@ test_file_size (const char* file, xoff_t *size)
  * attempts to get errors by shortening the input, otherwise it should
  * overflow.  Expects XD3_INTERNAL and MSG. */
 static int
-test_read_integer_error (xd3_stream *stream, int trunto, const char *msg)
+test_read_integer_error (xd3_stream *stream, usize_t trunto, const char *msg)
 {
   uint64_t eval = 1ULL << 34;
   uint32_t rval;
@@ -525,8 +517,9 @@ test_decode_integer_end_of_input (xd3_stream *stream, int unused)
   xd3_output *rbuf = NULL; \
   xd3_output *dbuf = NULL; \
   TYPE values[64]; \
-  int nvalues = 0; \
-  int i, ret = 0; \
+  usize_t nvalues = 0; \
+  usize_t i; \
+  int ret = 0; \
  \
   for (i = 0; i < (sizeof (TYPE) * 8); i += 7) \
     { \
@@ -646,7 +639,7 @@ test_usize_t_overflow (xd3_stream *stream, int unused)
 static int
 test_forward_match (xd3_stream *stream, int unused)
 {
-  int i;
+  usize_t i;
   uint8_t buf1[256], buf2[256];
 
   memset(buf1, 0, 256);
@@ -674,7 +667,8 @@ test_forward_match (xd3_stream *stream, int unused)
 static int
 test_address_cache (xd3_stream *stream, int unused)
 {
-  int ret, i;
+  int ret;
+  usize_t i;
   usize_t offset;
   usize_t *addrs;
   uint8_t *big_buf, *buf_max;
@@ -688,8 +682,8 @@ test_address_cache (xd3_stream *stream, int unused)
 
   if ((ret = xd3_encode_init_partial (stream))) { return ret; }
 
-  addrs = xd3_alloc (stream, sizeof (usize_t), ADDR_CACHE_ROUNDS);
-  modes = xd3_alloc (stream, sizeof (uint8_t), ADDR_CACHE_ROUNDS);
+  addrs = (usize_t*) xd3_alloc (stream, sizeof (usize_t), ADDR_CACHE_ROUNDS);
+  modes = (uint8_t*) xd3_alloc (stream, sizeof (uint8_t), ADDR_CACHE_ROUNDS);
 
   memset (mode_counts, 0, sizeof (mode_counts));
   memset (modes, 0, ADDR_CACHE_ROUNDS);
@@ -710,7 +704,7 @@ test_address_cache (xd3_stream *stream, int unused)
 
       p         = (mt_random (&static_mtrand) / (double)USIZE_T_MAX);
       prev_i    = mt_random (&static_mtrand) % offset;
-      nearby    = (mt_random (&static_mtrand) % 256) % offset, 1;
+      nearby    = (mt_random (&static_mtrand) % 256) % offset;
       nearby    = max (1U, nearby);
 
       if (p < 0.1)      { addr = addrs[offset-nearby]; }
@@ -724,7 +718,7 @@ test_address_cache (xd3_stream *stream, int unused)
     }
 
   /* Copy addresses into a contiguous buffer. */
-  big_buf = xd3_alloc (stream, xd3_sizeof_output (ADDR_HEAD (stream)), 1);
+  big_buf = (uint8_t*) xd3_alloc (stream, xd3_sizeof_output (ADDR_HEAD (stream)), 1);
 
   for (offset = 0, outp = ADDR_HEAD (stream); outp != NULL; offset += outp->next, outp = outp->next_page)
     {
@@ -936,7 +930,7 @@ static int
 test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
 {
   int ret;
-  int i;
+  usize_t i;
   uint8_t encoded[4*sizeof (test_text)]; /* make room for alt code table */
   usize_t  encoded_size;
   int non_failures = 0;
@@ -1627,7 +1621,7 @@ test_compressed_stream_overflow (xd3_stream *stream, int ignore)
   int ret;
   uint8_t *buf;
 
-  if ((buf = malloc (TWO_MEGS_AND_DELTA)) == NULL) { return ENOMEM; }
+  if ((buf = (uint8_t*) malloc (TWO_MEGS_AND_DELTA)) == NULL) { return ENOMEM; }
 
   memset (buf, 0, TWO_MEGS_AND_DELTA);
 
@@ -2087,7 +2081,8 @@ test_compressed_pipe (xd3_stream *stream, main_extcomp *ext, char* buf,
 static int
 test_externally_compressed_io (xd3_stream *stream, int ignore)
 {
-  int i, ret;
+  usize_t i;
+  int ret;
   char buf[TESTBUFSIZE];
 
   mt_init (& static_mtrand, 0x9f73f7fc);
@@ -2507,7 +2502,8 @@ static const string_match_test match_tests[] =
 static int
 test_string_matching (xd3_stream *stream, int ignore)
 {
-  int i, ret;
+  usize_t i;
+  int ret;
   xd3_config config;
   char rbuf[TESTBUFSIZE];
 
@@ -2586,7 +2582,8 @@ test_string_matching (xd3_stream *stream, int ignore)
 static int
 test_iopt_flush_instructions (xd3_stream *stream, int ignore)
 {
-  int ret, i, tpos = 0;
+  int ret, i;
+  usize_t tpos = 0;
   usize_t delta_size, recon_size;
   xd3_config config;
   uint8_t target[TESTBUFSIZE];
@@ -2752,17 +2749,6 @@ xd3_selftest (void)
     if (ret != 0) { goto failure; }                                   \
   } while (0)
 
-#define DO_TEST2(fn)                                                  \
-  do {                                                                \
-    DP(RINT "xdelta3: testing " #fn "%s...");                         \
-    if ((ret = test_ ## fn ()) == 0) {				      \
-      DP(RINT " success\n");                                          \
-    } else {                                                          \
-      DP(RINT " failed!\n");                                          \
-    }                                                                 \
-    if (ret != 0) { goto failure; }		                      \
-  } while (0)
-
   int ret;
 
 #ifndef WIN32
@@ -2775,6 +2761,7 @@ xd3_selftest (void)
 #endif
 
   DO_TEST (random_numbers, 0, 0);
+
   DO_TEST (decode_integer_end_of_input, 0, 0);
   DO_TEST (decode_integer_overflow, 0, 0);
   DO_TEST (encode_decode_uint32_t, 0, 0);
@@ -2795,8 +2782,6 @@ xd3_selftest (void)
 
   DO_TEST (iopt_flush_instructions, 0, 0);
   DO_TEST (source_cksum_offset, 0, 0);
-
-  DO_TEST2 (merge_command);
 
   DO_TEST (decompress_single_bit_error, 0, 3);
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);

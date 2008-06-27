@@ -407,12 +407,12 @@ main_config (void)
   DP(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
   DP(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
   DP(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
-  DP(RINT "sizeof(void*)=%d\n", sizeof(void*));
-  DP(RINT "sizeof(int)=%d\n", sizeof(int));
-  DP(RINT "sizeof(uint32_t)=%d\n", sizeof(uint32_t));
-  DP(RINT "sizeof(uint64_t)=%d\n", sizeof(uint64_t));
-  DP(RINT "sizeof(usize_t)=%d\n", sizeof(usize_t));
-  DP(RINT "sizeof(xoff_t)=%d\n", sizeof(xoff_t));
+  DP(RINT "sizeof(void*)=%ld\n", sizeof(void*));
+  DP(RINT "sizeof(int)=%ld\n", sizeof(int));
+  DP(RINT "sizeof(uint32_t)=%ld\n", sizeof(uint32_t));
+  DP(RINT "sizeof(uint64_t)=%ld\n", sizeof(uint64_t));
+  DP(RINT "sizeof(usize_t)=%ld\n", sizeof(usize_t));
+  DP(RINT "sizeof(xoff_t)=%ld\n", sizeof(xoff_t));
 
   return EXIT_SUCCESS;
 }

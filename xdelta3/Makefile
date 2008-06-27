@@ -25,7 +25,6 @@ SOURCES = xdelta3-cfgs.h \
 	  xdelta3-python.h \
 	  xdelta3-second.h \
 	  xdelta3-test.h \
-	  xdelta3-test2.h \
 	  xdelta3.c \
 	  xdelta3.h
 

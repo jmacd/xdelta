@@ -1,5 +1,5 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007, 2008. Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,13 +16,55 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* This file was started because xdelta3-test.h is large enough as-is,
- * and has lots of old cruft.  This is the shiny new test I always wanted. */
+// This file started because I wanted to write a test in C++ rather than C.
 
+extern "C" {
+#define NOT_MAIN 1
+#define REGRESSION_TEST 1
+#include "../xdelta3.c"
+}
+
+namespace {
+
+const int TEST_SEED1 = 0x1970;
+
+class RandomFileSpec {
+ public:
+  RandomFileSpec()
+    : size_(0),
+      seed_(0),
+      filedata_(NULL),
+      filename_(NULL),
+      deltafile_(NULL) {
+    main_file_init(&file_);
+    mt_init(&mt_, TEST_SEED1);
+  }
+  int size_;
+  int seed_;
+  uint8_t *filedata_;
+  char *filename_;
+  char *deltafile_;
+  main_file file_;
+  mtrand mt_;
+};
+
+}  // namespace
+
+int main(int argc, char **argv) {
+  RandomFileSpec spec1;
+
+  return 0;
+}
+
+
+#if 0
 static const int TESTS_PER_PARAMETER = 100;
 
 struct random_file_spec_ {
   int size;
+  int seed;
+  main_file file;
+  uint8_t *tmp_data;
   char *tmp_copy;
   char *tmp_delta;
   mtrand mt;
@@ -39,9 +81,9 @@ typedef struct random_file_spec_ random_file_spec;
 typedef struct random_parameters_ random_parameters;
 
 static const random_parameters test_parameters[] = {
-  { 16384, 4096, 128, 0 },
-  { 16384, 4096, 0, 128 },
-  { 16384, 4096, 128, 128 },
+  { 16384, 4096, 16, 0 },
+  { 16384, 4096, 0, 16 },
+  { 16384, 4096, 16, 16 },
   { 16384, 4096, 128, 128 },
 };
 
@@ -61,6 +103,13 @@ set_random_parameters ()
   current_parameters = test_parameters[0];
 }
 
+void*
+test2_malloc (int size)
+{
+  test2_malloc_count++;
+  return malloc(size);
+}
+
 void 
 test2_free (void *ptr)
 {
@@ -76,12 +125,20 @@ random_file_spec_clear (random_file_spec *spec)
     {
       unlink (spec->tmp_copy);  /* TODO(jmacd): make portable */
       test2_free (spec->tmp_copy);
+      spec->tmp_copy = NULL;
     }
 
   if (spec->tmp_delta)
     {
       unlink (spec->tmp_delta);
       test2_free (spec->tmp_delta);
+      spec->tmp_delta = NULL;
+    }
+
+  if (spec->tmp_data)
+    {
+      test2_free (spec->tmp_data);
+      spec->tmp_data = NULL;
     }
 }
 
@@ -97,18 +154,56 @@ random_file_spec_swap (random_file_spec *a,
 int
 random_file_spec_generate (random_file_spec *spec) 
 {
+  int i;
+  spec->seed = mt_random (&static_mtrand);
+  mt_init (&spec->mt, spec->seed);
+  main_file_init (&spec->file);
+
+  test_setup();
+  spec->tmp_copy = test2_malloc(strlen(TEST_TARGET_FILE) + 1);
+  strcpy (spec->tmp_copy, TEST_TARGET_FILE);
+
+  spec->size = current_parameters.file_size;
+  spec->tmp_data = (uint8_t*)test2_malloc(spec->size);
+
+  for (i = 0; i < spec->size; i++)
+    {
+      spec->tmp_data[i] = mt_random(&spec->mt);
+    }
+
   return 0;
 }
 
 int
 random_file_spec_write (random_file_spec *spec) 
 {
+  int ret;
+  if ((ret = main_file_open (&spec->file, spec->tmp_copy, XO_WRITE)) ||
+      (ret = main_file_write (&spec->file, spec->tmp_data, spec->size,
+			      "write failed")) ||
+      (ret = main_file_close (&spec->file)))
+    {
+      return ret;
+    }
+
   return 0;
 }
 
 int
 random_file_spec_mutate (random_file_spec *from, random_file_spec *to)
 {
+  to->seed = mt_random (&static_mtrand);
+  mt_init (&to->mt, to->seed);
+  main_file_init (&spec->file);
+
+  test_setup();
+  spec->tmp_copy = test2_malloc(strlen(TEST_TARGET_FILE) + 1);
+  strcpy (spec->tmp_copy, TEST_TARGET_FILE);
+
+  spec->size = current_parameters.file_size;
+  spec->tmp_data = (uint8_t*)test2_malloc(spec->size);
+
+
   return 0;
 }
 
@@ -186,3 +281,4 @@ test_merge_command ()
 
   return 0;
 }
+#endif
