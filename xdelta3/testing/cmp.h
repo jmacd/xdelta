@@ -1,6 +1,23 @@
 /* -*- Mode: C++ -*-  */
 namespace regtest {
 
+inline size_t CmpDifferentBlockBytes(const Block &a, const Block &b) {
+  size_t total = 0;
+  size_t i = 0; 
+  size_t m = min(a.Size(), b.Size());
+
+  for (; i < m; i++) {
+    if (a[i] != b[i]) {
+      total++;
+    }
+  }
+
+  total += a.Size() - i;
+  total += b.Size() - i;
+
+  return total;
+}
+
 inline xoff_t CmpDifferentBytes(const FileSpec &a, const FileSpec &b) {
   Block block_a, block_b;
   xoff_t total = 0;
@@ -11,17 +28,7 @@ inline xoff_t CmpDifferentBytes(const FileSpec &a, const FileSpec &b) {
     a_i.Get(&block_a);
     b_i.Get(&block_b);
 
-    size_t i = 0; 
-    size_t m = min(block_a.Size(), block_b.Size());
-
-    for (; i < m; i++) {
-      if (block_a[i] != block_b[i]) {
-	total++;
-      }
-    }
-
-    total += block_a.Size() - i;
-    total += block_b.Size() - i;
+    total += CmpDifferentBlockBytes(block_a, block_b);
   }
 
   for (; !a_i.Done(); a_i.Next()) {

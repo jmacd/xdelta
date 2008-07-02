@@ -4,6 +4,119 @@
 // Declare constants (needed for reference-values, etc).
 const xoff_t Constants::BLOCK_SIZE;
 
+//////////////////////////////////////////////////////////////////////
+
+// TODO: more options!
+void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
+  xd3_stream encode_stream;
+  xd3_config encode_config;
+  xd3_source encode_source;
+
+  xd3_stream decode_stream;
+  xd3_config decode_config;
+  xd3_source decode_source;
+
+  memset(&encode_stream, 0, sizeof (encode_stream));
+  memset(&encode_source, 0, sizeof (encode_source));
+
+  memset(&decode_stream, 0, sizeof (decode_stream));
+  memset(&decode_source, 0, sizeof (decode_source));
+
+  xd3_init_config(&encode_config, XD3_ADLER32);
+  xd3_init_config(&decode_config, XD3_ADLER32);
+
+  CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
+  CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
+
+  BlockIterator source_iterator(source_file);
+  BlockIterator target_iterator(target_file);
+  Block encode_source_block, decode_source_block;
+  Block decoded_block, target_block;
+  bool encoding = true;
+  bool done = false;
+
+  while (!done) {
+    target_iterator.Get(&target_block);
+
+    if (target_block.Size() < target_iterator.BlockSize()) {
+      xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
+    }
+
+    xd3_avail_input(&encode_stream, target_block.Data(), target_block.Size());
+
+  process:
+    int ret;
+    if (encoding) {
+      ret = xd3_encode_input(&encode_stream);
+    } else {
+      ret = xd3_decode_input(&decode_stream);
+    }
+
+    switch (ret) {
+    case XD3_OUTPUT:
+      if (encoding) {
+	xd3_avail_input(&decode_stream, 
+			encode_stream.next_out, 
+			encode_stream.avail_out);
+	xd3_consume_output(&encode_stream);
+	encoding = false;
+      } else {
+	decoded_block.Append(decode_stream.next_out,
+			     decode_stream.avail_out);
+	xd3_consume_output(&decode_stream);
+      }
+      goto process;
+
+    case XD3_GETSRCBLK: {
+      xd3_source *src = (encoding ? &encode_source : &decode_source);
+      Block *block = (encoding ? &encode_source_block : &decode_source_block);
+      
+      source_iterator.SetBlock(src->getblkno);
+      source_iterator.Get(block);
+      src->curblkno = src->getblkno;
+      src->onblk = block->Size();
+      src->curblk = block->Data();
+
+      goto process;
+    }
+
+    case XD3_INPUT:
+      if (!encoding) {
+	encoding = true;
+	goto process;
+      } else {
+	if (target_block.Size() < target_iterator.BlockSize()) {
+	  done = true;
+	}
+	continue;
+      }
+
+    case XD3_WINFINISH:
+      if (encoding) {
+	encoding = false;
+      } else {
+	CHECK_EQ(0, CmpDifferentBlockBytes(decoded_block, target_block));
+	decoded_block.Reset();
+	encoding = true;
+      }
+      goto process;
+
+    case XD3_WINSTART:
+    case XD3_GOTHEADER:
+      goto process;
+
+    default:
+      CHECK_EQ(0, ret);
+      CHECK_EQ(-1, ret);
+    }
+  }
+
+  xd3_close_stream(&encode_stream);
+  xd3_free_stream(&decode_stream);
+}
+
+//////////////////////////////////////////////////////////////////////
+
 void TestRandomNumbers() {
   MTRandom rand;
   int rounds = 1<<20;
@@ -86,11 +199,29 @@ void TestFirstByte() {
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
 }
 
+void TestBasicEncodeDecode() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  spec0.GenerateFixedSize(1024);
+  spec0.ModifyTo<Modify1stByte>(&spec1);
+  InMemoryEncodeDecode(spec0, spec1);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
+  spec0.ModifyTo<Modify1stByte>(&spec1);
+  InMemoryEncodeDecode(spec0, spec1);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
+  spec0.ModifyTo<Modify1stByte>(&spec1);
+  InMemoryEncodeDecode(spec0, spec1);
+}
+
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
   TEST(TestRandomNumbers);
   TEST(TestRandomFile);
   TEST(TestFirstByte);
+  TEST(TestBasicEncodeDecode);
   return 0;
 }
 

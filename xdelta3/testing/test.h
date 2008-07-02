@@ -51,6 +51,8 @@ using regtest::MTRandom;
 
 #include "file.h"
 using regtest::FileSpec;
+using regtest::Block;
+using regtest::BlockIterator;
 
 #include "modify.h"
 using regtest::Modify1stByte;
