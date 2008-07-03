@@ -3801,6 +3801,7 @@ xd3_encode_input (xd3_stream *stream)
 	      else
 		{
 		  stream->match_state = MATCH_SEARCHING;
+		  stream->match_fwd = 0;
 		}
 	      XD3_ASSERT (stream->match_fwd == 0);
 

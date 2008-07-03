@@ -59,3 +59,7 @@ using regtest::Modify1stByte;
 
 #include "cmp.h"
 using regtest::CmpDifferentBytes;
+
+#include "sizes.h"
+using regtest::SizeIterator;
+using regtest::SmallSizes;

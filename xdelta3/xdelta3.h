@@ -1207,7 +1207,7 @@ void    xd3_avail_input  (xd3_stream    *stream,
    * xd3_avail_input it will return XD3_INPUT right away without
    * allocating a stream->winsize buffer.  This is to avoid an
    * unwanted allocation. */
-  XD3_ASSERT (idata != NULL);
+  XD3_ASSERT (idata != NULL || isize == 0);
 
   stream->next_in  = idata;
   stream->avail_in = isize;

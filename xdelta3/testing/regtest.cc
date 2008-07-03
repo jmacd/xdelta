@@ -68,8 +68,8 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
       ret = xd3_decode_input(&decode_stream);
     }
 
-    DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
-       xd3_strerror(ret));
+    //DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+    //   xd3_strerror(ret));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -117,7 +117,7 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
 	encoding = false;
       } else {
 	CHECK_EQ(0, CmpDifferentBlockBytes(decoded_block, target_block));
-	DP(RINT "verified block %"Q"u\n", target_iterator.Blkno());
+	//DP(RINT "verified block %"Q"u\n", target_iterator.Blkno());
 	decoded_block.Reset();
 	encoding = true;
       }
@@ -236,23 +236,18 @@ void TestFirstByte() {
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE + 1);
   spec0.ModifyTo<Modify1stByte>(&spec1);
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
-}
 
-void TestBasicEncodeDecode() {
-  MTRandom rand;
-  FileSpec spec0(&rand);
-  FileSpec spec1(&rand);
-  spec0.GenerateFixedSize(1024);
-  spec0.ModifyTo<Modify1stByte>(&spec1);
-  InMemoryEncodeDecode(spec0, spec1);
+  SizeIterator<size_t, SmallSizes> si(&rand, 20);
 
-  spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
-  spec0.ModifyTo<Modify1stByte>(&spec1);
-  InMemoryEncodeDecode(spec0, spec1);
-
-  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
-  spec0.ModifyTo<Modify1stByte>(&spec1);
-  InMemoryEncodeDecode(spec0, spec1);
+  for (; !si.Done(); si.Next()) {
+    size_t size = si.Get();
+    if (size == 0) {
+      continue;
+    }
+    spec0.GenerateFixedSize(size);
+    spec0.ModifyTo<Modify1stByte>(&spec1);
+    InMemoryEncodeDecode(spec0, spec1);
+  }
 }
 
 int main(int argc, char **argv) {
@@ -260,7 +255,6 @@ int main(int argc, char **argv) {
   TEST(TestRandomNumbers);
   TEST(TestRandomFile);
   TEST(TestFirstByte);
-  TEST(TestBasicEncodeDecode);
   return 0;
 }
 

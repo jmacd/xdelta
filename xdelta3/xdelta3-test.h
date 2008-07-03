@@ -31,7 +31,7 @@
 
 struct mtrand_ {
   int mt_index;
-  usize_t mt_buffer[MT_LEN];
+  uint32_t mt_buffer[MT_LEN];
 };
 
 typedef struct mtrand_ mtrand;
@@ -46,13 +46,13 @@ static void mt_init (mtrand *mt, int seed) {
   mt->mt_index = 0;
 }
 
-static usize_t mt_random (mtrand *mt) {
-  usize_t * b = mt->mt_buffer;
+static uint32_t mt_random (mtrand *mt) {
+  uint32_t * b = mt->mt_buffer;
   int idx = mt->mt_index;
-  usize_t s;
+  uint32_t s;
   int i;
 	
-  if (idx == MT_LEN*sizeof(usize_t))
+  if (idx == MT_LEN*sizeof(uint32_t))
     {
       idx = 0;
       i = 0;
@@ -68,13 +68,24 @@ static usize_t mt_random (mtrand *mt) {
       s = TWIST(b, MT_LEN-1, 0);
       b[MT_LEN-1] = b[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
     }
-  mt->mt_index = idx + sizeof(usize_t);
-  return *(usize_t *)((unsigned char *)b + idx);
+  mt->mt_index = idx + sizeof(uint32_t);
+  return *(uint32_t *)((unsigned char *)b + idx);
 }
 
 static mtrand static_mtrand;
 
 #include <math.h>
+
+static uint32_t
+mt_exp_rand (uint32_t mean, uint32_t max_value)
+{
+  double mean_d = mean;
+  double erand  = log (1.0 / (mt_random (&static_mtrand) / 
+			      (double)UINT32_MAX));
+  uint32_t x = (uint32_t) (mean_d * erand + 0.5);
+
+  return min (x, max_value);
+}
 
 #ifndef WIN32
 #include <sys/wait.h>
@@ -102,8 +113,6 @@ static char   TEST_RECON_FILE[TESTFILESIZE];
 static char   TEST_RECON2_FILE[TESTFILESIZE];
 static char   TEST_COPY_FILE[TESTFILESIZE];
 static char   TEST_NOPERM_FILE[TESTFILESIZE];
-
-static int test_exponential_dist (usize_t mean, usize_t max);
 
 #define CHECK(cond) if (!(cond)) { DP(RINT "check failure: " #cond); abort(); }
 
@@ -149,17 +158,6 @@ static int do_fail (xd3_stream *stream, const char *buf)
   return 0;
 }
 
-static int
-test_exponential_dist (usize_t mean, usize_t max_value)
-{
-  double mean_d = mean;
-  double erand  = log (1.0 / (mt_random (&static_mtrand) / 
-			      (double)USIZE_T_MAX));
-  usize_t x = (usize_t) (mean_d * erand + 0.5);
-
-  return min (x, max_value);
-}
-
 /* Test that the exponential distribution actually produces its mean. */
 static int
 test_random_numbers (xd3_stream *stream, int ignore)
@@ -175,7 +173,7 @@ test_random_numbers (xd3_stream *stream, int ignore)
 
   for (i = 0; i < n_rounds; i += 1)
     {
-      sum += test_exponential_dist (mean, USIZE_T_MAX);
+      sum += mt_exp_rand (mean, USIZE_T_MAX);
     }
 
   average = (double) sum / (double) n_rounds;
@@ -272,7 +270,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
   for (i = 0; i < ts; )
     {
       size_t left = ts - i;
-      size_t next = test_exponential_dist (TEST_ADD_MEAN, TEST_ADD_MAX);
+      size_t next = mt_exp_rand (TEST_ADD_MEAN, TEST_ADD_MAX);
       size_t add_left = sadd_max - sadd;
       double add_prob = (left == 0) ? 0 : (add_left / (double) left);
       int do_copy;
@@ -1120,7 +1118,7 @@ sec_dist_func4 (xd3_stream *stream, xd3_output *data)
   int i, ret, x;
   for (i = 0; i < ALPHABET_SIZE*20; i += 1)
     {
-      x = test_exponential_dist (10, ALPHABET_SIZE/2);
+      x = mt_exp_rand (10, ALPHABET_SIZE/2);
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
     }
   return 0;
@@ -1133,7 +1131,7 @@ sec_dist_func5 (xd3_stream *stream, xd3_output *data)
   int i, ret, x;
   for (i = 0; i < ALPHABET_SIZE*20; i += 1)
     {
-      x = test_exponential_dist (10, ALPHABET_SIZE-1);
+      x = mt_exp_rand (10, ALPHABET_SIZE-1);
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
     }
   return 0;
