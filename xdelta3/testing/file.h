@@ -158,6 +158,10 @@ public:
     blkno_++;
   }
 
+  xoff_t Blkno() const {
+    return blkno_;
+  }
+
   void SetBlock(xoff_t blkno) {
     blkno_ = blkno;
   }
@@ -165,11 +169,19 @@ public:
   void Get(Block *block) const;
 
   size_t BytesOnBlock() const {
-    // Blocks() is unsigned, don't subtract
-    if (blkno_ + 1 < spec_.Blocks(blksize_)) {
-      return blksize_;
+    xoff_t blocks = spec_.Blocks(blksize_);
+    xoff_t size = spec_.Size();
+
+    CHECK((blkno_ < blocks) ||
+	  (blkno_ == blocks && size % blksize_ == 0));
+
+    if (blkno_ == blocks) {
+      return 0;
     }
-    return spec_.Size() % blksize_;
+    if (blkno_ + 1 == blocks) {
+      return ((size - 1) % blksize_) + 1;
+    }
+    return blksize_;
   }
 
   size_t BlockSize() const {

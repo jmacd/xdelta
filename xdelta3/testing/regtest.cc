@@ -25,8 +25,21 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
   xd3_init_config(&encode_config, XD3_ADLER32);
   xd3_init_config(&decode_config, XD3_ADLER32);
 
+  encode_config.winsize = Constants::BLOCK_SIZE;
+
   CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
   CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
+
+  encode_source.size = source_file.Size();
+  encode_source.blksize = Constants::BLOCK_SIZE;
+  encode_source.curblkno = -1;
+
+  decode_source.size = source_file.Size();
+  decode_source.blksize = Constants::BLOCK_SIZE;
+  decode_source.curblkno = -1;
+
+  xd3_set_source (&encode_stream, &encode_source);
+  xd3_set_source (&decode_stream, &decode_source);
 
   BlockIterator source_iterator(source_file);
   BlockIterator target_iterator(target_file);
@@ -34,6 +47,9 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
   Block decoded_block, target_block;
   bool encoding = true;
   bool done = false;
+
+  DP(RINT "source %"Q"u target %"Q"u\n",
+     source_file.Size(), target_file.Size());
 
   while (!done) {
     target_iterator.Get(&target_block);
@@ -51,6 +67,9 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
     } else {
       ret = xd3_decode_input(&decode_stream);
     }
+
+    DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+       xd3_strerror(ret));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -87,6 +106,8 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
       } else {
 	if (target_block.Size() < target_iterator.BlockSize()) {
 	  done = true;
+	} else {
+	  target_iterator.Next();
 	}
 	continue;
       }
@@ -96,6 +117,7 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
 	encoding = false;
       } else {
 	CHECK_EQ(0, CmpDifferentBlockBytes(decoded_block, target_block));
+	DP(RINT "verified block %"Q"u\n", target_iterator.Blkno());
 	decoded_block.Reset();
 	encoding = true;
       }
@@ -152,31 +174,48 @@ void TestRandomNumbers() {
 void TestRandomFile() {
   MTRandom rand1;
   FileSpec spec1(&rand1);
+  BlockIterator bi(spec1);
 
   spec1.GenerateFixedSize(0);
   CHECK_EQ(0, spec1.Size());
   CHECK_EQ(0, spec1.Segments());
   CHECK_EQ(0, spec1.Blocks());
+  bi.SetBlock(0);
+  CHECK_EQ(0, bi.BytesOnBlock());
 
   spec1.GenerateFixedSize(1);
   CHECK_EQ(1, spec1.Size());
   CHECK_EQ(1, spec1.Segments());
   CHECK_EQ(1, spec1.Blocks());
+  bi.SetBlock(0);
+  CHECK_EQ(1, bi.BytesOnBlock());
 
   spec1.GenerateFixedSize(Constants::BLOCK_SIZE);
   CHECK_EQ(Constants::BLOCK_SIZE, spec1.Size());
   CHECK_EQ(1, spec1.Segments());
   CHECK_EQ(1, spec1.Blocks());
+  bi.SetBlock(0);
+  CHECK_EQ(Constants::BLOCK_SIZE, bi.BytesOnBlock());
+  bi.SetBlock(1);
+  CHECK_EQ(0, bi.BytesOnBlock());
 
   spec1.GenerateFixedSize(Constants::BLOCK_SIZE + 1);
   CHECK_EQ(Constants::BLOCK_SIZE + 1, spec1.Size());
   CHECK_EQ(2, spec1.Segments());
   CHECK_EQ(2, spec1.Blocks());
+  bi.SetBlock(0);
+  CHECK_EQ(Constants::BLOCK_SIZE, bi.BytesOnBlock());
+  bi.SetBlock(1);
+  CHECK_EQ(1, bi.BytesOnBlock());
 
   spec1.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
   CHECK_EQ(Constants::BLOCK_SIZE * 2, spec1.Size());
   CHECK_EQ(2, spec1.Segments());
   CHECK_EQ(2, spec1.Blocks());
+  bi.SetBlock(0);
+  CHECK_EQ(Constants::BLOCK_SIZE, bi.BytesOnBlock());
+  bi.SetBlock(1);
+  CHECK_EQ(Constants::BLOCK_SIZE, bi.BytesOnBlock());
 }
 
 void TestFirstByte() {
