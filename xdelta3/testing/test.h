@@ -1,4 +1,4 @@
-/* -*- Mode: C++ -*-  */
+// -*- Mode: C++ -*-
 
 extern "C" {
 #define NOT_MAIN 1
@@ -7,6 +7,7 @@ extern "C" {
 }
 
 #define CHECK_EQ(x,y) CHECK_OP(x,y,==)
+#define CHECK_NE(x,y) CHECK_OP(x,y,!=)
 #define CHECK_LT(x,y) CHECK_OP(x,y,<)
 #define CHECK_GT(x,y) CHECK_OP(x,y,>)
 #define CHECK_LE(x,y) CHECK_OP(x,y,<=)
@@ -26,6 +27,9 @@ do {if (!((x) OP (y))) {			       \
   abort(); \
     } } while (false)
 
+//#define VLOG(n) if ((n) >= debug_level) cerr
+//static int debug_level;
+
 #include <iostream>
 using std::cerr;
 using std::endl;
@@ -34,6 +38,9 @@ using std::endl;
 using std::map;
 using std::pair;
 
+#include <list>
+using std::list;
+
 template <typename T, typename U>
 pair<T, U> make_pair(const T& t, const U& u) {
   return pair<T, U>(t, u);
@@ -41,21 +48,27 @@ pair<T, U> make_pair(const T& t, const U& u) {
 
 class Constants {
 public:
-  static const xoff_t BLOCK_SIZE = 1 << 14;
+  static const xoff_t BLOCK_SIZE = 1 << 15;
 };
 
 using std::min;
 
+#include "segment.h"
+
 #include "random.h"
 using regtest::MTRandom;
+
+#include "modify.h"
+using regtest::Mutator;
+using regtest::ChangeList;
+using regtest::Change;
+using regtest::ChangeListMutator;
+using regtest::Modify1stByte;
 
 #include "file.h"
 using regtest::FileSpec;
 using regtest::Block;
 using regtest::BlockIterator;
-
-#include "modify.h"
-using regtest::Modify1stByte;
 
 #include "cmp.h"
 using regtest::CmpDifferentBytes;

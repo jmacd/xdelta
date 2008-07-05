@@ -1,21 +1,6 @@
 /* -*- Mode: C++ -*-  */
 namespace regtest {
 
-class Segment {
- public:
-  Segment(uint32_t seed, size_t length)
-    : seed(seed),
-      length(length),
-      seed_offset(0) { }
-
-  uint32_t seed;  // Seed used for generating byte sequence
-  size_t length;  // Length of this segment
-  size_t seed_offset;  // Seed positions the sequence this many bytes
-                       // before its beginning.
-};
-
-typedef map<xoff_t, Segment> SegmentMap;
-
 class Block;
 class BlockIterator;
 
@@ -64,14 +49,23 @@ class FileSpec {
   }
 
   // Create a mutation according to "what".
-  template <typename T>
-  void ModifyTo(FileSpec *modify) const {
-    modify->table_ = table_;
-    T::Mutate(&modify->table_, rand_);
+  void ModifyTo(const Mutator &mutator,
+		FileSpec *modify) const {
+    modify->Reset();
+    mutator.Mutate(&modify->table_, &table_, rand_);
   }
 
   void Reset() {
     table_.clear();
+  }
+
+  void Print() const {
+    for (SegmentMap::const_iterator iter(table_.begin());
+	 iter != table_.end();
+	 ++iter) {
+      cerr << "Segment at " << iter->first << " (" << iter->second.seed
+	   << "," << iter->second.length << "," << iter->second.seed_offset << ")" << endl;
+    }
   }
 
   typedef BlockIterator iterator;

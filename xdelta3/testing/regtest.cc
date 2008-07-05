@@ -4,8 +4,6 @@
 // Declare constants (needed for reference-values, etc).
 const xoff_t Constants::BLOCK_SIZE;
 
-//////////////////////////////////////////////////////////////////////
-
 // TODO: more options!
 void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
   xd3_stream encode_stream;
@@ -230,11 +228,11 @@ void TestFirstByte() {
   CHECK_EQ(1, CmpDifferentBytes(spec1, spec0));
 
   spec0.GenerateFixedSize(1);
-  spec0.ModifyTo<Modify1stByte>(&spec1);
+  spec0.ModifyTo(Modify1stByte(), &spec1);
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE + 1);
-  spec0.ModifyTo<Modify1stByte>(&spec1);
+  spec0.ModifyTo(Modify1stByte(), &spec1);
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
 
   SizeIterator<size_t, SmallSizes> si(&rand, 20);
@@ -245,9 +243,26 @@ void TestFirstByte() {
       continue;
     }
     spec0.GenerateFixedSize(size);
-    spec0.ModifyTo<Modify1stByte>(&spec1);
+    spec0.ModifyTo(Modify1stByte(), &spec1);
     InMemoryEncodeDecode(spec0, spec1);
   }
+}
+
+void TestModifyMutator() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
+
+  ChangeList cl1;
+  cl1.push_back(Change(Change::MODIFY, Constants::BLOCK_SIZE, 0));
+  spec0.Print();
+  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+  spec1.Print();
+  CHECK_EQ(Constants::BLOCK_SIZE, CmpDifferentBytes(spec0, spec1));
+  InMemoryEncodeDecode(spec0, spec1);
+
 }
 
 int main(int argc, char **argv) {
@@ -255,6 +270,7 @@ int main(int argc, char **argv) {
   TEST(TestRandomNumbers);
   TEST(TestRandomFile);
   TEST(TestFirstByte);
+  TEST(TestModifyMutator);
   return 0;
 }
 
