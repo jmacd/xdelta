@@ -713,10 +713,14 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
 
 #elif XD3_WIN32
 #define XFNO(f) -1
-#define XSTDOUT_XF(f) \
-  { (f)->file = winStartupInfo.hStdOutput; (f)->filename = "(stdout)"; }
-#define XSTDIN_XF(f)  \
-  { (f)->file = winStartupInfo.hStdInput;  (f)->filename = "(stdin)"; }
+#define XSTDOUT_XF(f) { \
+  (f)->file = GetStdHandle(STD_OUTPUT_HANDLE); \
+  (f)->filename = "(stdout)"; \
+  }
+#define XSTDIN_XF(f) { \
+  (f)->file = GetStdHandle(STD_INPUT_HANDLE); \
+  (f)->filename = "(stdin)"; \
+  }
 #endif
 
 static void
