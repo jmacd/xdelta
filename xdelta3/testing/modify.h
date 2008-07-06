@@ -111,7 +111,7 @@ void ChangeListMutator::Mutate(const Change &ch,
 			       MTRandom *rand) {
   switch (ch.kind) {
   case Change::ADD:
-    //AddChange(ch, table, source_table, rand);
+    AddChange(ch, table, source_table, rand);
     break;
   case Change::MODIFY:
     ModifyChange(ch, table, source_table, rand);
@@ -164,6 +164,45 @@ void ChangeListMutator::ModifyChange(const Change &ch,
   }
 }
 
+void ChangeListMutator::AddChange(const Change &ch, 
+				  SegmentMap *table,
+				  const SegmentMap *source_table,
+				  MTRandom *rand) {
+  xoff_t m_start = ch.addr1;
+
+  for (SegmentMap::const_iterator iter(source_table->begin()); 
+       iter != source_table->end();
+       ++iter) {
+    const Segment &seg = iter->second;
+    xoff_t i_start = iter->first;
+    xoff_t i_end = i_start + seg.length;
+
+    if (i_end <= m_start) {
+      table->insert(table->end(), make_pair(i_start, seg));
+      continue;
+    }
+
+    if (i_start > m_start) {
+      table->insert(table->end(), make_pair(i_start + ch.size, seg));
+      continue;
+    }
+
+    if (i_start < m_start) {
+      Segment before(seg.seed, m_start - i_start, seg.seed_offset);
+      table->insert(table->end(), make_pair(i_start, before));
+    }
+
+    Segment addseg(rand->Rand32(), ch.size);
+    table->insert(table->end(), make_pair(m_start, addseg));
+
+    if (m_start < i_end) {
+      Segment after(seg.seed, i_end - m_start, 
+		    seg.seed_offset + (m_start - i_start));
+      table->insert(table->end(), make_pair(m_start + ch.size, after));
+    }
+  }
+}
+
 class Modify1stByte : public Mutator {
 public:
   void Mutate(SegmentMap *table, 
@@ -172,9 +211,6 @@ public:
     ChangeListMutator::Mutate(Change(Change::MODIFY, 1, 0),
 			      table, source_table, rand);
   }
-
-private:
-  ChangeListMutator clm_;
 };
 
 }  // namespace regtest

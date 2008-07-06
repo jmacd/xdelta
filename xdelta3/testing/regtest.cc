@@ -268,14 +268,42 @@ void TestModifyMutator() {
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
     cl1.push_back(Change(Change::MODIFY, test_cases[i].size, test_cases[i].addr));
-    spec0.Print();
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
-    spec1.Print();
     
     size_t diff = CmpDifferentBytes(spec0, spec1);
     CHECK_LE(diff, test_cases[i].size);
     CHECK_GE(diff, test_cases[i].size - (2 * test_cases[i].size / 256));
 
+    InMemoryEncodeDecode(spec0, spec1);
+  }
+}
+
+void TestAddMutator() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
+
+  struct {
+    size_t size;
+    size_t addr;
+  } test_cases[] = {
+    { 1, 0 },
+    { 1, 1 },
+    { 1, Constants::BLOCK_SIZE - 1 },
+    { 1, Constants::BLOCK_SIZE },
+    { 1, Constants::BLOCK_SIZE + 1},
+    { 1, 2 * Constants::BLOCK_SIZE },
+  };
+
+  for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
+    ChangeList cl1;
+    cl1.push_back(Change(Change::ADD, test_cases[i].size, test_cases[i].addr));
+    spec0.Print();
+    spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+    spec1.Print();
+    
     InMemoryEncodeDecode(spec0, spec1);
   }
 }
@@ -286,6 +314,7 @@ int main(int argc, char **argv) {
   TEST(TestRandomFile);
   TEST(TestFirstByte);
   TEST(TestModifyMutator);
+  TEST(TestAddMutator);
   return 0;
 }
 
