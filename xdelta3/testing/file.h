@@ -211,8 +211,8 @@ inline void BlockIterator::Get(Block *block) const {
       gen.Rand32();
     }
     
-    for (size_t i = seg_offset; i < pos->second.length; i++) {
-      CHECK_LT(got, blksize_);
+    for (size_t i = seg_offset; 
+	 i < pos->second.length && got < blksize_; i++) {
       block->data_[got++] = gen.Rand32();
     }
 

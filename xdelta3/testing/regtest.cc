@@ -255,14 +255,29 @@ void TestModifyMutator() {
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
-  ChangeList cl1;
-  cl1.push_back(Change(Change::MODIFY, Constants::BLOCK_SIZE, 0));
-  spec0.Print();
-  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
-  spec1.Print();
-  CHECK_EQ(Constants::BLOCK_SIZE, CmpDifferentBytes(spec0, spec1));
-  InMemoryEncodeDecode(spec0, spec1);
+  struct {
+    size_t size;
+    size_t addr;
+  } test_cases[] = {
+    { Constants::BLOCK_SIZE, 0 },
+    { Constants::BLOCK_SIZE / 2, 1 },
+    { Constants::BLOCK_SIZE, 1 },
+    { Constants::BLOCK_SIZE * 2, 1 },
+  };
 
+  for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
+    ChangeList cl1;
+    cl1.push_back(Change(Change::MODIFY, test_cases[i].size, test_cases[i].addr));
+    spec0.Print();
+    spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+    spec1.Print();
+    
+    size_t diff = CmpDifferentBytes(spec0, spec1);
+    CHECK_LE(diff, test_cases[i].size);
+    CHECK_GE(diff, test_cases[i].size - (2 * test_cases[i].size / 256));
+
+    InMemoryEncodeDecode(spec0, spec1);
+  }
 }
 
 int main(int argc, char **argv) {

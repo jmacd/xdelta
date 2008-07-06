@@ -15,15 +15,15 @@ extern "C" {
 
 #define CHECK_OP(x,y,OP) \
 do {if (!((x) OP (y))) {			       \
-  cerr << "Check failed: " << #x " " #OP " " #y << endl; \
-  cerr << "Expected: " << x << endl; \
-  cerr << "Actual: " << y << endl; \
+  cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x " " #OP " " #y << endl; \
+  cerr << __FILE__ << ":" << __LINE__ << " Expected: " << x << endl; \
+  cerr << __FILE__ << ":" << __LINE__ << " Actual: " << y << endl; \
   abort(); \
     } } while (false)
 
 #define CHECK(x) \
   do {if (!(x)) {				       \
-  cerr << "Check failed: " << #x << endl; \
+  cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x << endl; \
   abort(); \
     } } while (false)
 
