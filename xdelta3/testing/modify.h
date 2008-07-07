@@ -117,7 +117,7 @@ void ChangeListMutator::Mutate(const Change &ch,
     ModifyChange(ch, table, source_table, rand);
     break;
   case Change::DELETE:
-    //DeleteChange(ch, table, source_table, rand);
+    DeleteChange(ch, table, source_table, rand);
     break;
   case Change::MOVE:
     //MoveChange(ch, table, source_table, rand);
@@ -131,13 +131,15 @@ void ChangeListMutator::ModifyChange(const Change &ch,
 				     MTRandom *rand) {
   xoff_t m_start = ch.addr1;
   xoff_t m_end = m_start + ch.size;
+  xoff_t i_start = 0;
+  xoff_t i_end = 0;
 
   for (SegmentMap::const_iterator iter(source_table->begin()); 
        iter != source_table->end();
        ++iter) {
     const Segment &seg = iter->second;
-    xoff_t i_start = iter->first;
-    xoff_t i_end = i_start + seg.length;
+    i_start = iter->first;
+    i_end = i_start + seg.length;
 
     if (i_end <= m_start || i_start >= m_end) {
       table->insert(table->end(), make_pair(i_start, seg));
@@ -162,6 +164,8 @@ void ChangeListMutator::ModifyChange(const Change &ch,
       table->insert(table->end(), make_pair(m_end, after));
     }
   }
+
+  CHECK_LE(m_end, i_end);
 }
 
 void ChangeListMutator::AddChange(const Change &ch, 
@@ -169,13 +173,15 @@ void ChangeListMutator::AddChange(const Change &ch,
 				  const SegmentMap *source_table,
 				  MTRandom *rand) {
   xoff_t m_start = ch.addr1;
+  xoff_t i_start = 0;
+  xoff_t i_end = 0;
 
   for (SegmentMap::const_iterator iter(source_table->begin()); 
        iter != source_table->end();
        ++iter) {
     const Segment &seg = iter->second;
-    xoff_t i_start = iter->first;
-    xoff_t i_end = i_start + seg.length;
+    i_start = iter->first;
+    i_end = i_start + seg.length;
 
     if (i_end <= m_start) {
       table->insert(table->end(), make_pair(i_start, seg));
@@ -201,6 +207,55 @@ void ChangeListMutator::AddChange(const Change &ch,
       table->insert(table->end(), make_pair(m_start + ch.size, after));
     }
   }
+
+  CHECK_LE(m_start, i_end);
+
+  // Special case for add at end-of-input.
+  if (m_start == i_end) {
+    Segment addseg(rand->Rand32(), ch.size);
+    table->insert(table->end(), make_pair(m_start, addseg));
+  }
+}
+
+void ChangeListMutator::DeleteChange(const Change &ch, 
+				     SegmentMap *table,
+				     const SegmentMap *source_table,
+				     MTRandom *rand) {
+  xoff_t m_start = ch.addr1;
+  xoff_t m_end = m_start + ch.size;
+  xoff_t i_start = 0;
+  xoff_t i_end = 0;
+
+  for (SegmentMap::const_iterator iter(source_table->begin()); 
+       iter != source_table->end();
+       ++iter) {
+    const Segment &seg = iter->second;
+    i_start = iter->first;
+    i_end = i_start + seg.length;
+
+    if (i_end <= m_start) {
+      table->insert(table->end(), make_pair(i_start, seg));
+      continue;
+    }
+
+    if (i_start >= m_end) {
+      table->insert(table->end(), make_pair(i_start - ch.size, seg));
+      continue;
+    }
+
+    if (i_start < m_start) {
+      Segment before(seg.seed, m_start - i_start, seg.seed_offset);
+      table->insert(table->end(), make_pair(i_start, before));
+    }
+
+    if (i_end > m_end) {
+      Segment after(seg.seed, i_end - m_end, seg.seed_offset + (m_end - i_start));
+      table->insert(table->end(), make_pair(m_end - ch.size, after));
+    }
+  }
+
+  CHECK_LT(m_start, i_end);
+  CHECK_LE(m_end, i_end);
 }
 
 class Modify1stByte : public Mutator {

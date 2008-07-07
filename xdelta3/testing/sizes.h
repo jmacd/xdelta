@@ -19,7 +19,7 @@ class SizeIterator {
   }
 
   bool Done() {
-    return count_ >= howmany_;
+    return count_ >= fixed_size_ && count_ >= howmany_;
   }
 
   void Next() {
@@ -41,13 +41,13 @@ public:
 };
 
 size_t SmallSizes::sizes[] = {
-  0, 1, 1024, 3333, 
-  Constants::BLOCK_SIZE - 3333,
+  0, 1, Constants::BLOCK_SIZE / 4, 3333, 
+  Constants::BLOCK_SIZE - (Constants::BLOCK_SIZE / 3),
   Constants::BLOCK_SIZE,
-  Constants::BLOCK_SIZE + 3333,
-  2 * Constants::BLOCK_SIZE - 3333,
+  Constants::BLOCK_SIZE + (Constants::BLOCK_SIZE / 3),
+  2 * Constants::BLOCK_SIZE - (Constants::BLOCK_SIZE / 3),
   2 * Constants::BLOCK_SIZE,
-  2 * Constants::BLOCK_SIZE + 3333,
+  2 * Constants::BLOCK_SIZE + (Constants::BLOCK_SIZE / 3),
 };
 
 size_t SmallSizes::max_value = Constants::BLOCK_SIZE * 3;

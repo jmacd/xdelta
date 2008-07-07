@@ -122,4 +122,20 @@ class MTRandom {
   uint32_t mt_buffer_[MT_LEN];
 };
 
+class MTRandom8 {
+public:
+  MTRandom8(MTRandom *rand)
+    : rand_(rand) {
+  }
+
+  uint8_t Rand8() {
+    uint32_t r = rand_->Rand32();
+
+    return (r & 0xff) ^ (r >> 8) ^ (r >> 16) ^ (r >> 24);
+  }
+
+private:
+  MTRandom *rand_;
+};
+
 }  // namespace regtest

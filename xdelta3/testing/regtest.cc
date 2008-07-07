@@ -5,7 +5,9 @@
 const xoff_t Constants::BLOCK_SIZE;
 
 // TODO: more options!
-void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
+void InMemoryEncodeDecode(FileSpec &source_file, 
+			  FileSpec &target_file, 
+			  Block *coded_data) {
   xd3_stream encode_stream;
   xd3_config encode_config;
   xd3_source encode_source;
@@ -72,6 +74,12 @@ void InMemoryEncodeDecode(FileSpec &source_file, FileSpec &target_file) {
     switch (ret) {
     case XD3_OUTPUT:
       if (encoding) {
+	if (coded_data != NULL) {
+	  // Optional encoded-output to the caller
+	  coded_data->Append(encode_stream.next_out, 
+			     encode_stream.avail_out);
+	}
+	// Feed this data to the decoder.
 	xd3_avail_input(&decode_stream, 
 			encode_stream.next_out, 
 			encode_stream.avail_out);
@@ -235,7 +243,7 @@ void TestFirstByte() {
   spec0.ModifyTo(Modify1stByte(), &spec1);
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
 
-  SizeIterator<size_t, SmallSizes> si(&rand, 20);
+  SizeIterator<size_t, SmallSizes> si(&rand, 0);
 
   for (; !si.Done(); si.Next()) {
     size_t size = si.Get();
@@ -244,7 +252,7 @@ void TestFirstByte() {
     }
     spec0.GenerateFixedSize(size);
     spec0.ModifyTo(Modify1stByte(), &spec1);
-    InMemoryEncodeDecode(spec0, spec1);
+    InMemoryEncodeDecode(spec0, spec1, NULL);
   }
 }
 
@@ -269,12 +277,17 @@ void TestModifyMutator() {
     ChangeList cl1;
     cl1.push_back(Change(Change::MODIFY, test_cases[i].size, test_cases[i].addr));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+    CHECK_EQ(spec0.Size(), spec1.Size());
     
     size_t diff = CmpDifferentBytes(spec0, spec1);
     CHECK_LE(diff, test_cases[i].size);
+
+    // There is a 1/256 probability of the changed byte matching the
+    // original value.  The following allows double the probability to
+    // pass.
     CHECK_GE(diff, test_cases[i].size - (2 * test_cases[i].size / 256));
 
-    InMemoryEncodeDecode(spec0, spec1);
+    InMemoryEncodeDecode(spec0, spec1, NULL);
   }
 }
 
@@ -288,23 +301,65 @@ void TestAddMutator() {
   struct {
     size_t size;
     size_t addr;
+    size_t expected_adds;
   } test_cases[] = {
-    { 1, 0 },
-    { 1, 1 },
-    { 1, Constants::BLOCK_SIZE - 1 },
-    { 1, Constants::BLOCK_SIZE },
-    { 1, Constants::BLOCK_SIZE + 1},
-    { 1, 2 * Constants::BLOCK_SIZE },
+    { 1, 0,                         2 /* 1st byte, last byte (short block) */ },
+    { 1, 1,                         3 /* 1st 2 bytes, last byte */ },
+    { 1, Constants::BLOCK_SIZE - 1, 2 /* changed, last */ },
+    { 1, Constants::BLOCK_SIZE,     2 /* changed, last */ },
+    { 1, Constants::BLOCK_SIZE + 1, 3 /* changed + 1st of 2nd block, last */ },
+    { 1, 2 * Constants::BLOCK_SIZE, 1 /* last byte */ },
   };
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
     cl1.push_back(Change(Change::ADD, test_cases[i].size, test_cases[i].addr));
+    spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+    CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
+
+    Block coded;
+    InMemoryEncodeDecode(spec0, spec1, &coded);
+
+    Delta delta(coded);
+    CHECK_EQ(test_cases[i].expected_adds,
+	     delta.AddedBytes());
+  }
+}
+
+void TestDeleteMutator() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
+
+  struct {
+    size_t size;
+    size_t addr;
+  } test_cases[] = {
+    { Constants::BLOCK_SIZE, 0 },
+    { Constants::BLOCK_SIZE / 2, Constants::BLOCK_SIZE / 2 },
+    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE / 2 },
+    { Constants::BLOCK_SIZE * 2, Constants::BLOCK_SIZE / 2 },
+    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE * 2 },
+  };
+
+  for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
+    ChangeList cl1;
+    cl1.push_back(Change(Change::DELETE, test_cases[i].size, test_cases[i].addr));
     spec0.Print();
+    spec0.PrintData();
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     spec1.Print();
-    
-    InMemoryEncodeDecode(spec0, spec1);
+    spec1.PrintData();
+    CHECK_EQ(spec0.Size() - test_cases[i].size, spec1.Size());
+
+    Block coded;
+    InMemoryEncodeDecode(spec0, spec1, &coded);
+
+    Delta delta(coded);
+    delta.Print();
+    CHECK_EQ(0, delta.AddedBytes());
   }
 }
 
@@ -315,6 +370,7 @@ int main(int argc, char **argv) {
   TEST(TestFirstByte);
   TEST(TestModifyMutator);
   TEST(TestAddMutator);
+  TEST(TestDeleteMutator);
   return 0;
 }
 

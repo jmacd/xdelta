@@ -3,6 +3,7 @@
 extern "C" {
 #define NOT_MAIN 1
 #define REGRESSION_TEST 0
+#define VCDIFF_TOOLS 1
 #include "../xdelta3.c"
 }
 
@@ -27,9 +28,6 @@ do {if (!((x) OP (y))) {			       \
   abort(); \
     } } while (false)
 
-//#define VLOG(n) if ((n) >= debug_level) cerr
-//static int debug_level;
-
 #include <iostream>
 using std::cerr;
 using std::endl;
@@ -48,7 +46,7 @@ pair<T, U> make_pair(const T& t, const U& u) {
 
 class Constants {
 public:
-  static const xoff_t BLOCK_SIZE = 1 << 15;
+  static const xoff_t BLOCK_SIZE = 1 << 7;
 };
 
 using std::min;
@@ -76,3 +74,6 @@ using regtest::CmpDifferentBytes;
 #include "sizes.h"
 using regtest::SizeIterator;
 using regtest::SmallSizes;
+
+#include "delta.h"
+using regtest::Delta;

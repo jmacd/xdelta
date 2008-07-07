@@ -68,6 +68,8 @@ class FileSpec {
     }
   }
 
+  void PrintData() const;
+
   typedef BlockIterator iterator;
 
  private:
@@ -207,13 +209,14 @@ inline void BlockIterator::Get(Block *block) const {
     size_t seg_offset = offset - pos->first;
     xoff_t skip = seg_offset + pos->second.seed_offset;
     MTRandom gen(pos->second.seed);
+    MTRandom8 gen8(&gen);
     while (skip--) {
-      gen.Rand32();
+      gen8.Rand8();
     }
-    
-    for (size_t i = seg_offset; 
-	 i < pos->second.length && got < blksize_; i++) {
-      block->data_[got++] = gen.Rand32();
+    size_t advance = min(pos->second.length - seg_offset,
+			 blksize_ - got);
+    for (size_t i = 0; i < advance; i++) {
+      block->data_[got++] = gen8.Rand8();
     }
 
     offset += (pos->second.length - seg_offset);
@@ -241,6 +244,18 @@ inline void Block::Append(const uint8_t *data, size_t size) {
 
   memcpy(data_ + size_, data, size);
   size_ += size;
+}
+
+inline void FileSpec::PrintData() const {
+  Block block;
+
+  for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
+    iter.Get(&block);
+    for (size_t i = 0; i < block.Size(); i++) {
+      DP(RINT "%02x ", block[i]);
+    }
+  }
+  DP(RINT "\n");
 }
 
 }  // namespace regtest
