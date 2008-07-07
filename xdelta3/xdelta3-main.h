@@ -1256,14 +1256,14 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
       VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, 
 	 option_print_cpymode ? code : 0,
-	 xd3_rtype_to_string (stream->dec_current1.type, option_print_cpymode),
+	 xd3_rtype_to_string ((xd3_rtype) stream->dec_current1.type, option_print_cpymode),
 	 (usize_t) stream->dec_current1.size)VE;
 
       if (stream->dec_current1.type != XD3_NOOP)
 	{
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-"Q"6u", 
+	      VC(UT " @%-6"Q"u", 
 		 stream->dec_cpyoff + stream->dec_current1.addr)VE;
 	    }
 	  else
@@ -1277,7 +1277,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
       if (stream->dec_current2.type != XD3_NOOP)
 	{
 	  VC(UT "  %s %3u",
-	     xd3_rtype_to_string (stream->dec_current2.type,
+	     xd3_rtype_to_string ((xd3_rtype) stream->dec_current2.type,
 				  option_print_cpymode),
 	     (usize_t)stream->dec_current2.size)VE;
 
@@ -1355,7 +1355,7 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if (xfile->snprintf_buf == NULL)
     {
-      if ((xfile->snprintf_buf = main_malloc(SNPRINTF_BUFSIZE)) == NULL)
+      if ((xfile->snprintf_buf = (uint8_t*)main_malloc(SNPRINTF_BUFSIZE)) == NULL)
 	{
 	  return ENOMEM;
 	}

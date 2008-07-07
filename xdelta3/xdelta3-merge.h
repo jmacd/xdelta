@@ -78,7 +78,7 @@ xd3_realloc_buffer (xd3_stream *stream,
   cur_size = current_units * unit_size;
   new_alloc = xd3_round_blksize (needed * 2, XD3_ALLOCSIZE);
 
-  if ((new_buf = xd3_alloc (stream, new_alloc, 1)) == NULL)
+  if ((new_buf = (uint8_t*) xd3_alloc (stream, new_alloc, 1)) == NULL)
     {
       return ENOMEM;
     }
@@ -475,7 +475,7 @@ int xd3_merge_inputs (xd3_stream *stream,
 		      xd3_whole_state *input)
 {
   int ret = 0;
-  int input_i;
+  size_t input_i;
 
   /* iterate over each instruction. */
   for (input_i = 0; ret == 0 && input_i < input->instlen; ++input_i)
