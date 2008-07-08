@@ -248,11 +248,19 @@ inline void Block::Append(const uint8_t *data, size_t size) {
 
 inline void FileSpec::PrintData() const {
   Block block;
+  xoff_t pos = 0;
 
   for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
     iter.Get(&block);
     for (size_t i = 0; i < block.Size(); i++) {
+      if (pos % 16 == 0) {
+	DP(RINT "%5"Q"x: ", pos);
+      }
       DP(RINT "%02x ", block[i]);
+      if (pos % 16 == 15) {
+	DP(RINT "\n");
+      }
+      pos++;
     }
   }
   DP(RINT "\n");

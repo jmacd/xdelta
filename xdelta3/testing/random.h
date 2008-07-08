@@ -9,11 +9,10 @@ namespace regtest {
 
 class MTRandom {
  public:
-  static const uint32_t TEST_SEED1 = 0x1975;
+  static const uint32_t TEST_SEED1 = 5489UL;
 
   static const int MT_LEN = 624;
   static const int MT_IA = 397;
-  static const int MT_IB = (MT_LEN - MT_IA);
   static const uint32_t UPPER_MASK = 0x80000000;
   static const uint32_t LOWER_MASK = 0x7FFFFFFF;
   static const uint32_t MATRIX_A = 0x9908B0DF;
@@ -26,41 +25,37 @@ class MTRandom {
     Init(seed);
   }
 
-  uint32_t TWIST(int i, int j) {
-    return (mt_buffer_[i] & UPPER_MASK) | (mt_buffer_[j] & LOWER_MASK);
-  }
-
-  uint32_t MAGIC(uint32_t s) {
-    return (s & 1) * MATRIX_A;
-  }
-
   uint32_t Rand32 () {
-    int idx = mt_index_;
-    uint32_t s;
-    int i;
-	
-    if (idx == MT_LEN * sizeof(uint32_t)) {
-      idx = 0;
-      i = 0;
-      for (; i < MT_IB; i++) {
-	s = TWIST(i, i+1);
-	mt_buffer_[i] = mt_buffer_[i + MT_IA] ^ (s >> 1) ^ MAGIC(s);
-      }
-      for (; i < MT_LEN-1; i++) {
-	s = TWIST(i, i+1);
-	mt_buffer_[i] = mt_buffer_[i - MT_IB] ^ (s >> 1) ^ MAGIC(s);
-      }
-        
-      s = TWIST(MT_LEN-1, 0);
-      mt_buffer_[MT_LEN-1] = mt_buffer_[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
-    }
-    mt_index_ = idx + sizeof(uint32_t);
+    uint32_t y;
+    static unsigned long mag01[2] = { 
+      0 , MATRIX_A
+    };
 
-    // Original code had an unaligned access, make it portable.
-    //   return *(uint32_t *)((unsigned char *)b + idx);
-    uint32_t r;
-    memcpy(&r, ((unsigned char *)mt_buffer_ + idx), sizeof(uint32_t));
-    return r;
+    if (mt_index_ >= MT_LEN) {
+      int kk;
+
+      for (kk = 0; kk < MT_LEN - MT_IA; kk++) {
+	y = (mt_buffer_[kk] & UPPER_MASK) | (mt_buffer_[kk + 1] & LOWER_MASK);
+	mt_buffer_[kk] = mt_buffer_[kk + MT_IA] ^ (y >> 1) ^ mag01[y & 0x1UL];
+      }
+      for (;kk < MT_LEN - 1; kk++) {
+	y = (mt_buffer_[kk] & UPPER_MASK) | (mt_buffer_[kk + 1] & LOWER_MASK);
+	mt_buffer_[kk] = mt_buffer_[kk + (MT_IA - MT_LEN)] ^ (y >> 1) ^ mag01[y & 0x1UL];
+      }
+      y = (mt_buffer_[MT_LEN - 1] & UPPER_MASK) | (mt_buffer_[0] & LOWER_MASK);
+      mt_buffer_[MT_LEN - 1] = mt_buffer_[MT_IA - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
+
+      mt_index_ = 0;
+    }
+  
+    y = mt_buffer_[mt_index_++];
+
+    y ^= (y >> 11);
+    y ^= (y << 7) & 0x9d2c5680UL;
+    y ^= (y << 15) & 0xefc60000UL;
+    y ^= (y >> 18);
+
+    return y;
   }
 
   uint32_t ExpRand32(uint32_t mean) {
@@ -109,13 +104,16 @@ class MTRandom {
 
  private:
   void Init(uint32_t seed) {
-    int i;
-    srand (seed);
-    for (i = 0; i < MT_LEN; i++)
-      {
-	mt_buffer_[i] = rand ();
-      }
-    mt_index_ = 0;
+    mt_buffer_[0] = seed;
+    mt_index_ = MT_LEN;
+    for (int i = 1; i < MT_LEN; i++) {
+      /* See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. */
+      /* In the previous versions, MSBs of the seed affect   */
+      /* only MSBs of the array mt[].                        */
+      /* 2002/01/09 modified by Makoto Matsumoto             */
+      mt_buffer_[i] = 
+	(1812433253UL * (mt_buffer_[i-1] ^ (mt_buffer_[i-1] >> 30)) + i);
+    }
   }
 
   int mt_index_;
@@ -131,7 +129,7 @@ public:
   uint8_t Rand8() {
     uint32_t r = rand_->Rand32();
 
-    return (r & 0xff) ^ (r >> 8) ^ (r >> 16) ^ (r >> 24);
+    return (r & 0xff) ^ (r >> 7) ^ (r >> 15) ^ (r >> 21);
   }
 
 private:
