@@ -361,6 +361,78 @@ void TestDeleteMutator() {
   }
 }
 
+void TestCopyMutator() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
+
+  struct {
+    size_t size;
+    size_t from;
+    size_t to;
+  } test_cases[] = {
+    // Copy is difficult to write tests for because where Xdelta finds
+    // copies, it does not enter checksums.  So these tests copy data from
+    // later to earlier so that checksumming will start.
+    { Constants::BLOCK_SIZE / 2, Constants::BLOCK_SIZE / 2, 0 },
+    { Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE, Constants::BLOCK_SIZE, },
+  };
+
+  for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
+    ChangeList cl1;
+    cl1.push_back(Change(Change::COPY, test_cases[i].size, 
+			 test_cases[i].from, test_cases[i].to));
+    spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+    CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
+
+    Block coded;
+    InMemoryEncodeDecode(spec0, spec1, &coded);
+
+    Delta delta(coded);
+    CHECK_EQ(0, delta.AddedBytes());
+  }
+}
+
+void TestMoveMutator() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
+
+  struct {
+    size_t size;
+    size_t from;
+    size_t to;
+  } test_cases[] = {
+    // This is easier to test than Copy but has the same trouble as Delete.
+    { Constants::BLOCK_SIZE / 2, Constants::BLOCK_SIZE / 2, 0 },
+    { Constants::BLOCK_SIZE / 2, 0, Constants::BLOCK_SIZE / 2 },
+    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE },
+    { Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE, Constants::BLOCK_SIZE },
+    { Constants::BLOCK_SIZE * 3 / 2, Constants::BLOCK_SIZE, Constants::BLOCK_SIZE * 3 / 2 },
+
+    // This is a no-op
+    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE * 2, 3 * Constants::BLOCK_SIZE },
+  };
+
+  for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
+    ChangeList cl1;
+    cl1.push_back(Change(Change::MOVE, test_cases[i].size, 
+			 test_cases[i].from, test_cases[i].to));
+    spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+    CHECK_EQ(spec0.Size(), spec1.Size());
+
+    Block coded;
+    InMemoryEncodeDecode(spec0, spec1, &coded);
+
+    Delta delta(coded);
+    CHECK_EQ(0, delta.AddedBytes());
+  }
+}
+
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
   TEST(TestRandomNumbers);
@@ -369,6 +441,8 @@ int main(int argc, char **argv) {
   TEST(TestModifyMutator);
   TEST(TestAddMutator);
   TEST(TestDeleteMutator);
+  TEST(TestCopyMutator);
+  TEST(TestMoveMutator);
   return 0;
 }
 

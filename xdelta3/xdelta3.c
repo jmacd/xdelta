@@ -4894,7 +4894,8 @@ xd3_verify_run_state (xd3_stream    *stream,
  * *next_move_point.  NB: this is one of the most expensive functions
  * in this code and also the most critical for good compression.
  *
- * TODO: really would like a good test for this logic. how?
+ * TODO: really would like a good test for this logic. how? 
+ * Update: testing/regtest.cc has some basic tests, more would be nice.
  * TODO: optimize the inner loop
  */
 static int
