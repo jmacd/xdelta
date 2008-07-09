@@ -129,6 +129,7 @@ public:
   uint8_t Rand8() {
     uint32_t r = rand_->Rand32();
 
+    // TODO: make this use a single byte at a time?
     return (r & 0xff) ^ (r >> 7) ^ (r >> 15) ^ (r >> 21);
   }
 

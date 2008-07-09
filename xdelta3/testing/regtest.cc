@@ -1,11 +1,36 @@
 /* -*- Mode: C++ -*-  */
 #include "test.h"
 
+namespace {
+
 // Declare constants (needed for reference-values, etc).
 const xoff_t Constants::BLOCK_SIZE;
 
-// TODO: more options!
-void InMemoryEncodeDecode(FileSpec &source_file, 
+// 9 is a common value for cksum_size, but the exact value shouldn't
+// matter.
+const usize_t CKSUM_SIZE = 9;
+
+// These values are filled-in by FindCksumCollision
+uint8_t golden_cksum_bytes[CKSUM_SIZE] = {
+  0x8d, 0x83, 0xe7, 0x6f, 0x46, 0x7f, 0xed, 0x51, 0xe6 
+};
+uint8_t collision_cksum_bytes[CKSUM_SIZE] = {
+  0xaf, 0x55, 0x16, 0x89, 0x7c, 0x70, 0x00, 0xe5, 0xa7
+};
+
+struct TestOptions {
+  TestOptions()
+    : winsize(0),
+      large_cksum_step(0),
+      large_cksum_size(0) { }
+  
+  size_t winsize;
+  size_t large_cksum_step;
+  size_t large_cksum_size;
+};
+
+void InMemoryEncodeDecode(const TestOptions &options,
+			  FileSpec &source_file, 
 			  FileSpec &target_file, 
 			  Block *coded_data) {
   xd3_stream encode_stream;
@@ -25,7 +50,16 @@ void InMemoryEncodeDecode(FileSpec &source_file,
   xd3_init_config(&encode_config, XD3_ADLER32);
   xd3_init_config(&decode_config, XD3_ADLER32);
 
-  encode_config.winsize = Constants::BLOCK_SIZE;
+  encode_config.winsize = options.winsize ? options.winsize : Constants::BLOCK_SIZE;
+
+  if (options.large_cksum_step) {
+    encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+    encode_config.smatcher_soft.large_step = options.large_cksum_step;
+  }
+  if (options.large_cksum_size) {
+    encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+    encode_config.smatcher_soft.large_look = options.large_cksum_size;
+  }
 
   CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
   CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
@@ -228,6 +262,8 @@ void TestFirstByte() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
+  TestOptions options;
+
   spec0.GenerateFixedSize(0);
   spec1.GenerateFixedSize(1);
   CHECK_EQ(0, CmpDifferentBytes(spec0, spec0));
@@ -252,7 +288,7 @@ void TestFirstByte() {
     }
     spec0.GenerateFixedSize(size);
     spec0.ModifyTo(Modify1stByte(), &spec1);
-    InMemoryEncodeDecode(spec0, spec1, NULL);
+    InMemoryEncodeDecode(options, spec0, spec1, NULL);
   }
 }
 
@@ -260,6 +296,7 @@ void TestModifyMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
+  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
@@ -287,7 +324,7 @@ void TestModifyMutator() {
     // pass.
     CHECK_GE(diff, test_cases[i].size - (2 * test_cases[i].size / 256));
 
-    InMemoryEncodeDecode(spec0, spec1, NULL);
+    InMemoryEncodeDecode(options, spec0, spec1, NULL);
   }
 }
 
@@ -295,8 +332,11 @@ void TestAddMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
+  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
+  // TODO: fix this test (for all block sizes)!  it's broken because
+  // the same byte could be added?
 
   struct {
     size_t size;
@@ -318,7 +358,7 @@ void TestAddMutator() {
     CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(spec0, spec1, &coded);
+    InMemoryEncodeDecode(options, spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(test_cases[i].expected_adds,
@@ -330,6 +370,7 @@ void TestDeleteMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
+  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 4);
 
@@ -354,7 +395,7 @@ void TestDeleteMutator() {
     CHECK_EQ(spec0.Size() - test_cases[i].size, spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(spec0, spec1, &coded);
+    InMemoryEncodeDecode(options, spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(0, delta.AddedBytes());
@@ -365,6 +406,7 @@ void TestCopyMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
+  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
@@ -388,7 +430,7 @@ void TestCopyMutator() {
     CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(spec0, spec1, &coded);
+    InMemoryEncodeDecode(options, spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(0, delta.AddedBytes());
@@ -399,6 +441,7 @@ void TestMoveMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
+  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
@@ -426,23 +469,120 @@ void TestMoveMutator() {
     CHECK_EQ(spec0.Size(), spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(spec0, spec1, &coded);
+    InMemoryEncodeDecode(options, spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(0, delta.AddedBytes());
   }
 }
 
+void FindCksumCollision() {
+  if (golden_cksum_bytes[0] != 0) {
+    CHECK(memcmp(golden_cksum_bytes, collision_cksum_bytes, CKSUM_SIZE) != 0);
+    CHECK_EQ(xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE),
+	     xd3_lcksum(collision_cksum_bytes, CKSUM_SIZE));
+    return;
+  }
+
+  MTRandom rand;
+  MTRandom8 rand8(&rand);
+
+  for (size_t i = 0; i < CKSUM_SIZE; i++) {
+    collision_cksum_bytes[i] = golden_cksum_bytes[i] = rand8.Rand8();
+  }
+
+  uint32_t golden = xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE);
+
+  size_t i = 0;
+  while (true) {
+    collision_cksum_bytes[i++] = rand8.Rand8();
+
+    if (golden == xd3_lcksum(collision_cksum_bytes, CKSUM_SIZE) &&
+	memcmp(collision_cksum_bytes, golden_cksum_bytes, CKSUM_SIZE) != 0) {
+      break;
+    }
+
+    if (i == CKSUM_SIZE) {
+      i = 0;
+    }
+  }
+
+  Block b1, b2;
+  b1.Append(golden_cksum_bytes, CKSUM_SIZE);
+  b2.Append(collision_cksum_bytes, CKSUM_SIZE);
+  
+  DP(RINT "Found a cksum collision\n");
+  b1.Print();
+  b2.Print();
+}
+
+void TestNonBlockingCollisionProgress() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  FileSpec spec2(&rand);
+  TestOptions options;
+
+  FindCksumCollision();
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
+
+  Segment gcksum(CKSUM_SIZE, golden_cksum_bytes);
+  Segment ccksum(CKSUM_SIZE, collision_cksum_bytes);
+
+  uint32_t v1 = xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE);
+  uint32_t v2 = xd3_lcksum(collision_cksum_bytes, CKSUM_SIZE);
+  CHECK_EQ(v1, v2);
+
+  // TODO! the smatcher setup isn't working, the default is 9/3
+
+  // Place the collision just before the 1st block end, place the
+  // matching bytes at the start of the next block.  Note that
+  // source checksums are computed in reverse from the end of the
+  // block, so placing the collision at the end of the block works.
+
+  xoff_t false_offset = Constants::BLOCK_SIZE - CKSUM_SIZE;
+  xoff_t modify_offset = Constants::BLOCK_SIZE + 20;
+
+  // Fixed content for a backward match prior to the collision, which
+  // makes the total match length long enough for the min_match.
+  Segment preamble(20, 0xabcd);
+
+  Change c1(Change::MODIFY, CKSUM_SIZE, false_offset, &gcksum);
+  Change c2(Change::MODIFY, CKSUM_SIZE, modify_offset, &ccksum);
+
+  Change cp1(Change::MODIFY, 20, false_offset - 20, &preamble);
+  Change cp2(Change::MODIFY, 20, modify_offset - 20, &preamble);
+
+  ChangeList cl1;
+  ChangeList cl2;
+  cl1.push_back(c1);
+  cl1.push_back(cp1);
+  cl2.push_back(c2);
+  cl2.push_back(cp2);
+
+  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+  spec0.ModifyTo(ChangeListMutator(cl2), &spec2);
+
+  spec1.Print();
+  spec2.Print();
+
+  InMemoryEncodeDecode(options, spec1, spec2, NULL);
+}
+
+}  // anonymous namespace
+
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-  TEST(TestRandomNumbers);
-  TEST(TestRandomFile);
-  TEST(TestFirstByte);
-  TEST(TestModifyMutator);
-  TEST(TestAddMutator);
-  TEST(TestDeleteMutator);
-  TEST(TestCopyMutator);
-  TEST(TestMoveMutator);
+//   TEST(TestRandomNumbers);
+//   TEST(TestRandomFile);
+//   TEST(TestFirstByte);
+//   TEST(TestModifyMutator);
+//   TEST(TestAddMutator);
+//   TEST(TestDeleteMutator);
+//   TEST(TestCopyMutator);
+//   TEST(TestMoveMutator);
+  TEST(TestNonBlockingCollisionProgress);
   return 0;
 }
 

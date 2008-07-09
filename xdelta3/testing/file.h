@@ -16,7 +16,7 @@ class FileSpec {
     
     for (xoff_t p = 0; p < size; ) {
       xoff_t t = min(Constants::BLOCK_SIZE, size - p);
-      table_.insert(make_pair(p, Segment(rand_->Rand32(), t)));
+      table_.insert(make_pair(p, Segment(t, rand_)));
       p += t;
     }
   }
@@ -32,7 +32,7 @@ class FileSpec {
       return 0;
     }
     SegmentMap::const_iterator i = --table_.end();
-    return i->first + i->second.length;
+    return i->first + i->second.Size();
   }
 
   // Returns the number of blocks
@@ -63,8 +63,8 @@ class FileSpec {
     for (SegmentMap::const_iterator iter(table_.begin());
 	 iter != table_.end();
 	 ++iter) {
-      cerr << "Segment at " << iter->first << " (" << iter->second.seed
-	   << "," << iter->second.length << "," << iter->second.seed_offset << ")" << endl;
+      const Segment &seg = iter->second;
+      cerr << "Segment at " << iter->first << " (" << seg << ")" << endl;
     }
   }
 
@@ -113,6 +113,8 @@ public:
     size_ = 0;
   }
 
+  void Block::Print() const;
+
 private:
   void SetSize(size_t size) {
     size_ = size;
@@ -156,6 +158,10 @@ public:
 
   xoff_t Blkno() const {
     return blkno_;
+  }
+
+  xoff_t Offset() const {
+    return blkno_ * blksize_;
   }
 
   void SetBlock(xoff_t blkno) {
@@ -203,23 +209,19 @@ inline void BlockIterator::Get(Block *block) const {
     CHECK(pos != table.end());
     CHECK_GE(offset, pos->first);
 
+    const Segment &seg = pos->second;
+
     // The position of this segment may start before this block starts,
     // and then the position of the data may be offset from the seeding 
     // position.
     size_t seg_offset = offset - pos->first;
-    xoff_t skip = seg_offset + pos->second.seed_offset;
-    MTRandom gen(pos->second.seed);
-    MTRandom8 gen8(&gen);
-    while (skip--) {
-      gen8.Rand8();
-    }
-    size_t advance = min(pos->second.length - seg_offset,
+    size_t advance = min(seg.Size() - seg_offset,
 			 blksize_ - got);
-    for (size_t i = 0; i < advance; i++) {
-      block->data_[got++] = gen8.Rand8();
-    }
 
-    offset += (pos->second.length - seg_offset);
+    seg.Fill(seg_offset, advance, block->data_ + got);
+
+    got += advance;
+    offset += advance;
     ++pos;
   }
 }
@@ -248,20 +250,23 @@ inline void Block::Append(const uint8_t *data, size_t size) {
 
 inline void FileSpec::PrintData() const {
   Block block;
-  xoff_t pos = 0;
-
   for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
     iter.Get(&block);
-    for (size_t i = 0; i < block.Size(); i++) {
-      if (pos % 16 == 0) {
-	DP(RINT "%5"Q"x: ", pos);
-      }
-      DP(RINT "%02x ", block[i]);
-      if (pos % 16 == 15) {
-	DP(RINT "\n");
-      }
-      pos++;
+    block.Print();
+  }
+}
+
+inline void Block::Print() const {
+  xoff_t pos = 0;
+  for (size_t i = 0; i < Size(); i++) {
+    if (pos % 16 == 0) {
+      DP(RINT "%5"Q"x: ", pos);
     }
+    DP(RINT "%02x ", (*this)[i]);
+    if (pos % 16 == 15) {
+      DP(RINT "\n");
+    }
+    pos++;
   }
   DP(RINT "\n");
 }

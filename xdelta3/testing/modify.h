@@ -23,7 +23,17 @@ public:
   Change(Kind kind, xoff_t size, xoff_t addr1)
     : kind(kind),
       size(size),
-      addr1(addr1) { 
+      addr1(addr1),
+    insert(NULL) { 
+    CHECK(kind != MOVE && kind != COPY);
+  }
+
+  // Constructor for modify, add w/ provided data.
+  Change(Kind kind, xoff_t size, xoff_t addr1, Segment *insert)
+    : kind(kind),
+      size(size),
+      addr1(addr1),
+      insert(insert) { 
     CHECK(kind != MOVE && kind != COPY);
   }
 
@@ -32,7 +42,8 @@ public:
     : kind(kind),
       size(size),
       addr1(addr1),
-      addr2(addr2) { 
+      addr2(addr2),
+      insert(NULL) { 
     CHECK(kind == MOVE || kind == COPY);
   }
 
@@ -40,6 +51,7 @@ public:
   xoff_t size;
   xoff_t addr1;
   xoff_t addr2;
+  Segment *insert;  // For modify and/or add
 };
 
 typedef list<Change> ChangeList;
@@ -155,7 +167,7 @@ void ChangeListMutator::ModifyChange(const Change &ch,
        ++iter) {
     const Segment &seg = iter->second;
     i_start = iter->first;
-    i_end = i_start + seg.length;
+    i_end = i_start + seg.Size();
 
     if (i_end <= m_start || i_start >= m_end) {
       table->insert(table->end(), make_pair(i_start, seg));
@@ -163,21 +175,27 @@ void ChangeListMutator::ModifyChange(const Change &ch,
     }
 
     if (i_start < m_start) {
-      Segment before(seg.seed, m_start - i_start, seg.seed_offset);
-      table->insert(table->end(), make_pair(i_start, before));
+      table->insert(table->end(), 
+		    make_pair(i_start, 
+			      seg.Subseg(0, m_start - i_start)));
     }
 
     // Insert the entire segment, even though it may extend into later
     // segments.  This condition avoids inserting it during later
     // segments.
     if (m_start >= i_start) {
-      Segment part(rand->Rand32(), m_end - m_start);
-      table->insert(table->end(), make_pair(m_start, part));
+      if (ch.insert != NULL) {
+	table->insert(table->end(), make_pair(m_start, *ch.insert));
+      } else {
+	Segment part(m_end - m_start, rand);
+	table->insert(table->end(), make_pair(m_start, part));
+      }
     }
 
     if (i_end > m_end) {
-      Segment after(seg.seed, i_end - m_end, seg.seed_offset + (m_end - i_start));
-      table->insert(table->end(), make_pair(m_end, after));
+      table->insert(table->end(), 
+		    make_pair(m_end, 
+			      seg.Subseg(m_end - i_start, i_end - m_end)));
     }
   }
 
@@ -197,7 +215,7 @@ void ChangeListMutator::AddChange(const Change &ch,
        ++iter) {
     const Segment &seg = iter->second;
     i_start = iter->first;
-    i_end = i_start + seg.length;
+    i_end = i_start + seg.Size();
 
     if (i_end <= m_start) {
       table->insert(table->end(), make_pair(i_start, seg));
@@ -210,17 +228,22 @@ void ChangeListMutator::AddChange(const Change &ch,
     }
 
     if (i_start < m_start) {
-      Segment before(seg.seed, m_start - i_start, seg.seed_offset);
-      table->insert(table->end(), make_pair(i_start, before));
+      table->insert(table->end(), 
+		    make_pair(i_start, 
+			      seg.Subseg(0, m_start - i_start)));
     }
 
-    Segment addseg(rand->Rand32(), ch.size);
-    table->insert(table->end(), make_pair(m_start, addseg));
+    if (ch.insert != NULL) {
+      table->insert(table->end(), make_pair(m_start, *ch.insert));
+    } else {
+      Segment addseg(ch.size, rand);
+      table->insert(table->end(), make_pair(m_start, addseg));
+    }
 
     if (m_start < i_end) {
-      Segment after(seg.seed, i_end - m_start, 
-		    seg.seed_offset + (m_start - i_start));
-      table->insert(table->end(), make_pair(m_start + ch.size, after));
+      table->insert(table->end(), 
+		    make_pair(m_start + ch.size, 
+			      seg.Subseg(m_start - i_start, i_end - m_start)));
     }
   }
 
@@ -228,7 +251,7 @@ void ChangeListMutator::AddChange(const Change &ch,
 
   // Special case for add at end-of-input.
   if (m_start == i_end) {
-    Segment addseg(rand->Rand32(), ch.size);
+    Segment addseg(ch.size, rand);
     table->insert(table->end(), make_pair(m_start, addseg));
   }
 }
@@ -247,7 +270,7 @@ void ChangeListMutator::DeleteChange(const Change &ch,
        ++iter) {
     const Segment &seg = iter->second;
     i_start = iter->first;
-    i_end = i_start + seg.length;
+    i_end = i_start + seg.Size();
 
     if (i_end <= m_start) {
       table->insert(table->end(), make_pair(i_start, seg));
@@ -260,13 +283,15 @@ void ChangeListMutator::DeleteChange(const Change &ch,
     }
 
     if (i_start < m_start) {
-      Segment before(seg.seed, m_start - i_start, seg.seed_offset);
-      table->insert(table->end(), make_pair(i_start, before));
+      table->insert(table->end(), 
+		    make_pair(i_start, 
+			      seg.Subseg(0, m_start - i_start)));
     }
 
     if (i_end > m_end) {
-      Segment after(seg.seed, i_end - m_end, seg.seed_offset + (m_end - i_start));
-      table->insert(table->end(), make_pair(m_end - ch.size, after));
+      table->insert(table->end(), 
+		    make_pair(m_end - ch.size, 
+			      seg.Subseg(m_end - i_start, i_end - m_end)));
     }
   }
 
@@ -301,7 +326,7 @@ void ChangeListMutator::CopyChange(const Change &ch,
        ++iter) {
     const Segment &seg = iter->second;
     i_start = iter->first;
-    i_end = i_start + seg.length;
+    i_end = i_start + seg.Size();
 
     if (i_end <= m_start) {
       table->insert(table->end(), make_pair(i_start, seg));
@@ -314,16 +339,17 @@ void ChangeListMutator::CopyChange(const Change &ch,
     }
 
     if (i_start < m_start) {
-      Segment before(seg.seed, m_start - i_start, seg.seed_offset);
-      table->insert(table->end(), make_pair(i_start, before));
+      table->insert(table->end(), 
+		    make_pair(i_start, 
+			      seg.Subseg(0, m_start - i_start)));
     }
 
     AppendCopy(table, source_table, c_start, m_start, ch.size);
 
     if (m_start < i_end) {
-      Segment after(seg.seed, i_end - m_start, 
-		    seg.seed_offset + (m_start - i_start));
-      table->insert(table->end(), make_pair(m_start + ch.size, after));
+      table->insert(table->end(), 
+		    make_pair(m_start + ch.size, 
+			      seg.Subseg(m_start - i_start, i_end - m_start)));
     }
   }
 
@@ -346,15 +372,13 @@ void ChangeListMutator::AppendCopy(SegmentMap *table,
 
   while (got < length) {
     size_t seg_offset = copy_offset - pos->first;
-    xoff_t skip = seg_offset + pos->second.seed_offset;
-    size_t advance = min(pos->second.length - seg_offset, 
+    size_t advance = min(pos->second.Size() - seg_offset, 
 			 (size_t)(length - got));
 
     table->insert(table->end(), 
 		  make_pair(append_offset,
-			    Segment(pos->second.seed, 
-				    advance,
-				    skip)));
+			    pos->second.Subseg(seg_offset,
+					       advance)));
 
     got += advance;
     copy_offset += advance;

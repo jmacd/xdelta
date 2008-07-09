@@ -31,10 +31,14 @@ do {if (!((x) OP (y))) {			       \
 #include <iostream>
 using std::cerr;
 using std::endl;
+using std::ostream;
 
 #include <map> 
 using std::map;
 using std::pair;
+
+#include <ext/hash_map>
+using __gnu_cxx::hash_map;
 
 #include <list>
 using std::list;
@@ -51,10 +55,12 @@ public:
 
 using std::min;
 
-#include "segment.h"
-
 #include "random.h"
 using regtest::MTRandom;
+using regtest::MTRandom8;
+
+#include "segment.h"
+using regtest::Segment;
 
 #include "modify.h"
 using regtest::Mutator;
