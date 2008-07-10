@@ -2103,7 +2103,7 @@ xd3_alloc (xd3_stream *stream,
   if (a != NULL)
     {
       IF_DEBUG (stream->alloc_cnt += 1);
-      IF_DEBUG1 (DP(RINT "[stream %p malloc] size %u ptr %p\n", 
+      IF_DEBUG2 (DP(RINT "[stream %p malloc] size %u ptr %p\n", 
 		    stream, elts * size, a));
     }
   else
@@ -2122,7 +2122,7 @@ xd3_free (xd3_stream *stream,
     {
       IF_DEBUG (stream->free_cnt += 1);
       XD3_ASSERT (stream->free_cnt <= stream->alloc_cnt);
-      IF_DEBUG1 (DP(RINT "[stream %p free] %p\n", 
+      IF_DEBUG2 (DP(RINT "[stream %p free] %p\n", 
 		    stream, ptr));
       stream->free (stream->opaque, ptr);
     }
@@ -3228,7 +3228,7 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, usize_t code)
 
   IF_DEBUG1 (DP(RINT "[emit1] %u %s (%u) code %u\n",
 	       single->pos,
-	       xd3_rtype_to_string (single->type, 0),
+		xd3_rtype_to_string ((xd3_rtype) single->type, 0),
 	       single->size,
 	       code));
 
@@ -3266,9 +3266,9 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
 
   IF_DEBUG1 (DP(RINT "[emit2]: %u %s (%u) %s (%u) code %u\n",
 	       first->pos,
-	       xd3_rtype_to_string (first->type, 0),
+		xd3_rtype_to_string ((xd3_rtype) first->type, 0),
 	       first->size,
-	       xd3_rtype_to_string (second->type, 0),
+		xd3_rtype_to_string ((xd3_rtype) second->type, 0),
 	       second->size,
 	       code));
 
@@ -4329,10 +4329,14 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   stream->match_back    = 0;
   stream->match_fwd     = 0;
 
-  /* This avoids a loop.  TODO: if ever duplicates are added to the
-   * source hash table, this logic won't suffice to avoid loops. 
-   * TODO: how can you test this in a unittest?  Need to search for
-   * hash collisions, I suppose. */
+  /* This avoids a non-blocking endless loop caused by scanning
+   * backwards across a block boundary, only to find not enough
+   * matching bytes to beat the current min_match due to a better lazy
+   * target match: the re-entry to xd3_string_match() repeats the same
+   * long match because the input position hasn't changed.  TODO: if
+   * ever duplicates are added to the source hash table, this logic
+   * won't suffice to avoid loops.  See testing/regtest.cc's
+   * TestNonBlockingProgress test! */
   if (srcpos != 0 && srcpos == stream->match_last_srcpos)
     {
       goto bad;

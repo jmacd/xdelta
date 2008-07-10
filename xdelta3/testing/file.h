@@ -53,6 +53,18 @@ class FileSpec {
 		FileSpec *modify) const {
     modify->Reset();
     mutator.Mutate(&modify->table_, &table_, rand_);
+    modify->CheckSegments();
+  }
+
+  void CheckSegments() const {
+    for (SegmentMap::const_iterator iter(table_.begin());
+	 iter != table_.end(); ) {
+      SegmentMap::const_iterator iter0(iter++);
+      if (iter == table_.end()) {
+	break;
+      }
+      CHECK_EQ(iter0->first + iter0->second.Size(), iter->first);
+    }
   }
 
   void Reset() {

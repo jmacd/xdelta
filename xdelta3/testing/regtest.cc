@@ -29,6 +29,7 @@ struct TestOptions {
   size_t large_cksum_size;
 };
 
+// TODO! the smatcher setup isn't working, 
 void InMemoryEncodeDecode(const TestOptions &options,
 			  FileSpec &source_file, 
 			  FileSpec &target_file, 
@@ -173,7 +174,9 @@ void InMemoryEncodeDecode(const TestOptions &options,
     }
   }
 
-  xd3_close_stream(&encode_stream);
+  CHECK_EQ(0, xd3_close_stream(&decode_stream));
+  CHECK_EQ(0, xd3_close_stream(&encode_stream));
+  xd3_free_stream(&encode_stream);
   xd3_free_stream(&decode_stream);
 }
 
@@ -477,6 +480,7 @@ void TestMoveMutator() {
 }
 
 void FindCksumCollision() {
+  // TODO! This is not being used.
   if (golden_cksum_bytes[0] != 0) {
     CHECK(memcmp(golden_cksum_bytes, collision_cksum_bytes, CKSUM_SIZE) != 0);
     CHECK_EQ(xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE),
@@ -516,56 +520,80 @@ void FindCksumCollision() {
   b2.Print();
 }
 
-void TestNonBlockingCollisionProgress() {
+void TestOverwriteMutator() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  TestOptions options;
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
+
+  ChangeList cl1;
+  cl1.push_back(Change(Change::OVERWRITE, 10, 0, 20));
+  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+  CHECK_EQ(spec0.Size(), spec1.Size());
+
+  Block b0, b1;
+  BlockIterator(spec0).Get(&b0);
+  BlockIterator(spec1).Get(&b1);
+  
+  CHECK(memcmp(b0.Data(), b1.Data() + 20, 10) == 0);
+  CHECK(memcmp(b0.Data(), b1.Data(), 20) == 0);
+  CHECK(memcmp(b0.Data() + 30, b1.Data() + 30, Constants::BLOCK_SIZE - 30) == 0);
+
+  cl1.clear();
+  cl1.push_back(Change(Change::OVERWRITE, 10, 20, (xoff_t)0));
+  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+  CHECK_EQ(spec0.Size(), spec1.Size());
+
+  BlockIterator(spec0).Get(&b0);
+  BlockIterator(spec1).Get(&b1);
+  
+  CHECK(memcmp(b0.Data() + 20, b1.Data(), 10) == 0);
+  CHECK(memcmp(b0.Data() + 10, b1.Data() + 10, Constants::BLOCK_SIZE - 10) == 0);
+}
+
+void TestNonBlockingProgress() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
   FileSpec spec2(&rand);
   TestOptions options;
 
-  FindCksumCollision();
+  // TODO! this test assumes block_size == 128
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
 
-  Segment gcksum(CKSUM_SIZE, golden_cksum_bytes);
-  Segment ccksum(CKSUM_SIZE, collision_cksum_bytes);
+  // This is a lazy target match
+  Change ct(Change::OVERWRITE, 22, 
+	    Constants::BLOCK_SIZE + 50,
+	    Constants::BLOCK_SIZE + 20);
 
-  uint32_t v1 = xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE);
-  uint32_t v2 = xd3_lcksum(collision_cksum_bytes, CKSUM_SIZE);
-  CHECK_EQ(v1, v2);
+  // This is a source match just after the block boundary, shorter
+  // than the lazy target match.
+  Change cs1(Change::OVERWRITE, 16,
+	     Constants::BLOCK_SIZE + 51,
+	     Constants::BLOCK_SIZE - 1);
 
-  // TODO! the smatcher setup isn't working, the default is 9/3
+  // This overwrites the original source bytes.
+  Change cs2(Change::MODIFY, 108,
+	     Constants::BLOCK_SIZE + 20);
 
-  // Place the collision just before the 1st block end, place the
-  // matching bytes at the start of the next block.  Note that
-  // source checksums are computed in reverse from the end of the
-  // block, so placing the collision at the end of the block works.
+  // This changes the first blocks
+  Change c1st(Change::MODIFY, Constants::BLOCK_SIZE - 2, 0);
 
-  xoff_t false_offset = Constants::BLOCK_SIZE - CKSUM_SIZE;
-  xoff_t modify_offset = Constants::BLOCK_SIZE + 20;
+  ChangeList csl;
+  csl.push_back(cs1);
+  csl.push_back(cs2);
+  csl.push_back(c1st);
 
-  // Fixed content for a backward match prior to the collision, which
-  // makes the total match length long enough for the min_match.
-  Segment preamble(20, 0xabcd);
+  spec0.ModifyTo(ChangeListMutator(csl), &spec1);
 
-  Change c1(Change::MODIFY, CKSUM_SIZE, false_offset, &gcksum);
-  Change c2(Change::MODIFY, CKSUM_SIZE, modify_offset, &ccksum);
+  ChangeList ctl;
+  ctl.push_back(ct);
+  ctl.push_back(c1st);
 
-  Change cp1(Change::MODIFY, 20, false_offset - 20, &preamble);
-  Change cp2(Change::MODIFY, 20, modify_offset - 20, &preamble);
-
-  ChangeList cl1;
-  ChangeList cl2;
-  cl1.push_back(c1);
-  cl1.push_back(cp1);
-  cl2.push_back(c2);
-  cl2.push_back(cp2);
-
-  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
-  spec0.ModifyTo(ChangeListMutator(cl2), &spec2);
-
-  spec1.Print();
-  spec2.Print();
+  spec0.ModifyTo(ChangeListMutator(ctl), &spec2);
 
   InMemoryEncodeDecode(options, spec1, spec2, NULL);
 }
@@ -574,15 +602,16 @@ void TestNonBlockingCollisionProgress() {
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-//   TEST(TestRandomNumbers);
-//   TEST(TestRandomFile);
-//   TEST(TestFirstByte);
-//   TEST(TestModifyMutator);
-//   TEST(TestAddMutator);
-//   TEST(TestDeleteMutator);
-//   TEST(TestCopyMutator);
-//   TEST(TestMoveMutator);
-  TEST(TestNonBlockingCollisionProgress);
+  TEST(TestRandomNumbers);
+  TEST(TestRandomFile);
+  TEST(TestFirstByte);
+  TEST(TestModifyMutator);
+  TEST(TestAddMutator);
+  TEST(TestDeleteMutator);
+  TEST(TestCopyMutator);
+  TEST(TestMoveMutator);
+  TEST(TestOverwriteMutator);
+  TEST(TestNonBlockingProgress);
   return 0;
 }
 

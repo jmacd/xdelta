@@ -17,6 +17,7 @@ public:
     DELETE = 3,
     MOVE = 4,
     COPY = 5,
+    OVERWRITE = 6,
   };
 
   // Constructor for modify, add, delete.
@@ -25,7 +26,7 @@ public:
       size(size),
       addr1(addr1),
     insert(NULL) { 
-    CHECK(kind != MOVE && kind != COPY);
+    CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
 
   // Constructor for modify, add w/ provided data.
@@ -34,7 +35,7 @@ public:
       size(size),
       addr1(addr1),
       insert(insert) { 
-    CHECK(kind != MOVE && kind != COPY);
+    CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
 
   // Constructor for move
@@ -44,7 +45,7 @@ public:
       addr1(addr1),
       addr2(addr2),
       insert(NULL) { 
-    CHECK(kind == MOVE || kind == COPY);
+    CHECK(kind == MOVE || kind == COPY || kind == OVERWRITE);
   }
 
   Kind kind;
@@ -92,6 +93,11 @@ public:
 			 const SegmentMap *source_table,
 			 MTRandom *rand);
 
+  static void OverwriteChange(const Change &ch, 
+			      SegmentMap *table,
+			      const SegmentMap *source_table,
+			      MTRandom *rand);
+
   static void CopyChange(const Change &ch, 
 			 SegmentMap *table,
 			 const SegmentMap *source_table,
@@ -124,6 +130,7 @@ void ChangeListMutator::Mutate(SegmentMap *table,
 
   for (ChangeList::const_iterator iter(cl_.begin()); iter != cl_.end(); ++iter) {
     const Change &ch = *iter;
+    tmp.clear();
     Mutate(ch, &tmp, source_table, rand);
     tmp.swap(*table);
     source_table = table;
@@ -149,6 +156,9 @@ void ChangeListMutator::Mutate(const Change &ch,
     break;
   case Change::MOVE:
     MoveChange(ch, table, source_table, rand);
+    break;
+  case Change::OVERWRITE:
+    OverwriteChange(ch, table, source_table, rand);
     break;
   }
 }
@@ -308,6 +318,17 @@ void ChangeListMutator::MoveChange(const Change &ch,
   CopyChange(ch, &tmp, source_table, rand);
   Change d(Change::DELETE, ch.size, 
 	   ch.addr1 < ch.addr2 ? ch.addr1 : ch.addr1 + ch.size);
+  DeleteChange(d, table, &tmp, rand);
+}
+
+void ChangeListMutator::OverwriteChange(const Change &ch, 
+				   SegmentMap *table,
+				   const SegmentMap *source_table,
+				   MTRandom *rand) {
+  SegmentMap tmp;
+  CHECK_NE(ch.addr1, ch.addr2);
+  CopyChange(ch, &tmp, source_table, rand);
+  Change d(Change::DELETE, ch.size, ch.addr2 + ch.size);
   DeleteChange(d, table, &tmp, rand);
 }
 
