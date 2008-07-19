@@ -561,6 +561,7 @@ void TestNonBlockingProgress() {
   TestOptions options;
 
   // TODO! this test assumes block_size == 128
+  CHECK_EQ(128, Constants::BLOCK_SIZE);
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
 
@@ -598,97 +599,81 @@ void TestNonBlockingProgress() {
   InMemoryEncodeDecode(options, spec1, spec2, NULL);
 }
 
+void TestMergeCommand() {
+  /* Repeat random-input testing for a number of iterations.
+   * Test 2, 3, and 4-file scenarios (i.e., 1, 2, and 3-delta merges). */
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  FileSpec spec2(&rand);
+  FileSpec spec3(&rand);
+
+  TestOptions options;
+
+  SizeIterator<size_t, SmallSizes> si0(&rand, 10);
+
+  for (; !si0.Done(); si0.Next()) {
+    size_t size0 = si0.Get();
+
+    SizeIterator<size_t, SmallSizes> si1(&rand, 10);
+    for (; !si1.Done(); si1.Next()) {
+      size_t change1 = si1.Get();
+
+      if (change1 == 0) {
+	continue;
+      }
+      
+      DP(RINT "S0 = %lu\n", size0);
+      DP(RINT "C1 = %lu\n", change1);
+
+      size_t add1_pos = size0 ? rand.Rand32() % size0 : 0;
+      size_t del2_pos = size0 ? rand.Rand32() % size0 : 0;
+
+      spec0.GenerateFixedSize(size0);
+
+      ChangeList cl1, cl2, cl3;
+      
+      size_t change3 = change1;
+      size_t change3_pos;
+
+      if (change3 >= size0) {
+	change3 = size0;
+	change3_pos = 0;
+      } else {
+	change3_pos = rand.Rand32() % (size0 - change3);
+      }
+
+      cl1.push_back(Change(Change::ADD, change1, add1_pos));
+      cl2.push_back(Change(Change::DELETE, change1, del2_pos));
+      cl3.push_back(Change(Change::MODIFY, change3, change3_pos));
+
+      spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+      spec1.ModifyTo(ChangeListMutator(cl2), &spec2);
+      spec2.ModifyTo(ChangeListMutator(cl3), &spec3);
+
+      Block delta01, delta12, delta23;
+
+      InMemoryEncodeDecode(options, spec0, spec1, &delta01);
+      InMemoryEncodeDecode(options, spec1, spec2, &delta12);
+      InMemoryEncodeDecode(options, spec2, spec3, &delta23);
+    }
+  }
+}
+
 }  // anonymous namespace
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-  TEST(TestRandomNumbers);
-  TEST(TestRandomFile);
-  TEST(TestFirstByte);
-  TEST(TestModifyMutator);
-  TEST(TestAddMutator);
-  TEST(TestDeleteMutator);
-  TEST(TestCopyMutator);
-  TEST(TestMoveMutator);
-  TEST(TestOverwriteMutator);
-  TEST(TestNonBlockingProgress);
+//   TEST(TestRandomNumbers);
+//   TEST(TestRandomFile);
+//   TEST(TestFirstByte);
+//   TEST(TestModifyMutator);
+//   TEST(TestAddMutator);
+//   TEST(TestDeleteMutator);
+//   TEST(TestCopyMutator);
+//   TEST(TestMoveMutator);
+//   TEST(TestOverwriteMutator);
+//   TEST(TestNonBlockingProgress);
+  TEST(TestMergeCommand);
   return 0;
 }
-
-#if 0
-static const random_parameters test_parameters[] = {
-  { 16384, 4096, 16, 0 },
-  { 16384, 4096, 0, 16 },
-  { 16384, 4096, 16, 16 },
-  { 16384, 4096, 128, 128 },
-};
-
-int
-test_merge_chain (random_file_spec *specs, int number)
-{
-  /* "number" is from 1 (a single delta) between specs[0] and
-   * specs[1], to N, an (N-1) chain from specs[0] to specs[N]. */
-  return 0;
-}
-
-static int
-test_merge_command ()
-{
-  /* Repeat random-input testing for a number of iterations.
-   * Test 2, 3, and 4-file scenarios (i.e., 1, 2, and 3-delta merges). */
-  int ret;
-  int iter = 0, param = 0;
-  random_file_spec spec[4];
-
-  memset (spec, 0, sizeof (spec));
-
-  /* Repeat this loop for TESTS_PER_PARAMETER * #parameters * 2.  The
-   * first #parameters repeats are for the provided values, the second
-   * set of repeats use random parameters. */
-  for (; param < (2 * SIZEOF_ARRAY(test_parameters)); iter++)
-    {
-      if (iter % TESTS_PER_PARAMETER == 0)
-	{
-	  if (param < SIZEOF_ARRAY(test_parameters))
-	    {
-	      set_test_parameters (&test_parameters[param]);
-	    } 
-	  else 
-	    {
-	      set_random_parameters ();
-	    }
-
-	  param++;
-
-	  if ((ret = random_file_spec_generate (&spec[0]))) { return ret; }
-	  if ((ret = random_file_spec_write (&spec[0]))) { return ret; }
-
-	  if ((ret = random_file_spec_mutate (&spec[0], &spec[1]))) { return ret; }
-	  if ((ret = random_file_spec_write (&spec[1]))) { return ret; }
-	  if ((ret = random_file_spec_delta (&spec[0], &spec[1]))) { return ret; }
-
-	  if ((ret = random_file_spec_mutate (&spec[1], &spec[2]))) { return ret; }
-	  if ((ret = random_file_spec_write (&spec[2]))) { return ret; }
-	  if ((ret = random_file_spec_delta (&spec[1], &spec[2]))) { return ret; }
-	}
-
-      /* Each iteration creates a new mutation. */
-      if ((ret = random_file_spec_mutate (&spec[2], &spec[3]))) { return ret; }
-      if ((ret = random_file_spec_write (&spec[3]))) { return ret; }
-      if ((ret = random_file_spec_delta (&spec[2], &spec[3]))) { return ret; }
-
-      /* Test 1, 2, and 3 */
-      if ((ret = test_merge_chain (spec, 1))) { return ret; }
-      if ((ret = test_merge_chain (spec, 2))) { return ret; }
-      if ((ret = test_merge_chain (spec, 3))) { return ret; }
-
-      /* Clear 1st input, shift inputs */
-      random_file_spec_clear (&spec[0]);
-      random_file_spec_swap (&spec[0], &spec[1]);
-      random_file_spec_swap (&spec[1], &spec[2]);
-      random_file_spec_swap (&spec[2], &spec[3]);
-    }
-
-  return 0;
-}
-#endif

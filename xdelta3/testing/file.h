@@ -215,6 +215,10 @@ inline void BlockIterator::Get(Block *block) const {
   block->SetSize(BytesOnBlock());
 
   SegmentMap::const_iterator pos = table.upper_bound(offset);
+  if (pos == table.begin()) {
+    CHECK_EQ(0, spec_.Size());
+    return;
+  }
   --pos;
 
   while (got < block->size_) {
