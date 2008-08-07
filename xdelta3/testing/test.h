@@ -28,6 +28,9 @@ do {if (!((x) OP (y))) {			       \
   abort(); \
     } } while (false)
 
+#include <string>
+using std::string;
+
 #include <iostream>
 using std::cerr;
 using std::endl;
@@ -73,6 +76,7 @@ using regtest::Modify1stByte;
 using regtest::FileSpec;
 using regtest::Block;
 using regtest::BlockIterator;
+using regtest::TmpFile;
 
 #include "cmp.h"
 using regtest::CmpDifferentBytes;

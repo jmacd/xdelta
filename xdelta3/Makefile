@@ -55,7 +55,7 @@ WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 CFLAGS= -Wall -Wshadow -fno-builtin
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0t
+REL=3.0u_pre0
 
 RELDIR = xdelta$(REL)
 
@@ -67,6 +67,9 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	examples/compare_test.c examples/speed_test.c \
 	examples/test.h examples/checksum_test.cc \
 	xdelta3.py xdelta3_wrap.c xdelta3.wxs xdelta3.wxi \
+	testing/cmp.h testing/delta.h testing/file.h \
+	testing/modify.h testing/random.h testing/segment.h \
+	testing/sizes.h testing/test.h testing/Makefile \
 	README readme.txt
 
 SWIG_FLAGS = -DXD3_DEBUG=1 \

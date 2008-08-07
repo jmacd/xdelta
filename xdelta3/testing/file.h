@@ -3,6 +3,7 @@ namespace regtest {
 
 class Block;
 class BlockIterator;
+class TmpFile;
 
 class FileSpec {
  public:
@@ -82,6 +83,8 @@ class FileSpec {
 
   void PrintData() const;
 
+  void WriteTmpFile(TmpFile *f) const;
+
   typedef BlockIterator iterator;
 
  private:
@@ -125,7 +128,9 @@ public:
     size_ = 0;
   }
 
-  void Block::Print() const;
+  void Print() const;
+
+  void WriteTmpFile(TmpFile *f) const;
 
 private:
   void SetSize(size_t size) {
@@ -208,6 +213,39 @@ private:
   size_t blksize_;
 };
 
+class TmpFile {
+public:
+  // TODO this is a little unportable!
+  TmpFile() {
+    static int static_counter = 0;
+    char buf[32];
+    snprintf(buf, 32, "/tmp/regtest.%d", static_counter++);
+    filename_.append(buf);
+    main_file_init(&file_);
+    CHECK_EQ(0, main_file_open(&file_, filename_.c_str(), XO_WRITE));
+  }
+
+  ~TmpFile() {
+    unlink(filename_.c_str());
+    main_file_cleanup(&file_);
+  }
+
+  void Append(const Block *block) {
+    CHECK_EQ(0, main_file_write(&file_, 
+				block->Data(), block->Size(), 
+				"tmpfile write failed"));
+  }
+
+  const char* Name() const {
+    CHECK_EQ(0, main_file_close(&file_));
+    return filename_.c_str();
+  }
+
+private:
+  string filename_;
+  mutable main_file file_;
+};
+
 inline void BlockIterator::Get(Block *block) const {
   xoff_t offset = blkno_ * blksize_;
   const SegmentMap &table = spec_.table_;
@@ -285,6 +323,18 @@ inline void Block::Print() const {
     pos++;
   }
   DP(RINT "\n");
+}
+
+inline void FileSpec::WriteTmpFile(TmpFile *f) const {
+  Block block;
+  for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
+    iter.Get(&block);
+    f->Append(&block);
+  }
+}
+
+inline void Block::WriteTmpFile(TmpFile *f) const {
+  f->Append(this);
 }
 
 }  // namespace regtest

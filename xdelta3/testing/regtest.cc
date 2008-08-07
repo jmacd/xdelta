@@ -31,8 +31,8 @@ struct TestOptions {
 
 // TODO! the smatcher setup isn't working, 
 void InMemoryEncodeDecode(const TestOptions &options,
-			  FileSpec &source_file, 
-			  FileSpec &target_file, 
+			  const FileSpec &source_file, 
+			  const FileSpec &target_file, 
 			  Block *coded_data) {
   xd3_stream encode_stream;
   xd3_config encode_config;
@@ -41,6 +41,10 @@ void InMemoryEncodeDecode(const TestOptions &options,
   xd3_stream decode_stream;
   xd3_config decode_config;
   xd3_source decode_source;
+
+  if (coded_data) {
+    coded_data->Reset();
+  }
 
   memset(&encode_stream, 0, sizeof (encode_stream));
   memset(&encode_source, 0, sizeof (encode_source));
@@ -599,6 +603,39 @@ void TestNonBlockingProgress() {
   InMemoryEncodeDecode(options, spec1, spec2, NULL);
 }
 
+void FourWayMergeTest(const TestOptions &options,
+		      const FileSpec &spec0,
+		      const FileSpec &spec1,
+		      const FileSpec &spec2,
+		      const FileSpec &spec3) {
+  Block delta01, delta12, delta23;
+
+  InMemoryEncodeDecode(options, spec0, spec1, &delta01);
+  InMemoryEncodeDecode(options, spec1, spec2, &delta12);
+  InMemoryEncodeDecode(options, spec2, spec3, &delta23);
+
+  TmpFile f0, d01, d12, d23;
+
+  spec0.WriteTmpFile(&f0);
+  delta01.WriteTmpFile(&d01);
+  delta12.WriteTmpFile(&d12);
+  delta23.WriteTmpFile(&d23);
+
+  // Merge 2
+  TmpFile out;
+  const char* argv[] = {
+    "xdelta3",
+    "merge",
+    "-m", (char*)d01.Name(),
+    (char*)d12.Name(),
+    (char*)out.Name(),
+    NULL,
+  };
+
+  CHECK_EQ(0, xd3_main_cmdline(SIZEOF_ARRAY(argv) - 1, (char**)argv));
+  
+}
+
 void TestMergeCommand() {
   /* Repeat random-input testing for a number of iterations.
    * Test 2, 3, and 4-file scenarios (i.e., 1, 2, and 3-delta merges). */
@@ -651,11 +688,8 @@ void TestMergeCommand() {
       spec1.ModifyTo(ChangeListMutator(cl2), &spec2);
       spec2.ModifyTo(ChangeListMutator(cl3), &spec3);
 
-      Block delta01, delta12, delta23;
-
-      InMemoryEncodeDecode(options, spec0, spec1, &delta01);
-      InMemoryEncodeDecode(options, spec1, spec2, &delta12);
-      InMemoryEncodeDecode(options, spec2, spec3, &delta23);
+      FourWayMergeTest(options, spec0, spec1, spec2, spec3);
+      FourWayMergeTest(options, spec3, spec2, spec1, spec0);
     }
   }
 }
