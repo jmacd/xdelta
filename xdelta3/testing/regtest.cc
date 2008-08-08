@@ -107,8 +107,8 @@ void InMemoryEncodeDecode(const TestOptions &options,
       ret = xd3_decode_input(&decode_stream);
     }
 
-    //DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
-    //   xd3_strerror(ret));
+    DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+       xd3_strerror(ret));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -146,11 +146,15 @@ void InMemoryEncodeDecode(const TestOptions &options,
 
     case XD3_INPUT:
       if (!encoding) {
+	if (target_block.Size() < target_iterator.BlockSize()) {
+	  done = true;
+	  continue;
+	}
 	encoding = true;
 	goto process;
       } else {
 	if (target_block.Size() < target_iterator.BlockSize()) {
-	  done = true;
+	  encoding = false;
 	} else {
 	  target_iterator.Next();
 	}
@@ -162,7 +166,7 @@ void InMemoryEncodeDecode(const TestOptions &options,
 	encoding = false;
       } else {
 	CHECK_EQ(0, CmpDifferentBlockBytes(decoded_block, target_block));
-	//DP(RINT "verified block %"Q"u\n", target_iterator.Blkno());
+	DP(RINT "verified block %"Q"u\n", target_iterator.Blkno());
 	decoded_block.Reset();
 	encoding = true;
       }
@@ -603,6 +607,21 @@ void TestNonBlockingProgress() {
   InMemoryEncodeDecode(options, spec1, spec2, NULL);
 }
 
+void TestEmptyInMemory() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  TestOptions options;
+  Block delta;
+
+  spec0.GenerateFixedSize(0);
+  spec1.GenerateFixedSize(0);
+
+  InMemoryEncodeDecode(options, spec0, spec1, &delta);
+
+  CHECK_LT(0, delta.Size());
+}
+
 void FourWayMergeTest(const TestOptions &options,
 		      const FileSpec &spec0,
 		      const FileSpec &spec1,
@@ -633,7 +652,6 @@ void FourWayMergeTest(const TestOptions &options,
   };
 
   CHECK_EQ(0, xd3_main_cmdline(SIZEOF_ARRAY(argv) - 1, (char**)argv));
-  
 }
 
 void TestMergeCommand() {
@@ -708,6 +726,7 @@ int main(int argc, char **argv) {
 //   TEST(TestMoveMutator);
 //   TEST(TestOverwriteMutator);
 //   TEST(TestNonBlockingProgress);
+  TEST(TestEmptyInMemory);
   TEST(TestMergeCommand);
   return 0;
 }

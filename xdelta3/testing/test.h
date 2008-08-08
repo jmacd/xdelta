@@ -15,10 +15,11 @@ extern "C" {
 #define CHECK_GE(x,y) CHECK_OP(x,y,>=)
 
 #define CHECK_OP(x,y,OP) \
-do {if (!((x) OP (y))) {			       \
+  do { typeof((x) OP (y)) _x(x), _y(y);	\
+       if (!(_x OP _y)) { \
   cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x " " #OP " " #y << endl; \
-  cerr << __FILE__ << ":" << __LINE__ << " Expected: " << x << endl; \
-  cerr << __FILE__ << ":" << __LINE__ << " Actual: " << y << endl; \
+  cerr << __FILE__ << ":" << __LINE__ << " Expected: " << _x << endl; \
+  cerr << __FILE__ << ":" << __LINE__ << " Actual: " << _y << endl; \
   abort(); \
     } } while (false)
 

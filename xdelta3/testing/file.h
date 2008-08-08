@@ -117,6 +117,11 @@ public:
   }
 
   uint8_t* Data() const {
+    if (data_ == NULL) {
+      CHECK_EQ(0, size_); 
+      data_size_ = 1;
+      data_ = new uint8_t[1];
+    }
     return data_;
   }
 
@@ -147,8 +152,8 @@ private:
 
   friend class BlockIterator;
 
-  uint8_t *data_;
-  size_t data_size_;
+  mutable uint8_t *data_;
+  mutable size_t data_size_;
   size_t size_;
 };
 
