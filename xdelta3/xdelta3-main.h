@@ -1762,7 +1762,7 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 
   if (! xd3_decoder_needs_source (stream))
     {
-      DP(RINT "cannot merge inputs which do not have a source file\n");
+      XPR(NT "cannot merge inputs which do not have a source file\n");
       return XD3_INVALID;
     }
 

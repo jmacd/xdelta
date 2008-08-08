@@ -20,56 +20,65 @@
  * attributed to Michael Brundage.  Thanks!
  * http://www.qbrundage.com/michaelb/pubs/essays/random_number_generation.html
  */
-#define MT_LEN          624
-#define MT_IA           397
-#define MT_IB           (MT_LEN - MT_IA)
-#define UPPER_MASK      0x80000000
-#define LOWER_MASK      0x7FFFFFFF
-#define MATRIX_A        0x9908B0DF
-#define TWIST(b,i,j)    ((b)[i] & UPPER_MASK) | ((b)[j] & LOWER_MASK)
-#define MAGIC(s)        (((s)&1)*MATRIX_A)
+static const uint32_t TEST_SEED1 = 5489UL;
+#define MT_LEN 624
+#define MT_IA 397
+static const uint32_t UPPER_MASK = 0x80000000;
+static const uint32_t LOWER_MASK = 0x7FFFFFFF;
+static const uint32_t MATRIX_A = 0x9908B0DF;
 
-struct mtrand_ {
-  int mt_index;
-  uint32_t mt_buffer[MT_LEN];
+typedef struct mtrand mtrand;
+
+struct mtrand {
+  int mt_index_;
+  uint32_t mt_buffer_[MT_LEN];
 };
 
-typedef struct mtrand_ mtrand;
-
-static void mt_init (mtrand *mt, int seed) {
+void mt_init(mtrand *mt, uint32_t seed) {
   int i;
-  srand (seed);
-  for (i = 0; i < MT_LEN; i++)
-    {
-      mt->mt_buffer[i] = rand ();
-    }
-  mt->mt_index = 0;
+  mt->mt_buffer_[0] = seed;
+  mt->mt_index_ = MT_LEN;
+  for (i = 1; i < MT_LEN; i++) {
+    /* See Knuth TAOCP Vol2. 3rd Ed. P.106 for multiplier. */
+    /* In the previous versions, MSBs of the seed affect   */
+    /* only MSBs of the array mt[].                        */
+    /* 2002/01/09 modified by Makoto Matsumoto             */
+    mt->mt_buffer_[i] = 
+	(1812433253UL * (mt->mt_buffer_[i-1] ^ (mt->mt_buffer_[i-1] >> 30)) + i);
+  }
 }
 
-static uint32_t mt_random (mtrand *mt) {
-  uint32_t * b = mt->mt_buffer;
-  int idx = mt->mt_index;
-  uint32_t s;
-  int i;
-	
-  if (idx == MT_LEN*sizeof(uint32_t))
-    {
-      idx = 0;
-      i = 0;
-      for (; i < MT_IB; i++) {
-	s = TWIST(b, i, i+1);
-	b[i] = b[i + MT_IA] ^ (s >> 1) ^ MAGIC(s);
-      }
-      for (; i < MT_LEN-1; i++) {
-	s = TWIST(b, i, i+1);
-	b[i] = b[i - MT_IB] ^ (s >> 1) ^ MAGIC(s);
-      }
-        
-      s = TWIST(b, MT_LEN-1, 0);
-      b[MT_LEN-1] = b[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
+
+uint32_t mt_random (mtrand *mt) {
+  uint32_t y;
+  unsigned long mag01[2];
+  mag01[0] = 0;
+  mag01[1] = MATRIX_A;
+
+  if (mt->mt_index_ >= MT_LEN) {
+    int kk;
+
+    for (kk = 0; kk < MT_LEN - MT_IA; kk++) {
+      y = (mt->mt_buffer_[kk] & UPPER_MASK) | (mt->mt_buffer_[kk + 1] & LOWER_MASK);
+      mt->mt_buffer_[kk] = mt->mt_buffer_[kk + MT_IA] ^ (y >> 1) ^ mag01[y & 0x1UL];
     }
-  mt->mt_index = idx + sizeof(uint32_t);
-  return *(uint32_t *)((unsigned char *)b + idx);
+    for (;kk < MT_LEN - 1; kk++) {
+      y = (mt->mt_buffer_[kk] & UPPER_MASK) | (mt->mt_buffer_[kk + 1] & LOWER_MASK);
+      mt->mt_buffer_[kk] = mt->mt_buffer_[kk + (MT_IA - MT_LEN)] ^ (y >> 1) ^ mag01[y & 0x1UL];
+    }
+    y = (mt->mt_buffer_[MT_LEN - 1] & UPPER_MASK) | (mt->mt_buffer_[0] & LOWER_MASK);
+    mt->mt_buffer_[MT_LEN - 1] = mt->mt_buffer_[MT_IA - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
+    mt->mt_index_ = 0;
+  }
+  
+  y = mt->mt_buffer_[mt->mt_index_++];
+  
+  y ^= (y >> 11);
+  y ^= (y << 7) & 0x9d2c5680UL;
+  y ^= (y << 15) & 0xefc60000UL;
+  y ^= (y >> 18);
+  
+  return y;
 }
 
 static mtrand static_mtrand;
