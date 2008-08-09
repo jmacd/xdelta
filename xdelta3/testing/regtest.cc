@@ -41,6 +41,7 @@ void InMemoryEncodeDecode(const TestOptions &options,
   xd3_stream decode_stream;
   xd3_config decode_config;
   xd3_source decode_source;
+  xoff_t verified_bytes = 0;
 
   if (coded_data) {
     coded_data->Reset();
@@ -107,8 +108,8 @@ void InMemoryEncodeDecode(const TestOptions &options,
       ret = xd3_decode_input(&decode_stream);
     }
 
-    DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
-       xd3_strerror(ret));
+    //DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+    //   xd3_strerror(ret));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -146,10 +147,6 @@ void InMemoryEncodeDecode(const TestOptions &options,
 
     case XD3_INPUT:
       if (!encoding) {
-	if (target_block.Size() < target_iterator.BlockSize()) {
-	  done = true;
-	  continue;
-	}
 	encoding = true;
 	goto process;
       } else {
@@ -163,10 +160,14 @@ void InMemoryEncodeDecode(const TestOptions &options,
 
     case XD3_WINFINISH:
       if (encoding) {
+	if (encode_stream.flags & XD3_FLUSH) {
+	  done = true;
+	  continue;
+	}
 	encoding = false;
       } else {
 	CHECK_EQ(0, CmpDifferentBlockBytes(decoded_block, target_block));
-	DP(RINT "verified block %"Q"u\n", target_iterator.Blkno());
+	verified_bytes += decoded_block.Size();
 	decoded_block.Reset();
 	encoding = true;
       }
@@ -182,6 +183,7 @@ void InMemoryEncodeDecode(const TestOptions &options,
     }
   }
 
+  CHECK_EQ(target_file.Size(), verified_bytes);
   CHECK_EQ(0, xd3_close_stream(&decode_stream));
   CHECK_EQ(0, xd3_close_stream(&encode_stream));
   xd3_free_stream(&encode_stream);
@@ -716,16 +718,16 @@ void TestMergeCommand() {
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-//   TEST(TestRandomNumbers);
-//   TEST(TestRandomFile);
-//   TEST(TestFirstByte);
-//   TEST(TestModifyMutator);
-//   TEST(TestAddMutator);
-//   TEST(TestDeleteMutator);
-//   TEST(TestCopyMutator);
-//   TEST(TestMoveMutator);
-//   TEST(TestOverwriteMutator);
-//   TEST(TestNonBlockingProgress);
+  TEST(TestRandomNumbers);
+  TEST(TestRandomFile);
+  TEST(TestFirstByte);
+  TEST(TestModifyMutator);
+  TEST(TestAddMutator);
+  TEST(TestDeleteMutator);
+  TEST(TestCopyMutator);
+  TEST(TestMoveMutator);
+  TEST(TestOverwriteMutator);
+  TEST(TestNonBlockingProgress);
   TEST(TestEmptyInMemory);
   TEST(TestMergeCommand);
   return 0;
