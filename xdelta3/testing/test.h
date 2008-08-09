@@ -34,6 +34,18 @@ extern "C" {
 #include <string>
 using std::string;
 
+#include <vector>
+using std::vector;
+
+inline string CommandToString(const vector<const char*> &v) {
+  string s(v[0]);
+  for (size_t i = 1; i < v.size() && v[i] != NULL; i++) {
+    s.append(" ");
+    s.append(v[i]);
+  }
+  return s;
+}
+
 #include <iostream>
 using std::cerr;
 using std::endl;

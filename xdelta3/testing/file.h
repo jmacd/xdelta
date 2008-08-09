@@ -137,7 +137,6 @@ public:
 
   void WriteTmpFile(TmpFile *f) const;
 
-private:
   void SetSize(size_t size) {
     size_ = size;
 
@@ -149,7 +148,7 @@ private:
       data_size_ = size;
     }
   }
-
+private:
   friend class BlockIterator;
 
   mutable uint8_t *data_;
@@ -226,8 +225,8 @@ public:
     char buf[32];
     snprintf(buf, 32, "/tmp/regtest.%d", static_counter++);
     filename_.append(buf);
+    unlink(filename_.c_str());
     main_file_init(&file_);
-    CHECK_EQ(0, main_file_open(&file_, filename_.c_str(), XO_WRITE));
   }
 
   ~TmpFile() {
@@ -236,6 +235,9 @@ public:
   }
 
   void Append(const Block *block) {
+    if (!main_file_isopen(&file_)) {
+      CHECK_EQ(0, main_file_open(&file_, filename_.c_str(), XO_WRITE));
+    }
     CHECK_EQ(0, main_file_write(&file_, 
 				block->Data(), block->Size(), 
 				"tmpfile write failed"));
@@ -245,6 +247,9 @@ public:
     CHECK_EQ(0, main_file_close(&file_));
     return filename_.c_str();
   }
+
+  // Check whether a real file matches a file spec.
+  bool EqualsSpec(const FileSpec &spec) const;
 
 private:
   string filename_;

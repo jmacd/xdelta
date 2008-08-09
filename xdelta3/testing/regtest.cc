@@ -644,16 +644,38 @@ void FourWayMergeTest(const TestOptions &options,
 
   // Merge 2
   TmpFile out;
-  const char* argv[] = {
-    "xdelta3",
-    "merge",
-    "-m", (char*)d01.Name(),
-    (char*)d12.Name(),
-    (char*)out.Name(),
-    NULL,
-  };
+  vector<const char*> mcmd;
+  mcmd.push_back("xdelta3");
+  mcmd.push_back("merge");
+  mcmd.push_back("-m");
+  mcmd.push_back(d01.Name());
+  mcmd.push_back(d12.Name());
+  mcmd.push_back(out.Name());
+  mcmd.push_back(NULL);
 
-  CHECK_EQ(0, xd3_main_cmdline(SIZEOF_ARRAY(argv) - 1, (char**)argv));
+  CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1, 
+			       const_cast<char**>(&mcmd[0])));
+  DP(RINT "Ran one merge! %s\n", CommandToString(mcmd).c_str());
+
+  TmpFile recon;
+  vector<const char*> tcmd;
+  tcmd.push_back("xdelta3");
+  tcmd.push_back("-d");
+  tcmd.push_back("-s");
+  tcmd.push_back(f0.Name());
+  tcmd.push_back(out.Name());
+  tcmd.push_back(recon.Name());
+  tcmd.push_back(NULL);
+
+  CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1, 
+			       const_cast<char**>(&tcmd[0])));
+  DP(RINT "Ran one recon! %s\n", CommandToString(tcmd).c_str());
+
+  TmpFile f2;
+  spec2.WriteTmpFile(&f2);
+  DP(RINT "Should equal! %s\n", f2.Name());
+
+  CHECK(recon.EqualsSpec(spec2));
 }
 
 void TestMergeCommand() {
@@ -718,17 +740,17 @@ void TestMergeCommand() {
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-  TEST(TestRandomNumbers);
-  TEST(TestRandomFile);
-  TEST(TestFirstByte);
-  TEST(TestModifyMutator);
-  TEST(TestAddMutator);
-  TEST(TestDeleteMutator);
-  TEST(TestCopyMutator);
-  TEST(TestMoveMutator);
-  TEST(TestOverwriteMutator);
-  TEST(TestNonBlockingProgress);
-  TEST(TestEmptyInMemory);
+//   TEST(TestRandomNumbers);
+//   TEST(TestRandomFile);
+//   TEST(TestFirstByte);
+//   TEST(TestModifyMutator);
+//   TEST(TestAddMutator);
+//   TEST(TestDeleteMutator);
+//   TEST(TestCopyMutator);
+//   TEST(TestMoveMutator);
+//   TEST(TestOverwriteMutator);
+//   TEST(TestNonBlockingProgress);
+//   TEST(TestEmptyInMemory);
   TEST(TestMergeCommand);
   return 0;
 }
