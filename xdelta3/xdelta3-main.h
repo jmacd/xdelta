@@ -1760,11 +1760,10 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 {
   int ret;
 
-  if (! xd3_decoder_needs_source (stream))
-    {
-      XPR(NT "cannot merge inputs which do not have a source file\n");
-      return XD3_INVALID;
-    }
+  //if (! xd3_decoder_needs_source (stream))
+  //{
+  //  XPR(NT "warning: merging inputs which do not have a source file\n");
+  //}
 
   if ((ret = xd3_whole_append_window (stream)))
     {
@@ -1784,6 +1783,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   usize_t inst_pos = 0;
   xoff_t output_pos = 0;
   xd3_source recode_source;
+  int at_least_once = 0;
 
   /* merge_stream is set if there were arguments.  this stream's input
    * needs to be applied to the merge_stream source. */
@@ -1802,12 +1802,17 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   recode_stream->next_in = main_bdata;
   recode_stream->flags |= XD3_FLUSH;
 
-  while (inst_pos < stream->whole_target.instlen)
+  while (inst_pos < stream->whole_target.instlen || !at_least_once)
     {
       xoff_t window_start = output_pos;
-      xoff_t window_srcmin = XOFF_T_MAX;
+      int window_srcset = 0;
+      xoff_t window_srcmin = 0;
       xoff_t window_srcmax = 0;
       usize_t window_pos = 0;
+
+      /* at_least_once ensures that we encode at least one window,
+       * which handles the 0-byte case. */
+      at_least_once = 1;
 
       XD3_ASSERT (recode_stream->enc_state == ENC_INPUT);
 
@@ -1856,8 +1861,14 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	    default: /* XD3_COPY + copy mode */
 	      if (inst->mode != 0)
 		{
-		  window_srcmin = min(window_srcmin, inst->addr);
-		  window_srcmax = max(window_srcmax, inst->addr + take);
+		  if (window_srcset) {
+		    window_srcmin = min(window_srcmin, inst->addr);
+		    window_srcmax = max(window_srcmax, inst->addr + take);
+		  } else {
+		    window_srcset = 1;
+		    window_srcmin = inst->addr;
+		    window_srcmax = inst->addr + take;
+		  }
 		  addr = inst->addr;
 		}
 	      else 
@@ -1896,11 +1907,18 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
       xd3_avail_input (recode_stream, main_bdata, window_pos);
 
       recode_stream->enc_state = ENC_INSTR;
-      recode_stream->srcwin_decided = 1;
-      recode_stream->src = &recode_source;
-      recode_source.srclen = window_srcmax - window_srcmin;
-      recode_source.srcbase = window_srcmin;
-      recode_stream->taroff = recode_source.srclen;
+
+      if (window_srcset) {
+	recode_stream->srcwin_decided = 1;
+	recode_stream->src = &recode_source;
+	recode_source.srclen = window_srcmax - window_srcmin;
+	recode_source.srcbase = window_srcmin;
+	recode_stream->taroff = recode_source.srclen;
+      } else {
+	recode_stream->srcwin_decided = 0;
+	recode_stream->src = NULL;
+	recode_stream->taroff = 0;
+      }
 
       for (;;)
 	{
@@ -3271,6 +3289,13 @@ main_input (xd3_cmd     cmd,
 
   if ((ret = main_set_secondary_flags (&config)) ||
       (ret = xd3_config_stream (& stream, & config)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (& stream, ret));
+      return EXIT_FAILURE;
+    }
+
+  if ((cmd == CMD_MERGE || cmd == CMD_MERGE_ARG) && 
+      (ret = xd3_whole_state_init (& stream)))
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
       return EXIT_FAILURE;
