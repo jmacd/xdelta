@@ -3291,12 +3291,14 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 
+#if VCDIFF_TOOLS
   if ((cmd == CMD_MERGE || cmd == CMD_MERGE_ARG) && 
       (ret = xd3_whole_state_init (& stream)))
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
       return EXIT_FAILURE;
     }
+#endif
 
   if (IS_ENCODE (cmd) && sfile->filename != NULL &&
       (ret = xd3_set_source (& stream, & source)))
