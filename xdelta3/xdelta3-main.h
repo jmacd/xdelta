@@ -1760,11 +1760,6 @@ main_merge_func (xd3_stream* stream, main_file *no_write)
 {
   int ret;
 
-  //if (! xd3_decoder_needs_source (stream))
-  //{
-  //  XPR(NT "warning: merging inputs which do not have a source file\n");
-  //}
-
   if ((ret = xd3_whole_append_window (stream)))
     {
       return ret;
@@ -1802,6 +1797,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   recode_stream->next_in = main_bdata;
   recode_stream->flags |= XD3_FLUSH;
 
+  /* This encodes the entire target. */
   while (inst_pos < stream->whole_target.instlen || !at_least_once)
     {
       xoff_t window_start = output_pos;
@@ -1835,6 +1831,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  main_bsize = stream->dec_tgtlen;
 	}
 
+      /* This encodes a single target window. */
       while (window_pos < stream->dec_tgtlen &&
 	     inst_pos < stream->whole_target.instlen)
 	{

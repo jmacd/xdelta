@@ -94,7 +94,8 @@ void InMemoryEncodeDecode(const TestOptions &options,
   while (!done) {
     target_iterator.Get(&target_block);
 
-    if (target_block.Size() < target_iterator.BlockSize()) {
+    if (target_file.Blocks() == 0 ||
+	target_iterator.Blkno() == (target_file.Blocks() - 1)) {
       xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
     }
 
@@ -614,14 +615,32 @@ void TestEmptyInMemory() {
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
   TestOptions options;
-  Block delta;
+  Block block;
 
   spec0.GenerateFixedSize(0);
   spec1.GenerateFixedSize(0);
 
-  InMemoryEncodeDecode(options, spec0, spec1, &delta);
+  InMemoryEncodeDecode(options, spec0, spec1, &block);
 
-  CHECK_LT(0, delta.Size());
+  Delta delta(block);
+  CHECK_LT(0, block.Size());
+  CHECK_EQ(1, delta.Windows());
+}
+
+void TestBlockInMemory() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  TestOptions options;
+  Block block;
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
+  spec1.GenerateFixedSize(Constants::BLOCK_SIZE);
+
+  InMemoryEncodeDecode(options, spec0, spec1, &block);
+
+  Delta delta(block);
+  CHECK_EQ(1, delta.Windows());
 }
 
 void FourWayMergeTest(const TestOptions &options,
@@ -657,9 +676,9 @@ void FourWayMergeTest(const TestOptions &options,
   mcmd.push_back(out.Name());
   mcmd.push_back(NULL);
 
+  DP(RINT "Running one merge: %s\n", CommandToString(mcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1, 
 			       const_cast<char**>(&mcmd[0])));
-  DP(RINT "Ran one merge! %s\n", CommandToString(mcmd).c_str());
 
   ExtFile recon;
   vector<const char*> tcmd;
@@ -741,17 +760,18 @@ void TestMergeCommand() {
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-//   TEST(TestRandomNumbers);
-//   TEST(TestRandomFile);
-//   TEST(TestFirstByte);
-//   TEST(TestModifyMutator);
-//   TEST(TestAddMutator);
-//   TEST(TestDeleteMutator);
-//   TEST(TestCopyMutator);
-//   TEST(TestMoveMutator);
-//   TEST(TestOverwriteMutator);
-//   TEST(TestNonBlockingProgress);
-//   TEST(TestEmptyInMemory);
+  TEST(TestRandomNumbers);
+  TEST(TestRandomFile);
+  TEST(TestFirstByte);
+  TEST(TestEmptyInMemory);
+  TEST(TestBlockInMemory);
+  TEST(TestModifyMutator);
+  TEST(TestAddMutator);
+  TEST(TestDeleteMutator);
+  TEST(TestCopyMutator);
+  TEST(TestMoveMutator);
+  TEST(TestOverwriteMutator);
+  TEST(TestNonBlockingProgress);
   TEST(TestMergeCommand);
   return 0;
 }

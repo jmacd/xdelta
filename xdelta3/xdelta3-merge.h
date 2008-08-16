@@ -196,6 +196,8 @@ xd3_whole_append_window (xd3_stream *stream)
 {
   int ret;
 
+  stream->whole_target.windows += 1;
+
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
       if ((ret = xd3_decode_instruction (stream)))

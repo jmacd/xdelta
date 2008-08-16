@@ -14,6 +14,10 @@ public:
     return stream_.whole_target.addslen;
   }
 
+  xoff_t Windows() const {
+    return stream_.whole_target.windows;
+  }
+
   void Print() const;
 
 private:
