@@ -635,15 +635,19 @@ void FourWayMergeTest(const TestOptions &options,
   InMemoryEncodeDecode(options, spec1, spec2, &delta12);
   InMemoryEncodeDecode(options, spec2, spec3, &delta23);
 
-  TmpFile f0, d01, d12, d23;
+  TmpFile f0, f1, f2, f3, d01, d12, d23;
 
   spec0.WriteTmpFile(&f0);
+  spec1.WriteTmpFile(&f1);
+  spec2.WriteTmpFile(&f2);
+  spec2.WriteTmpFile(&f3);
+
   delta01.WriteTmpFile(&d01);
   delta12.WriteTmpFile(&d12);
   delta23.WriteTmpFile(&d23);
 
   // Merge 2
-  TmpFile out;
+  ExtFile out;
   vector<const char*> mcmd;
   mcmd.push_back("xdelta3");
   mcmd.push_back("merge");
@@ -657,7 +661,7 @@ void FourWayMergeTest(const TestOptions &options,
 			       const_cast<char**>(&mcmd[0])));
   DP(RINT "Ran one merge! %s\n", CommandToString(mcmd).c_str());
 
-  TmpFile recon;
+  ExtFile recon;
   vector<const char*> tcmd;
   tcmd.push_back("xdelta3");
   tcmd.push_back("-d");
@@ -670,9 +674,6 @@ void FourWayMergeTest(const TestOptions &options,
   CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1, 
 			       const_cast<char**>(&tcmd[0])));
   DP(RINT "Ran one recon! %s\n", CommandToString(tcmd).c_str());
-
-  TmpFile f2;
-  spec2.WriteTmpFile(&f2);
   DP(RINT "Should equal! %s\n", f2.Name());
 
   CHECK(recon.EqualsSpec(spec2));

@@ -299,9 +299,9 @@ xd3_merge_add (xd3_stream *stream,
   oinst->position = stream->whole_target.length;
   stream->whole_target.length += iinst->size;
 
-  memcpy(stream->whole_target.adds,
+  memcpy(stream->whole_target.adds + stream->whole_target.addslen,
 	 target->adds + iinst->addr,
-	 stream->whole_target.addslen);
+	 iinst->size);
 
   stream->whole_target.addslen += iinst->size;
 

@@ -217,42 +217,58 @@ private:
   size_t blksize_;
 };
 
-class TmpFile {
+class ExtFile {
 public:
-  // TODO this is a little unportable!
-  TmpFile() {
+  ExtFile() {
     static int static_counter = 0;
     char buf[32];
     snprintf(buf, 32, "/tmp/regtest.%d", static_counter++);
     filename_.append(buf);
     unlink(filename_.c_str());
-    main_file_init(&file_);
   }
 
-  ~TmpFile() {
+  ~ExtFile() {
     unlink(filename_.c_str());
-    main_file_cleanup(&file_);
-  }
-
-  void Append(const Block *block) {
-    if (!main_file_isopen(&file_)) {
-      CHECK_EQ(0, main_file_open(&file_, filename_.c_str(), XO_WRITE));
-    }
-    CHECK_EQ(0, main_file_write(&file_, 
-				block->Data(), block->Size(), 
-				"tmpfile write failed"));
   }
 
   const char* Name() const {
-    CHECK_EQ(0, main_file_close(&file_));
     return filename_.c_str();
   }
 
   // Check whether a real file matches a file spec.
   bool EqualsSpec(const FileSpec &spec) const;
 
-private:
+protected:
   string filename_;
+};
+
+class TmpFile : public ExtFile {
+public:
+  // TODO this is a little unportable!
+  TmpFile() {
+    main_file_init(&file_);
+    CHECK_EQ(0, main_file_open(&file_, filename_.c_str(), XO_WRITE));
+  }
+
+  ~TmpFile() {
+    main_file_cleanup(&file_);
+  }
+
+  void Append(const Block *block) {
+    CHECK_EQ(0, main_file_write(&file_, 
+				block->Data(), block->Size(), 
+				"tmpfile write failed"));
+  }
+
+
+  const char* Name() const {
+    if (main_file_isopen(&file_)) {
+      CHECK_EQ(0, main_file_close(&file_));
+    }
+    return ExtFile::Name();
+  }
+
+private:
   mutable main_file file_;
 };
 

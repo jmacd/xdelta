@@ -41,7 +41,7 @@ inline xoff_t CmpDifferentBytes(const FileSpec &a, const FileSpec &b) {
   return total;
 }
 
-inline bool TmpFile::EqualsSpec(const FileSpec &spec) const {
+inline bool ExtFile::EqualsSpec(const FileSpec &spec) const {
   main_file t;
   main_file_init(&t);
   CHECK_EQ(0, main_file_open(&t, Name(), XO_READ));
