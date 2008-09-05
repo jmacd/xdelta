@@ -3370,33 +3370,12 @@ main_input (xd3_cmd     cmd,
 	     * the sources. */
 	    if (cmd == CMD_DECODE)
 	      {
-		int have_src = sfile->filename != NULL;
-		int need_src = xd3_decoder_needs_source (& stream);
-		int recv_src;
-
 		/* May need to set the sfile->filename if none was given. */
 		main_get_appheader (& stream, ifile, ofile, sfile);
 
-		recv_src = sfile->filename != NULL;
-
-		/* Check if the user expected a source to be required although
-		 * it was not. */
-		if (have_src && ! need_src && option_verbose)
-		  {
-		    XPR(NT "warning: output window %"Q"u does not "
-			"copy source\n", stream.current_window);
-		  }
-
-		/* Check if we have no source name and need one. */
-		if (need_src && ! recv_src)
-		  {
-		    XPR(NT "input requires a source file, use -s\n");
-		    return EXIT_FAILURE;
-		  }
-
 		/* Now open the source file. */
-		if (need_src &&
-		    (ret = main_set_source (& stream, cmd, sfile, & source)))
+		  if ((sfile->filename != NULL) &&
+		      (ret = main_set_source (& stream, cmd, sfile, & source)))
 		  {
 		    return EXIT_FAILURE;
 		  }
@@ -3406,8 +3385,7 @@ main_input (xd3_cmd     cmd,
 		     cmd == CMD_PRINTDELTA ||
 		     cmd == CMD_RECODE)
 	      {
-		if (xd3_decoder_needs_source (& stream) &&
-		    sfile->filename == NULL)
+		if (sfile->filename == NULL)
 		  {
 		    allow_fake_source = 1;
 		    sfile->filename = "<placeholder>";

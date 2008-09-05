@@ -23,15 +23,6 @@
                      VCD_SOURCE : ((((x) & VCD_SRCORTGT) == \
                                     VCD_TARGET) ? VCD_TARGET : 0))
 
-/* Return true if the caller must provide a source.  Theoretically,
- * this has to be checked after every window.  It could be that the
- * first window requires no source, but the second window does.  In
- * practice? */
-int xd3_decoder_needs_source (xd3_stream *stream)
-{
-  return stream->dec_win_ind & VCD_SOURCE;
-}
-
 /* Initialize the decoder for a new window.  The dec_tgtlen value is
  * preserved across successive window decodings, and the update to
  * dec_winstart is delayed until a new window actually starts.  This

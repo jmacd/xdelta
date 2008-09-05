@@ -690,12 +690,14 @@ void FourWayMergeTest(const TestOptions &options,
   tcmd.push_back(recon.Name());
   tcmd.push_back(NULL);
 
+  DP(RINT "Running one recon! %s\n", CommandToString(tcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1, 
 			       const_cast<char**>(&tcmd[0])));
-  DP(RINT "Ran one recon! %s\n", CommandToString(tcmd).c_str());
   DP(RINT "Should equal! %s\n", f2.Name());
 
   CHECK(recon.EqualsSpec(spec2));
+
+  /* TODO: we've only done 3-way merges, try 4-way. */
 }
 
 void TestMergeCommand1() {
@@ -758,6 +760,8 @@ void TestMergeCommand1() {
 
 void TestMergeCommand2() {
   /* Same as above, different mutation pattern. */
+  /* TODO: run this with large sizes too */
+  /* TODO: run this with small sizes too */
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
@@ -806,6 +810,7 @@ void TestMergeCommand2() {
 	  spec0.ModifyTo(ChangeListMutator(cl3), &spec3);
 
 	  FourWayMergeTest(options, spec0, spec1, spec2, spec3);
+	  FourWayMergeTest(options, spec3, spec2, spec1, spec0);
 	}
       }
     }
@@ -816,19 +821,19 @@ void TestMergeCommand2() {
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-//   TEST(TestRandomNumbers);
-//   TEST(TestRandomFile);
-//   TEST(TestFirstByte);
-//   TEST(TestEmptyInMemory);
-//   TEST(TestBlockInMemory);
-//   TEST(TestModifyMutator);
-//   TEST(TestAddMutator);
-//   TEST(TestDeleteMutator);
-//   TEST(TestCopyMutator);
-//   TEST(TestMoveMutator);
-//   TEST(TestOverwriteMutator);
-//   TEST(TestNonBlockingProgress);
-//   TEST(TestMergeCommand1);
+  TEST(TestRandomNumbers);
+  TEST(TestRandomFile);
+  TEST(TestFirstByte);
+  TEST(TestEmptyInMemory);
+  TEST(TestBlockInMemory);
+  TEST(TestModifyMutator);
+  TEST(TestAddMutator);
+  TEST(TestDeleteMutator);
+  TEST(TestCopyMutator);
+  TEST(TestMoveMutator);
+  TEST(TestOverwriteMutator);
+  TEST(TestNonBlockingProgress);
+  TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
   return 0;
 }

@@ -183,7 +183,9 @@ xd3_whole_append_inst (xd3_stream *stream,
 	}
       else
 	{
-	  winst->addr = stream->total_out + inst->addr - stream->dec_cpylen;
+	  winst->addr = (stream->dec_winstart + 
+			 inst->addr - 
+			 stream->dec_cpylen);
 	}
       break;
     }
@@ -207,16 +209,16 @@ xd3_whole_append_window (xd3_stream *stream)
 
       if ((stream->dec_current1.type != XD3_NOOP) &&
           (ret = xd3_whole_append_inst (stream,
-                                        & stream->dec_current1)))
+					& stream->dec_current1)))
 	{
-          return ret;
+	  return ret;
 	}
 
       if ((stream->dec_current2.type != XD3_NOOP) &&
-          (ret = xd3_whole_append_inst (stream,
-                                        & stream->dec_current2)))
+	  (ret = xd3_whole_append_inst (stream,
+					& stream->dec_current2)))
 	{
-          return ret;
+	  return ret;
 	}
     }
 
@@ -316,8 +318,6 @@ xd3_merge_target_copy (xd3_stream *stream,
 {
   int ret;
   xd3_winst *oinst;
-
-  // TODO: this is totally untested
 
   if ((ret = xd3_whole_alloc_winst (stream, &oinst)))
     {

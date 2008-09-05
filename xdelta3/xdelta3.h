@@ -1141,9 +1141,10 @@ void    xd3_free_stream   (xd3_stream    *stream);
  * be called before the first xd3_encode_input.  A NULL source is
  * ignored.  For decoding, this should be called before the first
  * window is decoded, but the appheader may be read first
- * (XD3_GOTHEADER).  At this point, consult
- * xd3_decoder_needs_source(), inlined below, to determine if a source
- * is expected by the decoder. */
+ * (XD3_GOTHEADER).  After decoding the header, call xd3_set_source()
+ * if you have a source file.  Note: if (stream->dec_win_ind & VCD_SOURCE)
+ * is true, it means the first window expects there to be a source file.
+ */
 int     xd3_set_source    (xd3_stream    *stream,
 			   xd3_source    *source);
 
@@ -1160,12 +1161,6 @@ void    xd3_set_appheader (xd3_stream    *stream,
 int     xd3_get_appheader (xd3_stream     *stream,
 			   uint8_t       **data,
 			   usize_t        *size);
-
-/* After receiving XD3_GOTHEADER, the decoder should check this
- * function which returns 1 if the decoder will require source
- * data. */
-int     xd3_decoder_needs_source (xd3_stream *stream);
-
 
 /* To generate a VCDIFF encoded delta with xd3_encode_init() from
  * another format, use:
