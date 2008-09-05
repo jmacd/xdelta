@@ -100,6 +100,7 @@ using regtest::CmpDifferentBytes;
 #include "sizes.h"
 using regtest::SizeIterator;
 using regtest::SmallSizes;
+using regtest::LargeSizes;
 
 #include "delta.h"
 using regtest::Delta;

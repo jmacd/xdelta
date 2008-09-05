@@ -52,4 +52,18 @@ size_t SmallSizes::sizes[] = {
 
 size_t SmallSizes::max_value = Constants::BLOCK_SIZE * 3;
 
+class LargeSizes {
+public:
+  static size_t sizes[];
+  static size_t max_value;
+};
+
+size_t LargeSizes::sizes[] = {
+  1 << 20,
+  1 << 18,
+  1 << 16,
+};
+
+size_t LargeSizes::max_value = 1<<20;
+
 }  // namespace regtest

@@ -698,7 +698,7 @@ void FourWayMergeTest(const TestOptions &options,
   CHECK(recon.EqualsSpec(spec2));
 }
 
-void TestMergeCommand() {
+void TestMergeCommand1() {
   /* Repeat random-input testing for a number of iterations.
    * Test 2, 3, and 4-file scenarios (i.e., 1, 2, and 3-delta merges). */
   MTRandom rand;
@@ -756,22 +756,79 @@ void TestMergeCommand() {
   }
 }
 
+void TestMergeCommand2() {
+  /* Same as above, different mutation pattern. */
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  FileSpec spec2(&rand);
+  FileSpec spec3(&rand);
+
+  TestOptions options;
+
+  SizeIterator<size_t, LargeSizes> si0(&rand, 10);
+
+  for (; !si0.Done(); si0.Next()) {
+    size_t size0 = si0.Get();
+
+    SizeIterator<size_t, LargeSizes> si1(&rand, 10);
+    for (; !si1.Done(); si1.Next()) {
+      size_t size1 = si1.Get();
+
+      SizeIterator<size_t, LargeSizes> si2(&rand, 10);
+      for (; !si2.Done(); si2.Next()) {
+	size_t size2 = si2.Get();
+
+	SizeIterator<size_t, LargeSizes> si3(&rand, 10);
+	for (; !si3.Done(); si3.Next()) {
+	  size_t size3 = si3.Get();
+	  
+	  // We're only interested in three sizes, strictly decreasing. */
+	  if (size3 >= size2 || size2 >= size1 || size1 >= size0) {
+	    continue;
+	  }
+
+	  DP(RINT "S0 = %lu\n", size0);
+	  DP(RINT "S1 = %lu\n", size1);
+	  DP(RINT "S2 = %lu\n", size2);
+	  DP(RINT "S3 = %lu\n", size3);
+
+	  spec0.GenerateFixedSize(size0);
+
+	  ChangeList cl1, cl2, cl3;
+      
+	  cl1.push_back(Change(Change::DELETE, size0 - size1, 0));
+	  cl2.push_back(Change(Change::DELETE, size0 - size2, 0));
+	  cl3.push_back(Change(Change::DELETE, size0 - size3, 0));
+
+	  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+	  spec0.ModifyTo(ChangeListMutator(cl2), &spec2);
+	  spec0.ModifyTo(ChangeListMutator(cl3), &spec3);
+
+	  FourWayMergeTest(options, spec0, spec1, spec2, spec3);
+	}
+      }
+    }
+  }
+}
+
 }  // anonymous namespace
 
 int main(int argc, char **argv) {
 #define TEST(x) cerr << #x << "..." << endl; x()
-  TEST(TestRandomNumbers);
-  TEST(TestRandomFile);
-  TEST(TestFirstByte);
-  TEST(TestEmptyInMemory);
-  TEST(TestBlockInMemory);
-  TEST(TestModifyMutator);
-  TEST(TestAddMutator);
-  TEST(TestDeleteMutator);
-  TEST(TestCopyMutator);
-  TEST(TestMoveMutator);
-  TEST(TestOverwriteMutator);
-  TEST(TestNonBlockingProgress);
-  TEST(TestMergeCommand);
+//   TEST(TestRandomNumbers);
+//   TEST(TestRandomFile);
+//   TEST(TestFirstByte);
+//   TEST(TestEmptyInMemory);
+//   TEST(TestBlockInMemory);
+//   TEST(TestModifyMutator);
+//   TEST(TestAddMutator);
+//   TEST(TestDeleteMutator);
+//   TEST(TestCopyMutator);
+//   TEST(TestMoveMutator);
+//   TEST(TestOverwriteMutator);
+//   TEST(TestNonBlockingProgress);
+//   TEST(TestMergeCommand1);
+  TEST(TestMergeCommand2);
   return 0;
 }
