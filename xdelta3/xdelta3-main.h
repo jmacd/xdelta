@@ -1233,7 +1233,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
   int ret;
   usize_t size = 0;
 
-  VC(UT "  Offset Code Type1 Size1 @Addr1 + Type2 Size2 @Addr2\n")VE;
+  VC(UT "  Offset Code Type1 Size1  @Addr1 + Type2 Size2 @Addr2\n")VE;
 
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
@@ -1254,7 +1254,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
       addr_bytes = stream->addr_sect.buf - addr_before;
       inst_bytes = stream->inst_sect.buf - inst_before;
 
-      VC(UT "  %06"Q"u %03u  %s %3u", stream->dec_winstart + size, 
+      VC(UT "  %06"Q"u %03u  %s %6u", stream->dec_winstart + size, 
 	 option_print_cpymode ? code : 0,
 	 xd3_rtype_to_string ((xd3_rtype) stream->dec_current1.type, option_print_cpymode),
 	 (usize_t) stream->dec_current1.size)VE;
@@ -1263,8 +1263,16 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	{
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-6"Q"u", 
-		 stream->dec_cpyoff + stream->dec_current1.addr)VE;
+	      if (stream->dec_current1.addr >= stream->dec_cpylen) 
+		{
+		  VC(UT " T@%-6"Q"u", 
+		     stream->dec_current1.addr - stream->dec_cpylen)VE;
+		} 
+	      else
+		{
+		  VC(UT " S@%-6"Q"u", 
+		     stream->dec_cpyoff + stream->dec_current1.addr)VE;
+		}
 	    }
 	  else
 	    {
@@ -1276,15 +1284,23 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
       if (stream->dec_current2.type != XD3_NOOP)
 	{
-	  VC(UT "  %s %3u",
+	  VC(UT "  %s %6u",
 	     xd3_rtype_to_string ((xd3_rtype) stream->dec_current2.type,
 				  option_print_cpymode),
 	     (usize_t)stream->dec_current2.size)VE;
 
 	  if (stream->dec_current2.type >= XD3_CPY)
 	    {
-	      VC(UT " @%-6"Q"u", 
-		 stream->dec_cpyoff + stream->dec_current2.addr)VE;
+	      if (stream->dec_current2.addr >= stream->dec_cpylen) 
+		{
+		  VC(UT " T@%-6"Q"u", 
+		     stream->dec_current2.addr - stream->dec_cpylen)VE;
+		} 
+	      else
+		{
+		  VC(UT " S@%-6"Q"u", 
+		     stream->dec_cpyoff + stream->dec_current2.addr)VE;
+		}
 	    }
 
 	  size += stream->dec_current2.size;
