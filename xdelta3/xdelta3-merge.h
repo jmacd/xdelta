@@ -455,7 +455,7 @@ xd3_merge_source_copy (xd3_stream *stream,
 	  stream->whole_target.addslen += this_take;
 	  break;
 	default:
-	  minst->mode = VCD_SOURCE;
+	  minst->mode = sinst->mode;
 	  minst->addr = sinst->addr + sinst_offset;
 	  break;
 	}
