@@ -2295,6 +2295,7 @@ xd3_free_stream (xd3_stream *stream)
 
   xd3_free (stream, stream->whole_target.adds);
   xd3_free (stream, stream->whole_target.inst);
+  xd3_free (stream, stream->whole_target.winsizes);
 
   XD3_ASSERT (stream->alloc_cnt == stream->free_cnt);
 

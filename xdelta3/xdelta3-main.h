@@ -1265,7 +1265,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      if (stream->dec_current1.addr >= stream->dec_cpylen) 
 		{
-		  VC(UT " T@%-6"Q"u", 
+		  VC(UT " T@%-6u", 
 		     stream->dec_current1.addr - stream->dec_cpylen)VE;
 		} 
 	      else
@@ -1293,7 +1293,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      if (stream->dec_current2.addr >= stream->dec_cpylen) 
 		{
-		  VC(UT " T@%-6"Q"u", 
+		  VC(UT " T@%-6u", 
 		     stream->dec_current2.addr - stream->dec_cpylen)VE;
 		} 
 	      else
@@ -1794,6 +1794,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   usize_t inst_pos = 0;
   xoff_t output_pos = 0;
   xd3_source recode_source;
+  usize_t window_num = 0;
   int at_least_once = 0;
 
   /* merge_stream is set if there were arguments.  this stream's input
@@ -1821,6 +1822,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
       xoff_t window_srcmin = 0;
       xoff_t window_srcmax = 0;
       usize_t window_pos = 0;
+      usize_t window_size;
 
       /* at_least_once ensures that we encode at least one window,
        * which handles the 0-byte case. */
@@ -1834,25 +1836,31 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  return XD3_INVALID;
 	}
 
-      if (main_bsize < stream->dec_tgtlen)
+      /* Window sizes must match from the input to the output, so that
+       * target copies are in-range (and so that checksums carry
+       * over). */
+      XD3_ASSERT (window_num < stream->whole_target.winsizeslen);
+      window_size = stream->whole_target.winsizes[window_num++];
+
+      if (main_bsize < window_size)
 	{
 	  main_free (main_bdata);
 	  main_bdata = NULL;
 	  main_bsize = 0;
 	  if ((main_bdata = (uint8_t*) 
-	       main_malloc (stream->dec_tgtlen)) == NULL)
+	       main_malloc (window_size)) == NULL)
 	    {
 	      return ENOMEM;
 	    }
-	  main_bsize = stream->dec_tgtlen;
+	  main_bsize = window_size;
 	}
 
       /* This encodes a single target window. */
-      while (window_pos < stream->dec_tgtlen &&
+      while (window_pos < window_size &&
 	     inst_pos < stream->whole_target.instlen)
 	{
 	  xd3_winst *inst = &stream->whole_target.inst[inst_pos];
-	  usize_t take = min(inst->size, stream->dec_tgtlen - window_pos);
+	  usize_t take = min(inst->size, window_size - window_pos);
 	  xoff_t addr;
 
 	  switch (inst->type)

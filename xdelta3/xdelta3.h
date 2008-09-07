@@ -643,9 +643,15 @@ struct _xd3_whole_state {
   usize_t addslen;
   uint8_t *adds;
   usize_t  adds_alloc;
+
   usize_t instlen;
   xd3_winst *inst;
   usize_t  inst_alloc;
+
+  usize_t winsizeslen;
+  usize_t *winsizes;
+  usize_t winsizes_alloc;
+
   xoff_t length;
   xoff_t windows;
 };

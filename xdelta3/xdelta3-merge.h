@@ -28,15 +28,19 @@ xd3_whole_state_init (xd3_stream *stream)
 {
   XD3_ASSERT (stream->whole_target.adds == NULL);
   XD3_ASSERT (stream->whole_target.inst == NULL);
+  XD3_ASSERT (stream->whole_target.winsizes == NULL);
   XD3_ASSERT (stream->whole_target.length == 0);
 
   stream->whole_target.adds_alloc = XD3_ALLOCSIZE;
-  stream->whole_target.inst_alloc = XD3_ALLOCSIZE / sizeof (xd3_winst);
+  stream->whole_target.inst_alloc = XD3_ALLOCSIZE;
+  stream->whole_target.winsizes_alloc = XD3_ALLOCSIZE;
 
   if ((stream->whole_target.adds = (uint8_t*) 
-       xd3_alloc (stream, XD3_ALLOCSIZE, 1)) == NULL ||
+       xd3_alloc (stream, stream->whole_target.adds_alloc, 1)) == NULL ||
       (stream->whole_target.inst = (xd3_winst*) 
-       xd3_alloc (stream, XD3_ALLOCSIZE, sizeof(xd3_winst))) == NULL)
+       xd3_alloc (stream, stream->whole_target.inst_alloc, 1)) == NULL ||
+      (stream->whole_target.winsizes = (usize_t*) 
+       xd3_alloc (stream, stream->whole_target.winsizes_alloc, 1)) == NULL)
     {
       return ENOMEM;
     }
@@ -50,6 +54,7 @@ xd3_swap_whole_state (xd3_whole_state *a,
   xd3_whole_state tmp;
   XD3_ASSERT (a->inst != NULL && a->adds != NULL);
   XD3_ASSERT (b->inst != NULL && b->adds != NULL);
+  XD3_ASSERT (b->winsizes != NULL && b->winsizes != NULL);
   memcpy (&tmp, a, sizeof (xd3_whole_state));
   memcpy (a, b, sizeof (xd3_whole_state));
   memcpy (b, &tmp, sizeof (xd3_whole_state));
@@ -134,6 +139,27 @@ xd3_whole_alloc_adds (xd3_stream *stream,
 }
 
 static int
+xd3_whole_alloc_winsize (xd3_stream *stream,
+			 usize_t **winsizep)
+{
+  int ret;
+
+  if ((ret = xd3_realloc_buffer (stream, 
+				 stream->whole_target.winsizeslen, 
+				 sizeof (xd3_winst),
+				 1,
+				 & stream->whole_target.winsizes_alloc, 
+				 (void**) & stream->whole_target.winsizes))) 
+    { 
+      return ret; 
+    }
+
+  *winsizep = &stream->whole_target.winsizes[stream->whole_target.winsizeslen++];
+
+  return 0;
+}
+
+static int
 xd3_whole_append_inst (xd3_stream *stream,
                        xd3_hinst *inst)
 {
@@ -197,8 +223,13 @@ int
 xd3_whole_append_window (xd3_stream *stream)
 {
   int ret;
+  usize_t *winsize;
 
   stream->whole_target.windows += 1;
+  
+  if ((ret = xd3_whole_alloc_winsize (stream, &winsize))) { return ret; }
+
+  *winsize = stream->dec_tgtlen;
 
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
@@ -325,7 +356,6 @@ xd3_merge_target_copy (xd3_stream *stream,
     }
 
   XD3_ASSERT (stream->whole_target.length == iinst->position);
-  stream->whole_target.length += iinst->size;
 
   memcpy (oinst, iinst, sizeof (*oinst));
   return 0;
@@ -381,7 +411,7 @@ xd3_merge_find_position (xd3_stream *stream,
 static int
 xd3_merge_source_copy (xd3_stream *stream,
 		       xd3_whole_state *source,
-		       xd3_winst *iinst_orig)
+		       const xd3_winst *iinst_orig)
 {
   int ret;
   xd3_winst iinst;
@@ -455,12 +485,35 @@ xd3_merge_source_copy (xd3_stream *stream,
 	  stream->whole_target.addslen += this_take;
 	  break;
 	default:
-	  minst->mode = sinst->mode;
-	  minst->addr = sinst->addr + sinst_offset;
+	  if (sinst->mode != 0)
+	    {
+	      minst->mode = sinst->mode;
+	      minst->addr = sinst->addr + sinst_offset;
+	    }
+	  else
+	    {
+	      // TODO: this is slow because of the recursion, which
+	      // could reach a depth equal to the number of target
+	      // copies, and this is compression-inefficient because
+	      // it can produce duplicate adds.
+	      xd3_winst tinst;
+	      tinst.type = XD3_CPY;
+	      tinst.mode = iinst.mode;
+	      tinst.addr = sinst->addr + sinst_offset;
+	      tinst.size = this_take;
+	      tinst.position = iinst.position;
+
+	      // The instruction allocated in this frame will not be used.
+	      stream->whole_target.instlen -= 1;
+
+	      if ((ret = xd3_merge_source_copy (stream, source, &tinst)))
+		{ 
+		  return ret;
+		}
+	    }
 	  break;
 	}
 
-      stream->whole_target.length += this_take;
       iinst.position += this_take;
       iinst.addr += this_take;
       iinst.size -= this_take;
@@ -477,7 +530,16 @@ int xd3_merge_inputs (xd3_stream *stream,
 		      xd3_whole_state *input)
 {
   int ret = 0;
+  usize_t i;
   size_t input_i;
+
+  for (i = 0; i < input->winsizeslen; ++i) {
+    usize_t *copysize;
+
+    if ((ret = xd3_whole_alloc_winsize (stream, &copysize))) { return ret; }
+
+    *copysize = input->winsizes[i];
+  }
 
   /* iterate over each instruction. */
   for (input_i = 0; ret == 0 && input_i < input->instlen; ++input_i)
@@ -493,7 +555,7 @@ int xd3_merge_inputs (xd3_stream *stream,
 	  ret = xd3_merge_add (stream, input, iinst);
 	  break;
 	default:
-	  /* Note: VCD_TARGET support is completely untested all 
+	  /* TODO: VCD_TARGET support is completely untested all
 	   * throughout. */
 	  if (iinst->mode == 0 || iinst->mode == VCD_TARGET)
 	    {
@@ -503,6 +565,10 @@ int xd3_merge_inputs (xd3_stream *stream,
 	    {
 	      ret = xd3_merge_source_copy (stream, source, iinst);
 	    }
+
+	  /* The whole_target.length is not updated in the xd3_merge*copy
+	   * routine because of recursion in xd3_merge_source_copy. */
+	  stream->whole_target.length += iinst->size;
 	  break;
 	}
     }
