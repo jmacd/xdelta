@@ -135,7 +135,7 @@ typedef uint64_t xoff_t;
 #define SIZEOF_XOFF_T 8
 #define SIZEOF_USIZE_T 4
 #ifndef WIN32
-#define Q "q"
+#define Q "ll"
 #else
 #define Q "I64"
 #endif
