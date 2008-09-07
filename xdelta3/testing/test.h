@@ -68,6 +68,10 @@ pair<T, U> make_pair(const T& t, const U& u) {
 
 class Constants {
 public:
+  // TODO: need to repeat the tests with different block sizes
+  // 1 << 7 triggers some bugs, 1 << 20 triggers others.
+  //
+  //static const xoff_t BLOCK_SIZE = 1 << 20;
   static const xoff_t BLOCK_SIZE = 1 << 7;
 };
 

@@ -88,8 +88,8 @@ void InMemoryEncodeDecode(const TestOptions &options,
   bool encoding = true;
   bool done = false;
 
-  DP(RINT "source %"Q"u target %"Q"u\n",
-     source_file.Size(), target_file.Size());
+  //DP(RINT "source %"Q"u target %"Q"u\n",
+  //   source_file.Size(), target_file.Size());
 
   while (!done) {
     target_iterator.Get(&target_block);
@@ -136,6 +136,12 @@ void InMemoryEncodeDecode(const TestOptions &options,
     case XD3_GETSRCBLK: {
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
+//       if (encoding) {
+// 	DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
+// 	   encode_source.getblkno,
+// 	   encode_stream.match_last_srcpos,
+// 	   encode_stream.input_position);
+//       }
       
       source_iterator.SetBlock(src->getblkno);
       source_iterator.Get(block);
@@ -770,20 +776,19 @@ void TestMergeCommand2() {
 
   TestOptions options;
 
-  SizeIterator<size_t, LargeSizes> si0(&rand, 10);
-
+  SizeIterator<size_t, SmallSizes> si0(&rand, 10);
   for (; !si0.Done(); si0.Next()) {
     size_t size0 = si0.Get();
 
-    SizeIterator<size_t, LargeSizes> si1(&rand, 10);
+    SizeIterator<size_t, SmallSizes> si1(&rand, 10);
     for (; !si1.Done(); si1.Next()) {
       size_t size1 = si1.Get();
 
-      SizeIterator<size_t, LargeSizes> si2(&rand, 10);
+      SizeIterator<size_t, SmallSizes> si2(&rand, 10);
       for (; !si2.Done(); si2.Next()) {
 	size_t size2 = si2.Get();
 
-	SizeIterator<size_t, LargeSizes> si3(&rand, 10);
+	SizeIterator<size_t, SmallSizes> si3(&rand, 10);
 	for (; !si3.Done(); si3.Next()) {
 	  size_t size3 = si3.Get();
 	  
