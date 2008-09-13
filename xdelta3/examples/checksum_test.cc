@@ -671,7 +671,7 @@ int main(int argc, char** argv) {
       return 1;
     }
 
-    fprintf(stderr, "file %s is %u bytes\n",
+    fprintf(stderr, "file %s is %zu bytes\n",
 	    argv[i], buf_len);
 
     double min_time = -1.0;

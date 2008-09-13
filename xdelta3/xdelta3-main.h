@@ -373,8 +373,8 @@ static int main_help (void);
 static int
 main_version (void)
 {
-  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, Joshua MacDonald\n\");" $ */
-  DP(RINT "Xdelta version 3.0t, Copyright (C) 2007, Joshua MacDonald\n");
+  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, Joshua MacDonald\n\");" $ */
+  DP(RINT "Xdelta version 3.0u, Copyright (C) 2007, 2008, Joshua MacDonald\n");
   DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   DP(RINT "This is free software, and you are welcome to redistribute it\n");
   DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
@@ -3615,6 +3615,7 @@ done:
       return EXIT_FAILURE;
     }
 
+#if XD3_ENCODER
   if (option_verbose > 1 && cmd == CMD_ENCODE)
     {
       XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
@@ -3634,6 +3635,7 @@ done:
       XPR(NT "adds: %"Q"u (%"Q"u bytes)\n", stream.n_add, stream.l_add);
       XPR(NT "runs: %"Q"u (%"Q"u bytes)\n", stream.n_run, stream.l_run);
     }
+#endif
 
   xd3_free_stream (& stream);
 

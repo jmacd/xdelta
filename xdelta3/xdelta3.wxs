@@ -3,7 +3,7 @@
 
 <Wix xmlns='http://schemas.microsoft.com/wix/2003/01/wi'>
    <Product Id='$(var.PRODUCT_ID)'
-            Name='Xdelta 3.0t'
+            Name='Xdelta 3.0u'
             Language='1033'
             Codepage='1252'
             Version='3.0.1.1'
@@ -11,7 +11,7 @@
 
             <Package Id='$(var.PACKAGE_ID)'
                      Keywords='Installer'
-                     Description='Xdelta 3.0t'
+                     Description='Xdelta 3.0u'
                      Comments='http://xdelta.org'
                      Manufacturer='Josh.MacDonald@Gmail.Com'
                      InstallerVersion='300'
@@ -74,14 +74,14 @@
                        Guid='$(var.SOURCE_ID)'>
               <File Id='Source'
                     Name='xdelt30t.zip'
-                    LongName='xdelta3.0t.zip'
+                    LongName='xdelta3.0u.zip'
                     DiskId='1'
-                    Source='G:\jmacd\svn\xdelta3\xdelta3.0t.zip'
+                    Source='G:\jmacd\svn\xdelta3\xdelta3.0u.zip'
                     Vital='yes'>
                 <Shortcut Id="startupmenuSource"
                           Directory="ProgramMenuDir"
                           Name="xdelt30t.zip"
-                          LongName="xdelta3.0t.zip"
+                          LongName="xdelta3.0u.zip"
                           />
               </File>
             </Component>
@@ -92,7 +92,7 @@
               <Directory Id="ProgramMenuFolder" Name="PMenu" LongName="Programs">
 	        <Directory Id="ProgramMenuDir"
                            Name="xdelt30t"
-                           LongName="Xdelta 3.0t">
+                           LongName="Xdelta 3.0u">
                 </Directory>
               </Directory>
 

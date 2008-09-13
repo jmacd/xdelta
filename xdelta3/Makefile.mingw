@@ -55,7 +55,7 @@ CFLAGS= -Wall -Wshadow -fno-builtin
 XDWINFLAGS:=-DXD3_STDIO=0 -DXD3_POSIX=0 -DXD3_WIN32=1 -DEXTERNAL_COMPRESSION=0
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0t
+REL=3.0u
 
 RELDIR = xdelta$(REL)
 

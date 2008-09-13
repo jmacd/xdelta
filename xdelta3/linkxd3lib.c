@@ -29,7 +29,6 @@ int main() {
   
   use (xd3_decode_stream (& stream, NULL, 0, NULL, NULL, 0));
   use (xd3_decode_input (&stream));
-  use (xd3_decoder_needs_source (& stream));
   use (xd3_get_appheader (& stream, NULL, NULL));
   
   use ((int) xd3_errstring (& stream));

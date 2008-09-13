@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
   finish = get_millisecs_now();
 
   fprintf(stderr,
-	  "STAT: encode %3.2f ms from %s to %s repeat %d %dbit delta %d\n",
+	  "STAT: encode %3.2f ms from %s to %s repeat %d %zdbit delta %zd\n",
 	  (double)(finish - start) / repeat, from, to, repeat, sizeof (xoff_t) * 8, delta_size);
 
   ret = 0;
