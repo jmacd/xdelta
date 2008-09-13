@@ -55,7 +55,7 @@ WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 CFLAGS= -Wall -Wshadow -fno-builtin
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0u_pre0
+REL=3.0u
 
 RELDIR = xdelta$(REL)
 
