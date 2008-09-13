@@ -15,7 +15,7 @@ public:
   }
 
   xoff_t Windows() const {
-    return stream_.whole_target.windows;
+    return stream_.whole_target.wininfolen;
   }
 
   void Print() const;

@@ -28,19 +28,19 @@ xd3_whole_state_init (xd3_stream *stream)
 {
   XD3_ASSERT (stream->whole_target.adds == NULL);
   XD3_ASSERT (stream->whole_target.inst == NULL);
-  XD3_ASSERT (stream->whole_target.winsizes == NULL);
+  XD3_ASSERT (stream->whole_target.wininfo == NULL);
   XD3_ASSERT (stream->whole_target.length == 0);
 
   stream->whole_target.adds_alloc = XD3_ALLOCSIZE;
   stream->whole_target.inst_alloc = XD3_ALLOCSIZE;
-  stream->whole_target.winsizes_alloc = XD3_ALLOCSIZE;
+  stream->whole_target.wininfo_alloc = XD3_ALLOCSIZE;
 
   if ((stream->whole_target.adds = (uint8_t*) 
        xd3_alloc (stream, stream->whole_target.adds_alloc, 1)) == NULL ||
       (stream->whole_target.inst = (xd3_winst*) 
        xd3_alloc (stream, stream->whole_target.inst_alloc, 1)) == NULL ||
-      (stream->whole_target.winsizes = (usize_t*) 
-       xd3_alloc (stream, stream->whole_target.winsizes_alloc, 1)) == NULL)
+      (stream->whole_target.wininfo = (xd3_wininfo*) 
+       xd3_alloc (stream, stream->whole_target.wininfo_alloc, 1)) == NULL)
     {
       return ENOMEM;
     }
@@ -54,7 +54,7 @@ xd3_swap_whole_state (xd3_whole_state *a,
   xd3_whole_state tmp;
   XD3_ASSERT (a->inst != NULL && a->adds != NULL);
   XD3_ASSERT (b->inst != NULL && b->adds != NULL);
-  XD3_ASSERT (b->winsizes != NULL && b->winsizes != NULL);
+  XD3_ASSERT (b->wininfo != NULL && b->wininfo != NULL);
   memcpy (&tmp, a, sizeof (xd3_whole_state));
   memcpy (a, b, sizeof (xd3_whole_state));
   memcpy (b, &tmp, sizeof (xd3_whole_state));
@@ -139,22 +139,22 @@ xd3_whole_alloc_adds (xd3_stream *stream,
 }
 
 static int
-xd3_whole_alloc_winsize (xd3_stream *stream,
-			 usize_t **winsizep)
+xd3_whole_alloc_wininfo (xd3_stream *stream,
+			 xd3_wininfo **wininfop)
 {
   int ret;
 
   if ((ret = xd3_realloc_buffer (stream, 
-				 stream->whole_target.winsizeslen, 
-				 sizeof (xd3_winst),
+				 stream->whole_target.wininfolen, 
+				 sizeof (xd3_wininfo),
 				 1,
-				 & stream->whole_target.winsizes_alloc, 
-				 (void**) & stream->whole_target.winsizes))) 
+				 & stream->whole_target.wininfo_alloc, 
+				 (void**) & stream->whole_target.wininfo))) 
     { 
       return ret; 
     }
 
-  *winsizep = &stream->whole_target.winsizes[stream->whole_target.winsizeslen++];
+  *wininfop = &stream->whole_target.wininfo[stream->whole_target.wininfolen++];
 
   return 0;
 }
@@ -223,13 +223,13 @@ int
 xd3_whole_append_window (xd3_stream *stream)
 {
   int ret;
-  usize_t *winsize;
+  xd3_wininfo *wininfo;
 
-  stream->whole_target.windows += 1;
-  
-  if ((ret = xd3_whole_alloc_winsize (stream, &winsize))) { return ret; }
+  if ((ret = xd3_whole_alloc_wininfo (stream, &wininfo))) { return ret; }
 
-  *winsize = stream->dec_tgtlen;
+  wininfo->length = stream->dec_tgtlen;
+  wininfo->offset = stream->dec_winstart;
+  wininfo->adler32 = stream->dec_adler32;
 
   while (stream->inst_sect.buf < stream->inst_sect.buf_max)
     {
@@ -533,12 +533,12 @@ int xd3_merge_inputs (xd3_stream *stream,
   usize_t i;
   size_t input_i;
 
-  for (i = 0; i < input->winsizeslen; ++i) {
-    usize_t *copysize;
+  for (i = 0; i < input->wininfolen; ++i) {
+    xd3_wininfo *copyinfo;
 
-    if ((ret = xd3_whole_alloc_winsize (stream, &copysize))) { return ret; }
+    if ((ret = xd3_whole_alloc_wininfo (stream, &copyinfo))) { return ret; }
 
-    *copysize = input->winsizes[i];
+    *copyinfo = input->wininfo[i];
   }
 
   /* iterate over each instruction. */

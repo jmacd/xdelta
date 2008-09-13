@@ -249,6 +249,7 @@ typedef struct _xd3_code_table_desc    xd3_code_table_desc;
 typedef struct _xd3_code_table_sizes   xd3_code_table_sizes;
 typedef struct _xd3_slist              xd3_slist;
 typedef struct _xd3_whole_state        xd3_whole_state;
+typedef struct _xd3_wininfo            xd3_wininfo;
 
 /* The stream configuration has three callbacks functions, all of
  * which may be supplied with NULL values.  If config->getblk is
@@ -638,6 +639,13 @@ struct _xd3_slist
   usize_t     last_pos;
 };
 
+/* window info (for whole state) */
+struct _xd3_wininfo {
+  xoff_t offset;
+  usize_t length;
+  uint32_t adler32;
+};
+
 /* whole state for, e.g., merge */
 struct _xd3_whole_state {
   usize_t addslen;
@@ -648,12 +656,11 @@ struct _xd3_whole_state {
   xd3_winst *inst;
   usize_t  inst_alloc;
 
-  usize_t winsizeslen;
-  usize_t *winsizes;
-  usize_t winsizes_alloc;
+  usize_t wininfolen;
+  xd3_wininfo *wininfo;
+  usize_t wininfo_alloc;
 
   xoff_t length;
-  xoff_t windows;
 };
 
 /********************************************************************

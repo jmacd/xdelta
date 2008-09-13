@@ -1807,6 +1807,13 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
       return ret;
     }
 
+  if (option_use_appheader != 0 &&
+      option_appheader != NULL)
+    {
+      xd3_set_appheader (recode_stream, option_appheader,
+			 strlen ((char*) option_appheader));
+    }
+
   /* Enter the ENC_INPUT state and bypass the next_in == NULL test
    * and (leftover) input buffering logic. */
   XD3_ASSERT(recode_stream->enc_state == ENC_INIT);
@@ -1839,8 +1846,24 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
       /* Window sizes must match from the input to the output, so that
        * target copies are in-range (and so that checksums carry
        * over). */
-      XD3_ASSERT (window_num < stream->whole_target.winsizeslen);
-      window_size = stream->whole_target.winsizes[window_num++];
+      XD3_ASSERT (window_num < stream->whole_target.wininfolen);
+      window_size = stream->whole_target.wininfo[window_num].length;
+
+      /* Output position should also match. */
+      if (output_pos != stream->whole_target.wininfo[window_num].offset)
+	{
+	  XPR(NT "internal merge error: offset mismatch\n");
+	  return XD3_INVALID;
+	}
+
+      if (option_use_checksum &&
+	  (stream->dec_win_ind & VCD_ADLER32) != 0) 
+	{
+	  recode_stream->flags |= XD3_ADLER32_RECODE;
+	  recode_stream->recode_adler32 = stream->whole_target.wininfo[window_num].adler32;
+	}
+
+      window_num++;
 
       if (main_bsize < window_size)
 	{
