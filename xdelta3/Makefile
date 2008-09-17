@@ -45,7 +45,8 @@ TARGETS = xdelta3-debug \
 	  xdelta3-noext xdelta3-tools \
 	  xdelta3-notools \
 	  xdelta3_wrap.c xdelta3.py \
-	  $(PYTGT) $(SWIGTGT)
+	  $(PYTGT) $(SWIGTGT) \
+	  xdelta3-warnings
 
 PYTHON = python
 
@@ -53,6 +54,7 @@ WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 
 # -arch x86_64
 CFLAGS= -Wall -Wshadow -fno-builtin
+WFLAGS= -Wextra -Wsign-compare -Wconversion -Wextra -Wno-unused-parameter
 
 # $Format: "REL=$Xdelta3Version$" $
 REL=3.0u
@@ -70,7 +72,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	testing/cmp.h testing/delta.h testing/file.h \
 	testing/modify.h testing/random.h testing/segment.h \
 	testing/sizes.h testing/test.h testing/Makefile \
-	README readme.txt
+	testing/regtest.cc README readme.txt
 
 SWIG_FLAGS = -DXD3_DEBUG=1 \
 	      -DEXTERNAL_COMPRESSION=0 \
@@ -134,6 +136,17 @@ xdelta3: $(SOURCES)
 
 xdelta3-debug: $(SOURCES)
 	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DREGRESSION_TEST=1 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-DXD3_DEBUG=1 \
+		-DXD3_MAIN=1 \
+		-DXD3_STDIO=1 \
+		-DXD3_USE_LARGEFILE64=1
+
+xdelta3-warnings: $(SOURCES)
+	$(CC) -g $(CFLAGS) $(WFLAGS) xdelta3.c -lm -o xdelta3-warnings \
 		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \

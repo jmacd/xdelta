@@ -171,7 +171,7 @@ xd3_decode_secondary (xd3_stream      *stream,
 static inline int xd3_encode_bit (xd3_stream      *stream,
 				  xd3_output     **output,
 				  bit_state       *bits,
-				  int              bit)
+				  usize_t          bit)
 {
   int ret;
 

@@ -90,7 +90,7 @@ static const uint16_t __single_hash[256] =
 inline uint32_t
 xd3_large_cksum_update (uint32_t cksum,
 			const uint8_t *base,
-			int look) {
+			usize_t look) {
   uint32_t old_c = PERMUTE(base[0]);
   uint32_t new_c = PERMUTE(base[look]);
   uint32_t low   = ((cksum & 0xffff) - old_c + new_c) & 0xffff;
@@ -106,7 +106,7 @@ xd3_large_cksum_update (uint32_t cksum,
 static inline uint32_t
 xd3_scksum (uint32_t *state,
             const uint8_t *base,
-            const int look)
+            const usize_t look)
 {
   (*state) = *(uint32_t*)base;
   return (*state) * hash_multiplier;
@@ -114,7 +114,7 @@ xd3_scksum (uint32_t *state,
 static inline uint32_t
 xd3_small_cksum_update (uint32_t *state,
 			const uint8_t *base,
-			int look)
+			usize_t look)
 {
   (*state) = *(uint32_t*)(base+1);
   return (*state) * hash_multiplier;
@@ -123,7 +123,7 @@ xd3_small_cksum_update (uint32_t *state,
 static inline uint32_t
 xd3_scksum (uint32_t *state,
             const uint8_t *base,
-            const int look)
+            const usize_t look)
 {
   (*state) = (base[0] << 24 |
               base[1] << 16 |
@@ -134,7 +134,7 @@ xd3_scksum (uint32_t *state,
 static inline uint32_t
 xd3_small_cksum_update (uint32_t *state,
 			const uint8_t *base,
-			const int look)
+			const usize_t look)
 {
   (*state) <<= 8;
   (*state) |= base[4];
@@ -158,9 +158,9 @@ xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum)
 
 #if ADLER_LARGE_CKSUM
 static inline uint32_t
-xd3_lcksum (const uint8_t *seg, const int ln)
+xd3_lcksum (const uint8_t *seg, const usize_t ln)
 {
-  int i = 0;
+  usize_t i = 0;
   uint32_t low  = 0;
   uint32_t high = 0;
 
@@ -174,9 +174,9 @@ xd3_lcksum (const uint8_t *seg, const int ln)
 }
 #else
 static inline uint32_t
-xd3_lcksum (const uint8_t *seg, const int ln)
+xd3_lcksum (const uint8_t *seg, const usize_t ln)
 {
-  int i, j;
+  usize_t i, j;
   uint32_t h = 0;
   for (i = 0, j = ln - 1; i < ln; ++i, --j) {
     h += PERMUTE(seg[i]) * hash_multiplier_powers[j];

@@ -1216,7 +1216,7 @@ snprintf_func (char *str, int n, char *fmt, ...)
 #define VE ) >= SNPRINTF_BUFSIZE			       \
   && (ret = main_print_overflow(ret)) != 0)		       \
   || (ret = main_file_write(xfile, xfile->snprintf_buf,        \
-			    ret, "print")) != 0)	       \
+			    (usize_t)ret, "print")) != 0)      \
   { return ret; } } while (0)
 
 static int
@@ -1890,7 +1890,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	    {
 	    case XD3_RUN:
 	      if ((ret = xd3_emit_run (recode_stream, window_pos, take,
-				       stream->whole_target.adds[inst->addr])))
+				       &stream->whole_target.adds[inst->addr])))
 		{
 		  return ret;
 		}
@@ -2609,7 +2609,7 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
       const char *icomp;
       const char *sname;
       const char *scomp;
-      int len;
+      usize_t len;
 
       iname = main_apphead_string (input->filename);
       icomp = (input->compressor == NULL) ? "" : input->compressor->ident;
@@ -2672,7 +2672,7 @@ main_get_appheader_params (main_file *file, char **parsed,
 	char *last_slash = strrchr(other->filename, '/');
 
 	if (last_slash != NULL) {
-	  int dlen = last_slash - other->filename;
+	  usize_t dlen = last_slash - other->filename;
 
 	  XD3_ASSERT(file->filename_copy == NULL);
 	  file->filename_copy =
@@ -2847,7 +2847,7 @@ main_open_output (xd3_stream *stream, main_file *ofile)
  * application header is received.  Stream may be NULL, in which case
  * xd3_set_source is not called. */
 static int
-main_set_source (xd3_stream *stream, int cmd,
+main_set_source (xd3_stream *stream, xd3_cmd cmd,
 		 main_file *sfile, xd3_source *source)
 {
   int ret = 0;

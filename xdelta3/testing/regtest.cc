@@ -72,11 +72,9 @@ void InMemoryEncodeDecode(const TestOptions &options,
 
   encode_source.size = source_file.Size();
   encode_source.blksize = Constants::BLOCK_SIZE;
-  encode_source.curblkno = -1;
 
   decode_source.size = source_file.Size();
   decode_source.blksize = Constants::BLOCK_SIZE;
-  decode_source.curblkno = -1;
 
   xd3_set_source (&encode_stream, &encode_source);
   xd3_set_source (&decode_stream, &decode_source);

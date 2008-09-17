@@ -24,6 +24,7 @@
 #ifndef _XDELTA3_H_
 #define _XDELTA3_H_
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -671,8 +672,8 @@ struct _xd3_whole_state {
 struct _xd3_sec_cfg
 {
   int                data_type;     /* Which section. (set automatically) */
-  int                ngroups;       /* Number of DJW Huffman groups. */
-  int                sector_size;   /* Sector size. */
+  usize_t            ngroups;       /* Number of DJW Huffman groups. */
+  usize_t            sector_size;   /* Sector size. */
   int                inefficient;   /* If true, ignore efficiency check [avoid XD3_NOSECOND]. */
 };
 

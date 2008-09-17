@@ -24,7 +24,7 @@
 static inline ETYPE*                                                    \
 LTYPE ## _entry (LTYPE* l)                                              \
 {                                                                       \
-  return (ETYPE*) ((char*) l - (unsigned long) &((ETYPE*) 0)->LNAME);   \
+  return (ETYPE*) ((char*) l - (ptrdiff_t) &((ETYPE*) 0)->LNAME);       \
 }                                                                       \
                                                                         \
 static inline void                                                      \

@@ -1326,9 +1326,10 @@ test_secondary_decode (xd3_stream         *stream,
 }
 
 static int
-test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
+test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 {
-  int test_i, ret;
+  usize_t test_i;
+  int ret;
   xd3_output *in_head, *out_head, *p;
   usize_t p_off, input_size, compress_size;
   uint8_t *dec_input = NULL, *dec_output = NULL, *dec_correct = NULL;
@@ -1456,9 +1457,9 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, int groups)
   return 0;
 }
 
-IF_FGK (static int test_secondary_fgk  (xd3_stream *stream, int gp)
+IF_FGK (static int test_secondary_fgk  (xd3_stream *stream, usize_t gp)
 	{ return test_secondary (stream, & fgk_sec_type, gp); })
-IF_DJW (static int test_secondary_huff (xd3_stream *stream, int gp)
+IF_DJW (static int test_secondary_huff (xd3_stream *stream, usize_t gp)
 	{ return test_secondary (stream, & djw_sec_type, gp); })
 #endif
 
@@ -2334,7 +2335,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   xd3_source source;
   int nextencwin = 0;
   int winstarts = 0, winfinishes = 0;
-  xoff_t srcwin = -1;
+  xoff_t srcwin = XOFF_T_MAX;
   usize_t delpos = 0, recsize;
   xd3_config config;
 
@@ -2346,7 +2347,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   source.blksize  = IDB_BLKSZ;
   source.name     = "";
   source.curblk   = NULL;
-  source.curblkno = -1;
+  source.curblkno = 0;
 
   if ((ret = xd3_set_source (stream, & source))) { goto fail; }
 

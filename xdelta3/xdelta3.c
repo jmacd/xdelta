@@ -306,29 +306,25 @@
 
 /***********************************************************************/
 
-typedef enum {
-
   /* header indicator bits */
-  VCD_SECONDARY  = (1 << 0),  /* uses secondary compressor */
-  VCD_CODETABLE  = (1 << 1),  /* supplies code table data */
-  VCD_APPHEADER  = (1 << 2),  /* supplies application data */
-  VCD_INVHDR     = ~7U,
+#define VCD_SECONDARY (1U << 0)  /* uses secondary compressor */
+#define VCD_CODETABLE (1U << 1)  /* supplies code table data */
+#define VCD_APPHEADER (1U << 2)  /* supplies application data */
+#define VCD_INVHDR    (~0x7U)
 
   /* window indicator bits */
-  VCD_SOURCE     = (1 << 0),  /* copy window in source file */
-  VCD_TARGET     = (1 << 1),  /* copy window in target file */
-  VCD_ADLER32    = (1 << 2),  /* has adler32 checksum */
-  VCD_INVWIN     = ~7U,
+#define VCD_SOURCE   (1U << 0)  /* copy window in source file */
+#define VCD_TARGET   (1U << 1)  /* copy window in target file */
+#define VCD_ADLER32  (1U << 2)  /* has adler32 checksum */
+#define VCD_INVWIN   (~0x7U)
 
-  VCD_SRCORTGT   = VCD_SOURCE | VCD_TARGET,
+#define VCD_SRCORTGT (VCD_SOURCE | VCD_TARGET)
 
   /* delta indicator bits */
-  VCD_DATACOMP   = (1 << 0),
-  VCD_INSTCOMP   = (1 << 1),
-  VCD_ADDRCOMP   = (1 << 2),
-  VCD_INVDEL     = ~0x7U,
-
-} xd3_indicator;
+#define VCD_DATACOMP (1U << 0)
+#define VCD_INSTCOMP (1U << 1)
+#define VCD_ADDRCOMP (1U << 2)
+#define VCD_INVDEL   (~0x7U)
 
 typedef enum {
   VCD_DJW_ID    = 1,
@@ -350,14 +346,12 @@ typedef enum {
   ADDR_SECTION,
 } xd3_section_type;
 
-typedef enum
-{
-  XD3_NOOP = 0,
-  XD3_ADD  = 1,
-  XD3_RUN  = 2,
-  XD3_CPY  = 3, /* XD3_CPY rtypes are represented as (XD3_CPY +
-                 * copy-mode value) */
-} xd3_rtype;
+typedef unsigned int xd3_rtype;
+#define XD3_NOOP 0U
+#define XD3_ADD 1U
+#define  XD3_RUN 2U
+#define  XD3_CPY 3U /* XD3_CPY rtypes are represented as (XD3_CPY +
+                     * copy-mode value) */
 
 /***********************************************************************/
 
@@ -511,7 +505,7 @@ static void*       xd3_alloc0 (xd3_stream *stream,
 static xd3_output* xd3_alloc_output (xd3_stream *stream,
 				     xd3_output *old_output);
 
-static int         xd3_alloc_iopt (xd3_stream *stream, int elts);
+static int         xd3_alloc_iopt (xd3_stream *stream, usize_t elts);
 
 static void        xd3_free_output (xd3_stream *stream,
 				    xd3_output *output);
@@ -545,13 +539,13 @@ static usize_t xd3_smatch (xd3_stream *stream,
 			   usize_t scksum,
 			   usize_t *match_offset);
 static int xd3_string_match_init (xd3_stream *stream);
-static uint32_t xd3_scksum (uint32_t *state, const uint8_t *seg, const int ln);
-static int xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp);
+static uint32_t xd3_scksum (uint32_t *state, const uint8_t *seg, const usize_t ln);
+static usize_t xd3_comprun (const uint8_t *seg, usize_t slook, uint8_t *run_cp);
 static int xd3_srcwin_move_point (xd3_stream *stream,
 				  usize_t *next_move_point);
 
 static int xd3_emit_run (xd3_stream *stream, usize_t pos,
-			 usize_t size, uint8_t run_c);
+			 usize_t size, uint8_t *run_c);
 static usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg,
 				  const usize_t cksum);
 static xoff_t xd3_source_cksum_offset(xd3_stream *stream, usize_t low);
@@ -564,8 +558,8 @@ static void xd3_scksum_insert (xd3_stream *stream,
 #if XD3_DEBUG
 static void xd3_verify_run_state (xd3_stream    *stream,
 				  const uint8_t *inp,
-				  int            x_run_l,
-				  uint8_t        x_run_c);
+				  usize_t        x_run_l,
+				  uint8_t       *x_run_c);
 static void xd3_verify_large_state (xd3_stream *stream,
 				    const uint8_t *inp,
 				    uint32_t x_cksum);
@@ -712,7 +706,7 @@ xd3_encode_secondary (xd3_stream      *stream,
 #endif /* SECONDARY_ANY */
 
 #if SECONDARY_FGK
-static const xd3_sec_type fgk_sec_type;
+extern const xd3_sec_type fgk_sec_type;
 #define IF_FGK(x) x
 #define FGK_CASE(s) \
   s->sec_type = & fgk_sec_type; \
@@ -725,7 +719,7 @@ static const xd3_sec_type fgk_sec_type;
 #endif
 
 #if SECONDARY_DJW
-static const xd3_sec_type djw_sec_type;
+extern const xd3_sec_type djw_sec_type;
 #define IF_DJW(x) x
 #define DJW_CASE(s) \
   s->sec_type = & djw_sec_type; \
@@ -758,31 +752,35 @@ static const xd3_sec_type djw_sec_type;
 
 #if SECONDARY_FGK
 #include "xdelta3-fgk.h"
-static const xd3_sec_type fgk_sec_type =
+const xd3_sec_type fgk_sec_type =
 {
   VCD_FGK_ID,
   "FGK Adaptive Huffman",
   SEC_NOFLAGS,
-  (xd3_sec_stream* (*)())  fgk_alloc,
-  (void (*)())             fgk_destroy,
-  (void (*)())             fgk_init,
-  (int (*)())              xd3_decode_fgk,
-  IF_ENCODER((int (*)())   xd3_encode_fgk)
+  (xd3_sec_stream* (*)(xd3_stream*)) fgk_alloc,
+  (void (*)(xd3_stream*, xd3_sec_stream*)) fgk_destroy,
+  (void (*)(xd3_sec_stream*)) fgk_init,
+  (int (*)(xd3_stream*, xd3_sec_stream*, const uint8_t**, const uint8_t*, 
+	   uint8_t**, const uint8_t*)) xd3_decode_fgk,
+  IF_ENCODER((int (*)(xd3_stream*, xd3_sec_stream*, xd3_output*, 
+		      xd3_output*, xd3_sec_cfg*))   xd3_encode_fgk)
 };
 #endif
 
 #if SECONDARY_DJW
 #include "xdelta3-djw.h"
-static const xd3_sec_type djw_sec_type =
+const xd3_sec_type djw_sec_type =
 {
   VCD_DJW_ID,
   "Static Huffman",
   SEC_COUNT_FREQS,
-  (xd3_sec_stream* (*)())  djw_alloc,
-  (void (*)())             djw_destroy,
-  (void (*)())             djw_init,
-  (int (*)())              xd3_decode_huff,
-  IF_ENCODER((int (*)())   xd3_encode_huff)
+  (xd3_sec_stream* (*)(xd3_stream*)) djw_alloc,
+  (void (*)(xd3_stream*, xd3_sec_stream*)) djw_destroy,
+  (void (*)(xd3_sec_stream*)) djw_init,
+  (int (*)(xd3_stream*, xd3_sec_stream*, const uint8_t**, const uint8_t*, 
+	   uint8_t**, const uint8_t*)) xd3_decode_huff,
+  IF_ENCODER((int (*)(xd3_stream*, xd3_sec_stream*, xd3_output*, 
+		      xd3_output*, xd3_sec_cfg*))   xd3_encode_huff)
 };
 #endif
 
@@ -1562,7 +1560,7 @@ xd3_pow2_roundup (usize_t x)
 {
   usize_t i = 1;
   while (x > i) {
-    i <<= 1;
+    i <<= 1U;
   }
   return i;
 }
@@ -1630,11 +1628,11 @@ static unsigned long adler32 (unsigned long adler, const uint8_t *buf, usize_t l
  ***********************************************************************/
 
 #if XD3_ENCODER
-static int
-xd3_comprun (const uint8_t *seg, int slook, uint8_t *run_cp)
+static usize_t
+xd3_comprun (const uint8_t *seg, usize_t slook, uint8_t *run_cp)
 {
-  int i;
-  int     run_l = 0;
+  usize_t i;
+  usize_t run_l = 0;
   uint8_t run_c = 0;
 
   for (i = 0; i < slook; i += 1)
@@ -1823,20 +1821,16 @@ xd3_emit_bytes (xd3_stream     *stream,
   uint8_t buf[10];                                                     \
   usize_t  bufi = 10;                                                  \
                                                                        \
-  XD3_ASSERT (num >= 0);                                               \
-                                                                       \
   /* This loop performs division and turns on all MSBs. */             \
   do                                                                   \
     {                                                                  \
       buf[--bufi] = (num & 127) | 128;                                 \
-      num >>= 7;                                                       \
+      num >>= 7U;                                                      \
     }                                                                  \
   while (num != 0);                                                    \
                                                                        \
   /* Turn off MSB of the last byte. */                                 \
   buf[9] &= 127;                                                       \
-                                                                       \
-  XD3_ASSERT (bufi >= 0);                                              \
                                                                        \
   return xd3_emit_bytes (stream, output, buf + bufi, 10 - bufi)
 
@@ -1978,7 +1972,7 @@ xd3_encode_address (xd3_stream *stream, usize_t addr, usize_t here, uint8_t* mod
   usize_t i, bestm, ret;
   xd3_addr_cache* acache = & stream->acache;
 
-#define SMALLEST_INT(x) do { if (((x) & ~127) == 0) { goto good; } } while (0)
+#define SMALLEST_INT(x) do { if (((x) & ~127U) == 0) { goto good; } } while (0)
 
   /* Attempt to find the address mode that yields the smallest integer value
    * for "d", the encoded address value, thereby minimizing the encoded size
@@ -2000,14 +1994,19 @@ xd3_encode_address (xd3_stream *stream, usize_t addr, usize_t here, uint8_t* mod
 
   for (i = 0; i < acache->s_near; i += 1)
     {
-      d = addr - acache->near_array[i];
-
-      if (d >= 0 && d < bestd)
+      /* Note: If we used signed computation here, we'd could compte d
+       * and then check (d >= 0 && d < bestd). */
+      if (addr >= acache->near_array[i]) 
 	{
-	  bestd = d;
-	  bestm = i+2; /* 2 counts the VCD_SELF, VCD_HERE modes */
+	  d = addr - acache->near_array[i];
 
-	  SMALLEST_INT (bestd);
+	  if (d < bestd)
+	    {
+	      bestd = d;
+	      bestm = i+2; /* 2 counts the VCD_SELF, VCD_HERE modes */
+
+	      SMALLEST_INT (bestd);
+	    }
 	}
     }
 
@@ -2548,7 +2547,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	  return XD3_INTERNAL;
 	}
 
-      XD3_ASSERT (source->curblk != NULL || blkno != source->curblkno);
+      XD3_ASSERT (source->curblk == NULL || blkno != source->curblkno);
 
       source->getblkno = blkno;
 
@@ -2602,7 +2601,7 @@ xd3_set_source (xd3_stream *stream,
     }
   else if (src->size <= src->blksize)
     {
-      int x = xd3_pow2_roundup (src->blksize);
+      usize_t x = xd3_pow2_roundup (src->blksize);
       xd3_check_pow2 (x, &shiftby);
       src->shiftby = shiftby;
       src->maskby = (1 << shiftby) - 1;
@@ -3139,7 +3138,7 @@ xd3_iopt_get_slot (xd3_stream *stream, xd3_rinst** iptr)
     {
       if (stream->iopt_unlimited)
 	{
-	  int elts = XD3_ALLOCSIZE / sizeof(xd3_rinst);
+	  usize_t elts = XD3_ALLOCSIZE / sizeof(xd3_rinst);
 
 	  if ((ret = xd3_alloc_iopt (stream, elts)))
 	    {
@@ -3279,7 +3278,7 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
 /* This enters a potential run instruction into the iopt buffer.  The
  * position argument is relative to the target window. */
 static int
-xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
+xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t *run_c)
 {
   xd3_rinst* ri;
   int ret;
@@ -3287,7 +3286,7 @@ xd3_emit_run (xd3_stream *stream, usize_t pos, usize_t size, uint8_t run_c)
   if ((ret = xd3_iopt_get_slot (stream, & ri))) { return ret; }
 
   ri->type = XD3_RUN;
-  ri->xtra = run_c;
+  ri->xtra = *run_c;
   ri->pos  = pos;
   ri->size = size;
 
@@ -3569,9 +3568,9 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
 
 /* Allocates one block of xd3_rlist elements */
 static int
-xd3_alloc_iopt (xd3_stream *stream, int elts)
+xd3_alloc_iopt (xd3_stream *stream, usize_t elts)
 {
-  int i;
+  usize_t i;
   xd3_iopt_buflist* last =
     (xd3_iopt_buflist*) xd3_alloc (stream, sizeof (xd3_iopt_buflist), 1);
 
@@ -4881,14 +4880,14 @@ xd3_verify_large_state (xd3_stream    *stream,
 static void
 xd3_verify_run_state (xd3_stream    *stream,
 		      const uint8_t *inp,
-		      int            x_run_l,
-		      uint8_t        x_run_c)
+		      usize_t        x_run_l,
+		      uint8_t       *x_run_c)
 {
-  int     slook = stream->smatcher.small_look;
+  usize_t slook = stream->smatcher.small_look;
   uint8_t run_c;
-  int     run_l = xd3_comprun (inp, slook, &run_c);
+  usize_t run_l = xd3_comprun (inp, slook, &run_c);
 
-  XD3_ASSERT (run_l == 0 || run_c == x_run_c);
+  XD3_ASSERT (run_l == 0 || run_c == *x_run_c);
   XD3_ASSERT (x_run_l > slook || run_l == x_run_l);
 }
 #endif /* XD3_DEBUG */
@@ -5192,7 +5191,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	{
 	  usize_t max_len = stream->avail_in - stream->input_position;
 
-	  IF_DEBUG (xd3_verify_run_state (stream, inp, run_l, run_c));
+	  IF_DEBUG (xd3_verify_run_state (stream, inp, run_l, &run_c));
 
 	  while (run_l < max_len && inp[run_l] == run_c) { run_l += 1; }
 
@@ -5200,7 +5199,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  if (run_l >= stream->min_match && run_l >= MIN_RUN)
 	    {
 	      if ((ret = xd3_emit_run (stream, stream->input_position,
-				       run_l, run_c))) { return ret; }
+				       run_l, &run_c))) { return ret; }
 
 	      HANDLELAZY (run_l);
 	    }
@@ -5290,7 +5289,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 					  /* decoder position */
 					  stream->input_position,
 					  /* length */ match_length,
-					  /* address */ match_offset,
+					  /* address */ (xoff_t) match_offset,
 					  /* is_source */ 0)))
 		{
 		  return ret;
