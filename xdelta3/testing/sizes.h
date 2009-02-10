@@ -1,6 +1,4 @@
 // -*- Mode: C++ -*-
-namespace regtest {
-
 template <typename T, typename U>
 class SizeIterator {
  public:
@@ -34,6 +32,7 @@ class SizeIterator {
   size_t howmany_;
 };
 
+// Small sizes
 class SmallSizes {
 public:
   static size_t sizes[];
@@ -41,17 +40,18 @@ public:
 };
 
 size_t SmallSizes::sizes[] = {
-  0, 1, Constants::BLOCK_SIZE / 4, 3333, 
-  Constants::BLOCK_SIZE - (Constants::BLOCK_SIZE / 3),
-  Constants::BLOCK_SIZE,
-  Constants::BLOCK_SIZE + (Constants::BLOCK_SIZE / 3),
-  2 * Constants::BLOCK_SIZE - (Constants::BLOCK_SIZE / 3),
-  2 * Constants::BLOCK_SIZE,
-  2 * Constants::BLOCK_SIZE + (Constants::BLOCK_SIZE / 3),
+  0, 1, 128 / 4, 3333, 
+  128 - (128 / 3),
+  128,
+  128 + (128 / 3),
+  2 * 128 - (128 / 3),
+  2 * 128,
+  2 * 128 + (128 / 3),
 };
 
-size_t SmallSizes::max_value = Constants::BLOCK_SIZE * 3;
+size_t SmallSizes::max_value = 128 * 3;
 
+// Large sizes
 class LargeSizes {
 public:
   static size_t sizes[];
@@ -66,4 +66,30 @@ size_t LargeSizes::sizes[] = {
 
 size_t LargeSizes::max_value = 1<<20;
 
-}  // namespace regtest
+// Regtest<> arguments
+struct SmallBlock {
+  static const xoff_t BLOCK_SIZE;
+  static const size_t WINDOW_SIZE;
+  typedef SmallSizes Sizes;
+};
+
+const xoff_t SmallBlock::BLOCK_SIZE = 1<<7;
+const size_t SmallBlock::WINDOW_SIZE = 1<<7;
+
+struct LargeBlock {
+  static const xoff_t BLOCK_SIZE;
+  static const size_t WINDOW_SIZE;
+  typedef LargeSizes Sizes;
+};
+
+const xoff_t LargeBlock::BLOCK_SIZE = (1 << 20);
+const size_t LargeBlock::WINDOW_SIZE = (1 << 20);
+
+struct MixedBlock {
+  static const xoff_t BLOCK_SIZE;
+  static const size_t WINDOW_SIZE;
+  typedef SmallSizes Sizes;
+};
+
+const xoff_t MixedBlock::BLOCK_SIZE = 1<<7;
+const size_t MixedBlock::WINDOW_SIZE = 1<<8;

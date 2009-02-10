@@ -1,7 +1,5 @@
 // -*- Mode: C++ -*-
 
-namespace regtest {
-
 class Segment {
  public:
   Segment(size_t size, MTRandom *rand)
@@ -58,6 +56,22 @@ class Segment {
     }
   }
 
+  string ToString() const {
+    string r;
+    if (data_) {
+      for (size_t i = 0; i < size_; i++) {
+	char buf[10];
+	sprintf(buf, "%02x ", data_[i]);
+	r.append(buf);
+      }
+    } else {
+      char buf[256];
+      sprintf(buf, "size=%ld,seed=%ld,skip=%ld", size_, seed_, seed_offset_);
+      r.append(buf);
+    }
+    return r;
+  }
+
 private:
   // Used by Subseg()
   Segment(size_t size, uint32_t seed, size_t seed_offset)
@@ -67,8 +81,6 @@ private:
       data_(NULL) {
     CHECK_GT(size_, 0);
   }
-
-  friend ostream& operator<<(ostream& os, const Segment &seg);
 
   size_t size_;  // Size of this segment
 
@@ -81,20 +93,6 @@ private:
   uint8_t *data_;
 };
 
-ostream& operator<<(ostream& os, const Segment &seg) {
-  if (seg.data_) {
-    for (size_t i = 0; i < seg.size_; i++) {
-      char buf[10];
-      sprintf(buf, "%02x ", seg.data_[i]);
-      os << buf;
-    }
-    return os;
-  } else {
-    return os << "size=" << seg.size_ << ",seed=" << seg.seed_
-	      << ",skip=" << seg.seed_offset_;
-  }
-}
-
 typedef map<xoff_t, Segment> SegmentMap;
-
-}  // namespace regtest
+typedef typename SegmentMap::const_iterator ConstSegmentMapIterator;
+typedef typename SegmentMap::iterator SegmentMapIterator;

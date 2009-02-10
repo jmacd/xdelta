@@ -5,6 +5,7 @@ extern "C" {
 #define REGRESSION_TEST 0
 #define VCDIFF_TOOLS 1
 #include "../xdelta3.c"
+#include <math.h>
 }
 
 #define CHECK_EQ(x,y) CHECK_OP(x,y,==)
@@ -66,45 +67,7 @@ pair<T, U> make_pair(const T& t, const U& u) {
   return pair<T, U>(t, u);
 }
 
-class Constants {
-public:
-  // TODO: need to repeat the tests with different block sizes
-  // 1 << 7 triggers some bugs, 1 << 20 triggers others.
-  //
-  //static const xoff_t BLOCK_SIZE = 1 << 20;
-  static const xoff_t BLOCK_SIZE = 1 << 7;
-};
-
 using std::min;
+using std::max;
 
-#include "random.h"
-using regtest::MTRandom;
-using regtest::MTRandom8;
 
-#include "segment.h"
-using regtest::Segment;
-
-#include "modify.h"
-using regtest::Mutator;
-using regtest::ChangeList;
-using regtest::Change;
-using regtest::ChangeListMutator;
-using regtest::Modify1stByte;
-
-#include "file.h"
-using regtest::Block;
-using regtest::BlockIterator;
-using regtest::ExtFile;
-using regtest::FileSpec;
-using regtest::TmpFile;
-
-#include "cmp.h"
-using regtest::CmpDifferentBytes;
-
-#include "sizes.h"
-using regtest::SizeIterator;
-using regtest::SmallSizes;
-using regtest::LargeSizes;
-
-#include "delta.h"
-using regtest::Delta;

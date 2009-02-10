@@ -3,10 +3,6 @@
  * attributed to Michael Brundage.  Thanks!
  * http://www.qbrundage.com/michaelb/pubs/essays/random_number_generation.html
  */
-#include <math.h>
-
-namespace regtest {
-
 class MTRandom {
  public:
   static const uint32_t TEST_SEED1 = 5489UL;
@@ -136,5 +132,3 @@ public:
 private:
   MTRandom *rand_;
 };
-
-}  // namespace regtest

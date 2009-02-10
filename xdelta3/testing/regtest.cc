@@ -1,37 +1,20 @@
 /* -*- Mode: C++ -*-  */
 #include "test.h"
+#include "random.h"
+#include "sizes.h"
 
-namespace {
+template <typename Constants>
+class Regtest {
+public:
+  typedef typename Constants::Sizes Sizes;
 
-// Declare constants (needed for reference-values, etc).
-const xoff_t Constants::BLOCK_SIZE;
+#include "segment.h"
+#include "modify.h"
+#include "file.h"
+#include "cmp.h"
+#include "delta.h"
 
-// 9 is a common value for cksum_size, but the exact value shouldn't
-// matter.
-const usize_t CKSUM_SIZE = 9;
-
-// These values are filled-in by FindCksumCollision
-uint8_t golden_cksum_bytes[CKSUM_SIZE] = {
-  0x8d, 0x83, 0xe7, 0x6f, 0x46, 0x7f, 0xed, 0x51, 0xe6 
-};
-uint8_t collision_cksum_bytes[CKSUM_SIZE] = {
-  0xaf, 0x55, 0x16, 0x89, 0x7c, 0x70, 0x00, 0xe5, 0xa7
-};
-
-struct TestOptions {
-  TestOptions()
-    : winsize(0),
-      large_cksum_step(0),
-      large_cksum_size(0) { }
-  
-  size_t winsize;
-  size_t large_cksum_step;
-  size_t large_cksum_size;
-};
-
-// TODO! the smatcher setup isn't working, 
-void InMemoryEncodeDecode(const TestOptions &options,
-			  const FileSpec &source_file, 
+void InMemoryEncodeDecode(const FileSpec &source_file, 
 			  const FileSpec &target_file, 
 			  Block *coded_data) {
   xd3_stream encode_stream;
@@ -42,6 +25,7 @@ void InMemoryEncodeDecode(const TestOptions &options,
   xd3_config decode_config;
   xd3_source decode_source;
   xoff_t verified_bytes = 0;
+  xoff_t encoded_bytes = 0;
 
   if (coded_data) {
     coded_data->Reset();
@@ -56,16 +40,17 @@ void InMemoryEncodeDecode(const TestOptions &options,
   xd3_init_config(&encode_config, XD3_ADLER32);
   xd3_init_config(&decode_config, XD3_ADLER32);
 
-  encode_config.winsize = options.winsize ? options.winsize : Constants::BLOCK_SIZE;
+  encode_config.winsize = Constants::WINDOW_SIZE;
 
-  if (options.large_cksum_step) {
-    encode_config.smatch_cfg = XD3_SMATCH_SOFT;
-    encode_config.smatcher_soft.large_step = options.large_cksum_step;
-  }
-  if (options.large_cksum_size) {
-    encode_config.smatch_cfg = XD3_SMATCH_SOFT;
-    encode_config.smatcher_soft.large_look = options.large_cksum_size;
-  }
+  // TODO! the smatcher setup isn't working, 
+//   if (options.large_cksum_step) {
+//     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+//     encode_config.smatcher_soft.large_step = options.large_cksum_step;
+//   }
+//   if (options.large_cksum_size) {
+//     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+//     encode_config.smatcher_soft.large_look = options.large_cksum_size;
+//   }
 
   CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
   CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
@@ -86,8 +71,8 @@ void InMemoryEncodeDecode(const TestOptions &options,
   bool encoding = true;
   bool done = false;
 
-  //DP(RINT "source %"Q"u target %"Q"u\n",
-  //   source_file.Size(), target_file.Size());
+  DP(RINT "source %"Q"u target %"Q"u\n",
+     source_file.Size(), target_file.Size());
 
   while (!done) {
     target_iterator.Get(&target_block);
@@ -98,6 +83,7 @@ void InMemoryEncodeDecode(const TestOptions &options,
     }
 
     xd3_avail_input(&encode_stream, target_block.Data(), target_block.Size());
+    encoded_bytes += target_block.Size();
 
   process:
     int ret;
@@ -107,8 +93,8 @@ void InMemoryEncodeDecode(const TestOptions &options,
       ret = xd3_decode_input(&decode_stream);
     }
 
-    //DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
-    //   xd3_strerror(ret));
+    DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+       xd3_strerror(ret));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -134,12 +120,12 @@ void InMemoryEncodeDecode(const TestOptions &options,
     case XD3_GETSRCBLK: {
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
-//       if (encoding) {
-// 	DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
-// 	   encode_source.getblkno,
-// 	   encode_stream.match_last_srcpos,
-// 	   encode_stream.input_position);
-//       }
+      if (encoding) {
+ 	DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
+ 	   encode_source.getblkno,
+ 	   encode_stream.match_last_srcpos,
+ 	   encode_stream.input_position);
+      }
       
       source_iterator.SetBlock(src->getblkno);
       source_iterator.Get(block);
@@ -188,6 +174,7 @@ void InMemoryEncodeDecode(const TestOptions &options,
     }
   }
 
+  CHECK_EQ(target_file.Size(), encoded_bytes);
   CHECK_EQ(target_file.Size(), verified_bytes);
   CHECK_EQ(0, xd3_close_stream(&decode_stream));
   CHECK_EQ(0, xd3_close_stream(&encode_stream));
@@ -280,7 +267,6 @@ void TestFirstByte() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(0);
   spec1.GenerateFixedSize(1);
@@ -297,7 +283,7 @@ void TestFirstByte() {
   spec0.ModifyTo(Modify1stByte(), &spec1);
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
 
-  SizeIterator<size_t, SmallSizes> si(&rand, 0);
+  SizeIterator<size_t, Sizes> si(&rand, 0);
 
   for (; !si.Done(); si.Next()) {
     size_t size = si.Get();
@@ -306,7 +292,7 @@ void TestFirstByte() {
     }
     spec0.GenerateFixedSize(size);
     spec0.ModifyTo(Modify1stByte(), &spec1);
-    InMemoryEncodeDecode(options, spec0, spec1, NULL);
+    InMemoryEncodeDecode(spec0, spec1, NULL);
   }
 }
 
@@ -314,7 +300,6 @@ void TestModifyMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
@@ -342,7 +327,7 @@ void TestModifyMutator() {
     // pass.
     CHECK_GE(diff, test_cases[i].size - (2 * test_cases[i].size / 256));
 
-    InMemoryEncodeDecode(options, spec0, spec1, NULL);
+    InMemoryEncodeDecode(spec0, spec1, NULL);
   }
 }
 
@@ -350,7 +335,6 @@ void TestAddMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
   // TODO: fix this test (for all block sizes)!  it's broken because
@@ -376,7 +360,7 @@ void TestAddMutator() {
     CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(options, spec0, spec1, &coded);
+    InMemoryEncodeDecode(spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(test_cases[i].expected_adds,
@@ -388,7 +372,6 @@ void TestDeleteMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 4);
 
@@ -413,7 +396,7 @@ void TestDeleteMutator() {
     CHECK_EQ(spec0.Size() - test_cases[i].size, spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(options, spec0, spec1, &coded);
+    InMemoryEncodeDecode(spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(0, delta.AddedBytes());
@@ -424,7 +407,6 @@ void TestCopyMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
@@ -448,7 +430,7 @@ void TestCopyMutator() {
     CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(options, spec0, spec1, &coded);
+    InMemoryEncodeDecode(spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(0, delta.AddedBytes());
@@ -459,7 +441,6 @@ void TestMoveMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
@@ -487,59 +468,17 @@ void TestMoveMutator() {
     CHECK_EQ(spec0.Size(), spec1.Size());
 
     Block coded;
-    InMemoryEncodeDecode(options, spec0, spec1, &coded);
+    InMemoryEncodeDecode(spec0, spec1, &coded);
 
     Delta delta(coded);
     CHECK_EQ(0, delta.AddedBytes());
   }
 }
 
-void FindCksumCollision() {
-  // TODO! This is not being used.
-  if (golden_cksum_bytes[0] != 0) {
-    CHECK(memcmp(golden_cksum_bytes, collision_cksum_bytes, CKSUM_SIZE) != 0);
-    CHECK_EQ(xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE),
-	     xd3_lcksum(collision_cksum_bytes, CKSUM_SIZE));
-    return;
-  }
-
-  MTRandom rand;
-  MTRandom8 rand8(&rand);
-
-  for (size_t i = 0; i < CKSUM_SIZE; i++) {
-    collision_cksum_bytes[i] = golden_cksum_bytes[i] = rand8.Rand8();
-  }
-
-  uint32_t golden = xd3_lcksum(golden_cksum_bytes, CKSUM_SIZE);
-
-  size_t i = 0;
-  while (true) {
-    collision_cksum_bytes[i++] = rand8.Rand8();
-
-    if (golden == xd3_lcksum(collision_cksum_bytes, CKSUM_SIZE) &&
-	memcmp(collision_cksum_bytes, golden_cksum_bytes, CKSUM_SIZE) != 0) {
-      break;
-    }
-
-    if (i == CKSUM_SIZE) {
-      i = 0;
-    }
-  }
-
-  Block b1, b2;
-  b1.Append(golden_cksum_bytes, CKSUM_SIZE);
-  b2.Append(collision_cksum_bytes, CKSUM_SIZE);
-  
-  DP(RINT "Found a cksum collision\n");
-  b1.Print();
-  b2.Print();
-}
-
 void TestOverwriteMutator() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
 
@@ -568,15 +507,13 @@ void TestOverwriteMutator() {
   CHECK(memcmp(b0.Data() + 10, b1.Data() + 10, Constants::BLOCK_SIZE - 10) == 0);
 }
 
+// Note: this test is written to expose a problem, but the problem was
+// only exposed with BLOCK_SIZE = 128.
 void TestNonBlockingProgress() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
   FileSpec spec2(&rand);
-  TestOptions options;
-
-  // TODO! this test assumes block_size == 128
-  CHECK_EQ(128, Constants::BLOCK_SIZE);
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
 
@@ -611,20 +548,19 @@ void TestNonBlockingProgress() {
 
   spec0.ModifyTo(ChangeListMutator(ctl), &spec2);
 
-  InMemoryEncodeDecode(options, spec1, spec2, NULL);
+  InMemoryEncodeDecode(spec1, spec2, NULL);
 }
 
 void TestEmptyInMemory() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
   Block block;
 
   spec0.GenerateFixedSize(0);
   spec1.GenerateFixedSize(0);
 
-  InMemoryEncodeDecode(options, spec0, spec1, &block);
+  InMemoryEncodeDecode(spec0, spec1, &block);
 
   Delta delta(block);
   CHECK_LT(0, block.Size());
@@ -635,28 +571,26 @@ void TestBlockInMemory() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
-  TestOptions options;
   Block block;
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
   spec1.GenerateFixedSize(Constants::BLOCK_SIZE);
 
-  InMemoryEncodeDecode(options, spec0, spec1, &block);
+  InMemoryEncodeDecode(spec0, spec1, &block);
 
   Delta delta(block);
   CHECK_EQ(1, delta.Windows());
 }
 
-void FourWayMergeTest(const TestOptions &options,
-		      const FileSpec &spec0,
+void FourWayMergeTest(const FileSpec &spec0,
 		      const FileSpec &spec1,
 		      const FileSpec &spec2,
 		      const FileSpec &spec3) {
   Block delta01, delta12, delta23;
 
-  InMemoryEncodeDecode(options, spec0, spec1, &delta01);
-  InMemoryEncodeDecode(options, spec1, spec2, &delta12);
-  InMemoryEncodeDecode(options, spec2, spec3, &delta23);
+  InMemoryEncodeDecode(spec0, spec1, &delta01);
+  InMemoryEncodeDecode(spec1, spec2, &delta12);
+  InMemoryEncodeDecode(spec2, spec3, &delta23);
 
   TmpFile f0, f1, f2, f3, d01, d12, d23;
 
@@ -694,10 +628,10 @@ void FourWayMergeTest(const TestOptions &options,
   tcmd.push_back(recon.Name());
   tcmd.push_back(NULL);
 
-  DP(RINT "Running one recon! %s\n", CommandToString(tcmd).c_str());
+  //DP(RINT "Running one recon! %s\n", CommandToString(tcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1, 
 			       const_cast<char**>(&tcmd[0])));
-  DP(RINT "Should equal! %s\n", f2.Name());
+  //DP(RINT "Should equal! %s\n", f2.Name());
 
   CHECK(recon.EqualsSpec(spec2));
 
@@ -713,14 +647,12 @@ void TestMergeCommand1() {
   FileSpec spec2(&rand);
   FileSpec spec3(&rand);
 
-  TestOptions options;
-
-  SizeIterator<size_t, SmallSizes> si0(&rand, 10);
+  SizeIterator<size_t, Sizes> si0(&rand, 10);
 
   for (; !si0.Done(); si0.Next()) {
     size_t size0 = si0.Get();
 
-    SizeIterator<size_t, SmallSizes> si1(&rand, 10);
+    SizeIterator<size_t, Sizes> si1(&rand, 10);
     for (; !si1.Done(); si1.Next()) {
       size_t change1 = si1.Get();
 
@@ -756,8 +688,8 @@ void TestMergeCommand1() {
       spec1.ModifyTo(ChangeListMutator(cl2), &spec2);
       spec2.ModifyTo(ChangeListMutator(cl3), &spec3);
 
-      FourWayMergeTest(options, spec0, spec1, spec2, spec3);
-      FourWayMergeTest(options, spec3, spec2, spec1, spec0);
+      FourWayMergeTest(spec0, spec1, spec2, spec3);
+      FourWayMergeTest(spec3, spec2, spec1, spec0);
     }
   }
 }
@@ -772,21 +704,19 @@ void TestMergeCommand2() {
   FileSpec spec2(&rand);
   FileSpec spec3(&rand);
 
-  TestOptions options;
-
-  SizeIterator<size_t, SmallSizes> si0(&rand, 10);
+  SizeIterator<size_t, Sizes> si0(&rand, 10);
   for (; !si0.Done(); si0.Next()) {
     size_t size0 = si0.Get();
 
-    SizeIterator<size_t, SmallSizes> si1(&rand, 10);
+    SizeIterator<size_t, Sizes> si1(&rand, 10);
     for (; !si1.Done(); si1.Next()) {
       size_t size1 = si1.Get();
 
-      SizeIterator<size_t, SmallSizes> si2(&rand, 10);
+      SizeIterator<size_t, Sizes> si2(&rand, 10);
       for (; !si2.Done(); si2.Next()) {
 	size_t size2 = si2.Get();
 
-	SizeIterator<size_t, SmallSizes> si3(&rand, 10);
+	SizeIterator<size_t, Sizes> si3(&rand, 10);
 	for (; !si3.Done(); si3.Next()) {
 	  size_t size3 = si3.Get();
 	  
@@ -812,31 +742,50 @@ void TestMergeCommand2() {
 	  spec0.ModifyTo(ChangeListMutator(cl2), &spec2);
 	  spec0.ModifyTo(ChangeListMutator(cl3), &spec3);
 
-	  FourWayMergeTest(options, spec0, spec1, spec2, spec3);
-	  FourWayMergeTest(options, spec3, spec2, spec1, spec0);
+	  FourWayMergeTest(spec0, spec1, spec2, spec3);
+	  FourWayMergeTest(spec3, spec2, spec1, spec0);
 	}
       }
     }
   }
 }
 
-}  // anonymous namespace
+};  // class Regtest<Constants>
 
-int main(int argc, char **argv) {
-#define TEST(x) cerr << #x << "..." << endl; x()
+#define TEST(x) cerr << #x << "..." << endl; regtest.x()
+
+template <class T>
+void UnitTest() {
+  Regtest<T> regtest;
   TEST(TestRandomNumbers);
   TEST(TestRandomFile);
   TEST(TestFirstByte);
-  TEST(TestEmptyInMemory);
-  TEST(TestBlockInMemory);
   TEST(TestModifyMutator);
   TEST(TestAddMutator);
   TEST(TestDeleteMutator);
   TEST(TestCopyMutator);
   TEST(TestMoveMutator);
   TEST(TestOverwriteMutator);
+}
+
+template <class T>
+void MainTest() {
+  Regtest<T> regtest;
+  TEST(TestEmptyInMemory);
+  TEST(TestBlockInMemory);
   TEST(TestNonBlockingProgress);
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
+}
+
+#undef TEST
+
+int main(int argc, char **argv) {
+  Regtest<MixedBlock> r;
+  r.TestNonBlockingProgress();
+  //UnitTest<SmallBlock>();
+  //MainTest<SmallBlock>();
+  //MainTest<MixedBlock>();
+  //MainTest<LargeBlock>();
   return 0;
 }
