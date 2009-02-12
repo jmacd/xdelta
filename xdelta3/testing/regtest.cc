@@ -93,8 +93,8 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       ret = xd3_decode_input(&decode_stream);
     }
 
-    DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
-       xd3_strerror(ret));
+    //DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+    //   xd3_strerror(ret));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -121,10 +121,10 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
       if (encoding) {
- 	DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
- 	   encode_source.getblkno,
- 	   encode_stream.match_last_srcpos,
- 	   encode_stream.input_position);
+ 	//DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
+ 	//   encode_source.getblkno,
+ 	//   encode_stream.match_last_srcpos,
+ 	//   encode_stream.input_position);
       }
       
       source_iterator.SetBlock(src->getblkno);
@@ -157,7 +157,9 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 	}
 	encoding = false;
       } else {
-	CHECK_EQ(0, CmpDifferentBlockBytes(decoded_block, target_block));
+	CHECK_EQ(0, CmpDifferentBlockBytesAtOffset(decoded_block, 
+						   target_file, 
+						   verified_bytes));
 	verified_bytes += decoded_block.Size();
 	decoded_block.Reset();
 	encoding = true;
@@ -781,11 +783,10 @@ void MainTest() {
 #undef TEST
 
 int main(int argc, char **argv) {
-  Regtest<MixedBlock> r;
-  r.TestNonBlockingProgress();
-  //UnitTest<SmallBlock>();
-  //MainTest<SmallBlock>();
-  //MainTest<MixedBlock>();
-  //MainTest<LargeBlock>();
+  UnitTest<SmallBlock>();
+  MainTest<SmallBlock>();
+  MainTest<MixedBlock>();
+  MainTest<OversizeBlock>();
+  MainTest<LargeBlock>();
   return 0;
 }

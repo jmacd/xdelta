@@ -283,17 +283,16 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
     abort (); } } while (0)
 #else
 #define XD3_ASSERT(x) (void)0
-#endif
+#endif  /* XD3_DEBUG */
 
 #ifdef __GNUC__
-/* As seen on linux-kernel. */
 #ifndef max
 #define max(x,y) ({ \
 	const typeof(x) _x = (x);	\
 	const typeof(y) _y = (y);	\
 	(void) (&_x == &_y);		\
 	_x > _y ? _x : _y; })
-#endif
+#endif /* __GNUC__ */
 
 #ifndef min
 #define min(x,y) ({ \
@@ -302,14 +301,14 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
 	(void) (&_x == &_y);		\
 	_x < _y ? _x : _y; })
 #endif
-#else
+#else  /* __GNUC__ */
 #ifndef max
 #define max(x,y) ((x) < (y) ? (y) : (x))
 #endif
 #ifndef min
 #define min(x,y) ((x) < (y) ? (x) : (y))
 #endif
-#endif
+#endif  /* __GNUC__ */
 
 /****************************************************************
  PUBLIC ENUMS
@@ -854,7 +853,7 @@ struct _xd3_stream
 					 match (across windows) */
 
   uint8_t          *buf_in;           /* for saving buffered input */
-  usize_t            buf_avail;        /* amount of saved input */
+  usize_t           buf_avail;        /* amount of saved input */
   const uint8_t    *buf_leftover;     /* leftover content of next_in
 					 (i.e., user's buffer) */
   usize_t            buf_leftavail;    /* amount of leftover content */
@@ -1205,7 +1204,21 @@ void    xd3_init_config (xd3_config *config,
   config->flags = flags;
 }
 
-/* This supplies some input to the stream. */
+/* This supplies some input to the stream.  
+ *
+ * For encoding, if the input is larger than the configured window
+ * size (xd3_config.winsize), the entire input will be consumed and
+ * encoded anyway.  If you wish to strictly limit the window size,
+ * limit the buffer passed to xd3_avail_input to the window size.
+ *
+ * For encoding, if the input is smaller than the configured window
+ * size (xd3_config.winsize), the library will create a window-sized
+ * buffer and accumulate input until a full-sized window can be
+ * encoded.  The input must remain valid until the next time
+ * xd3_encode_input() returns XD3_INPUT.
+ *
+ * For decoding, the entire input will be consumed for each call.
+ */
 static inline
 void    xd3_avail_input  (xd3_stream    *stream,
 			  const uint8_t *idata,

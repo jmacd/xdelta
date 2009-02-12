@@ -3,107 +3,6 @@ class Block;
 class BlockIterator;
 class TmpFile;
 
-class FileSpec {
- public:
-  FileSpec(MTRandom *rand)
-    : rand_(rand) {
-  }
-
-  // Generates a file with a known size
-  void GenerateFixedSize(xoff_t size) {
-    Reset();
-    
-    for (xoff_t p = 0; p < size; ) {
-      xoff_t t = min(Constants::BLOCK_SIZE, size - p);
-      table_.insert(make_pair(p, Segment(t, rand_)));
-      p += t;
-    }
-  }
-
-  // Generates a file with exponential-random distributed size
-  void GenerateRandomSize(xoff_t mean) {
-    GenerateFixedSize(rand_->ExpRand(mean));
-  }
-
-  // Returns the size of the file
-  xoff_t Size() const {
-    if (table_.empty()) {
-      return 0;
-    }
-    ConstSegmentMapIterator i = --table_.end();
-    return i->first + i->second.Size();
-  }
-
-  // Returns the number of blocks
-  xoff_t Blocks(size_t blksize = Constants::BLOCK_SIZE) const {
-    if (table_.empty()) {
-      return 0;
-    }
-    return ((Size() - 1) / blksize) + 1;
-  }
-
-  // Returns the number of segments
-  xoff_t Segments() const {
-    return table_.size();
-  }
-
-  // Create a mutation according to "what".
-  void ModifyTo(const Mutator &mutator,
-		FileSpec *modify) const {
-    modify->Reset();
-    mutator.Mutate(&modify->table_, &table_, rand_);
-    modify->CheckSegments();
-  }
-
-  void CheckSegments() const {
-    for (ConstSegmentMapIterator iter(table_.begin());
-	 iter != table_.end(); ) {
-      ConstSegmentMapIterator iter0(iter++);
-      if (iter == table_.end()) {
-	break;
-      }
-      CHECK_EQ(iter0->first + iter0->second.Size(), iter->first);
-    }
-  }
-
-  void Reset() {
-    table_.clear();
-  }
-
-  void Print() const {
-    for (ConstSegmentMapIterator iter(table_.begin());
-	 iter != table_.end();
-	 ++iter) {
-      const Segment &seg = iter->second;
-      cerr << "Segment at " << iter->first << " (" << seg.ToString() << ")" << endl;
-    }
-  }
-
-  void PrintData() const {
-    Block block;
-    for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
-      iter.Get(&block);
-      block.Print();
-    }
-  }
-
-  void WriteTmpFile(TmpFile *f) const {
-    Block block;
-    for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
-      iter.Get(&block);
-      f->Append(&block);
-    }
-  }
-
-  typedef BlockIterator iterator;
-
- private:
-  friend class BlockIterator;
-
-  MTRandom *rand_;
-  SegmentMap table_;
-};
-
 class Block {
 public:
   Block()
@@ -201,6 +100,139 @@ private:
   size_t size_;
 };
 
+class FileSpec {
+ public:
+  FileSpec(MTRandom *rand)
+    : rand_(rand) {
+  }
+
+  // Generates a file with a known size
+  void GenerateFixedSize(xoff_t size) {
+    Reset();
+    
+    for (xoff_t p = 0; p < size; ) {
+      xoff_t t = min(Constants::BLOCK_SIZE, size - p);
+      table_.insert(make_pair(p, Segment(t, rand_)));
+      p += t;
+    }
+  }
+
+  // Generates a file with exponential-random distributed size
+  void GenerateRandomSize(xoff_t mean) {
+    GenerateFixedSize(rand_->ExpRand(mean));
+  }
+
+  // Returns the size of the file
+  xoff_t Size() const {
+    if (table_.empty()) {
+      return 0;
+    }
+    ConstSegmentMapIterator i = --table_.end();
+    return i->first + i->second.Size();
+  }
+
+  // Returns the number of blocks
+  xoff_t Blocks(size_t blksize = Constants::BLOCK_SIZE) const {
+    if (table_.empty()) {
+      return 0;
+    }
+    return ((Size() - 1) / blksize) + 1;
+  }
+
+  // Returns the number of segments
+  xoff_t Segments() const {
+    return table_.size();
+  }
+
+  // Create a mutation according to "what".
+  void ModifyTo(const Mutator &mutator,
+		FileSpec *modify) const {
+    modify->Reset();
+    mutator.Mutate(&modify->table_, &table_, rand_);
+    modify->CheckSegments();
+  }
+
+  void CheckSegments() const {
+    for (ConstSegmentMapIterator iter(table_.begin());
+	 iter != table_.end(); ) {
+      ConstSegmentMapIterator iter0(iter++);
+      if (iter == table_.end()) {
+	break;
+      }
+      CHECK_EQ(iter0->first + iter0->second.Size(), iter->first);
+    }
+  }
+
+  void Reset() {
+    table_.clear();
+  }
+
+  void Print() const {
+    for (ConstSegmentMapIterator iter(table_.begin());
+	 iter != table_.end();
+	 ++iter) {
+      const Segment &seg = iter->second;
+      cerr << "Segment at " << iter->first << " (" << seg.ToString() << ")" << endl;
+    }
+  }
+
+  void PrintData() const {
+    Block block;
+    for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
+      iter.Get(&block);
+      block.Print();
+    }
+  }
+
+  void WriteTmpFile(TmpFile *f) const {
+    Block block;
+    for (BlockIterator iter(*this); !iter.Done(); iter.Next()) {
+      iter.Get(&block);
+      f->Append(&block);
+    }
+  }
+
+  void Get(Block *block, xoff_t offset, size_t size) const {
+    size_t got = 0;
+    block->SetSize(size);
+
+    ConstSegmentMapIterator pos = table_.upper_bound(offset);
+    if (pos == table_.begin()) {
+      CHECK_EQ(0, Size());
+      return;
+    }
+    --pos;
+
+    while (got < size) {
+      CHECK(pos != table_.end());
+      CHECK_GE(offset, pos->first);
+
+      const Segment &seg = pos->second;
+
+      // The position of this segment may start before this block starts,
+      // and then the position of the data may be offset from the seeding 
+      // position.
+      size_t seg_offset = offset - pos->first;
+      size_t advance = min(seg.Size() - seg_offset,
+			   size - got);
+
+      seg.Fill(seg_offset, advance, block->Data() + got);
+
+      got += advance;
+      offset += advance;
+      ++pos;
+    }
+  }
+
+  typedef BlockIterator iterator;
+
+ private:
+  friend class BlockIterator;
+
+  MTRandom *rand_;
+  SegmentMap table_;
+};
+
 class BlockIterator {
 public:
   explicit BlockIterator(const FileSpec& spec)
@@ -235,37 +267,7 @@ public:
   }
 
   void Get(Block *block) const {
-    xoff_t offset = blkno_ * blksize_;
-    const SegmentMap &table = spec_.table_;
-    size_t got = 0;
-    block->SetSize(BytesOnBlock());
-
-    ConstSegmentMapIterator pos = table.upper_bound(offset);
-    if (pos == table.begin()) {
-      CHECK_EQ(0, spec_.Size());
-      return;
-    }
-    --pos;
-
-    while (got < block->size_) {
-      CHECK(pos != table.end());
-      CHECK_GE(offset, pos->first);
-
-      const Segment &seg = pos->second;
-
-      // The position of this segment may start before this block starts,
-      // and then the position of the data may be offset from the seeding 
-      // position.
-      size_t seg_offset = offset - pos->first;
-      size_t advance = min(seg.Size() - seg_offset,
-			   blksize_ - got);
-
-      seg.Fill(seg_offset, advance, block->data_ + got);
-
-      got += advance;
-      offset += advance;
-      ++pos;
-    }
+    spec_.Get(block, blkno_ * blksize_, BytesOnBlock());
   }
 
   size_t BytesOnBlock() const {

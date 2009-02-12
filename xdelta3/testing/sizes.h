@@ -93,3 +93,12 @@ struct MixedBlock {
 
 const xoff_t MixedBlock::BLOCK_SIZE = 1<<7;
 const size_t MixedBlock::WINDOW_SIZE = 1<<8;
+
+struct OversizeBlock {
+  static const xoff_t BLOCK_SIZE;
+  static const size_t WINDOW_SIZE;
+  typedef SmallSizes Sizes;
+};
+
+const xoff_t OversizeBlock::BLOCK_SIZE = 1<<8;
+const size_t OversizeBlock::WINDOW_SIZE = 1<<7;

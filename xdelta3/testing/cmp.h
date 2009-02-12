@@ -38,3 +38,16 @@ static xoff_t CmpDifferentBytes(const FileSpec &a, const FileSpec &b) {
 
   return total;
 }
+
+static size_t CmpDifferentBlockBytesAtOffset(const Block &a,
+					     const FileSpec &b_spec,
+					     xoff_t offset) {
+  Block b;
+  size_t size = a.Size();
+  CHECK_LE(offset, b_spec.Size());
+  if (b_spec.Size() < offset + size) {
+    size = b_spec.Size() - offset;
+  }
+  b_spec.Get(&b, offset, size);
+  return CmpDifferentBlockBytes(a, b);
+}

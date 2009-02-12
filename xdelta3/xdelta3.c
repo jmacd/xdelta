@@ -3756,6 +3756,7 @@ xd3_encode_input (xd3_stream *stream)
        * without flush.  The label at this point is reached by a goto
        * below, when there is leftover input after postout. */
       if ((stream->buf_leftover != NULL) ||
+	  (stream->buf_avail != 0) ||
 	  (stream->avail_in < stream->winsize && ! (stream->flags & XD3_FLUSH)))
 	{
 	  if ((ret = xd3_encode_buffer_leftover (stream))) { return ret; }
@@ -3843,7 +3844,7 @@ xd3_encode_input (xd3_stream *stream)
 
     case ENC_INSTR:
       /* Note: Jump here to encode VCDIFF deltas w/o using this
-       * string-matching code. */
+       * string-matching code.  Merging code code enters here. */
 
       /* Flush the instrution buffer, then possibly add one more
        * instruction, then emit the header. */

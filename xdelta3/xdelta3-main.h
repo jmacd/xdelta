@@ -4185,6 +4185,14 @@ main_help (void)
 
   /* Note: update wiki when command-line features change */
   DP(RINT "usage: xdelta3 [command/options] [input [output]]\n");
+  DP(RINT "make patch:\n");
+  DP(RINT "\n");
+  DP(RINT "  xdelta3.exe -e -s old_file new_file delta_file\n");
+  DP(RINT "\n");
+  DP(RINT "apply patch:\n");
+  DP(RINT "\n");
+  DP(RINT "  xdelta3.exe -d -s old_file delta_file decoded_new_file\n");
+  DP(RINT "\n");
   DP(RINT "special command names:\n");
   DP(RINT "    config      prints xdelta3 configuration\n");
   DP(RINT "    decode      decompress the input\n");
@@ -4201,6 +4209,10 @@ main_help (void)
   DP(RINT "    recode      encode with new application/secondary settings\n");
   DP(RINT "    merge       merge VCDIFF inputs (see below)\n");
 #endif
+  DP(RINT "merge patches:\n");
+  DP(RINT "\n");
+  DP(RINT "  xdelta3 merge -m 1.vcdiff -m 2.vcdiff 3.vcdiff merged.vcdiff\n");
+  DP(RINT "\n");
   DP(RINT "standard options:\n");
   DP(RINT "   -0 .. -9     compression level\n");
   DP(RINT "   -c           use stdout\n");
@@ -4236,7 +4248,5 @@ main_help (void)
   DP(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
   DP(RINT "   tar --use-compress-program=xdelta3 \\\n");
   DP(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y\n");
-  DP(RINT "the \"merge\" command combines VCDIFF inputs as follows:\n");
-  DP(RINT "   xdelta3 merge -m 1.vcdiff -m 2.vcdiff 3.vcdiff merged.vcdiff\n");
   return EXIT_FAILURE;
 }
