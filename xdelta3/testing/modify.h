@@ -152,6 +152,8 @@ public:
       }
     }
 
+    // This check verifies that the modify does not extend past the
+    // source_table EOF.
     CHECK_LE(m_end, i_end);
   }
 

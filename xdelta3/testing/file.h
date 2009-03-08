@@ -258,6 +258,10 @@ public:
     return blkno_;
   }
 
+  xoff_t Blocks() const {
+    return spec_.Blocks(blksize_);
+  }
+
   xoff_t Offset() const {
     return blkno_ * blksize_;
   }
@@ -274,8 +278,8 @@ public:
     xoff_t blocks = spec_.Blocks(blksize_);
     xoff_t size = spec_.Size();
 
-    CHECK((blkno_ < blocks) ||
-	  (blkno_ == blocks && size % blksize_ == 0));
+    DCHECK((blkno_ < blocks) ||
+	   (blkno_ == blocks && size % blksize_ == 0));
 
     if (blkno_ == blocks) {
       return 0;

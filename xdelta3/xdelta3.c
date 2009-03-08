@@ -3521,6 +3521,8 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
       return ENOMEM;
     }
 
+  IF_DEBUG1 (DP(RINT "[leftover] flush?=%s\n", (stream->flags & XD3_FLUSH) ? "yes" : "no"));
+
   /* Take leftover input first. */
   if (stream->buf_leftover != NULL)
     {
@@ -3548,17 +3550,16 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
       /* Buffer is full */
       stream->buf_leftover  = stream->next_in  + take;
       stream->buf_leftavail = stream->avail_in - take;
-
-      IF_DEBUG1 (DP(RINT "[leftover] take %u remaining %u\n", take, stream->buf_leftavail));
     }
   else if ((stream->buf_avail < stream->winsize) && !(stream->flags & XD3_FLUSH))
     {
       /* Buffer has space */
-      IF_DEBUG1 (DP(RINT "[leftover] %u emptied\n", take));
+      IF_DEBUG1 (DP(RINT "[leftover] emptied %u\n", take));
       return XD3_INPUT;
     }
 
   /* Use the buffer: */
+  IF_DEBUG1 (DP(RINT "[leftover] take %u remaining %u\n", take, stream->buf_leftavail));
   stream->next_in   = stream->buf_in;
   stream->avail_in  = stream->buf_avail;
   stream->buf_avail = 0;
@@ -3922,7 +3923,7 @@ xd3_encode_input (xd3_stream *stream)
       stream->enc_state = ENC_INPUT;
 
       /* If there is leftover input to flush, repeat. */
-      if ((stream->buf_leftover != NULL) && (stream->flags & XD3_FLUSH))
+      if (stream->buf_leftover != NULL)
 	{
 	  goto enc_flush;
 	}

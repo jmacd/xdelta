@@ -64,21 +64,30 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
   xd3_set_source (&encode_stream, &encode_source);
   xd3_set_source (&decode_stream, &decode_source);
 
-  BlockIterator source_iterator(source_file);
-  BlockIterator target_iterator(target_file);
+  BlockIterator source_iterator(source_file, Constants::BLOCK_SIZE);
+  BlockIterator target_iterator(target_file, Constants::READ_SIZE);
   Block encode_source_block, decode_source_block;
   Block decoded_block, target_block;
   bool encoding = true;
   bool done = false;
+  bool done_after_input = false;
 
-  DP(RINT "source %"Q"u target %"Q"u\n",
-     source_file.Size(), target_file.Size());
+  DP(RINT "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
+     source_file.Size(), Constants::BLOCK_SIZE,
+     target_file.Size(), Constants::READ_SIZE,
+     Constants::WINDOW_SIZE);
 
   while (!done) {
     target_iterator.Get(&target_block);
 
-    if (target_file.Blocks() == 0 ||
-	target_iterator.Blkno() == (target_file.Blocks() - 1)) {
+    xoff_t blks = target_iterator.Blocks();
+
+    //DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
+    //   encoding ? "encoding" : "decoding",
+    //   target_iterator.Offset(), target_iterator.Offset() + target_block.Size(),
+    //   target_iterator.Blkno(), blks, verified_bytes);
+
+    if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
       xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
     }
 
@@ -93,7 +102,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       ret = xd3_decode_input(&decode_stream);
     }
 
-    //DP(RINT "%s = %s\n", encoding ? "encoding" : "decoding",
+    //DP(RINT "%s = %s\n", encoding ? "E " : " D",
     //   xd3_strerror(ret));
 
     switch (ret) {
@@ -141,6 +150,11 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 	encoding = true;
 	goto process;
       } else {
+	if (done_after_input) {
+	  done = true;
+	  continue;
+	}
+
 	if (target_block.Size() < target_iterator.BlockSize()) {
 	  encoding = false;
 	} else {
@@ -152,8 +166,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
     case XD3_WINFINISH:
       if (encoding) {
 	if (encode_stream.flags & XD3_FLUSH) {
-	  done = true;
-	  continue;
+	  done_after_input = true;
 	}
 	encoding = false;
       } else {
@@ -285,7 +298,7 @@ void TestFirstByte() {
   spec0.ModifyTo(Modify1stByte(), &spec1);
   CHECK_EQ(1, CmpDifferentBytes(spec0, spec1));
 
-  SizeIterator<size_t, Sizes> si(&rand, 0);
+  SizeIterator<size_t, Sizes> si(&rand, Constants::TEST_ROUNDS);
 
   for (; !si.Done(); si.Next()) {
     size_t size = si.Get();
@@ -517,7 +530,7 @@ void TestNonBlockingProgress() {
   FileSpec spec1(&rand);
   FileSpec spec2(&rand);
 
-  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 2);
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
   // This is a lazy target match
   Change ct(Change::OVERWRITE, 22, 
@@ -581,7 +594,7 @@ void TestBlockInMemory() {
   InMemoryEncodeDecode(spec0, spec1, &block);
 
   Delta delta(block);
-  CHECK_EQ(1, delta.Windows());
+  CHECK_EQ(spec1.Blocks(Constants::WINDOW_SIZE), delta.Windows());
 }
 
 void FourWayMergeTest(const FileSpec &spec0,
@@ -616,7 +629,7 @@ void FourWayMergeTest(const FileSpec &spec0,
   mcmd.push_back(out.Name());
   mcmd.push_back(NULL);
 
-  DP(RINT "Running one merge: %s\n", CommandToString(mcmd).c_str());
+  //DP(RINT "Running one merge: %s\n", CommandToString(mcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1, 
 			       const_cast<char**>(&mcmd[0])));
 
@@ -786,6 +799,7 @@ int main(int argc, char **argv) {
   UnitTest<SmallBlock>();
   MainTest<SmallBlock>();
   MainTest<MixedBlock>();
+  MainTest<PrimeBlock>();
   MainTest<OversizeBlock>();
   MainTest<LargeBlock>();
   return 0;

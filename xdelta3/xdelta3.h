@@ -1214,10 +1214,11 @@ void    xd3_init_config (xd3_config *config,
  * For encoding, if the input is smaller than the configured window
  * size (xd3_config.winsize), the library will create a window-sized
  * buffer and accumulate input until a full-sized window can be
- * encoded.  The input must remain valid until the next time
- * xd3_encode_input() returns XD3_INPUT.
+ * encoded.  XD3_INPUT will be returned.  The input must remain valid
+ * until the next time xd3_encode_input() returns XD3_INPUT.
  *
- * For decoding, the entire input will be consumed for each call.
+ * For decoding, the input will be consumed entirely before XD3_INPUT
+ * is returned again.
  */
 static inline
 void    xd3_avail_input  (xd3_stream    *stream,

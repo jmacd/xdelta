@@ -32,6 +32,8 @@ extern "C" {
   abort(); \
     } } while (false)
 
+#define DCHECK(x)
+
 #include <string>
 using std::string;
 
