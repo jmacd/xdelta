@@ -57,7 +57,7 @@ CFLAGS= -Wall -Wshadow -fno-builtin
 WFLAGS= -Wextra -Wsign-compare -Wconversion -Wextra -Wno-unused-parameter
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0u
+REL=3.0v
 
 RELDIR = xdelta$(REL)
 
