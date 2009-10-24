@@ -20,6 +20,7 @@
 
 import os, sys, math, re, time, types, array, random
 import xdelta3
+import xdelta3main
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
 #RCSDIR = '/tmp/PRCS_read_copy'
@@ -29,6 +30,7 @@ import xdelta3
 #SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 #RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/net/x25'
+RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/fs'
 RCSDIR = '/Users/jmacd/src/ftp.kernel.org'
 
 #
@@ -900,7 +902,7 @@ class RandomTest:
     #end
 
     def __str__(self):
-        decodestr = ' %.6f' % self.decodetime
+        decodestr = ' %s' % self.decodetime
         return 'time %.6f%s size %d%s << %s >>%s' % (
             self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
             self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
@@ -998,8 +1000,8 @@ def RunTestLoop(rand, generator, rounds):
             #end
         #end
 
-        GraphResults('expt%d' % rnum, results)
-        GraphSummary('sum%d' % rnum, results)
+        #GraphResults('expt%d' % rnum, results)
+        #GraphSummary('sum%d' % rnum, results)
 
         # re-test some fraction
         configs = [r.config() for r in results[0:int(MAX_RESULTS * KEEP_P)]]
@@ -1186,7 +1188,7 @@ def GraphSummary(desc, results_ignore):
         syn = ScoreTests(syn)
         #print 'smap is %s' % (smap,)
         #print 'syn is %s' % (' and '.join([str(x) for x in syn]))
-        GraphResults(summary, syn)
+        #GraphResults(summary, syn)
     #end
 #end
 
@@ -1196,19 +1198,20 @@ if __name__ == "__main__":
         os.mkdir(TMPDIR)
 
         rcsf = GetTestRcsFiles()
-        #generator = rcsf.Generator()
+        generator = rcsf.Generator()
 
         #sample = SampleDataTest([SAMPLEDIR])
         #generator = sample.Generator()
 
-        #rand = random.Random(135135135135135)
-        #RunTestLoop(rand, generator, TEST_ROUNDS)
+        rand = random.Random(135135135135135)
+        RunTestLoop(rand, generator, TEST_ROUNDS)
 
         #RunSpeedTest()
 
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-1', '-3', '-6']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9']))
-        x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
-        x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-1', '-S', 'djw']))
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
+        #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-1', '-S', 'djw']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-T']))
 
         #x1r = rcsf.AllPairsByDate(Xdelta1RunClass())

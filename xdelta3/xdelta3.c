@@ -5085,7 +5085,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 
   const uint8_t *inp;
   uint32_t       scksum = 0;
-  uint32_t       scksum_state;
+  uint32_t       scksum_state = 0;
   uint32_t       lcksum = 0;
   usize_t         sinx;
   usize_t         linx;

@@ -8,7 +8,7 @@ PYVER = 2.5
 
 ifeq ("$(CYGWIN)", "")
 SWIGTGT = xdelta3module.so
-PYTGT = build/lib.linux-i686-$(PYVER)/xdelta3main.so
+PYTGT = build/lib.macosx-10.5-i386-2.5/xdelta3main.so
 else
 SWIGTGT = xdelta3module.dll
 PYTGT = build/lib.cygwin-1.5.24-i686-$(PYVER)/xdelta3main.dll
@@ -57,13 +57,13 @@ CFLAGS= -Wall -Wshadow -fno-builtin
 WFLAGS= -Wextra -Wsign-compare -Wconversion -Wextra -Wno-unused-parameter
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0v
+REL=3.0wRC11
 
 RELDIR = xdelta$(REL)
 
 EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	draft-korn-vcdiff.txt xdelta3.vcproj badcopy.vcproj \
-	xdelta3-regtest.py xdelta3-test.py setup.py \
+	testing/xdelta3-regtest.py xdelta3-test.py setup.py \
 	examples/Makefile examples/small_page_test.c \
 	examples/README examples/encode_decode_test.c \
 	examples/compare_test.c examples/speed_test.c \
