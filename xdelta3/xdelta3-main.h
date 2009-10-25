@@ -1918,7 +1918,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 		  XD3_ASSERT (inst->addr >= window_start);
 		  addr = inst->addr - window_start;
 		}
-	      IF_DEBUG1 (DP(RINT "[merge copy] winpos %u take %u addr %"Q"u mode %u\n",
+	      IF_DEBUG2 (DP(RINT "[merge copy] winpos %u take %u addr %"Q"u mode %u\n",
 			    window_pos, take, addr, inst->mode));
 	      if ((ret = xd3_found_match (recode_stream, window_pos, take, 
 					  addr, inst->mode != 0)))
@@ -2274,18 +2274,19 @@ main_input_decompress_setup (const main_extcomp     *decomp,
  * is passed to the pipe copier.  This avoids using the same size
  * buffer in both cases. */
 static int
-main_decompress_input_check (main_file   *ifile,
-			    uint8_t    *input_buf,
-			    usize_t      input_size,
-			    usize_t     *nread)
+main_decompress_input_check (main_file  *ifile,
+			     uint8_t    *input_buf,
+			     usize_t     input_size,
+			     usize_t    *nread)
 {
   int ret;
   usize_t i;
+  usize_t try_read = min (input_size, XD3_ALLOCSIZE);
   usize_t check_nread;
-  uint8_t check_buf[XD3_ALLOCSIZE];
+  uint8_t check_buf[XD3_ALLOCSIZE];  /* TODO: stack limit */
 
   if ((ret = main_file_read (ifile, check_buf,
-			     min (input_size, XD3_ALLOCSIZE),
+			     try_read,
 			     & check_nread, "input read failed")))
     {
       return ret;
@@ -2320,10 +2321,12 @@ main_decompress_input_check (main_file   *ifile,
   /* Now read the rest of the input block. */
   (*nread) = 0;
 
-  if (check_nread == XD3_ALLOCSIZE)
+  if (check_nread == try_read)
     {
-      ret = main_file_read (ifile, input_buf + XD3_ALLOCSIZE,
-			    input_size - XD3_ALLOCSIZE, nread,
+      ret = main_file_read (ifile, 
+			    input_buf + try_read,
+			    input_size - try_read, 
+			    nread,
 			    "input read failed");
     }
 
@@ -2332,107 +2335,6 @@ main_decompress_input_check (main_file   *ifile,
   (*nread) += check_nread;
 
   return 0;
-}
-
-/* This is called when the source file needs to be decompressed.  We
- * fork/exec a decompression command with the proper input and output
- * to a temporary file. */
-static int
-main_decompress_source (main_file *sfile, xd3_source *source)
-{
-  const main_extcomp *decomp = sfile->compressor;
-  pid_t decomp_id;  /* One subproc. */
-  int   input_fd  = -1;
-  int   output_fd = -1;
-  int   ret;
-  char *tmpname = NULL;
-  char *tmpdir  = getenv ("TMPDIR");
-  static const char tmpl[] = "/xd3src.XXXXXX";
-
-  /* Make a template for mkstmp() */
-  if (tmpdir == NULL) { tmpdir = "/tmp"; }
-  if ((tmpname =
-       (char*) main_malloc (strlen (tmpdir) + sizeof (tmpl) + 1)) == NULL)
-    {
-      return ENOMEM;
-    }
-  sprintf (tmpname, "%s%s", tmpdir, tmpl);
-
-  XD3_ASSERT (ext_tmpfile == NULL);
-  ext_tmpfile = tmpname;
-
-  /* Open the output FD. */
-  if ((output_fd = mkstemp (tmpname)) < 0)
-    {
-      XPR(NT "mkstemp failed: %s: %s",
-	  tmpname, xd3_mainerror (ret = get_errno ()));
-      goto cleanup;
-    }
-
-  /* Copy the input FD, reset file position. */
-  XD3_ASSERT (main_file_isopen (sfile));
-#if XD3_STDIO
-  if ((input_fd = dup (fileno (sfile->file))) < 0)
-    {
-      XPR(NT "dup failed: %s", xd3_mainerror (ret = get_errno ()));
-      goto cleanup;
-    }
-  main_file_close (sfile);
-  sfile->file = NULL;
-#elif XD3_POSIX
-  input_fd = sfile->file;
-  sfile->file = -1;
-#endif
-
-  if ((ret = lseek (input_fd, SEEK_SET, 0)) != 0)
-    {
-      XPR(NT "lseek failed: : %s", xd3_mainerror (ret = get_errno ()));
-      goto cleanup;
-    }
-
-  if ((decomp_id = fork ()) < 0)
-    {
-      XPR(NT "fork failed: %s", xd3_mainerror (ret = get_errno ()));
-      goto cleanup;
-    }
-
-  /* The child runs the decompression process: */
-  if (decomp_id == 0)
-    {
-      /* Setup pipes: write to the output file, read from the pipe. */
-      if (dup2 (input_fd, STDIN_FILENO) < 0 ||
-	  dup2 (output_fd, STDOUT_FILENO) < 0 ||
-	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname,
-		  decomp->decomp_options, NULL))
-	{
-	  XPR(NT "child process %s failed to execute: %s\n",
-		   decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
-	}
-
-      _exit (127);
-    }
-
-  close (input_fd);
-  close (output_fd);
-  input_fd  = -1;
-  output_fd = -1;
-
-  /* Then wait for completion. */
-  if ((ret = main_waitpid_check (decomp_id)))
-    {
-      goto cleanup;
-    }
-
-  /* Open/stat the decompressed source file. */
-  if ((ret = main_file_open (sfile, tmpname, XO_READ))) { goto cleanup; }
-  return 0;
-
- cleanup:
-  close (input_fd);
-  close (output_fd);
-  if (tmpname) { free (tmpname); }
-  ext_tmpfile = NULL;
-  return ret;
 }
 
 /* Initiate re-compression of the output stream.  This is easier than
@@ -2753,12 +2655,12 @@ main_get_appheader (xd3_stream *stream, main_file *ifile,
  **********************************************************************/
 
 /* This function acts like the above except it may also try to
- * recognize a compressed input when the first buffer of data is read.
- * The EXTERNAL_COMPRESSION code is called to search for magic
- * numbers. */
+ * recognize a compressed input (source or target) when the first
+ * buffer of data is read.  The EXTERNAL_COMPRESSION code is called to
+ * search for magic numbers. */
 static int
 main_read_primary_input (main_file   *ifile,
-			 uint8_t    *buf,
+			 uint8_t     *buf,
 			 usize_t      size,
 			 usize_t     *nread)
 {
@@ -2849,7 +2751,12 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   int ret = 0;
   usize_t i;
   uint8_t *tmp_buf = NULL;
-  XD3_ASSERT(stream);
+  xoff_t source_size = 0;
+  int seekable = 0;
+  int source_size_known = 0;
+
+  main_blklru_list_init (& lru_list);
+  main_blklru_list_init (& lru_free);
 
   /* Open it, check for seekability, set required xd3_source fields. */
   if (allow_fake_source)
@@ -2857,114 +2764,69 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
+      seekable = 1;
+      source_size_known = 1;
     }
   else
     {
+      int stat_val;
+
       if ((ret = main_file_open (sfile, sfile->filename, XO_READ)))
 	{
 	  goto error;
 	}
+      stat_val = main_file_stat (sfile, &source_size);
+
+      if (stat_val == 0)
+	{
+	  seekable = 1;
+	  source_size_known = 1;
+
+	  if (option_verbose > 1) 
+	    {
+	      XPR(NT "source file size: %"Q"u\n", source_size);
+	    }
+	}
+      else
+	{
+	  seekable = 0;
+	  source_size_known = 0;
+
+	  if (option_verbose) 
+	    {
+	      XPR(NT "source not seekable\n");
+	    }
+	}
+    }
+
+  if (source_size_known && source_size < option_srcwinsz)
+    { 
+     /* Reduce sizes to actual source size, read whole file */
+      option_srcwinsz = source_size;
+      source->blksize = source_size;
+    }
+  else
+    {
+      option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
+      source->blksize = (option_srcwinsz / LRU_SIZE);
     }
 
   source->name     = sfile->filename;
   source->ioh      = sfile;
-  source->curblkno = (xoff_t) -1;
+  source->curblkno = 0;
   source->curblk   = NULL;
 
-#if EXTERNAL_COMPRESSION
-  if (option_decompress_inputs)
+  // May change source->blksize next
+  if (source_size_known)
     {
-      /* If encoding, read the header to check for decompression. */
-      if (IS_ENCODE (cmd))
-	{
-	  usize_t nread;
-	  tmp_buf = (uint8_t*) main_malloc (XD3_ALLOCSIZE);
-
-	  if ((ret = main_file_read (sfile, tmp_buf, XD3_ALLOCSIZE,
-				     & nread, "source read failed")))
-	    {
-	      goto error;
-	    }
-
-	  /* Check known magic numbers. */
-	  for (i = 0; i < SIZEOF_ARRAY (extcomp_types); i += 1)
-	    {
-	      const main_extcomp *decomp = & extcomp_types[i];
-
-	      if ((nread > decomp->magic_size) &&
-		  memcmp (tmp_buf, decomp->magic, decomp->magic_size) == 0)
-		{
-		  sfile->compressor = decomp;
-		  break;
-		}
-	    }
-
-	  if (sfile->compressor == NULL)
-	    {
-	      if (option_verbose > 2)
-		{
-		  XPR(NT "source block 0 read (not compressed)\n");
-		}
-	    }
-	}
-
-      /* In either the encoder or decoder, start decompression. */
-      if (sfile->compressor)
-	{
-	  if ((ret = main_decompress_source (sfile, source)))
-	    {
-	      goto error;
-	    }
-
-	  if (! option_quiet)
-	    {
-	      XPR(NT "%s | %s %s => %s\n",
-		  sfile->filename,
-		  sfile->compressor->decomp_cmdname,
-		  sfile->compressor->decomp_options,
-		  sfile->realname);
-	    }
-	}
+      ret = xd3_set_source_and_size (stream, source, source_size);
     }
-#endif
+  else
+    {
+      ret = xd3_set_source (stream, source);
+    }
 
-  /* At this point we do not know source->size.  But in case we do,
-     simplify everything by using 1 block for files <
-     option_srcwinsz . */
-  {
-    xoff_t source_size = 0;
-    int source_size_known = 0;
-    if (main_file_stat (sfile, &source_size) == 0 &&
-	source_size < option_srcwinsz)
-      {
-	if (option_verbose > 1) 
-	  {
-	    XPR(NT "source file size: %"Q"u\n", source_size);
-	  }
-
-	/* Reduce sizes to actual source size, read whole file */
-	option_srcwinsz = source_size;
-	source->blksize = source_size;
-	source_size_known = 1;
-      }
-    else
-      {
-	if (option_verbose > 1) 
-	  {
-	    XPR(NT "source not seekable, decoder/encoder must match -B flag!\n");
-	  }
-
-	option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
-	source->blksize = (option_srcwinsz / LRU_SIZE);
-	source_size_known = 0;
-      }
-  }
-
-  main_blklru_list_init (& lru_list);
-  main_blklru_list_init (& lru_free);
-
-  // This may change source->blksize
-  if ((ret = xd3_set_source (stream, source)))
+  if (ret) 
     {
       XPR(NT XD3_LIB_ERRMSG (stream, ret));
       goto error;
@@ -3062,8 +2924,9 @@ main_getblk_func (xd3_stream *stream,
   if (allow_fake_source)
     {
       source->curblkno = blkno;
-      source->onblk    = source->blksize;
+      source->onblk    = 0;
       source->curblk   = lru[0].blk;
+      lru[0].size = 0;
       return 0;
     }
 
@@ -3154,6 +3017,7 @@ main_getblk_func (xd3_stream *stream,
   source->curblk   = blru->blk;
   source->curblkno = blkno;
   source->onblk    = nread;
+  blru->size       = nread;
 
   return 0;
 }
@@ -3320,7 +3184,7 @@ main_input (xd3_cmd     cmd,
       /* When encoding, open the source file, possibly decompress it.
        * The decoder delays this step until XD3_GOTHEADER. */
       if (sfile->filename != NULL &&
-	  (ret = main_set_source (NULL, cmd, sfile, & source)))
+	  (ret = main_set_source (& stream, cmd, sfile, & source)))
 	{
 	  return EXIT_FAILURE;
 	}
@@ -3347,12 +3211,13 @@ main_input (xd3_cmd     cmd,
     }
 #endif
 
-  if (IS_ENCODE (cmd) && sfile->filename != NULL &&
-      (ret = xd3_set_source (& stream, & source)))
-    {
-      XPR(NT XD3_LIB_ERRMSG (& stream, ret));
-      return EXIT_FAILURE;
-    }
+  /* TODO: this can be deleted? */
+/*   if (IS_ENCODE (cmd) && sfile->filename != NULL && */
+/*       (ret = xd3_set_source (& stream, & source))) */
+/*     { */
+/*       XPR(NT XD3_LIB_ERRMSG (& stream, ret)); */
+/*       return EXIT_FAILURE; */
+/*     } */
 
   /* This times each window. */
   get_millisecs_since ();

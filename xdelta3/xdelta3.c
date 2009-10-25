@@ -2541,7 +2541,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	{
 	  if (!source->eof_known) 
 	    {
-	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
+	      IF_DEBUG1 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
 			    xd3_bytes_on_srcblk (source, blkno),
 			    xd3_source_eof (source)));
 	      source->eof_known = 1;
@@ -2552,7 +2552,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
     }
 
   XD3_ASSERT (source->curblk != NULL);
-  IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
+  IF_DEBUG1 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
 		blkno, source->onblk, source->blksize));
 
   if (blkno == source->max_blkno)
@@ -2808,7 +2808,7 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	    return ret;
 	  }
 
-	IF_DEBUG1 ({
+	IF_DEBUG2 ({
 	  static int cnt;
 	  DP(RINT "[iopt copy:%d] pos %"Q"u-%"Q"u addr %"Q"u-%"Q"u size %u\n",
 		   cnt++,
@@ -2827,7 +2827,7 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	stream->n_run += 1;
 	stream->l_run += inst->size;
 
-	IF_DEBUG1 ({
+	IF_DEBUG2 ({
 	  static int cnt;
 	  DP(RINT "[iopt run:%d] pos %"Q"u size %u\n", cnt++, stream->total_in + inst->pos, inst->size);
 	});
@@ -2841,7 +2841,7 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	stream->n_add += 1;
 	stream->l_add += inst->size;
 
-	IF_DEBUG1 ({
+	IF_DEBUG2 ({
 	  static int cnt;
 	  DP(RINT "[iopt add:%d] pos %"Q"u size %u\n", cnt++, stream->total_in + inst->pos, inst->size);
 	});
@@ -3224,7 +3224,7 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, usize_t code)
   int has_size = stream->code_table[code].size1 == 0;
   int ret;
 
-  IF_DEBUG1 (DP(RINT "[emit1] %u %s (%u) code %u\n",
+  IF_DEBUG2 (DP(RINT "[emit1] %u %s (%u) code %u\n",
 	       single->pos,
 		xd3_rtype_to_string ((xd3_rtype) single->type, 0),
 	       single->size,
@@ -3262,7 +3262,7 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
       return ret;
     }
 
-  IF_DEBUG1 (DP(RINT "[emit2]: %u %s (%u) %s (%u) code %u\n",
+  IF_DEBUG2 (DP(RINT "[emit2]: %u %s (%u) %s (%u) code %u\n",
 	       first->pos,
 		xd3_rtype_to_string ((xd3_rtype) first->type, 0),
 	       first->size,
@@ -3519,7 +3519,7 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
       return ENOMEM;
     }
 
-  IF_DEBUG1 (DP(RINT "[leftover] flush?=%s\n", (stream->flags & XD3_FLUSH) ? "yes" : "no"));
+  IF_DEBUG2 (DP(RINT "[leftover] flush?=%s\n", (stream->flags & XD3_FLUSH) ? "yes" : "no"));
 
   /* Take leftover input first. */
   if (stream->buf_leftover != NULL)
@@ -3527,7 +3527,7 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
       XD3_ASSERT (stream->buf_avail == 0);
       XD3_ASSERT (stream->buf_leftavail < stream->winsize);
 
-      IF_DEBUG1 (DP(RINT "[leftover] previous %u avail %u\n", stream->buf_leftavail, stream->avail_in));
+      IF_DEBUG2 (DP(RINT "[leftover] previous %u avail %u\n", stream->buf_leftavail, stream->avail_in));
 
       memcpy (stream->buf_in, stream->buf_leftover, stream->buf_leftavail);
 
@@ -3552,12 +3552,12 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
   else if ((stream->buf_avail < stream->winsize) && !(stream->flags & XD3_FLUSH))
     {
       /* Buffer has space */
-      IF_DEBUG1 (DP(RINT "[leftover] emptied %u\n", take));
+      IF_DEBUG2 (DP(RINT "[leftover] emptied %u\n", take));
       return XD3_INPUT;
     }
 
   /* Use the buffer: */
-  IF_DEBUG1 (DP(RINT "[leftover] take %u remaining %u\n", take, stream->buf_leftavail));
+  IF_DEBUG2 (DP(RINT "[leftover] take %u remaining %u\n", take, stream->buf_leftavail));
   stream->next_in   = stream->buf_in;
   stream->avail_in  = stream->buf_avail;
   stream->buf_avail = 0;
@@ -3770,7 +3770,7 @@ xd3_encode_input (xd3_stream *stream)
 
       stream->enc_state = ENC_SEARCH;
 
-      IF_DEBUG1 (DP(RINT "[WINSTART:%"Q"u] input bytes %u offset %"Q"u\n",
+      IF_DEBUG2 (DP(RINT "[WINSTART:%"Q"u] input bytes %u offset %"Q"u\n",
 		    stream->current_window, stream->avail_in,
 		    stream->total_in));
       return XD3_WINSTART;
@@ -3908,7 +3908,7 @@ xd3_encode_input (xd3_stream *stream)
       stream->total_in += (xoff_t) stream->avail_in;
       stream->enc_state = ENC_POSTWIN;
 
-      IF_DEBUG1 (DP(RINT "[WINFINISH:%"Q"u] in=%"Q"u\n",
+      IF_DEBUG2 (DP(RINT "[WINFINISH:%"Q"u] in=%"Q"u\n",
 		    stream->current_window,
 		    stream->total_in));
       return XD3_WINFINISH;
@@ -4079,9 +4079,10 @@ xd3_process_memory (int            is_encode,
     }
 
  exit:
-  if (ret != 0) {
-    IF_DEBUG1 (DP(RINT "process_memory: %d: %s", ret, stream.msg));
-  }
+  if (ret != 0) 
+    {
+      IF_DEBUG1 (DP(RINT "process_memory: %d: %s\n", ret, stream.msg));
+    }
   xd3_free_stream(&stream);
   return ret;
 }
@@ -4548,7 +4549,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
 	  tryrem = min (tryoff, stream->match_maxback - stream->match_back);
 	  
-	  IF_DEBUG1(DP(RINT "match maxback %u trysrc %"Q"u/%u tgt %u tryrem %u\n",
+	  IF_DEBUG2(DP(RINT "match maxback %u trysrc %"Q"u/%u tgt %u tryrem %u\n",
 		       stream->match_maxback, tryblk, tryoff, streamoff, tryrem));
 
 	  /* TODO: This code can be optimized similar to xd3_match_forward() */
@@ -4586,7 +4587,7 @@ xd3_source_extend_match (xd3_stream *stream)
       if ((ret = xd3_getblk (stream, tryblk)))
 	{
 	  /* if search went too far back, continue forward. */
-	  if (ret == XD3_TOOFARBACK)
+  if (ret == XD3_TOOFARBACK)
 	    {
 	      break;
 	    }
@@ -4597,6 +4598,15 @@ xd3_source_extend_match (xd3_stream *stream)
 
       tryrem = min(stream->match_maxfwd - stream->match_fwd,
 		   src->onblk - tryoff);
+
+      if (tryrem == 0)
+	{
+	  /* Generally, this means we have a power-of-two size source
+	   * and we just found the end-of-file, in this case it's an
+	   * empty block. */
+	  XD3_ASSERT (src->onblk < src->blksize);
+	  break;
+	}
 
       matched = xd3_forward_match(src->curblk + tryoff,
 				  stream->next_in + streamoff,
@@ -4906,9 +4916,6 @@ xd3_verify_run_state (xd3_stream    *stream,
  * stream->input_position reaches the value returned as
  * *next_move_point.  NB: this is one of the most expensive functions
  * in this code and also the most critical for good compression.
- *
- * TODO: really would like a good test for this logic. how? 
- * Update: testing/regtest.cc has some basic tests, more would be nice.
  * TODO: optimize the inner loop
  */
 static int
@@ -4986,19 +4993,13 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       xoff_t  blkno;
       xoff_t  blkbaseoffset;
       usize_t blkrem;
-      ssize_t oldpos;
-      ssize_t blkpos;
+      ssize_t oldpos;  /* Using ssize_t because of a  */
+      ssize_t blkpos;  /* do { blkpos-- }
+			  while (blkpos >= oldpos); */
       int ret;
       xd3_blksize_div (stream->srcwin_cksum_pos,
 		       stream->src, &blkno, &blkrem);
       oldpos = blkrem;
-      blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
-
-      if (oldpos + stream->smatcher.large_look > (usize_t) blkpos)
-	{
-	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
-	  continue;
-	}
 
       if ((ret = xd3_getblk (stream, blkno)))
 	{
@@ -5009,13 +5010,13 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	    }
 	  return ret;
 	}
-      
-      /* If we read a zero-length block, end. */
-      if (stream->src->onblk == 0)
+
+      blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
+
+      if (blkpos < (ssize_t) stream->smatcher.large_look)
 	{
-	  XD3_ASSERT (stream->src->eof_known);
-	  *next_move_point = USIZE_T_MAX;
-	  return 0;
+	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
+	  continue;
 	}
 
       /* This inserts checksums for the entire block, in reverse,

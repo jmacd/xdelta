@@ -79,7 +79,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 
     xoff_t blks = target_iterator.Blocks();
 
-    IF_DEBUG1(DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
+    IF_DEBUG2(DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
 		 encoding ? "encoding" : "decoding",
 		 target_iterator.Offset(), target_iterator.Offset() + target_block.Size(),
 		 target_iterator.Blkno(), blks, verified_bytes));
@@ -102,7 +102,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       msg = decode_stream.msg;
     }
 
-    IF_DEBUG1(DP(RINT "%s = %s %s\n", encoding ? "E " : " D",
+    IF_DEBUG2(DP(RINT "%s = %s %s\n", encoding ? "E " : " D",
 		 xd3_strerror(ret),
 		 msg == NULL ? "" : msg));
 
@@ -131,7 +131,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
       if (encoding) {
- 	IF_DEBUG1(DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
+ 	IF_DEBUG2(DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
 		     encode_source.getblkno,
 		     encode_stream.match_last_srcpos,
 		     encode_stream.input_position));

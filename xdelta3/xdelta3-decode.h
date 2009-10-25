@@ -444,7 +444,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG2(DP(RINT "block %"Q"u onblk %u blksize %u blkoff %u take %u\n",
+		    IF_DEBUG1(DP(RINT "[srcfile] short at blkno %"Q"u onblk %u blksize %u blkoff %u take %u\n",
 				 block,
 				 source->onblk,
 				 blksize,
