@@ -255,6 +255,7 @@ struct _main_blklru
 {
   uint8_t         *blk;
   xoff_t           blkno;
+  usize_t          size;
   main_blklru_list  link;
 };
 
@@ -284,10 +285,12 @@ XD3_MAKELIST(main_merge_list,main_merge,link);
 // TODO: really need to put options in a struct so that internal
 // callers can easily reset state.
 
+#define DEFAULT_VERBOSE 0
+
 /* Program options: various command line flags and options. */
 static int         option_stdout             = 0;
 static int         option_force              = 0;
-static int         option_verbose            = 0;
+static int         option_verbose            = DEFAULT_VERBOSE;
 static int         option_quiet              = 0;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
@@ -423,7 +426,7 @@ reset_defaults(void)
 {
   option_stdout = 0;
   option_force = 0;
-  option_verbose = 0;
+  option_verbose = DEFAULT_VERBOSE;
   option_quiet = 0;
   option_appheader = NULL;
   option_use_secondary = 0;
@@ -853,7 +856,7 @@ main_file_open (main_file *xfile, const char* name, int mode)
 }
 
 static int
-main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
+main_file_stat (main_file *xfile, xoff_t *size)
 {
   int ret = 0;
 #if XD3_WIN32
@@ -873,7 +876,9 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
     {
       ret = GetLastError();
       if (ret != NO_ERROR)
-	return ret;
+	{
+	  return ret;
+	}
     }
   *size = filesize;
 # endif
@@ -882,19 +887,11 @@ main_file_stat (main_file *xfile, xoff_t *size, int err_ifnoseek)
   if (fstat (XFNO (xfile), & sbuf) < 0)
     {
       ret = get_errno ();
-      if (err_ifnoseek)
-	{
-	  XF_ERROR ("stat", xfile->filename, ret);
-	}
       return ret;
     }
 
   if (! S_ISREG (sbuf.st_mode))
     {
-      if (err_ifnoseek)
-	{
-	  XPR(NT "source file must be seekable: %s\n", xfile->filename);
-	}
       return ESPIPE;
     }
   (*size) = sbuf.st_size;
@@ -2428,7 +2425,6 @@ main_decompress_source (main_file *sfile, xd3_source *source)
 
   /* Open/stat the decompressed source file. */
   if ((ret = main_file_open (sfile, tmpname, XO_READ))) { goto cleanup; }
-  if ((ret = main_file_stat (sfile, & source->size, 1))) { goto cleanup; }
   return 0;
 
  cleanup:
@@ -2845,8 +2841,7 @@ main_open_output (xd3_stream *stream, main_file *ofile)
 
 /* This is called at different times for encoding and decoding.  The
  * encoder calls it immediately, the decoder delays until the
- * application header is received.  Stream may be NULL, in which case
- * xd3_set_source is not called. */
+ * application header is received.  */
 static int
 main_set_source (xd3_stream *stream, xd3_cmd cmd,
 		 main_file *sfile, xd3_source *source)
@@ -2854,6 +2849,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   int ret = 0;
   usize_t i;
   uint8_t *tmp_buf = NULL;
+  XD3_ASSERT(stream);
 
   /* Open it, check for seekability, set required xd3_source fields. */
   if (allow_fake_source)
@@ -2861,12 +2857,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
-      source->size = XOFF_T_MAX;
     }
   else
     {
-      if ((ret = main_file_open (sfile, sfile->filename, XO_READ)) ||
-	  (ret = main_file_stat (sfile, & source->size, 1)))
+      if ((ret = main_file_open (sfile, sfile->filename, XO_READ)))
 	{
 	  goto error;
 	}
@@ -2917,8 +2911,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       /* In either the encoder or decoder, start decompression. */
       if (sfile->compressor)
 	{
-	  xoff_t osize = source->size;
-
 	  if ((ret = main_decompress_source (sfile, source)))
 	    {
 	      goto error;
@@ -2926,51 +2918,71 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
 	  if (! option_quiet)
 	    {
-	      char s1[32], s2[32];
-	      XPR(NT "%s | %s %s => %s %.1f%% [ %s , %s ]\n",
-		 sfile->filename,
-		 sfile->compressor->decomp_cmdname,
-		 sfile->compressor->decomp_options,
-		 sfile->realname,
-		 100.0 * source->size / osize,
-		 main_format_bcnt (osize, s1),
-		 main_format_bcnt (source->size, s2));
+	      XPR(NT "%s | %s %s => %s\n",
+		  sfile->filename,
+		  sfile->compressor->decomp_cmdname,
+		  sfile->compressor->decomp_options,
+		  sfile->realname);
 	    }
 	}
     }
 #endif
 
-  /* At this point we know source->size.
-   * Source buffer, blksize, LRU init. */
-  if (source->size < option_srcwinsz)
-    {
-      /* Reduce sizes to actual source size, read whole file */
-      option_srcwinsz = source->size;
-      source->blksize = source->size;
-      lru_size = 1;
-    }
-  else
-    {
-      option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
+  /* At this point we do not know source->size.  But in case we do,
+     simplify everything by using 1 block for files <
+     option_srcwinsz . */
+  {
+    xoff_t source_size = 0;
+    int source_size_known = 0;
+    if (main_file_stat (sfile, &source_size) == 0 &&
+	source_size < option_srcwinsz)
+      {
+	if (option_verbose > 1) 
+	  {
+	    XPR(NT "source file size: %"Q"u\n", source_size);
+	  }
 
-      source->blksize = (option_srcwinsz / LRU_SIZE);
-      lru_size = LRU_SIZE;
-    }
+	/* Reduce sizes to actual source size, read whole file */
+	option_srcwinsz = source_size;
+	source->blksize = source_size;
+	source_size_known = 1;
+      }
+    else
+      {
+	if (option_verbose > 1) 
+	  {
+	    XPR(NT "source not seekable, decoder/encoder must match -B flag!\n");
+	  }
+
+	option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
+	source->blksize = (option_srcwinsz / LRU_SIZE);
+	source_size_known = 0;
+      }
+  }
 
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
+
+  // This may change source->blksize
+  if ((ret = xd3_set_source (stream, source)))
+    {
+      XPR(NT XD3_LIB_ERRMSG (stream, ret));
+      goto error;
+    }
+
+  lru_size = (option_srcwinsz + source->blksize - 1) / source->blksize;
+  option_srcwinsz = lru_size * source->blksize;
 
   if (option_verbose)
     {
       static char buf[32];
 
-      XPR(NT "source %s winsize %s size %"Q"u\n",
-	  sfile->filename, main_format_bcnt(option_srcwinsz, buf),
-	  source->size);
+      XPR(NT "source %s winsize %s\n",
+	  sfile->filename, main_format_bcnt(option_srcwinsz, buf));
     }
 
-  if (option_verbose > 1)
-    {
+  if (option_verbose > 1) 
+   {
       XPR(NT "source block size: %u\n", source->blksize);
     }
 
@@ -2994,12 +3006,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       main_blklru_list_push_back (& lru_free, & lru[i]);
     }
 
-  if (stream && (ret = xd3_set_source (stream, source)))
-    {
-      XPR(NT XD3_LIB_ERRMSG (stream, ret));
-      goto error;
-    }
-
  error:
   if (tmp_buf != NULL)
     {
@@ -3011,10 +3017,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
 static usize_t
 main_get_winsize (main_file *ifile) {
-  xoff_t file_size;
+  xoff_t file_size = 0;
   usize_t size = option_winsize;
 
-  if (main_file_stat (ifile, &file_size, 0) == 0)
+  if (main_file_stat (ifile, &file_size) == 0)
     {
       size = (usize_t) min(file_size, (xoff_t) size);
     }
@@ -3050,14 +3056,13 @@ main_getblk_func (xd3_stream *stream,
   xoff_t pos = blkno * source->blksize;
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru  = NULL;
-  usize_t onblk = xd3_bytes_on_srcblk_fast (source, blkno);
   usize_t nread;
   usize_t i;
 
   if (allow_fake_source)
     {
       source->curblkno = blkno;
-      source->onblk    = onblk;
+      source->onblk    = source->blksize;
       source->curblk   = lru[0].blk;
       return 0;
     }
@@ -3069,7 +3074,7 @@ main_getblk_func (xd3_stream *stream,
       if (lru[idx].blkno == blkno)
 	{
 	  source->curblkno = blkno;
-	  source->onblk    = onblk;
+	  source->onblk    = lru[idx].size;
 	  source->curblk   = lru[idx].blk;
 	  lru_hits += 1;
 	  return 0;
@@ -3092,7 +3097,7 @@ main_getblk_func (xd3_stream *stream,
 	      main_blklru_list_push_back (& lru_list, & lru[i]);
 
 	      source->curblkno = blkno;
-	      source->onblk    = onblk;
+	      source->onblk    = lru[i].size;
 	      source->curblk   = lru[i].blk;
 	      lru_hits += 1;
 	      return 0;
@@ -3128,12 +3133,6 @@ main_getblk_func (xd3_stream *stream,
       return ret;
     }
 
-  if (nread != onblk)
-    {
-      XPR(NT "source file size change: %s\n", sfile->filename);
-      return XD3_INTERNAL;
-    }
-
   main_blklru_list_push_back (& lru_list, blru);
 
   if (option_verbose > 3)
@@ -3154,7 +3153,7 @@ main_getblk_func (xd3_stream *stream,
   blru->blkno      = blkno;
   source->curblk   = blru->blk;
   source->curblkno = blkno;
-  source->onblk    = onblk;
+  source->onblk    = nread;
 
   return 0;
 }

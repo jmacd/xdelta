@@ -444,9 +444,14 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
+		    IF_DEBUG1(DP(RINT "block %"Q"u onblk %u blksize %u blkoff %u take %u\n",
+				 block,
+				 source->onblk,
+				 blksize,
+				 blkoff,
+				 take));
 		    stream->msg = "source file too short";
 		    return XD3_INVALID_INPUT;
-
 		  }
 
 		XD3_ASSERT (blkoff != blksize);
@@ -1068,6 +1073,16 @@ xd3_decode_input (xd3_stream *stream)
 	  xd3_blksize_div(stream->dec_cpyoff, src,
 			  &src->cpyoff_blocks,
 			  &src->cpyoff_blkoff);
+	  
+	  IF_DEBUG1(DP(RINT
+		       "decode cpyoff %"Q"u "
+		       "cpyblkno %"Q"u "
+		       "cpyblkoff %u "
+		       "blksize %u\n",
+		       stream->dec_cpyoff,
+		       src->cpyoff_blocks,
+		       src->cpyoff_blkoff,
+		       src->blksize));
 	}
 
       /* xd3_decode_emit returns XD3_OUTPUT on every success. */

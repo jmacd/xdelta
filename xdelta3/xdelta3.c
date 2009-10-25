@@ -1,5 +1,6 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007, 
+ * 2008, 2009. Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1484,7 +1485,6 @@ xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t si
    * popular. */
   xd3_compute_code_table_string (xd3_rfc3284_code_table (), dflt_string);
 
-  source.size     = CODE_TABLE_STRING_SIZE;
   source.blksize  = CODE_TABLE_STRING_SIZE;
   source.onblk    = CODE_TABLE_STRING_SIZE;
   source.name     = "rfc3284 code table";
@@ -2530,25 +2530,42 @@ xd3_config_stream(xd3_stream *stream,
  Getblk interface
  ***********************************************************/
 
+inline
+xoff_t xd3_source_eof(const xd3_source *src)
+{
+  xoff_t r = (src->blksize * src->max_blkno) + (xoff_t)src->onlastblk;
+  IF_DEBUG2 (DP(RINT "[src] source_size == %"Q"u\n", r));
+  return r;
+}
+
+inline
+usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
+{
+  usize_t r = (blkno == src->max_blkno ? 
+	       src->onlastblk :
+	       src->blksize);
+  IF_DEBUG2 (DP(RINT "[src] source last block size %u\n", r));
+  return r;
+}
+
 /* This function interfaces with the client getblk function, checks
- * its results, etc. */
+ * its results, updates frontier_blkno, max_blkno, onlastblk. */
 static int
 xd3_getblk (xd3_stream *stream, xoff_t blkno)
 {
   int ret;
   xd3_source *source = stream->src;
+  IF_DEBUG1 (if (source->eof_known &&
+		 blkno == source->max_blkno)
+	       {
+		 /* Doesn't make sense for application to read a zero-byte
+		  * block after it already knows there's a zero-byte last 
+		  * block. */
+		 XD3_ASSERT (source->onlastblk != 0);
+	       });
 
-  if (source->curblk == NULL ||
-      blkno != source->curblkno)
+  if (source->curblk == NULL || blkno != source->curblkno)
     {
-      if (blkno >= source->blocks)
-	{
-	  stream->msg = "source file too short";
-	  return XD3_INTERNAL;
-	}
-
-      XD3_ASSERT (source->curblk == NULL || blkno != source->curblkno);
-
       source->getblkno = blkno;
 
       if (stream->getblk == NULL)
@@ -2556,22 +2573,51 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	  stream->msg = "getblk source input";
 	  return XD3_GETSRCBLK;
 	}
-      else if ((ret = stream->getblk (stream, source, blkno)) != 0)
+      
+      ret = stream->getblk (stream, source, blkno);
+
+      if (ret != 0) 
 	{
 	  stream->msg = "getblk failed";
 	  return ret;
 	}
-
-      XD3_ASSERT (source->curblk != NULL);
     }
-
-  if (source->onblk != (blkno == source->blocks - 1 ?
-			source->onlastblk : source->blksize))
+  
+  if (blkno >= source->frontier_blkno)
     {
-      stream->msg = "getblk returned short block";
-      return XD3_INTERNAL;
+      source->max_blkno = blkno;
+      source->onlastblk = source->onblk;
+
+      if (source->onblk == source->blksize)
+	{
+	  source->frontier_blkno = blkno + 1;
+
+	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: source length unknown %"Q"u\n", 
+			blkno,
+			xd3_source_eof (source)));
+	  XD3_ASSERT(!source->eof_known);
+	}
+      else
+	{
+	  if (!source->eof_known) 
+	    {
+	      IF_DEBUG1 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
+			    xd3_bytes_on_srcblk (source, blkno),
+			    xd3_source_eof (source)));
+	      source->eof_known = 1;
+	    }
+
+	  source->frontier_blkno = blkno;
+	}
     }
 
+  XD3_ASSERT (source->curblk != NULL);
+  IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk %u\n", 
+		blkno, source->onblk));
+
+  XD3_ASSERT (blkno == source->max_blkno ?
+	      source->onblk == source->onlastblk :
+	      source->onblk == source->blksize);
   return 0;
 }
 
@@ -2583,14 +2629,14 @@ int
 xd3_set_source (xd3_stream *stream,
 		xd3_source *src)
 {
-  xoff_t blk_num;
-  usize_t tail_size, shiftby;
+  usize_t shiftby;
 
-  IF_DEBUG1 (DP(RINT "[set source] size %"Q"u\n", src->size));
+  IF_DEBUG1 (DP(RINT "[set source] %s\n", 
+		stream->getblk == NULL ? "async" : "sync"));
 
-  if (src == NULL || src->size < stream->smatcher.large_look) { return 0; }
-
-  stream->src  = src;
+  stream->src = src;
+  src->srclen  = 0;
+  src->srcbase = 0;
 
   // If src->blksize is a power-of-two, xd3_blksize_div() will use
   // shift and mask rather than divide.  Check that here.
@@ -2599,24 +2645,12 @@ xd3_set_source (xd3_stream *stream,
       src->shiftby = shiftby;
       src->maskby = (1 << shiftby) - 1;
     }
-  else if (src->size <= src->blksize)
-    {
-      usize_t x = xd3_pow2_roundup (src->blksize);
-      xd3_check_pow2 (x, &shiftby);
-      src->shiftby = shiftby;
-      src->maskby = (1 << shiftby) - 1;
-    }
   else
     {
-      src->shiftby = 0;
-      src->maskby = 0;
+      src->blksize = 1 << shiftby;
+      src->shiftby = shiftby;
+      src->maskby = src->blksize - 1;
     }
-
-  xd3_blksize_div (src->size, src, &blk_num, &tail_size);
-  src->blocks  = blk_num + (tail_size > 0);
-  src->onlastblk = xd3_bytes_on_srcblk (src, src->blocks - 1);
-  src->srclen  = 0;
-  src->srcbase = 0;
 
   return 0;
 }
@@ -4057,12 +4091,12 @@ xd3_process_memory (int            is_encode,
   if (source != NULL)
     {
       memset (& src, 0, sizeof (src));
-      src.size = source_size;
 
       src.blksize = source_size;
       src.onblk = source_size;
       src.curblk = source;
       src.curblkno = 0;
+      src.frontier_blkno = 1;
 
       if ((ret = xd3_set_source (&stream, &src)) != 0)
 	{
@@ -4300,12 +4334,9 @@ xd3_srcwin_setup (xd3_stream *stream)
    * now.  */
   src->srcbase = stream->match_minaddr;
   src->srclen  = max ((usize_t) length, stream->avail_in + (stream->avail_in >> 2));
-  if (src->size < src->srcbase + (xoff_t) src->srclen)
-    {
-      /* Could reduce srcbase, as well. */
-      src->srclen = src->size - src->srcbase;
-    }
 
+  /* OPT: If we know the source size, it might be possible to reduce
+   * srclen. */
   XD3_ASSERT (src->srclen);
  done:
   /* Set the taroff.  This convenience variable is used even when
@@ -4379,19 +4410,25 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
        * 0--src->size.  We compare the usize_t
        * match_maxfwd/match_maxback against the xoff_t
        * src->size/srcpos values and take the min. */
-      xoff_t srcavail;
-
       if (srcpos < (xoff_t) stream->match_maxback)
 	{
 	  stream->match_maxback = srcpos;
 	}
 
-      srcavail = src->size - srcpos;
-      if (srcavail < (xoff_t) stream->match_maxfwd)
+      if (stream->src->eof_known)
 	{
-	  stream->match_maxfwd = srcavail;
+	  xoff_t srcavail = xd3_source_eof (stream->src) - srcpos;
+
+	  if (srcavail < (xoff_t) stream->match_maxfwd)
+	    {
+	      stream->match_maxfwd = srcavail;
+	    }
 	}
 
+      IF_DEBUG1(DP(RINT "[match_setup] srcpos %"Q"u unrestricted back %u fwd %u\n",
+		   srcpos,
+		   stream->match_maxback,
+		   stream->match_maxfwd));
       goto good;
     }
 
@@ -4414,10 +4451,15 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	}
 
       srcavail = (usize_t) (src->srcbase + (xoff_t) src->srclen - srcpos);
-      if (srcavail < stream->match_maxfwd)	{
+      if (srcavail < stream->match_maxfwd)
+	{
 	  stream->match_maxfwd = srcavail;
 	}
 
+      IF_DEBUG1(DP(RINT "[match_setup] srcpos %"Q"u restricted back %u fwd %u\n",
+		   srcpos,
+		   stream->match_maxback,
+		   stream->match_maxfwd));
       goto good;
     }
 
@@ -4514,7 +4556,7 @@ xd3_source_extend_match (xd3_stream *stream)
   if (stream->match_state == MATCH_BACKWARD)
     {
       /* Note: this code is practically duplicated below, substituting
-       * match_fwd/match_back and direction.  Consolidate? */
+       * match_fwd/match_back and direction.  TODO: Consolidate? */
       matchoff  = stream->match_srcpos - stream->match_back;
       streamoff = stream->input_position - stream->match_back;
       xd3_blksize_div (matchoff, src, &tryblk, &tryoff);
@@ -4541,11 +4583,13 @@ xd3_source_extend_match (xd3_stream *stream)
 	      return ret;
 	    }
 
+	  tryrem = min (tryoff, stream->match_maxback - stream->match_back);
+	  
+	  IF_DEBUG1(DP(RINT "match maxback %u trysrc %"Q"u/%u tgt %u tryrem %u\n",
+		       stream->match_maxback, tryblk, tryoff, streamoff, tryrem));
+
 	  /* TODO: This code can be optimized similar to xd3_match_forward() */
-	  for (tryrem = min (tryoff, stream->match_maxback -
-			     stream->match_back);
-	       tryrem != 0;
-	       tryrem -= 1, stream->match_back += 1)
+	  for (; tryrem != 0; tryrem -= 1, stream->match_back += 1)
 	    {
 	      if (src->curblk[tryoff-1] != stream->next_in[streamoff-1])
 		{
@@ -4908,12 +4952,18 @@ static int
 xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 {
   xoff_t logical_input_cksum_pos;
+  xoff_t source_size;
 
-  XD3_ASSERT(stream->srcwin_cksum_pos <= stream->src->size);
-  if (stream->srcwin_cksum_pos == stream->src->size)
+  if (stream->src->eof_known)
     {
-      *next_move_point = USIZE_T_MAX;
-      return 0;
+      source_size = xd3_source_eof (stream->src);
+      XD3_ASSERT(stream->srcwin_cksum_pos <= source_size);
+
+      if (stream->srcwin_cksum_pos == source_size)
+	{
+	  *next_move_point = USIZE_T_MAX;
+	  return 0;
+	}
     }
 
   /* Begin by advancing at twice the input rate, up to half the
@@ -4960,13 +5010,15 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
    */
   logical_input_cksum_pos += stream->src->blksize;
 
-  IF_DEBUG1 (DP(RINT "[srcwin_move_point] T=%"Q"u S=%"Q"u/%"Q"u\n",
-	       stream->total_in + stream->input_position,
-	       stream->srcwin_cksum_pos,
-	       logical_input_cksum_pos));
-
+  IF_DEBUG1 (DP(RINT "[srcwin_move_point] T=%"Q"u{%"Q"u} S=%"Q"u EOF=%"Q"u %s\n",
+		stream->total_in + stream->input_position,
+		logical_input_cksum_pos,
+		stream->srcwin_cksum_pos,
+		xd3_source_eof (stream->src),
+		stream->src->eof_known ? "known" : "unknown"));
   while (stream->srcwin_cksum_pos < logical_input_cksum_pos &&
-	 stream->srcwin_cksum_pos < stream->src->size)
+	 (!stream->src->eof_known ||
+	  stream->srcwin_cksum_pos < xd3_source_eof (stream->src)))
     {
       xoff_t  blkno;
       xoff_t  blkbaseoffset;
@@ -4977,7 +5029,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       xd3_blksize_div (stream->srcwin_cksum_pos,
 		       stream->src, &blkno, &blkrem);
       oldpos = blkrem;
-      blkpos = xd3_bytes_on_srcblk_fast (stream->src, blkno);
+      blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
 
       if (oldpos + stream->smatcher.large_look > (usize_t) blkpos)
 	{
@@ -4993,6 +5045,13 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
  	      ret = XD3_INTERNAL;
 	    }
 	  return ret;
+	}
+      
+      /* If we read a zero-length block, end. */
+      if (stream->src->onblk == 0)
+	{
+	  XD3_ASSERT (stream->src->eof_known);
+	  return 0;
 	}
 
       /* This inserts checksums for the entire block, in reverse,
@@ -5026,12 +5085,17 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
     }
 
-  if (stream->srcwin_cksum_pos >= stream->src->size)
+  if (stream->src->eof_known)
     {
-      /* This invariant is needed for xd3_source_cksum_offset() */
-      stream->srcwin_cksum_pos = stream->src->size;
-      *next_move_point = USIZE_T_MAX;
-      return 0;
+      source_size = xd3_source_eof (stream->src);
+      
+      if (stream->srcwin_cksum_pos >= source_size)
+	{
+	  /* This invariant is needed for xd3_source_cksum_offset() */
+	  stream->srcwin_cksum_pos = source_size;
+	  *next_move_point = USIZE_T_MAX;
+	  return 0;
+	}
     }
 
   /* How long until this function should be called again. */
@@ -5223,8 +5287,8 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  if (stream->large_table[linx] != 0)
 	    {
 	      /* the match_setup will fail if the source window has
-	       * been decided and the match lies outside it.  You
-	       * could consider forcing a window at this point to
+	       * been decided and the match lies outside it.  
+	       * OPT: Consider forcing a window at this point to
 	       * permit a new source window. */
 	      xoff_t adj_offset =
 		xd3_source_cksum_offset(stream,
@@ -5320,11 +5384,16 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	}
 
       /* Compute next RUN, CKSUM */
-      if (DO_RUN) { NEXTRUN (inp[SLOOK]); }
+      if (DO_RUN) 
+	{
+	  NEXTRUN (inp[SLOOK]);
+	}
+
       if (DO_SMALL)
 	{
 	  scksum = xd3_small_cksum_update (&scksum_state, inp, SLOOK);
 	}
+
       if (DO_LARGE && (stream->input_position + LLOOK < stream->avail_in))
 	{
 	  lcksum = xd3_large_cksum_update (lcksum, inp, LLOOK);
@@ -5334,5 +5403,6 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
  loopnomore:
   return 0;
 }
+
 #endif /* XD3_ENCODER */
 #endif /* __XDELTA3_C_TEMPLATE_PASS__ */

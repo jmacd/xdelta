@@ -55,10 +55,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
   CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
   CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
 
-  encode_source.size = source_file.Size();
   encode_source.blksize = Constants::BLOCK_SIZE;
-
-  decode_source.size = source_file.Size();
   decode_source.blksize = Constants::BLOCK_SIZE;
 
   xd3_set_source (&encode_stream, &encode_source);
@@ -72,20 +69,20 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
   bool done = false;
   bool done_after_input = false;
 
-  DP(RINT "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
-     source_file.Size(), Constants::BLOCK_SIZE,
-     target_file.Size(), Constants::READ_SIZE,
-     Constants::WINDOW_SIZE);
+  IF_DEBUG1 (DP(RINT "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
+		source_file.Size(), Constants::BLOCK_SIZE,
+		target_file.Size(), Constants::READ_SIZE,
+		Constants::WINDOW_SIZE));
 
   while (!done) {
     target_iterator.Get(&target_block);
 
     xoff_t blks = target_iterator.Blocks();
 
-    //DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
-    //   encoding ? "encoding" : "decoding",
-    //   target_iterator.Offset(), target_iterator.Offset() + target_block.Size(),
-    //   target_iterator.Blkno(), blks, verified_bytes);
+    IF_DEBUG1(DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
+		 encoding ? "encoding" : "decoding",
+		 target_iterator.Offset(), target_iterator.Offset() + target_block.Size(),
+		 target_iterator.Blkno(), blks, verified_bytes));
 
     if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
       xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
@@ -96,14 +93,18 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 
   process:
     int ret;
+    const char *msg;
     if (encoding) {
       ret = xd3_encode_input(&encode_stream);
+      msg = encode_stream.msg;
     } else {
       ret = xd3_decode_input(&decode_stream);
+      msg = decode_stream.msg;
     }
 
-    //DP(RINT "%s = %s\n", encoding ? "E " : " D",
-    //   xd3_strerror(ret));
+    IF_DEBUG1(DP(RINT "%s = %s %s\n", encoding ? "E " : " D",
+		 xd3_strerror(ret),
+		 msg == NULL ? "" : msg));
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -130,10 +131,10 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
       if (encoding) {
- 	//DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
- 	//   encode_source.getblkno,
- 	//   encode_stream.match_last_srcpos,
- 	//   encode_stream.input_position);
+ 	IF_DEBUG1(DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
+		     encode_source.getblkno,
+		     encode_stream.match_last_srcpos,
+		     encode_stream.input_position));
       }
       
       source_iterator.SetBlock(src->getblkno);

@@ -2343,11 +2343,11 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 
   stream->winsize = IDB_WINSZ;
 
-  source.size     = IDB_TGTSZ;
   source.blksize  = IDB_BLKSZ;
   source.name     = "";
   source.curblk   = NULL;
   source.curblkno = 0;
+  source.onlastblk = IDB_BLKSZ;
 
   if ((ret = xd3_set_source (stream, & source))) { goto fail; }
 
@@ -2398,7 +2398,6 @@ test_identical_behavior (xd3_stream *stream, int ignore)
       xd3_consume_output (stream);
     }
 
-  CHECK(srcwin == source.blocks - 1);
   CHECK(winfinishes == IDB_WINCNT);
   CHECK(winstarts == IDB_WINCNT);
   CHECK(nextencwin == IDB_WINCNT);
@@ -2688,7 +2687,6 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
 	xoff_t r;
     stream->srcwin_cksum_pos = test_ptr->cpos;
     stream->total_in = test_ptr->ipos;
-    stream->src->size = test_ptr->size;
 
     r = xd3_source_cksum_offset(stream, test_ptr->input);
     CHECK(r == test_ptr->output);
