@@ -1160,6 +1160,23 @@ void    xd3_free_stream   (xd3_stream    *stream);
 int     xd3_set_source    (xd3_stream    *stream,
 			   xd3_source    *source);
 
+/* If the source size is known, call this instead of xd3_set_source(). 
+ * to avoid having stream->getblk called (and/or to avoid XD3_GETSRCBLK).
+ *
+ * Follow these steps:
+  xd3_source source;
+  memset(&source, 0, sizeof(source));
+  source.blksize  = size;
+  source.onblk    = size;
+  source.curblk   = buf;
+  source.curblkno = 0;
+  int ret = xd3_set_source_and_size(&stream, &source, size);
+  ...
+ */
+int     xd3_set_source_and_size (xd3_stream    *stream,
+				 xd3_source    *source,
+				 xoff_t         source_size);
+
 /* This should be called before the first call to xd3_encode_input()
  * to include application-specific data in the VCDIFF header. */
 void    xd3_set_appheader (xd3_stream    *stream,

@@ -2322,8 +2322,8 @@ test_no_output (xd3_stream *stream, int ignore)
 static int
 test_identical_behavior (xd3_stream *stream, int ignore)
 {
-#define IDB_TGTSZ 10000
-#define IDB_BLKSZ 500
+#define IDB_TGTSZ 10000  /* Not a power of two b/c of hard-coded expectations below. */
+#define IDB_BLKSZ 512
 #define IDB_WINSZ 1000
 #define IDB_DELSZ 1000
 #define IDB_WINCNT (IDB_TGTSZ / IDB_WINSZ)
@@ -2338,6 +2338,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   xoff_t srcwin = XOFF_T_MAX;
   usize_t delpos = 0, recsize;
   xd3_config config;
+  memset(&source, 0, sizeof(source));
 
   for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = mt_random (&static_mtrand); }
 
@@ -2347,7 +2348,6 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   source.name     = "";
   source.curblk   = NULL;
   source.curblkno = 0;
-  source.onlastblk = IDB_BLKSZ;
 
   if ((ret = xd3_set_source (stream, & source))) { goto fail; }
 
@@ -2403,6 +2403,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   CHECK(nextencwin == IDB_WINCNT);
 
   /* Reset. */
+  memset(&source, 0, sizeof(source));
   source.blksize  = IDB_TGTSZ;
   source.onblk    = IDB_TGTSZ;
   source.curblk   = buf;
@@ -2412,7 +2413,7 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   xd3_free_stream (stream);
   xd3_init_config (& config, 0);
   if ((ret = xd3_config_stream (stream, & config))) { goto fail; }
-  if ((ret = xd3_set_source (stream, & source))) { goto fail; }
+  if ((ret = xd3_set_source_and_size (stream, & source, IDB_TGTSZ))) { goto fail; }
 
   /* Decode. */
   if ((ret = xd3_decode_stream (stream, del, delpos, rec, & recsize, IDB_TGTSZ))) { goto fail; }

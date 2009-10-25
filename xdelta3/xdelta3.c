@@ -1286,14 +1286,13 @@ int xd3_compute_code_table_encoding (xd3_stream *in_stream,
 
   if ((ret = xd3_config_stream (& stream, & config))) { goto fail; }
 
-  source.size     = CODE_TABLE_STRING_SIZE;
   source.blksize  = CODE_TABLE_STRING_SIZE;
   source.onblk    = CODE_TABLE_STRING_SIZE;
   source.name     = "";
   source.curblk   = dflt_string;
   source.curblkno = 0;
 
-  if ((ret = xd3_set_source (& stream, & source))) { goto fail; }
+  if ((ret = xd3_set_source_and_size (& stream, & source, CODE_TABLE_STRING_SIZE))) { goto fail; }
 
   if ((ret = xd3_encode_stream (& stream, code_string, CODE_TABLE_STRING_SIZE,
 				comp_string, comp_string_size, CODE_TABLE_VCDIFF_SIZE))) { goto fail; }
@@ -1492,7 +1491,7 @@ xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t si
   source.curblkno = 0;
 
   if ((ret = xd3_config_stream (& stream, NULL)) ||
-      (ret = xd3_set_source (& stream, & source)) ||
+      (ret = xd3_set_source_and_size (& stream, & source, CODE_TABLE_STRING_SIZE)) ||
       (ret = xd3_decode_stream (& stream, data, size, code_string, & code_size, sizeof (code_string))))
     {
       in_stream->msg = stream.msg;
@@ -2555,14 +2554,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 {
   int ret;
   xd3_source *source = stream->src;
-  IF_DEBUG1 (if (source->eof_known &&
-		 blkno == source->max_blkno)
-	       {
-		 /* Doesn't make sense for application to read a zero-byte
-		  * block after it already knows there's a zero-byte last 
-		  * block. */
-		 XD3_ASSERT (source->onlastblk != 0);
-	       });
 
   if (source->curblk == NULL || blkno != source->curblkno)
     {
@@ -2595,7 +2586,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: source length unknown %"Q"u\n", 
 			blkno,
 			xd3_source_eof (source)));
-	  XD3_ASSERT(!source->eof_known);
 	}
       else
 	{
@@ -2612,12 +2602,20 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
     }
 
   XD3_ASSERT (source->curblk != NULL);
-  IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk %u\n", 
-		blkno, source->onblk));
+  IF_DEBUG1 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
+		blkno, source->onblk, source->blksize));
 
-  XD3_ASSERT (blkno == source->max_blkno ?
-	      source->onblk == source->onlastblk :
-	      source->onblk == source->blksize);
+  if (blkno == source->max_blkno)
+    {
+      /* In case the application sets the source as 1 block w/ a
+	 preset buffer. */
+      source->onlastblk = source->onblk;
+
+      if (source->onblk == source->blksize)
+	{
+	  source->frontier_blkno = blkno + 1;
+	}
+    }
   return 0;
 }
 
@@ -2647,12 +2645,26 @@ xd3_set_source (xd3_stream *stream,
     }
   else
     {
-      src->blksize = 1 << shiftby;
-      src->shiftby = shiftby;
-      src->maskby = src->blksize - 1;
+      src->blksize = xd3_pow2_roundup(src->blksize);
+      xd3_check_pow2 (src->blksize, &shiftby);
     }
 
   return 0;
+}
+
+int
+xd3_set_source_and_size (xd3_stream *stream, xd3_source *user_source, xoff_t source_size) {
+  int ret = xd3_set_source (stream, user_source);
+  if (ret == 0)
+    {
+      stream->src->eof_known = 1;
+
+      xd3_blksize_div(source_size,
+		      stream->src, 
+		      &stream->src->max_blkno,
+		      &stream->src->onlastblk);
+    }
+  return ret;
 }
 
 void
@@ -4096,9 +4108,8 @@ xd3_process_memory (int            is_encode,
       src.onblk = source_size;
       src.curblk = source;
       src.curblkno = 0;
-      src.frontier_blkno = 1;
 
-      if ((ret = xd3_set_source (&stream, &src)) != 0)
+      if ((ret = xd3_set_source_and_size (&stream, &src, source_size)) != 0)
 	{
 	  goto exit;
 	}
@@ -4516,6 +4527,7 @@ static inline usize_t
 xd3_forward_match(const uint8_t *s1c,
 		  const uint8_t *s2c,
 		  usize_t n) {
+  IF_DEBUG1(DP(RINT "[forward_match] %u\n", n));
   usize_t i = 0;
   while (i < n && s1c[i] == s2c[i])
     {
@@ -4633,7 +4645,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	}
 
       tryrem = min(stream->match_maxfwd - stream->match_fwd,
-		   src->blksize - tryoff);
+		   src->onblk - tryoff);
 
       matched = xd3_forward_match(src->curblk + tryoff,
 				  stream->next_in + streamoff,
@@ -5051,6 +5063,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       if (stream->src->onblk == 0)
 	{
 	  XD3_ASSERT (stream->src->eof_known);
+	  *next_move_point = USIZE_T_MAX;
 	  return 0;
 	}
 

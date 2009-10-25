@@ -4,7 +4,7 @@ CFLAGS = -g -Wall -Wconversion -Wsign-compare -Wextra -Wno-unused-parameter -I..
 	      -DSECONDARY_FGK=1 \
 	      -DXD3_USE_LARGEFILE64=1
 
-CFLAGS = -g -Wall -I.. -DXD3_DEBUG=2
+CFLAGS = -g -Wall -I.. -DXD3_DEBUG=1
 #CFLAGS = -O2 -Wall -I.. -DXD3_DEBUG=1 -DNDEBUG=1
 
 DEPS = ../*.h ../*.c *.cc *.h

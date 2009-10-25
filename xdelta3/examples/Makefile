@@ -29,4 +29,4 @@ checksum_test: checksum_test.cc
 	$(CXX) $(CFLAGS) checksum_test.cc -o checksum_test
 
 clean:
-	rm -f *.exe *.stackdump $(TARGETS)
+	rm -r -f *.exe *.stackdump $(TARGETS) *.dSYM *~

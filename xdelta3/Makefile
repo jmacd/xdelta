@@ -117,7 +117,7 @@ zip:
 
 clean:
 	rm -f $(TARGETS)
-	rm -rf build Debug Release core cifs* *.stackdump *.exe \
+	rm -rf build Debug Release core cifs* *.stackdump *.exe *~ *.dSYM \
 		xdelta3.ncb xdelta3.suo xdelta3.sln xdelta3.wixobj xdelta3.msi
 
 wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
@@ -141,7 +141,7 @@ xdelta3-debug: $(SOURCES)
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
-		-DXD3_DEBUG=1 \
+		-DXD3_DEBUG=2 \
 		-DXD3_MAIN=1 \
 		-DXD3_STDIO=1 \
 		-DXD3_USE_LARGEFILE64=1
