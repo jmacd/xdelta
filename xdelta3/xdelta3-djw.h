@@ -315,7 +315,7 @@ heap_check (usize_t *heap, djw_heapen *ents, usize_t heap_last)
       /* Heap property: child not less than parent */
       XD3_ASSERT (! heap_less (& ents[heap[i]], & ents[heap[i/2]]));
 
-      IF_DEBUG1 (DP(RINT "heap[%d] = %u\n", i, ents[heap[i]].freq));
+      IF_DEBUG2 (DP(RINT "heap[%d] = %u\n", i, ents[heap[i]].freq));
     }
 }
 #endif
@@ -401,7 +401,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
   for (i = 0; i < asize; i += 1)
     {
       ents[i+1].freq = freq[i];
-      IF_DEBUG1 (DP(RINT "ents[%d] = freq[%d] = %d\n",
+      IF_DEBUG2 (DP(RINT "ents[%d] = freq[%d] = %d\n",
 			i+1, i, freq[i]));
     }
 
@@ -480,7 +480,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
 	}
 
       /* clen is 0-origin, unlike ents. */
-      IF_DEBUG1 (DP(RINT "clen[%d] = %d\n", i-1, b));
+      IF_DEBUG2 (DP(RINT "clen[%d] = %d\n", i-1, b));
       clen[i-1] = b;
     }
 
@@ -488,7 +488,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
 
   if (! overflow)
     {
-      IF_DEBUG1 (if (first_bits != total_bits)
+      IF_DEBUG2 (if (first_bits != total_bits)
       {
 	DP(RINT "code length overflow changed %u bits\n",
 	   (usize_t)(total_bits - first_bits));
@@ -541,7 +541,7 @@ djw_build_codes (usize_t *codes, const uint8_t *clen, usize_t asize, usize_t abs
       code <<= 1;
     }
 
-  IF_DEBUG1 ({
+  IF_DEBUG2 ({
       for (i = 0; i < asize; i += 1)
 	{
 	  DP(RINT "code[%d] = %u\n", i, codes[i]);
@@ -628,7 +628,7 @@ djw_count_freqs (djw_weight *freq, xd3_output *input)
       while (++p < p_max);
     }
 
-  IF_DEBUG1 ({int i;
+  IF_DEBUG2 ({int i;
   DP(RINT "freqs: ");
   for (i = 0; i < ALPHABET_SIZE; i += 1)
     {
@@ -973,7 +973,7 @@ xd3_encode_huff (xd3_stream   *stream,
       usize_t  gbest_no;
       usize_t  gpcnt;
       const uint8_t *p;
-      IF_DEBUG1 (usize_t gcount[DJW_MAX_GROUPS]);
+      IF_DEBUG2 (usize_t gcount[DJW_MAX_GROUPS]);
 
       /* Encode: sector size (5 bits) */
       if ((ret = xd3_encode_bits (stream, & output, & bstate,
@@ -1010,7 +1010,7 @@ xd3_encode_huff (xd3_stream   *stream,
 	  djw_weight sum  = 0;
 	  djw_weight goal = left / (groups - gp);
 
-	  IF_DEBUG1 (usize_t nz = 0);
+	  IF_DEBUG2 (usize_t nz = 0);
 
 	  /* Due to the single-code granularity of this distribution, it may
 	   * be that we can't generate a distribution for each group.  In that
@@ -1018,7 +1018,7 @@ xd3_encode_huff (xd3_stream   *stream,
 	   * testing group behavior, so don't mess things up. */
 	  if (goal == 0 && !cfg->inefficient)
 	    {
-	      IF_DEBUG1 (DP(RINT "too many groups (%u), dropping one\n",
+	      IF_DEBUG2 (DP(RINT "too many groups (%u), dropping one\n",
 			    groups));
 	      groups -= 1;
 	      goto regroup;
@@ -1028,11 +1028,11 @@ xd3_encode_huff (xd3_stream   *stream,
 	  while (sum < goal)
 	    {
 	      XD3_ASSERT (sym2 < ALPHABET_SIZE);
-	      IF_DEBUG1 (nz += real_freq[sym2] != 0);
+	      IF_DEBUG2 (nz += real_freq[sym2] != 0);
 	      sum += real_freq[sym2++];
 	    }
 
-	  IF_DEBUG1(DP(RINT "group %u has symbols %u..%u (%u non-zero) "
+	  IF_DEBUG2(DP(RINT "group %u has symbols %u..%u (%u non-zero) "
 		       "(%u/%u = %.3f)\n",
 		       gp, sym1, sym2, nz, sum,
 		       input_bytes, sum / (double)input_bytes););
@@ -1051,7 +1051,7 @@ xd3_encode_huff (xd3_stream   *stream,
       niter += 1;
       gbest_no = 0;
       memset (evolve_freq, 0, sizeof (evolve_freq[0]) * groups);
-      IF_DEBUG1 (memset (gcount, 0, sizeof (gcount[0]) * groups));
+      IF_DEBUG2 (memset (gcount, 0, sizeof (gcount[0]) * groups));
 
       /* For each input page (loop is irregular to allow non-pow2-size group
        * size. */
@@ -1103,7 +1103,7 @@ xd3_encode_huff (xd3_stream   *stream,
 
 	  XD3_ASSERT(gbest_no < gbest_max);
 	  gbest[gbest_no++] = winner;
-	  IF_DEBUG1 (gcount[winner] += 1);
+	  IF_DEBUG2 (gcount[winner] += 1);
 
 	  p  = p0;
 	  in = in0;
@@ -1155,19 +1155,19 @@ xd3_encode_huff (xd3_stream   *stream,
 	   * for the (output_bits==0) assert after all bits are output. */
 	  if (any_zeros)
 	    {
-	      IF_DEBUG1 (usize_t save_total = output_bits);
+	      IF_DEBUG2 (usize_t save_total = output_bits);
 
 	      for (i = 0; i < ALPHABET_SIZE; i += 1)
 		{
 		  if (evolve_zero[i]) { output_bits -= evolve_clen[gp][i]; }
 		}
 
-	      IF_DEBUG1 (DP(RINT "evolve_zero reduced %u bits in group %u\n",
+	      IF_DEBUG2 (DP(RINT "evolve_zero reduced %u bits in group %u\n",
 			    save_total - output_bits, gp));
 	    }
 	}
 
-      IF_DEBUG1(
+      IF_DEBUG2(
 	DP(RINT "pass %u total bits: %u group uses: ", niter, output_bits);
 	for (gp = 0; gp < groups; gp += 1) { DP(RINT "%u ", gcount[gp]); }
 	DP(RINT "\n");
@@ -1175,7 +1175,7 @@ xd3_encode_huff (xd3_stream   *stream,
 
       /* End iteration. */
 
-      IF_DEBUG1 (if (niter > 1 && best_bits < output_bits) {
+      IF_DEBUG2 (if (niter > 1 && best_bits < output_bits) {
 	DP(RINT "iteration lost %u bits\n", output_bits - best_bits); });
 
       if (niter == 1 || (niter < DJW_MAX_ITER &&
@@ -1191,7 +1191,7 @@ xd3_encode_huff (xd3_stream   *stream,
 	  goto nosecond;
 	}
 
-      IF_DEBUG1 (DP(RINT "djw compression: %u -> %0.3f\n",
+      IF_DEBUG2 (DP(RINT "djw compression: %u -> %0.3f\n",
 		    input_bytes, output_bits / 8.0));
 
       /* Encode: prefix */

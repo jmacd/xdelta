@@ -2541,7 +2541,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	{
 	  if (!source->eof_known) 
 	    {
-	      IF_DEBUG1 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
+	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
 			    xd3_bytes_on_srcblk (source, blkno),
 			    xd3_source_eof (source)));
 	      source->eof_known = 1;
@@ -2552,7 +2552,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
     }
 
   XD3_ASSERT (source->curblk != NULL);
-  IF_DEBUG1 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
+  IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
 		blkno, source->onblk, source->blksize));
 
   if (blkno == source->max_blkno)
@@ -2579,7 +2579,7 @@ xd3_set_source (xd3_stream *stream,
 {
   usize_t shiftby;
 
-  IF_DEBUG1 (DP(RINT "[set source] %s\n", 
+  IF_DEBUG2 (DP(RINT "[set source] %s\n", 
 		stream->getblk == NULL ? "async" : "sync"));
 
   stream->src = src;
@@ -2608,6 +2608,8 @@ xd3_set_source_and_size (xd3_stream *stream, xd3_source *user_source, xoff_t sou
   if (ret == 0)
     {
       stream->src->eof_known = 1;
+      IF_DEBUG2 (DP(RINT "[set source] size known %"Q"u\n",
+		    source_size));
 
       xd3_blksize_div(source_size,
 		      stream->src, 

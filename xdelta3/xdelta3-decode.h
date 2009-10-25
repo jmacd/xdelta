@@ -444,7 +444,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG1(DP(RINT "block %"Q"u onblk %u blksize %u blkoff %u take %u\n",
+		    IF_DEBUG2(DP(RINT "block %"Q"u onblk %u blksize %u blkoff %u take %u\n",
 				 block,
 				 source->onblk,
 				 blksize,
@@ -671,7 +671,7 @@ xd3_decode_emit (xd3_stream *stream)
 
   if (stream->avail_out != stream->dec_tgtlen)
     {
-      IF_DEBUG1 (DP(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n",
+      IF_DEBUG2 (DP(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n",
 		    stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
       return XD3_INVALID_INPUT;
@@ -918,7 +918,7 @@ xd3_decode_input (xd3_stream *stream)
 
 	stream->dec_state = DEC_CPYLEN;
 
-	IF_DEBUG1 (DP(RINT "--------- TARGET WINDOW %"Q"u -----------\n",
+	IF_DEBUG2 (DP(RINT "--------- TARGET WINDOW %"Q"u -----------\n",
 		      stream->current_window));
       }
 
@@ -1074,7 +1074,7 @@ xd3_decode_input (xd3_stream *stream)
 			  &src->cpyoff_blocks,
 			  &src->cpyoff_blkoff);
 	  
-	  IF_DEBUG1(DP(RINT
+	  IF_DEBUG2(DP(RINT
 		       "decode cpyoff %"Q"u "
 		       "cpyblkno %"Q"u "
 		       "cpyblkoff %u "

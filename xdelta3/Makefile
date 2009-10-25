@@ -82,7 +82,7 @@ SWIG_FLAGS = -DXD3_DEBUG=1 \
 	      -DVCDIFF_TOOLS=1 \
 	      -DSWIG_MODULE=1
 
-all: xdelta3-debug xdelta3
+all: xdelta3-debug xdelta3-debug2 xdelta3
 	(cd testing && make)
 
 all-py: all $(PYTGT) $(SWIGTGT)
