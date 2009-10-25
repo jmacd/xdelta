@@ -1248,60 +1248,28 @@ static usize_t  __alternate_code_table_compressed_size;
 /* This function generates a delta describing the code table for
  * encoding within a VCDIFF file.  This function is NOT thread safe
  * because it is only intended that this function is used to generate
- * statically-compiled strings. */
+ * statically-compiled strings.  "comp_string" must be sized 
+ * CODE_TABLE_VCDIFF_SIZE. */
 int xd3_compute_code_table_encoding (xd3_stream *in_stream,
 				     const xd3_dinst *code_table,
 				     uint8_t *comp_string,
 				     usize_t *comp_string_size)
 {
-  /* TODO: use xd3_encode_memory() */
+  /* Use DJW secondary compression if it is on by default.  This saves
+   * about 20 bytes. */
+  int flags = (SECONDARY_DJW ? XD3_SEC_DJW : 0) | XD3_COMPLEVEL_9 | XD3_ADLER32;
+
   uint8_t dflt_string[CODE_TABLE_STRING_SIZE];
   uint8_t code_string[CODE_TABLE_STRING_SIZE];
-  xd3_stream stream;
-  xd3_source source;
-  xd3_config config;
   int ret;
-
-  memset (& source, 0, sizeof (source));
 
   xd3_compute_code_table_string (xd3_rfc3284_code_table (), dflt_string);
   xd3_compute_code_table_string (code_table, code_string);
 
-  /* Use DJW secondary compression if it is on by default.  This saves
-   * about 20 bytes. */
-  xd3_init_config (& config, XD3_FLUSH | (SECONDARY_DJW ? XD3_SEC_DJW : 0));
-
-  /* Be exhaustive. */
-  config.sprevsz = 1<<11;
-  config.srcwin_maxsz = CODE_TABLE_STRING_SIZE;
-
-  config.smatch_cfg = XD3_SMATCH_SOFT;
-  config.smatcher_soft.large_look    = 4;
-  config.smatcher_soft.large_step    = 1;
-  config.smatcher_soft.small_look    = 4;
-  config.smatcher_soft.small_chain   = CODE_TABLE_STRING_SIZE;
-  config.smatcher_soft.small_lchain  = CODE_TABLE_STRING_SIZE;
-  config.smatcher_soft.max_lazy      = CODE_TABLE_STRING_SIZE;
-  config.smatcher_soft.long_enough   = CODE_TABLE_STRING_SIZE;
-
-  if ((ret = xd3_config_stream (& stream, & config))) { goto fail; }
-
-  source.blksize  = CODE_TABLE_STRING_SIZE;
-  source.onblk    = CODE_TABLE_STRING_SIZE;
-  source.name     = "";
-  source.curblk   = dflt_string;
-  source.curblkno = 0;
-
-  if ((ret = xd3_set_source_and_size (& stream, & source, CODE_TABLE_STRING_SIZE))) { goto fail; }
-
-  if ((ret = xd3_encode_stream (& stream, code_string, CODE_TABLE_STRING_SIZE,
-				comp_string, comp_string_size, CODE_TABLE_VCDIFF_SIZE))) { goto fail; }
-
- fail:
-
-  in_stream->msg = stream.msg;
-  xd3_free_stream (& stream);
-  return ret;
+  return xd3_encode_memory (code_string, CODE_TABLE_STRING_SIZE,
+			    dflt_string, CODE_TABLE_STRING_SIZE,
+			    comp_string, comp_string_size,
+			    CODE_TABLE_VCDIFF_SIZE);
 }
 
 /* Compute a delta between alternate and rfc3284 tables.  As soon as
@@ -1476,41 +1444,23 @@ xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t si
   uint8_t dflt_string[CODE_TABLE_STRING_SIZE];
   uint8_t code_string[CODE_TABLE_STRING_SIZE];
   usize_t code_size;
-  xd3_stream stream;
-  xd3_source source;
   int ret;
 
-  /* The default code table string can be cached if alternate code tables ever become
-   * popular. */
   xd3_compute_code_table_string (xd3_rfc3284_code_table (), dflt_string);
 
-  source.blksize  = CODE_TABLE_STRING_SIZE;
-  source.onblk    = CODE_TABLE_STRING_SIZE;
-  source.name     = "rfc3284 code table";
-  source.curblk   = dflt_string;
-  source.curblkno = 0;
-
-  if ((ret = xd3_config_stream (& stream, NULL)) ||
-      (ret = xd3_set_source_and_size (& stream, & source, CODE_TABLE_STRING_SIZE)) ||
-      (ret = xd3_decode_stream (& stream, data, size, code_string, & code_size, sizeof (code_string))))
-    {
-      in_stream->msg = stream.msg;
-      goto fail;
-    }
+  if ((ret = xd3_decode_memory (data, size, 
+				dflt_string, CODE_TABLE_STRING_SIZE,
+				code_string, &code_size,
+				CODE_TABLE_STRING_SIZE,
+				0))) { return ret; }
 
   if (code_size != sizeof (code_string))
     {
-      stream.msg = "corrupt code-table encoding";
-      ret = XD3_INTERNAL;
-      goto fail;
+      in_stream->msg = "corrupt code-table encoding";
+      return XD3_INTERNAL;
     }
 
-  if ((ret = xd3_apply_table_string (in_stream, code_string))) { goto fail; }
-
- fail:
-
-  xd3_free_stream (& stream);
-  return ret;
+  return xd3_apply_table_string (in_stream, code_string);
 }
 
 /***********************************************************************/
@@ -4527,7 +4477,6 @@ static inline usize_t
 xd3_forward_match(const uint8_t *s1c,
 		  const uint8_t *s2c,
 		  usize_t n) {
-  IF_DEBUG1(DP(RINT "[forward_match] %u\n", n));
   usize_t i = 0;
   while (i < n && s1c[i] == s2c[i])
     {
