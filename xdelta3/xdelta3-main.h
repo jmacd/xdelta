@@ -2854,7 +2854,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	}
       else
 	{
-	  strcpy(sizebuf, " not seekable");
+	  sizebuf[0] = 0;
 	}
 
       XPR(NT "source %s winsize %s blksize %u%s\n",
@@ -3063,6 +3063,12 @@ main_getblk_func (xd3_stream *stream,
 	    {
 	      /* Could assert !IS_ENCODE(), this shouldn't happen
 	       * because of do_not_lru during encode. */
+	      if (option_verbose)
+		{
+		  XPR(NT "copy lags source position by %"Q"u bytes\n", 
+		      sfile->source_position - pos);
+		}
+
 	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
 	      return XD3_TOOFARBACK;
 	    }
