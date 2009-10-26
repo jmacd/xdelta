@@ -2516,7 +2516,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	}
       
       ret = stream->getblk (stream, source, blkno);
-
+      IF_DEBUG1 (DP(RINT "[getblk] func ret %d\n", ret));
       if (ret != 0) 
 	{
 	  stream->msg = "getblk failed";
@@ -2578,9 +2578,6 @@ xd3_set_source (xd3_stream *stream,
 		xd3_source *src)
 {
   usize_t shiftby;
-
-  IF_DEBUG2 (DP(RINT "[set source] %s\n", 
-		stream->getblk == NULL ? "async" : "sync"));
 
   stream->src = src;
   src->srclen  = 0;
@@ -3776,6 +3773,8 @@ xd3_encode_input (xd3_stream *stream)
       return XD3_WINSTART;
 
     case ENC_SEARCH:
+      IF_DEBUG1 (DP(RINT "[SEARCH] match_state %d avail_in %u %s\n", 
+		    stream->match_state, stream->avail_in, stream->src ? "source" : "no source"));
 
       /* Reentrant matching. */
       if (stream->src != NULL)
@@ -3793,7 +3792,7 @@ xd3_encode_input (xd3_stream *stream)
 	      if (stream->avail_in > 0)
 		{
 		  /* This call can't fail because the source window is
-		     unrestricted. */
+		   * unrestricted. */
 		  ret = xd3_source_match_setup (stream, stream->match_srcpos);
 		  XD3_ASSERT (ret == 0);
 		  stream->match_state = MATCH_FORWARD;
@@ -4336,6 +4335,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
    * TestNonBlockingProgress test! */
   if (srcpos != 0 && srcpos == stream->match_last_srcpos)
     {
+      IF_DEBUG1(DP(RINT "[match_setup] looping failure\n"));
       goto bad;
     }
 
@@ -4402,6 +4402,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   /* Restricted case: fail if the srcpos lies outside the source window */
   if ((srcpos < src->srcbase) || (srcpos > (src->srcbase + (xoff_t) src->srclen)))
     {
+      IF_DEBUG1(DP(RINT "[match_setup] restricted source window failure\n"));
       goto bad;
     }
   else
@@ -4512,6 +4513,9 @@ xd3_source_extend_match (xd3_stream *stream)
   usize_t tryoff;
   usize_t tryrem;    /* tryrem is the number of matchable bytes */
   usize_t matched;
+
+  IF_DEBUG1(DP(RINT "[extend match] srcpos %"Q"u\n", 
+	       stream->match_srcpos));
 
   XD3_ASSERT (src != NULL);
 
@@ -5302,7 +5306,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  /* Maybe output a COPY instruction */
 	  if (match_length >= stream->min_match)
 	    {
-	      IF_DEBUG1 ({
+	      IF_DEBUG2 ({
 		static int x = 0;
 		DP(RINT "[target match:%d] <inp %u %u>  <cpy %u %u> "
 		   "(-%d) [ %u bytes ]\n",

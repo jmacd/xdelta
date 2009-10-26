@@ -2761,6 +2761,8 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
 
+  IF_DEBUG1 (DP(RINT "[main_set_source] %s\n", sfile->filename));
+
   /* Open it, check for seekability, set required xd3_source fields. */
   if (allow_fake_source)
     {
@@ -2795,9 +2797,9 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  seekable = 0;
 	  source_size_known = 0;
 
-	  if (option_verbose) 
+	  if (option_verbose > 1) 
 	    {
-	      XPR(NT "source not seekable\n");
+	      XPR(NT "source not seekable: %s\n", xd3_mainerror (stat_val));
 	    }
 	}
     }
@@ -2827,6 +2829,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       XPR(NT XD3_LIB_ERRMSG (stream, ret));
       goto error;
     }
+  XD3_ASSERT (stream->src == source);
 
   lru_size = (option_srcwinsz + source->blksize - 1) / source->blksize;
   option_srcwinsz = lru_size * source->blksize;
@@ -2835,7 +2838,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
     {
       static char buf[32];
 
-      XPR(NT "source %s winsize %s\n",
+      XPR(NT "source %s: winsize %s\n",
 	  sfile->filename, main_format_bcnt(option_srcwinsz, buf));
     }
 
@@ -2864,7 +2867,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       main_blklru_list_push_back (& lru_free, & lru[i]);
     }
 
+  return 0;
+
  error:
+  IF_DEBUG1 (DP(RINT "[main_set_source] error %s\n", xd3_strerror (ret)));
   if (tmp_buf != NULL)
     {
       main_free (tmp_buf);
@@ -3224,17 +3230,6 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 
-  if (IS_ENCODE (cmd))
-    {
-      /* When encoding, open the source file, possibly decompress it.
-       * The decoder delays this step until XD3_GOTHEADER. */
-      if (sfile->filename != NULL &&
-	  (ret = main_set_source (& stream, cmd, sfile, & source)))
-	{
-	  return EXIT_FAILURE;
-	}
-    }
-
   config.winsize = winsize;
   config.srcwin_maxsz = option_srcwinsz;
   config.getblk = main_getblk_func;
@@ -3255,6 +3250,21 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 #endif
+
+  if (cmd != CMD_DECODE)
+    {
+      /* When not decoding, set source now.  The decoder delays this
+       * step until XD3_GOTHEADER. */
+      if (sfile->filename != NULL) 
+	{
+	  if ((ret = main_set_source (& stream, cmd, sfile, & source)))
+	    {
+	      return EXIT_FAILURE;
+	    }
+
+	  XD3_ASSERT(stream.src != NULL);
+	}
+    }
 
   /* This times each window. */
   get_millisecs_since ();
@@ -3329,18 +3339,6 @@ main_input (xd3_cmd     cmd,
 		    return EXIT_FAILURE;
 		  }
 	      }
-	    else if (cmd == CMD_PRINTHDR ||
-		     cmd == CMD_PRINTHDRS ||
-		     cmd == CMD_PRINTDELTA ||
-		     cmd == CMD_RECODE)
-	      {
-		if (sfile->filename == NULL)
-		  {
-		    allow_fake_source = 1;
-		    sfile->filename = "<placeholder>";
-		    main_set_source (& stream, cmd, sfile, & source);
-		  }
-	      }
 	  }
 	/* FALLTHROUGH */
 	case XD3_WINSTART:
@@ -3397,6 +3395,7 @@ main_input (xd3_cmd     cmd,
 			    "no source copies\n",
 			    stream.current_window * winsize,
 			    (stream.current_window+1) * winsize);
+			XD3_ASSERT (stream.src != NULL);
 		      }
 
 		    /* Limited i-buffer size affects source copies */
