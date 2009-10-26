@@ -2518,7 +2518,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
       ret = stream->getblk (stream, source, blkno);
       if (ret != 0) 
 	{
-	  stream->msg = "getblk failed";
 	  return ret;
 	}
     }

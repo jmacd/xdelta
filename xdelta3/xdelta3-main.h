@@ -2995,8 +2995,6 @@ main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_
   (*is_new) = 1;
   (*blrup) = blru;
   blru->blkno = blkno;
-  IF_DEBUG1 (DP(RINT "new lru blkno == %"Q"u (lru_size=%u)\n", 
-		blru->blkno, lru_size));
   return 0;
 }
 
@@ -3057,11 +3055,6 @@ main_getblk_func (xd3_stream *stream,
 	  
       if (sfile->seek_failed || ret != 0)
 	{
-	  if (!sfile->seek_failed && option_verbose)
-	    {
-	      XPR(NT "unseekable source: skipping past unused input\n");
-	    }
-
 	  sfile->seek_failed = 1;
 
 	  /* For an unseekable file (or other seek error, does it
@@ -3070,8 +3063,6 @@ main_getblk_func (xd3_stream *stream,
 	    {
 	      /* Could assert !IS_ENCODE(), this shouldn't happen
 	       * because of do_not_lru during encode. */
-	      IF_DEBUG1 (DP(RINT "[getblk] cannot seek backwards blkno %"Q"u (do_not_lru %d)\n", 
-			    blkno, do_not_lru));
 	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
 	      return XD3_TOOFARBACK;
 	    }
