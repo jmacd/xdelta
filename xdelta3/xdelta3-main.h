@@ -2849,6 +2849,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   XD3_ASSERT (stream->src == source);
 
   lru_size = (option_srcwinsz + source->blksize - 1) / source->blksize;
+  lru_size = max(lru_size, 1U);
   option_srcwinsz = lru_size * source->blksize;
 
   if (option_verbose)
@@ -2943,7 +2944,7 @@ main_getblk_func (xd3_stream *stream,
   xoff_t pos = blkno * source->blksize;
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru  = NULL;
-  usize_t nread;
+  usize_t nread = 0;
   usize_t i;
 
   if (allow_fake_source)
@@ -3006,6 +3007,10 @@ main_getblk_func (xd3_stream *stream,
 	blru = main_blklru_list_pop_front (& lru_list);
       }
       lru_misses += 1;
+    }
+  else
+    {
+      XD3_ASSERT(0);
     }
 
   lru_filled += 1;
@@ -3117,7 +3122,7 @@ main_input (xd3_cmd     cmd,
 {
   int        ret;
   xd3_stream stream;
-  usize_t    nread;
+  usize_t    nread = 0;
   usize_t    winsize;
   int        stream_flags = 0;
   xd3_config config;
