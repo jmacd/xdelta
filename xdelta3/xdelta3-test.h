@@ -144,6 +144,7 @@ static int do_cmd (xd3_stream *stream, const char *buf)
       if (WIFEXITED (ret))
 	{
 	  stream->msg = "command exited non-zero";
+	  IF_DEBUG1 (DP(RINT "command was: %s\n", buf));
 	}
       else
 	{
@@ -1894,15 +1895,11 @@ test_recode_command2 (xd3_stream *stream, int has_source,
 
   /* Check recode changes. */
 
-  /* TODO!  This test is broken! */
   if ((ret = check_vcdiff_header (stream,
 				  TEST_COPY_FILE,
 				  "VCDIFF window indicator",
 				  "VCD_SOURCE",
-				  has_source))) 
-    { 
-      DP(RINT "TEST IS BROKEN: %s\n", xd3_strerror (ret));
-    }
+				  has_source))) { return ret; }
 
   if ((ret = check_vcdiff_header (stream,
 				  TEST_COPY_FILE,
@@ -2172,35 +2169,35 @@ test_source_decompression (xd3_stream *stream, int ignore)
 
   /* Now the two identical files are compressed.  Delta-encode the target,
    * with decompression. */
-  sprintf (buf, "%s -eq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -v -eq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Decode the delta file with recompression disabled, should get an
    * uncompressed file out. */
-  sprintf (buf, "%s -dq -R -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  sprintf (buf, "%s -v -dq -R -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (stream, TEST_COPY_FILE, TEST_RECON_FILE))) { return ret; }
 
   /* Decode the delta file with recompression, should get a compressed file
    * out.  But we can't compare compressed files directly. */
-  sprintf (buf, "%s -dqf -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  sprintf (buf, "%s -v -dqf -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   sprintf (buf, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options, TEST_RECON_FILE, TEST_RECON2_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (stream, TEST_COPY_FILE, TEST_RECON2_FILE))) { return ret; }
 
   /* Encode with decompression disabled */
-  sprintf (buf, "%s -feqD -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -v -feqD -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Decode the delta file with recompression enabled, it doesn't matter,
    * should get the compressed file out. */
-  sprintf (buf, "%s -fdq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  sprintf (buf, "%s -v -fdq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE))) { return ret; }
 
   /* Try again with recompression disabled, it doesn't make a difference. */
-  sprintf (buf, "%s -fqRd -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  sprintf (buf, "%s -v -fqRd -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE))) { return ret; }
   test_cleanup();
@@ -2813,14 +2810,13 @@ xd3_selftest (void)
   DO_TEST (stdout_behavior, 0, 0);
   DO_TEST (no_output, 0, 0);
   DO_TEST (command_line_arguments, 0, 0);
-  // TODO BROKEN!!
-  //DO_TEST (recode_command, 0, 0);
 
 #if EXTERNAL_COMPRESSION
   DO_TEST (source_decompression, 0, 0);
   DO_TEST (externally_compressed_io, 0, 0);
 #endif
 
+  DO_TEST (recode_command, 0, 0);
 #endif /* WIN32 */
 
   IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));

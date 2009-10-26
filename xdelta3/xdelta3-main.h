@@ -373,6 +373,9 @@ static int main_input (xd3_cmd cmd, main_file *ifile,
 static void main_get_appheader (xd3_stream *stream, main_file *ifile,
 				main_file *output, main_file *sfile);
 
+static int main_getblk_func (xd3_stream *stream,
+			     xd3_source *source,
+			     xoff_t      blkno);
 static int main_help (void);
 
 static int
@@ -2665,14 +2668,22 @@ static int
 main_read_primary_input (main_file   *ifile,
 			 uint8_t     *buf,
 			 usize_t      size,
-			 usize_t     *nread)
+			 usize_t     *nread,
+			 int          is_source)
 {
 #if EXTERNAL_COMPRESSION
   if (option_decompress_inputs && ifile->flags & RD_FIRST)
     {
       ifile->flags &= ~RD_FIRST;
 
-      return main_decompress_input_check (ifile, buf, size, nread);
+      if (is_source && ifile->compressor == NULL)
+	{
+	  /* Application header overrides magic number. */
+	}
+      else 
+	{
+	  return main_decompress_input_check (ifile, buf, size, nread);
+	}
     }
 #endif
 
@@ -2755,13 +2766,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   usize_t i;
   uint8_t *tmp_buf = NULL;
   xoff_t source_size = 0;
-  int seekable = 0;
   int source_size_known = 0;
 
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
-
-  IF_DEBUG1 (DP(RINT "[main_set_source] %s\n", sfile->filename));
 
   /* Open it, check for seekability, set required xd3_source fields. */
   if (allow_fake_source)
@@ -2769,7 +2777,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
-      seekable = 1;
       source_size_known = 1;
     }
   else
@@ -2784,7 +2791,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       stat_val = main_file_stat (sfile, &source_size);
       if (stat_val == 0)
 	{
-	  seekable = 1;
 	  source_size_known = 1;
 
 	  if (option_verbose > 1) 
@@ -2794,7 +2800,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	}
       else
 	{
-	  seekable = 0;
 	  source_size_known = 0;
 
 	  if (option_verbose > 1) 
@@ -2815,6 +2820,18 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
       source->blksize = (option_srcwinsz / LRU_SIZE);
     }
+
+  if (source_size_known)
+    {
+      IF_DEBUG2 (DP(RINT "[main_set_source] %s size %"Q"u\n",
+		    sfile->filename, source_size));
+    }
+  else
+    {
+      IF_DEBUG2 (DP(RINT "[main_set_source] %s size not known\n",
+		    sfile->filename, source_size));
+    }
+
 
   source->name     = sfile->filename;
   source->ioh      = sfile;
@@ -2867,10 +2884,16 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       main_blklru_list_push_back (& lru_free, & lru[i]);
     }
 
+  if ((ret = main_getblk_func (stream, source, 0)))
+    {
+      XPR(NT "error reading first block: %s\n", xd3_mainerror (ret));
+      return ret;
+    }
+
   return 0;
 
  error:
-  IF_DEBUG1 (DP(RINT "[main_set_source] error %s\n", xd3_strerror (ret)));
+  IF_DEBUG2 (DP(RINT "[main_set_source] error %s\n", xd3_strerror (ret)));
   if (tmp_buf != NULL)
     {
       main_free (tmp_buf);
@@ -3020,7 +3043,8 @@ main_getblk_func (xd3_stream *stream,
 	      if ((ret = main_read_primary_input (sfile,
 						  (uint8_t*) blru->blk, 
 						  source->blksize, 
-						  & nread)))
+						  & nread, 
+						  1 /* source */)))
 		{
 		  return ret;
 		}
@@ -3039,7 +3063,8 @@ main_getblk_func (xd3_stream *stream,
   if ((ret = main_read_primary_input (sfile, 
 				      (uint8_t*) blru->blk, 
 				      source->blksize, 
-				      & nread)))
+				      & nread,
+				      1 /* source */)))
     {
       return ret;
     }
@@ -3049,7 +3074,7 @@ main_getblk_func (xd3_stream *stream,
 
   main_blklru_list_push_back (& lru_list, blru);
 
-  if (option_verbose > 3)
+  if (option_verbose > 2)
     {
       if (blru->blkno != (xoff_t)-1)
 	{
@@ -3069,6 +3094,9 @@ main_getblk_func (xd3_stream *stream,
   source->curblkno = blkno;
   source->onblk    = nread;
   blru->size       = nread;
+
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u\n",
+		blkno, nread));
 
   return 0;
 }
@@ -3255,7 +3283,7 @@ main_input (xd3_cmd     cmd,
     {
       /* When not decoding, set source now.  The decoder delays this
        * step until XD3_GOTHEADER. */
-      if (sfile->filename != NULL) 
+      if (sfile && sfile->filename != NULL) 
 	{
 	  if ((ret = main_set_source (& stream, cmd, sfile, & source)))
 	    {
@@ -3263,6 +3291,19 @@ main_input (xd3_cmd     cmd,
 	    }
 
 	  XD3_ASSERT(stream.src != NULL);
+	}
+    }
+  
+  if (cmd == CMD_PRINTHDR ||
+      cmd == CMD_PRINTHDRS ||
+      cmd == CMD_PRINTDELTA ||
+      cmd == CMD_RECODE)
+    {
+      if (sfile->filename == NULL)
+	{
+	  allow_fake_source = 1;
+	  sfile->filename = "<placeholder>";
+	  main_set_source (& stream, cmd, sfile, & source);
 	}
     }
 
@@ -3283,7 +3324,8 @@ main_input (xd3_cmd     cmd,
       try_read = (usize_t) min ((xoff_t) config.winsize, input_remain);
 
       if ((ret = main_read_primary_input (ifile, main_bdata,
-					  try_read, & nread)))
+					  try_read, & nread,
+					  0 /* !source */)))
 	{
 	  return EXIT_FAILURE;
 	}
@@ -3914,7 +3956,7 @@ main (int argc, char **argv)
 	  if (option_verbose > 0)
 	    {
 	      XPR(NT "warning: -D option ignored, "
-		       "external compression support was not compiled\n");
+		  "external compression support was not compiled\n");
 	    }
 #else
 	  option_decompress_inputs  = 0;
@@ -3925,7 +3967,7 @@ main (int argc, char **argv)
 	  if (option_verbose > 0)
 	    {
 	      XPR(NT "warning: -R option ignored, "
-		       "external compression support was not compiled\n");
+		  "external compression support was not compiled\n");
 	    }
 #else
 	  option_recompress_outputs = 0;

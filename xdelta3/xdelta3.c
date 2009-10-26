@@ -2516,7 +2516,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	}
       
       ret = stream->getblk (stream, source, blkno);
-      IF_DEBUG1 (DP(RINT "[getblk] func ret %d\n", ret));
       if (ret != 0) 
 	{
 	  stream->msg = "getblk failed";
@@ -2541,7 +2540,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	{
 	  if (!source->eof_known) 
 	    {
-	      IF_DEBUG1 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
+	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
 			    xd3_bytes_on_srcblk (source, blkno),
 			    xd3_source_eof (source)));
 	      source->eof_known = 1;
@@ -2552,7 +2551,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
     }
 
   XD3_ASSERT (source->curblk != NULL);
-  IF_DEBUG1 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
+  IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n", 
 		blkno, source->onblk, source->blksize));
 
   if (blkno == source->max_blkno)
@@ -3773,7 +3772,7 @@ xd3_encode_input (xd3_stream *stream)
       return XD3_WINSTART;
 
     case ENC_SEARCH:
-      IF_DEBUG1 (DP(RINT "[SEARCH] match_state %d avail_in %u %s\n", 
+      IF_DEBUG2 (DP(RINT "[SEARCH] match_state %d avail_in %u %s\n", 
 		    stream->match_state, stream->avail_in, stream->src ? "source" : "no source"));
 
       /* Reentrant matching. */
@@ -4080,7 +4079,7 @@ xd3_process_memory (int            is_encode,
  exit:
   if (ret != 0) 
     {
-      IF_DEBUG1 (DP(RINT "process_memory: %d: %s\n", ret, stream.msg));
+      IF_DEBUG2 (DP(RINT "process_memory: %d: %s\n", ret, stream.msg));
     }
   xd3_free_stream(&stream);
   return ret;
@@ -4335,7 +4334,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
    * TestNonBlockingProgress test! */
   if (srcpos != 0 && srcpos == stream->match_last_srcpos)
     {
-      IF_DEBUG1(DP(RINT "[match_setup] looping failure\n"));
+      IF_DEBUG2(DP(RINT "[match_setup] looping failure\n"));
       goto bad;
     }
 
@@ -4389,7 +4388,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	    }
 	}
 
-      IF_DEBUG1(DP(RINT "[match_setup] srcpos %"Q"u unrestricted back %u fwd %u\n",
+      IF_DEBUG2(DP(RINT "[match_setup] srcpos %"Q"u unrestricted back %u fwd %u\n",
 		   srcpos,
 		   stream->match_maxback,
 		   stream->match_maxfwd));
@@ -4402,7 +4401,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   /* Restricted case: fail if the srcpos lies outside the source window */
   if ((srcpos < src->srcbase) || (srcpos > (src->srcbase + (xoff_t) src->srclen)))
     {
-      IF_DEBUG1(DP(RINT "[match_setup] restricted source window failure\n"));
+      IF_DEBUG2(DP(RINT "[match_setup] restricted source window failure\n"));
       goto bad;
     }
   else
@@ -4421,7 +4420,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	  stream->match_maxfwd = srcavail;
 	}
 
-      IF_DEBUG1(DP(RINT "[match_setup] srcpos %"Q"u restricted back %u fwd %u\n",
+      IF_DEBUG2(DP(RINT "[match_setup] srcpos %"Q"u restricted back %u fwd %u\n",
 		   srcpos,
 		   stream->match_maxback,
 		   stream->match_maxfwd));
@@ -4514,7 +4513,7 @@ xd3_source_extend_match (xd3_stream *stream)
   usize_t tryrem;    /* tryrem is the number of matchable bytes */
   usize_t matched;
 
-  IF_DEBUG1(DP(RINT "[extend match] srcpos %"Q"u\n", 
+  IF_DEBUG2(DP(RINT "[extend match] srcpos %"Q"u\n", 
 	       stream->match_srcpos));
 
   XD3_ASSERT (src != NULL);
