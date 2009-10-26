@@ -2824,7 +2824,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 		    sfile->filename, source_size));
     }
 
-
   source->name     = sfile->filename;
   source->ioh      = sfile;
   source->curblkno = 0;
@@ -2842,6 +2841,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   lru_size = (option_srcwinsz + source->blksize - 1) / source->blksize;
   lru_size = max(lru_size, 1U);
+  IF_DEBUG1 (DP(RINT "[lru_size] == %d\n", lru_size));
   option_srcwinsz = lru_size * source->blksize;
 
   if (option_verbose)
@@ -2864,6 +2864,8 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  sizebuf);
     }
 
+  XD3_ASSERT (lru == NULL);
+
   if ((lru = (main_blklru*)
        main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
     {
@@ -2881,7 +2883,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  goto error;
 	}
 
-      main_blklru_list_push_back (& lru_free, & lru[i]);
+      if (! do_not_lru)
+	{
+	  main_blklru_list_push_back (& lru_free, & lru[i]);
+	}
     }
 
   if ((ret = main_getblk_func (stream, source, 0)))
@@ -2926,6 +2931,75 @@ main_get_winsize (main_file *ifile) {
  Source routines
  *******************************************************************/
 
+static int
+main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_new)
+{
+  main_blklru *blru = NULL;
+  usize_t i;
+
+  (*is_new) = 0;
+
+  if (do_not_lru)
+    {
+      /* Direct lookup assumes sequential scan w/o skipping blocks. */
+      int idx = blkno % lru_size;
+      blru = & lru[idx];
+      if (blru->blkno == blkno)
+	{
+	  (*blrup) = blru;
+	  return 0;
+	}
+
+      if (blru->blkno != (xoff_t)-1 &&
+	  blru->blkno != (xoff_t)(blkno - lru_size))
+	{
+	  return XD3_TOOFARBACK;
+	}
+    }
+  else
+    {
+      /* Sequential search through LRU. */
+      for (i = 0; i < lru_size; i += 1)
+	{
+	  blru = & lru[i];
+	  if (blru->blkno == blkno)
+	    {
+	      main_blklru_list_remove (blru);
+	      main_blklru_list_push_back (& lru_list, blru);
+	      (*blrup) = blru;
+	      return 0;
+	    }
+	}
+    }
+
+  if (do_not_lru) 
+    {
+      int idx = blkno % lru_size;
+      blru = & lru[idx];
+    }
+  else 
+    {
+      if (! main_blklru_list_empty (& lru_free))
+	{
+	  blru = main_blklru_list_pop_front (& lru_free);
+	  main_blklru_list_push_back (& lru_list, blru);
+	}
+      else
+	{
+	  blru = main_blklru_list_pop_front (& lru_list);
+	  main_blklru_list_push_back (& lru_list, blru);
+	}
+    }
+
+  lru_filled += 1;
+  (*is_new) = 1;
+  (*blrup) = blru;
+  blru->blkno = blkno;
+  IF_DEBUG1 (DP(RINT "new lru blkno == %"Q"u (lru_size=%u)\n", 
+		blru->blkno, lru_size));
+  return 0;
+}
+
 /* This is the callback for reading a block of source.  This function
  * is blocking and it implements a small LRU.
  *
@@ -2942,11 +3016,9 @@ main_getblk_func (xd3_stream *stream,
   int ret = 0;
   xoff_t pos = blkno * source->blksize;
   main_file *sfile = (main_file*) source->ioh;
-  main_blklru *blru  = NULL;
+  main_blklru *blru;
+  int is_new;
   usize_t nread = 0;
-  usize_t i;
-
-  // TODO! The skip logic has to fill cache, duh!
 
   if (allow_fake_source)
     {
@@ -2957,64 +3029,21 @@ main_getblk_func (xd3_stream *stream,
       return 0;
     }
 
-  if (do_not_lru)
+  if ((ret = main_getblk_lru (source, blkno, & blru, & is_new)))
     {
-      /* Direct lookup assumes sequential scan w/o skipping blocks. */
-      int idx = blkno % lru_size;
-      if (lru[idx].blkno == blkno)
-	{
-	  source->curblkno = blkno;
-	  source->onblk    = lru[idx].size;
-	  source->curblk   = lru[idx].blk;
-	  lru_hits += 1;
-	  return 0;
-	}
-
-      if (lru[idx].blkno != (xoff_t)-1 &&
-	  lru[idx].blkno != (xoff_t)(blkno - lru_size))
-	{
-	  return XD3_TOOFARBACK;
-	}
-    }
-  else
-    {
-      /* Sequential search through LRU. */
-      for (i = 0; i < lru_size; i += 1)
-	{
-	  if (lru[i].blkno == blkno)
-	    {
-	      main_blklru_list_remove (& lru[i]);
-	      main_blklru_list_push_back (& lru_list, & lru[i]);
-
-	      source->curblkno = blkno;
-	      source->onblk    = lru[i].size;
-	      source->curblk   = lru[i].blk;
-	      lru_hits += 1;
-	      return 0;
-	    }
-	}
+      return ret;
     }
 
-  if (! main_blklru_list_empty (& lru_free))
+  if (!is_new) 
     {
-      blru = main_blklru_list_pop_front (& lru_free);
-    }
-  else if (! main_blklru_list_empty (& lru_list))
-    {
-      if (do_not_lru) {
-	blru = & lru[blkno % lru_size];
-	main_blklru_list_remove(blru);
-      } else {
-	blru = main_blklru_list_pop_front (& lru_list);
-      }
-      lru_misses += 1;
-    }
-  else
-    {
-      XD3_ASSERT(0);
+      source->curblkno = blkno;
+      source->onblk    = blru->size;
+      source->curblk   = blru->blk;
+      lru_hits++;
+      return 0;
     }
 
-  lru_filled += 1;
+  lru_misses += 1;
 
   if (pos != sfile->source_position)
     {
@@ -3026,35 +3055,51 @@ main_getblk_func (xd3_stream *stream,
 	  ret = main_file_seek (sfile, pos);
 	}
 	  
-      if (ret != 0 || sfile->seek_failed)
+      if (sfile->seek_failed || ret != 0)
 	{
+	  if (!sfile->seek_failed && option_verbose)
+	    {
+	      XPR(NT "unseekable source: skipping past unused input\n");
+	    }
+
 	  sfile->seek_failed = 1;
-	  
+
 	  /* For an unseekable file (or other seek error, does it
 	   * matter?) */
 	  if (sfile->source_position > pos)
 	    {
 	      /* Could assert !IS_ENCODE(), this shouldn't happen
 	       * because of do_not_lru during encode. */
-	      IF_DEBUG1 (DP(RINT "cannot seek backwards\n"));
+	      IF_DEBUG1 (DP(RINT "[getblk] cannot seek backwards blkno %"Q"u (do_not_lru %d)\n", 
+			    blkno, do_not_lru));
 	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
 	      return XD3_TOOFARBACK;
 	    }
 
-	  if (option_verbose &&
-	      sfile->source_position == 0 &&
-	      !sfile->seek_failed)
-	    {
-	      XPR(NT "unseekable source: skipping past unused input\n");
-	    }
+	  IF_DEBUG1 (DP(RINT "[getblk] skip %"Q"u starting at %"Q"u\n", 
+			pos - sfile->source_position,
+			sfile->source_position));
 
 	  while (sfile->source_position < pos)
 	    {
+	      xoff_t skip_blkno;
+	      usize_t skip_offset;
+
+	      xd3_blksize_div (sfile->source_position, source, &skip_blkno, &skip_offset);
+
 	      /* Read past unused data */
 	      XD3_ASSERT (pos - sfile->source_position >= source->blksize);
+	      XD3_ASSERT (skip_offset == 0);
+
+	      if ((ret = main_getblk_lru (source, skip_blkno, & blru, & is_new)))
+		{
+		  return ret;
+		}
+
+	      XD3_ASSERT (is_new);
 
 	      if ((ret = main_read_primary_input (sfile,
-						  (uint8_t*) blru->blk, 
+						  (uint8_t*) blru->blk,
 						  source->blksize, 
 						  & nread, 
 						  1 /* source */)))
@@ -3062,19 +3107,18 @@ main_getblk_func (xd3_stream *stream,
 		  return ret;
 		}
 
-	      sfile->source_position += nread;
-	      
-	      if (option_verbose > 1)
-		{
-		  XPR(NT "skip 1 source block\n");
-		}
-
 	      if (nread != source->blksize)
 		{
-		  IF_DEBUG1 (DP(RINT "short skip block nread = %u\n", nread));
+		  IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %u\n", nread));
 		  stream->msg = "non-seekable input is short";
 		  return XD3_INVALID_INPUT;
 		}
+
+	      sfile->source_position += nread;
+	      blru->size = nread;
+
+	      IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u {%"Q"u} size %u\n", 
+			    skip_blkno, blru->blkno, blru->size));
 
 	      XD3_ASSERT (sfile->source_position <= pos);
 	    }
@@ -3082,6 +3126,11 @@ main_getblk_func (xd3_stream *stream,
     }
 
   XD3_ASSERT (sfile->source_position == pos);
+
+  if ((ret = main_getblk_lru (source, blkno, & blru, & is_new)))
+    {
+      return ret;
+    }
 
   if ((ret = main_read_primary_input (sfile, 
 				      (uint8_t*) blru->blk, 
@@ -3112,13 +3161,12 @@ main_getblk_func (xd3_stream *stream,
 	}
     }
 
-  blru->blkno      = blkno;
   source->curblk   = blru->blk;
   source->curblkno = blkno;
   source->onblk    = nread;
   blru->size       = nread;
 
-  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u srcpos %"Q"u\n",
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u pos %"Q"u sfile->source_position %"Q"u\n",
 		blkno, nread, pos, sfile->source_position));
 
   return 0;
