@@ -224,6 +224,7 @@ struct _main_file
   xoff_t              nread;         /* for input position */
   xoff_t              nwrite;        /* for output position */
   uint8_t            *snprintf_buf;  /* internal snprintf() use */
+  xoff_t              source_position; /* for avoiding seek in getblk_func */
 };
 
 /* Various strings and magic values used to detect and call external
@@ -1956,6 +1957,8 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	recode_source.srclen = window_srcmax - window_srcmin;
 	recode_source.srcbase = window_srcmin;
 	recode_stream->taroff = recode_source.srclen;
+
+	XD3_ASSERT (recode_source.srclen != 0);
       } else {
 	recode_stream->srcwin_decided = 0;
 	recode_stream->src = NULL;
@@ -2775,8 +2778,8 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	{
 	  goto error;
 	}
-      stat_val = main_file_stat (sfile, &source_size);
 
+      stat_val = main_file_stat (sfile, &source_size);
       if (stat_val == 0)
 	{
 	  seekable = 1;
@@ -2801,7 +2804,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   if (source_size_known && source_size < option_srcwinsz)
     { 
-     /* Reduce sizes to actual source size, read whole file */
+      /* Reduce sizes to actual source size, read whole file. */
       option_srcwinsz = source_size;
       source->blksize = source_size;
     }
@@ -2816,16 +2819,9 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->curblkno = 0;
   source->curblk   = NULL;
 
-  // May change source->blksize next
-  if (source_size_known)
-    {
-      ret = xd3_set_source_and_size (stream, source, source_size);
-    }
-  else
-    {
-      ret = xd3_set_source (stream, source);
-    }
-
+  /* DO NOT call xd3_set_source_and_size because of potential
+   * secondary compression. */
+  ret = xd3_set_source (stream, source);
   if (ret) 
     {
       XPR(NT XD3_LIB_ERRMSG (stream, ret));
@@ -2985,16 +2981,65 @@ main_getblk_func (xd3_stream *stream,
 
   lru_filled += 1;
 
-  if ((ret = main_file_seek (sfile, pos)))
+  if (pos != sfile->source_position)
+    {
+      /* Only try to seek when the position is wrong.  This means the
+       * decoder will fail when the source buffer is too small, but
+       * only when the input is non-seekable. */
+      ret = main_file_seek (sfile, pos);
+
+      if (ret != 0)
+	{
+	  /* For an unseekable file (or other seek error, does it
+	   * matter?) */
+	  if (option_verbose &&
+	      sfile->source_position == 0) 
+	    {
+	      XPR(NT "unseekable source, skipping past unused input");
+	    }
+
+	  if (sfile->source_position > pos)
+	    {
+	      /* Should assert !IS_ENCODE(), this shouldn't happen
+	       * because of do_not_lru during encode. */
+	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
+	      return XD3_TOOFARBACK;
+	    }
+
+	  while (sfile->source_position < pos)
+	    {
+	      /* Read past unused data */
+	      XD3_ASSERT (pos - sfile->source_position >= source->blksize);
+
+	      if ((ret = main_read_primary_input (sfile,
+						  (uint8_t*) blru->blk, 
+						  source->blksize, 
+						  & nread)))
+		{
+		  return ret;
+		}
+
+	      sfile->source_position += nread;
+
+	      if (nread != source->blksize)
+		{
+		  stream->msg = "non-seekable input is short";
+		  return XD3_INVALID_INPUT;
+		}
+	    }
+	}
+    }
+
+  if ((ret = main_read_primary_input (sfile, 
+				      (uint8_t*) blru->blk, 
+				      source->blksize, 
+				      & nread)))
     {
       return ret;
     }
 
-  if ((ret = main_file_read (sfile, (uint8_t*) blru->blk, source->blksize,
-			     & nread, "source read failed")))
-    {
-      return ret;
-    }
+  /* Save the last block read, used to handle non-seekable files. */
+  sfile->source_position = pos + nread;
 
   main_blklru_list_push_back (& lru_list, blru);
 
@@ -3210,14 +3255,6 @@ main_input (xd3_cmd     cmd,
       return EXIT_FAILURE;
     }
 #endif
-
-  /* TODO: this can be deleted? */
-/*   if (IS_ENCODE (cmd) && sfile->filename != NULL && */
-/*       (ret = xd3_set_source (& stream, & source))) */
-/*     { */
-/*       XPR(NT XD3_LIB_ERRMSG (& stream, ret)); */
-/*       return EXIT_FAILURE; */
-/*     } */
 
   /* This times each window. */
   get_millisecs_since ();

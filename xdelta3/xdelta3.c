@@ -4489,7 +4489,6 @@ xd3_forward_match(const uint8_t *s1c,
 }
 #endif
 
-
 /* This function expands the source match backward and forward.  It is
  * reentrant, since xd3_getblk may return XD3_GETSRCBLK, so most
  * variables are kept in xd3_stream.  There are two callers of this
@@ -4587,7 +4586,7 @@ xd3_source_extend_match (xd3_stream *stream)
       if ((ret = xd3_getblk (stream, tryblk)))
 	{
 	  /* if search went too far back, continue forward. */
-  if (ret == XD3_TOOFARBACK)
+	  if (ret == XD3_TOOFARBACK)
 	    {
 	      break;
 	    }
