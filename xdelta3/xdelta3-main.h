@@ -225,6 +225,7 @@ struct _main_file
   xoff_t              nwrite;        /* for output position */
   uint8_t            *snprintf_buf;  /* internal snprintf() use */
   xoff_t              source_position; /* for avoiding seek in getblk_func */
+  int                 seek_failed;   /* after seek fails once */
 };
 
 /* Various strings and magic values used to detect and call external
@@ -1069,7 +1070,8 @@ main_file_seek (main_file *xfile, xoff_t pos)
 
   if (ret)
     {
-      XPR(NT "seek failed: %s: %s\n", xfile->filename, xd3_mainerror (ret));
+      XPR(NT "seek to %"Q"u failed: %s: %s\n", 
+	  pos, xfile->filename, xd3_mainerror (ret));
     }
 
   return ret;
@@ -2792,20 +2794,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       if (stat_val == 0)
 	{
 	  source_size_known = 1;
-
-	  if (option_verbose > 1) 
-	    {
-	      XPR(NT "source file size: %"Q"u\n", source_size);
-	    }
 	}
       else
 	{
 	  source_size_known = 0;
-
-	  if (option_verbose > 1) 
-	    {
-	      XPR(NT "source not seekable: %s\n", xd3_mainerror (stat_val));
-	    }
 	}
     }
 
@@ -2855,14 +2847,21 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   if (option_verbose)
     {
       static char buf[32];
+      static char sizebuf[32];
+      if (source_size_known)
+	{
+	  sprintf(sizebuf, " size %"Q"u", source_size);
+	}
+      else
+	{
+	  strcpy(sizebuf, " not seekable");
+	}
 
-      XPR(NT "source %s: winsize %s\n",
-	  sfile->filename, main_format_bcnt(option_srcwinsz, buf));
-    }
-
-  if (option_verbose > 1) 
-   {
-      XPR(NT "source block size: %u\n", source->blksize);
+      XPR(NT "source %s winsize %s blksize %u%s\n",
+	  sfile->filename,
+	  main_format_bcnt(option_srcwinsz, buf), 
+	  source->blksize, 
+	  sizebuf);
     }
 
   if ((lru = (main_blklru*)
@@ -2940,12 +2939,14 @@ main_getblk_func (xd3_stream *stream,
 		  xd3_source *source,
 		  xoff_t      blkno)
 {
-  int ret;
+  int ret = 0;
   xoff_t pos = blkno * source->blksize;
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru  = NULL;
   usize_t nread = 0;
   usize_t i;
+
+  // TODO! The skip logic has to fill cache, duh!
 
   if (allow_fake_source)
     {
@@ -3020,24 +3021,31 @@ main_getblk_func (xd3_stream *stream,
       /* Only try to seek when the position is wrong.  This means the
        * decoder will fail when the source buffer is too small, but
        * only when the input is non-seekable. */
-      ret = main_file_seek (sfile, pos);
-
-      if (ret != 0)
+      if (!sfile->seek_failed)
 	{
+	  ret = main_file_seek (sfile, pos);
+	}
+	  
+      if (ret != 0 || sfile->seek_failed)
+	{
+	  sfile->seek_failed = 1;
+	  
 	  /* For an unseekable file (or other seek error, does it
 	   * matter?) */
-	  if (option_verbose &&
-	      sfile->source_position == 0) 
-	    {
-	      XPR(NT "unseekable source, skipping past unused input");
-	    }
-
 	  if (sfile->source_position > pos)
 	    {
-	      /* Should assert !IS_ENCODE(), this shouldn't happen
+	      /* Could assert !IS_ENCODE(), this shouldn't happen
 	       * because of do_not_lru during encode. */
+	      IF_DEBUG1 (DP(RINT "cannot seek backwards\n"));
 	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
 	      return XD3_TOOFARBACK;
+	    }
+
+	  if (option_verbose &&
+	      sfile->source_position == 0 &&
+	      !sfile->seek_failed)
+	    {
+	      XPR(NT "unseekable source: skipping past unused input\n");
 	    }
 
 	  while (sfile->source_position < pos)
@@ -3055,15 +3063,25 @@ main_getblk_func (xd3_stream *stream,
 		}
 
 	      sfile->source_position += nread;
+	      
+	      if (option_verbose > 1)
+		{
+		  XPR(NT "skip 1 source block\n");
+		}
 
 	      if (nread != source->blksize)
 		{
+		  IF_DEBUG1 (DP(RINT "short skip block nread = %u\n", nread));
 		  stream->msg = "non-seekable input is short";
 		  return XD3_INVALID_INPUT;
 		}
+
+	      XD3_ASSERT (sfile->source_position <= pos);
 	    }
 	}
     }
+
+  XD3_ASSERT (sfile->source_position == pos);
 
   if ((ret = main_read_primary_input (sfile, 
 				      (uint8_t*) blru->blk, 
@@ -3079,7 +3097,7 @@ main_getblk_func (xd3_stream *stream,
 
   main_blklru_list_push_back (& lru_list, blru);
 
-  if (option_verbose > 2)
+  if (option_verbose > 3)
     {
       if (blru->blkno != (xoff_t)-1)
 	{
@@ -3100,8 +3118,8 @@ main_getblk_func (xd3_stream *stream,
   source->onblk    = nread;
   blru->size       = nread;
 
-  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u\n",
-		blkno, nread));
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u srcpos %"Q"u\n",
+		blkno, nread, pos, sfile->source_position));
 
   return 0;
 }
