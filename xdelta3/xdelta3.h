@@ -132,6 +132,9 @@ typedef ULONGLONG      uint64_t;
  * 64bit platform because we allocate large arrays of these values. */
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
+#define _LARGEFILE_SOURCE
+#define _FILE_OFFSET_BITS 64
+
 typedef uint64_t xoff_t;
 #define SIZEOF_XOFF_T 8
 #define SIZEOF_USIZE_T 4
