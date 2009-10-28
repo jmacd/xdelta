@@ -1,4 +1,4 @@
-CFLAGS = -g -Wall -Wconversion -Wsign-compare -Wextra -Wno-unused-parameter -I.. \
+CFLAGS = -O2 -Wall -Wconversion -Wsign-compare -Wextra -Wno-unused-parameter -I.. \
 	      -DGENERIC_ENCODE_TABLES=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \

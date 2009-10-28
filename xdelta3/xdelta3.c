@@ -4437,9 +4437,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
-/* This code is experimental, and I'm having trouble benchmarking
- * it reliably. */
-#if 0
+#if 1
 static inline int
 xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, size_t n)
 {

@@ -384,12 +384,15 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	usize_t i;
 	const uint8_t *src;
 	uint8_t *dst;
+	int overlap;
 
 	/* See if it copies from the VCD_TARGET/VCD_SOURCE window or
 	 * the target window.  Out-of-bounds checks for the addresses
 	 * and sizes are performed in xd3_decode_parse_halfinst. */
 	if (inst->addr < stream->dec_cpylen)
 	  {
+	    overlap = 0;
+
 	    if (stream->dec_win_ind & VCD_TARGET)
 	      {
 		/* For VCD_TARGET we know the entire range is
@@ -444,7 +447,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG1(DP(RINT "[srcfile] short at blkno %"Q"u onblk %u blksize %u blkoff %u take %u\n",
+		    IF_DEBUG1(DP(RINT "[srcfile] short at blkno %"Q"u onblk "
+				 "%u blksize %u blkoff %u take %u\n",
 				 block,
 				 source->onblk,
 				 blksize,
@@ -480,16 +484,29 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	    src = stream->dec_tgtaddrbase + inst->addr;
 	    inst->type = XD3_NOOP;
 	    inst->size = 0;
+
+	    /* TODO: This can be more specific, it's whether 
+	     *   (inst->addr - srclen) + inst->size > input_pos
+	     * ?
+	     */
+	    overlap = 1;
 	  }
 
  	dst = stream->next_out + stream->avail_out;
 
 	stream->avail_out += take;
 
-	/* Can't just memcpy here due to possible overlap. */
-	for (i = take; i != 0; i -= 1)
+	if (overlap)
 	  {
-	    *dst++ = *src++;
+	    /* Can't just memcpy here due to possible overlap. */
+	    for (i = take; i != 0; i -= 1)
+	      {
+		*dst++ = *src++;
+	      }
+	  }
+	else
+	  {
+	    memcpy (dst, src, take);
 	  }
 
 	take = inst->size;

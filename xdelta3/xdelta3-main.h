@@ -365,6 +365,9 @@ static main_extcomp extcomp_types[] =
 
   /* TODO: add commandline support for magic-less formats */
   /*{ "lzma", "-cf",   "lzma", "-dcf",   "M", "]\000", 2, 0 },*/
+
+  /* Xz is lzma with a magic number http://tukaani.org/xz/ */
+  { "xz", "-cf", "xz", "-dcf", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0 },
 };
 
 // };
