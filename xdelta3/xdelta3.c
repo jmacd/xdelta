@@ -2583,17 +2583,16 @@ xd3_set_source (xd3_stream *stream,
 
   // If src->blksize is a power-of-two, xd3_blksize_div() will use
   // shift and mask rather than divide.  Check that here.
-  if (xd3_check_pow2 (src->blksize, &shiftby) == 0)
+  if (!xd3_check_pow2 (src->blksize, &shiftby) == 0)
     {
-      src->shiftby = shiftby;
-      src->maskby = (1 << shiftby) - 1;
-    }
-  else
-    {
+      int check;
       src->blksize = xd3_pow2_roundup(src->blksize);
-      xd3_check_pow2 (src->blksize, &shiftby);
+      check = xd3_check_pow2 (src->blksize, &shiftby);
+      XD3_ASSERT (check == 0);
     }
 
+  src->shiftby = shiftby;
+  src->maskby = (1 << shiftby) - 1;
   return 0;
 }
 
@@ -2777,14 +2776,14 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 		XD3_ASSERT (inst->addr + inst->size <= src->srcbase + src->srclen);
 		addr = (inst->addr - src->srcbase);
 		stream->n_scpy += 1;
-		stream->l_scpy += inst->size;
+		stream->l_scpy += (xoff_t) inst->size;
 	      }
 	    else
 	      {
 		/* with source window: target copy address is offset by taroff. */
 		addr = stream->taroff + (usize_t) inst->addr;
 		stream->n_tcpy += 1;
-		stream->l_tcpy += inst->size;
+		stream->l_tcpy += (xoff_t) inst->size;
 	      }
 	  }
 	else
@@ -3483,10 +3482,11 @@ xd3_emit_hdr (xd3_stream *stream)
 	  a32 = stream->recode_adler32;
 	}
 
-      send[0] = (a32 >> 24);
-      send[1] = (a32 >> 16);
-      send[2] = (a32 >> 8);
-      send[3] = (a32 & 0xff);
+      /* Four bytes. */
+      send[0] = (uint8_t) (a32 >> 24);
+      send[1] = (uint8_t) (a32 >> 16);
+      send[2] = (uint8_t) (a32 >> 8);
+      send[3] = (uint8_t) (a32 & 0x000000FFU);
 
       if ((ret = xd3_emit_bytes (stream, & HDR_TAIL (stream), send, 4)))
 	{
@@ -4374,7 +4374,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
        * src->size/srcpos values and take the min. */
       if (srcpos < (xoff_t) stream->match_maxback)
 	{
-	  stream->match_maxback = srcpos;
+	  stream->match_maxback = (usize_t) srcpos;
 	}
 
       if (stream->src->eof_known)
@@ -4383,7 +4383,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
 	  if (srcavail < (xoff_t) stream->match_maxfwd)
 	    {
-	      stream->match_maxfwd = srcavail;
+	      stream->match_maxfwd = (usize_t) srcavail;
 	    }
 	}
 

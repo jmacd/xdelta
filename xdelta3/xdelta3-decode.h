@@ -904,7 +904,8 @@ xd3_decode_input (xd3_stream *stream)
 	    }
 	}
 
-      stream->dec_hdrsize = stream->total_in;
+      /* xoff_t -> usize_t is safe because this is the first block. */
+      stream->dec_hdrsize = (usize_t) stream->total_in;
       stream->dec_state = DEC_WININD;
 
     case DEC_WININD:

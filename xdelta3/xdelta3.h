@@ -1289,7 +1289,7 @@ void xd3_set_flags (xd3_stream *stream, int flags)
 }
 
 /* Gives some extra information about the latest library error, if any
-   is known. */
+ * is known. */
 static inline
 const char* xd3_errstring (xd3_stream  *stream)
 {
@@ -1297,19 +1297,16 @@ const char* xd3_errstring (xd3_stream  *stream)
 }
 
 
-/* 64-bit divisions are expensive.  on a 32bit platform, these show in
- * a profile as __udivdi3().  these are all the xoff_t divisions: */
+/* 64-bit divisions are expensive, which is why we require a power-of-2
+ * block size.  To relax this restriction is relatively easy, see the history 
+ * for this method.  gcc users should not see __udivdi3() in xd3_ profiles. */
 static inline
 void xd3_blksize_div (const xoff_t offset,
 		      const xd3_source *source,
 		      xoff_t *blkno,
 		      usize_t *blkoff) {
-  *blkno = source->maskby ?
-    (offset >> source->shiftby) :
-    (offset / source->blksize);
-  *blkoff = source->maskby ?
-    (offset & source->maskby) :
-    (offset - *blkno * source->blksize);
+  *blkno = (xoff_t) (offset >> source->shiftby);
+  *blkoff = (usize_t) (offset & source->maskby);
 }
 
 #endif /* _XDELTA3_H_ */
