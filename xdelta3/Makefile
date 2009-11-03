@@ -31,7 +31,7 @@ SOURCES = xdelta3-cfgs.h \
 TARGETS = xdelta3-debug \
 	  xdelta3 \
 	  xdelta3-debug2 \
-	  xdelta3-debug3 \
+	  xdelta3-debugstdio \
 	  xdelta3.o \
 	  xdelta3_wrap.o \
 	  xdelta3-32 \
@@ -143,7 +143,7 @@ xdelta3-debug: $(SOURCES)
 		-DSECONDARY_FGK=1 \
 		-DXD3_DEBUG=1 \
 		-DXD3_MAIN=1 \
-		-DXD3_STDIO=1 \
+		-DXD3_POSIX=1 \
 		-DXD3_USE_LARGEFILE64=1
 
 xdelta3-warnings: $(SOURCES)
@@ -172,7 +172,7 @@ xdelta3-debug2: $(SOURCES)
 		xdelta3.c -o xdelta3-debug2 \
 		-DXD3_DEBUG=2 \
 		-DXD3_MAIN=1 \
-		-DXD3_STDIO=1 \
+		-DXD3_POSIX=1 \
 		-DXD3_USE_LARGEFILE64=1 \
 		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
@@ -180,14 +180,14 @@ xdelta3-debug2: $(SOURCES)
 		-DSECONDARY_FGK=1 \
 		-lm
 
-xdelta3-debug3: $(SOURCES)
-	$(CC) -g $(CFLAGS) xdelta3.c -o xdelta3-debug3 \
+xdelta3-debugstdio: $(SOURCES)
+	$(CC) -g $(CFLAGS) xdelta3.c -o xdelta3-debugstdio \
 		-DXD3_MAIN=1 \
 		-DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 \
 		-DXD3_STDIO=1 \
 		-DREGRESSION_TEST=1 \
-		-DXD3_DEBUG=3 \
+		-DXD3_DEBUG=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
 		-lm

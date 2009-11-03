@@ -435,6 +435,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		    /* could be a XD3_GETSRCBLK failure. */
 		    if (ret == XD3_TOOFARBACK)
 		      {
+			stream->msg = "non-seekable source in decode";
 			ret = XD3_INTERNAL;
 		      }
 		    return ret;

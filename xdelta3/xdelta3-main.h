@@ -594,19 +594,55 @@ get_millisecs_since (void)
 static char*
 main_format_bcnt (xoff_t r, char *buf)
 {
-  static const char* fmts[] = { "B", "KB", "MB", "GB" };
+  static const char* fmts[] = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
   usize_t i;
 
-  for (i = 0; i < SIZEOF_ARRAY(fmts); i += 1)
+  for (i = 0; i < SIZEOF_ARRAY(fmts) - 1; i += 1)
     {
-      if (r <= (10 * 1024) || i == (-1 + (int)SIZEOF_ARRAY(fmts)))
+      xoff_t new_r;
+
+      if (r == 0)
+	{
+	  sprintf (buf, "0 %s", fmts[i]);
+	  return buf;
+	}
+
+      if (r >= 1 && r < 10)
+	{
+	  sprintf (buf, "%.2f %s", (double) r, fmts[i]);
+	  return buf;
+	}
+
+      if (r >= 10 && r < 100)
+	{
+	  sprintf (buf, "%.1f %s", (double) r, fmts[i]);
+	  return buf;
+	}
+
+      if (r >= 100 && r < 1000)
 	{
 	  sprintf (buf, "%"Q"u %s", r, fmts[i]);
-	  break;
+	  return buf;
 	}
-      r /= 1024;
+
+      new_r = r / 1024;
+
+      if (new_r < 10)
+	{
+	  sprintf (buf, "%.2f %s", (double) r / 1024.0, fmts[i + 1]);
+	  return buf;
+	}
+
+      if (new_r < 100)
+	{
+	  sprintf (buf, "%.1f %s", (double) r / 1024.0, fmts[i + 1]);
+	  return buf;
+	}
+
+      r = new_r;
     }
-  return buf;
+  XD3_ASSERT (0);
+  return "";
 }
 
 static char*
@@ -616,7 +652,7 @@ main_format_rate (xoff_t bytes, long millis, char *buf)
   static char lbuf[32];
 
   main_format_bcnt (r, lbuf);
-  sprintf (buf, "%s/sec", lbuf);
+  sprintf (buf, "%s/s", lbuf);
   return buf;
 }
 
@@ -954,11 +990,11 @@ xd3_posix_io (int fd, uint8_t *buf, usize_t size,
 /* POSIX is unbuffered, while STDIO is buffered.  main_file_read()
  * should always be called on blocks. */
 static int
-main_file_read (main_file   *ifile,
-	       uint8_t    *buf,
-	       usize_t      size,
-	       usize_t     *nread,
-	       const char *msg)
+main_file_read (main_file  *ifile,
+		uint8_t    *buf,
+		usize_t     size,
+		usize_t    *nread,
+		const char *msg)
 {
   int ret = 0;
 
@@ -1101,6 +1137,32 @@ main_write_output (xd3_stream* stream, main_file *ofile)
     }
 
   return 0;
+}
+
+/* Called when the stream transitions from unknown status to
+ * possibly/definitely non-seekable. */
+static void 
+main_internal_do_not_lru () 
+{
+  usize_t i;
+
+  if (do_not_lru) 
+    {
+      /* Already set */
+      return;
+    }
+
+  do_not_lru = 1;
+
+  /* It's possible that we've already ejected in a non-LRU fashion,
+   * report on that. */
+  for (i = 0; i < lru_size; i += 1)
+    {
+      if (lru[i].blkno == (xoff_t) -1) 
+	{
+	  continue;
+	}
+    }  
 }
 
 static int
@@ -2285,7 +2347,7 @@ main_input_decompress_setup (const main_extcomp     *decomp,
  * is passed to the pipe copier.  This avoids using the same size
  * buffer in both cases. */
 static int
-main_decompress_input_check (main_file  *ifile,
+main_secondary_decompress_check (main_file  *ifile,
 			     uint8_t    *input_buf,
 			     usize_t     input_size,
 			     usize_t    *nread)
@@ -2321,6 +2383,8 @@ main_decompress_input_check (main_file  *ifile,
 		 decomp->decomp_cmdname,
 		 decomp->decomp_options);
 	    }
+
+	  main_internal_do_not_lru ();
 
 	  return main_input_decompress_setup (decomp, ifile,
 					      input_buf, input_size,
@@ -2670,29 +2734,29 @@ main_get_appheader (xd3_stream *stream, main_file *ifile,
  * buffer of data is read.  The EXTERNAL_COMPRESSION code is called to
  * search for magic numbers. */
 static int
-main_read_primary_input (main_file   *ifile,
+main_read_primary_input (main_file   *file,
 			 uint8_t     *buf,
 			 usize_t      size,
 			 usize_t     *nread,
 			 int          is_source)
 {
 #if EXTERNAL_COMPRESSION
-  if (option_decompress_inputs && ifile->flags & RD_FIRST)
+  if (option_decompress_inputs && file->flags & RD_FIRST)
     {
-      ifile->flags &= ~RD_FIRST;
+      file->flags &= ~RD_FIRST;
 
-      if (is_source && ifile->compressor == NULL)
+      if (is_source && file->compressor == NULL)
 	{
 	  /* Application header overrides magic number. */
 	}
       else 
 	{
-	  return main_decompress_input_check (ifile, buf, size, nread);
+	  return main_secondary_decompress_check (file, buf, size, nread);
 	}
     }
 #endif
 
-  return main_file_read (ifile, buf, size, nread, "input read failed");
+  return main_file_read (file, buf, size, nread, "input read failed");
 }
 
 /* Open the main output file, sets a default file name, initiate
@@ -2825,6 +2889,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
     {
       IF_DEBUG2 (DP(RINT "[main_set_source] %s size not known\n",
 		    sfile->filename, source_size));
+      main_internal_do_not_lru ();
     }
 
   source->name     = sfile->filename;
@@ -2849,22 +2914,23 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   if (option_verbose)
     {
-      static char buf[32];
-      static char sizebuf[32];
+      static char winszbuf[32];
+      static char srcszbuf[32];
+      static char blkszbuf[32];
       if (source_size_known)
 	{
-	  sprintf(sizebuf, " size %"Q"u", source_size);
+	  sprintf(srcszbuf, " size %"Q"u", source_size);
 	}
       else
 	{
-	  sizebuf[0] = 0;
+	  strcpy(srcszbuf, " size not known");
 	}
 
-      XPR(NT "source %s winsize %s blksize %u%s\n",
+      XPR(NT "source %s winsize %s blksize %s%s\n",
 	  sfile->filename,
-	  main_format_bcnt(option_srcwinsz, buf), 
-	  source->blksize, 
-	  sizebuf);
+	  main_format_bcnt(option_srcwinsz, winszbuf), 
+	  main_format_bcnt(source->blksize, blkszbuf),
+	  srcszbuf);
     }
 
   XD3_ASSERT (lru == NULL);
@@ -3054,12 +3120,18 @@ main_getblk_func (xd3_stream *stream,
       if (!sfile->seek_failed)
 	{
 	  ret = main_file_seek (sfile, pos);
+
+	  if (ret == 0)
+	    {
+	      sfile->source_position = pos;
+	    }
 	}
-	  
+
+      /* There's a chance here, that an genuine lseek error will cause
+       * xdelta3 to shift into non-seekable mode, entering a degraded
+       * condition.  */
       if (sfile->seek_failed || ret != 0)
 	{
-	  sfile->seek_failed = 1;
-
 	  /* For an unseekable file (or other seek error, does it
 	   * matter?) */
 	  if (sfile->source_position > pos)
@@ -3068,17 +3140,24 @@ main_getblk_func (xd3_stream *stream,
 	       * because of do_not_lru during encode. */
 	      if (option_verbose)
 		{
-		  XPR(NT "copy lags source position by %"Q"u bytes\n", 
-		      sfile->source_position - pos);
+		  XPR(NT "source can't seek backwards; requested block offset "
+		      "%"Q"u source position is %"Q"u\n", 
+		      pos, sfile->source_position);
 		}
 
+	      sfile->seek_failed = 1;
 	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
 	      return XD3_TOOFARBACK;
 	    }
 
-	  IF_DEBUG1 (DP(RINT "[getblk] skip %"Q"u starting at %"Q"u\n", 
-			pos - sfile->source_position,
-			sfile->source_position));
+	  if (option_verbose > 2 || (option_verbose > 1 && !sfile->seek_failed))
+	    {
+	      XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n", 
+		  pos - sfile->source_position,
+		  sfile->source_position);
+	    }
+
+	  sfile->seek_failed = 1;
 
 	  while (sfile->source_position < pos)
 	    {
@@ -3166,7 +3245,7 @@ main_getblk_func (xd3_stream *stream,
   source->onblk    = nread;
   blru->size       = nread;
 
-  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u pos %"Q"u sfile->source_position %"Q"u\n",
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u pos %"Q"u srcpos %"Q"u\n",
 		blkno, nread, pos, sfile->source_position));
 
   return 0;
@@ -3528,6 +3607,7 @@ main_input (xd3_cmd     cmd,
 		    char rrateavg[32], wrateavg[32], tm[32];
 		    char rdb[32], wdb[32];
 		    char trdb[32], twdb[32];
+		    char srcpos[32];
 		    long millis = get_millisecs_since ();
 		    usize_t this_read = (usize_t)(stream.total_in -
 						  last_total_in);
@@ -3539,7 +3619,7 @@ main_input (xd3_cmd     cmd,
 		    if (option_verbose > 1)
 		      {
 			XPR(NT "%"Q"u: in %s (%s): out %s (%s): "
-			    "total in %s: out %s: %s\n",
+			    "total in %s: out %s: %s: srcpos %s\n",
 			    stream.current_window,
 			    main_format_bcnt (this_read, rdb),
 			    main_format_rate (this_read, millis, rrateavg),
@@ -3547,7 +3627,8 @@ main_input (xd3_cmd     cmd,
 			    main_format_rate (this_write, millis, wrateavg),
 			    main_format_bcnt (stream.total_in, trdb),
 			    main_format_bcnt (stream.total_out, twdb),
-			    main_format_millis (millis, tm));
+			    main_format_millis (millis, tm),
+			    main_format_bcnt (sfile->source_position, srcpos));
 		      }
 		    else
 		      {
@@ -3659,7 +3740,7 @@ done:
       long end_time = get_millisecs_now ();
       xoff_t nwrite = ofile != NULL ? ofile->nwrite : 0;
 
-      XPR(NT "finished in %s; input %"Q"u  output %"Q"u bytes  (%0.2f%%)\n",
+      XPR(NT "finished in %s; input %"Q"u output %"Q"u bytes (%0.2f%%)\n",
 	  main_format_millis (end_time - start_time, tm),
 	  ifile->nread, nwrite, 100.0 * nwrite / ifile->nread);
     }

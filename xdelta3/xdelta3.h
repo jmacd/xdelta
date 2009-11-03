@@ -1297,9 +1297,9 @@ const char* xd3_errstring (xd3_stream  *stream)
 }
 
 
-/* 64-bit divisions are expensive, which is why we require a power-of-2
- * block size.  To relax this restriction is relatively easy, see the history 
- * for this method.  gcc users should not see __udivdi3() in xd3_ profiles. */
+/* 64-bit divisions are expensive, which is why we require a
+ * power-of-two source->blksize.  To relax this restriction is
+ * relatively easy, see the history for xd3_blksize_div(). */
 static inline
 void xd3_blksize_div (const xoff_t offset,
 		      const xd3_source *source,

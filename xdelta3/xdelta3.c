@@ -2518,6 +2518,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
       ret = stream->getblk (stream, source, blkno);
       if (ret != 0) 
 	{
+	  IF_DEBUG1 (DP(RINT "[getblk] app error: %s\n", xd3_strerror (ret)));
 	  return ret;
 	}
     }
@@ -2581,14 +2582,15 @@ xd3_set_source (xd3_stream *stream,
   src->srclen  = 0;
   src->srcbase = 0;
 
-  // If src->blksize is a power-of-two, xd3_blksize_div() will use
-  // shift and mask rather than divide.  Check that here.
+  /* Enforce power-of-two blocksize so that source-block number
+   * calculations are cheap. */
   if (!xd3_check_pow2 (src->blksize, &shiftby) == 0)
     {
       int check;
       src->blksize = xd3_pow2_roundup(src->blksize);
       check = xd3_check_pow2 (src->blksize, &shiftby);
       XD3_ASSERT (check == 0);
+      IF_DEBUG1 (DP(RINT "raising srcblksz to %u\n", src->blksize));
     }
 
   src->shiftby = shiftby;
