@@ -132,8 +132,12 @@ typedef ULONGLONG      uint64_t;
  * 64bit platform because we allocate large arrays of these values. */
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
+#ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
+#endif
+#ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
+#endif
 
 typedef uint64_t xoff_t;
 #define SIZEOF_XOFF_T 8
@@ -346,6 +350,7 @@ typedef enum {
   XD3_INVALID_INPUT = -17712, /* invalid input/decoder error */
   XD3_NOSECOND    = -17713, /* when secondary compression finds no
 			       improvement. */
+  XD3_UNIMPLEMENTED = -17714, /* currently VCD_TARGET */
 } xd3_rvalues;
 
 /* special values in config->flags */
@@ -1307,6 +1312,28 @@ void xd3_blksize_div (const xoff_t offset,
 		      usize_t *blkoff) {
   *blkno = (xoff_t) (offset >> source->shiftby);
   *blkoff = (usize_t) (offset & source->maskby);
+  XD3_ASSERT (*blkoff < source->blksize);
+}
+
+static inline
+void xd3_blksize_add (xoff_t *blkno,
+		      usize_t *blkoff,
+		      const xd3_source *source,
+		      const usize_t add)
+{
+  usize_t blkdiff;
+
+  /* Does not check for overflow, checked in xdelta3-decode.h. */
+  *blkoff += add;
+  blkdiff = *blkoff >> source->shiftby;
+
+  if (blkdiff) 
+    {
+      *blkno += blkdiff;
+      *blkoff &= source->maskby;
+    }
+
+  XD3_ASSERT (*blkoff < source->blksize);
 }
 
 #endif /* _XDELTA3_H_ */

@@ -638,7 +638,10 @@ const char* xd3_strerror (int ret)
     case XD3_WINFINISH: return "XD3_WINFINISH";
     case XD3_TOOFARBACK: return "XD3_TOOFARBACK";
     case XD3_INTERNAL: return "XD3_INTERNAL";
+    case XD3_INVALID: return "XD3_INVALID";
     case XD3_INVALID_INPUT: return "XD3_INVALID_INPUT";
+    case XD3_NOSECOND: return "XD3_NOSECOND";
+    case XD3_UNIMPLEMENTED: return "XD3_UNIMPLEMENTED";
     }
   return NULL;
 }
