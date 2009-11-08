@@ -2486,7 +2486,6 @@ inline
 xoff_t xd3_source_eof(const xd3_source *src)
 {
   xoff_t r = (src->blksize * src->max_blkno) + (xoff_t)src->onlastblk;
-  IF_DEBUG2 (DP(RINT "[src] source_size == %"Q"u\n", r));
   return r;
 }
 
@@ -2496,7 +2495,6 @@ usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
   usize_t r = (blkno == src->max_blkno ? 
 	       src->onlastblk :
 	       src->blksize);
-  IF_DEBUG2 (DP(RINT "[src] source last block size %u\n", r));
   return r;
 }
 
@@ -2772,6 +2770,11 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	    if (stream->srcwin_decided == 0)
 	      {
 		if ((ret = xd3_srcwin_setup (stream))) { return ret; }
+	      }
+	    else
+	      {
+		stream->srcwin_decided_early = (!stream->src->eof_known || 
+						(stream->srcwin_cksum_pos < xd3_source_eof (stream->src)));
 	      }
 
 	    /* xtra field indicates the copy is from the source */
@@ -3688,6 +3691,7 @@ xd3_encode_reset (xd3_stream *stream)
       stream->src->srcbase   = 0;
       stream->src->srclen    = 0;
       stream->srcwin_decided = 0;
+      stream->srcwin_decided_early = 0;
       stream->match_minaddr  = 0;
       stream->match_maxaddr  = 0;
       stream->taroff         = 0;

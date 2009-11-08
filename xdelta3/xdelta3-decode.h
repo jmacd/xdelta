@@ -631,9 +631,7 @@ xd3_decode_sections (xd3_stream *stream)
 
   /* OPT: A possible optimization is to avoid allocating memory in
    * decode_setup_buffers and to avoid a large memcpy when the window
-   * consists of a single VCD_SOURCE copy instruction.  The only
-   * potential problem is if the following window is a VCD_TARGET,
-   * then you need to remember... */
+   * consists of a single VCD_SOURCE copy instruction. */
   if ((ret = xd3_decode_setup_buffers (stream))) { return ret; }
 
   return 0;

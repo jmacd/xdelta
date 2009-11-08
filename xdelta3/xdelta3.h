@@ -834,9 +834,12 @@ struct _xd3_stream
 
   // SRCWIN
   // these variables plus srcwin_maxsz above (set by config)
-  int                srcwin_decided;    /* boolean: true if the
-					   srclen,srcbase have been
+  int                srcwin_decided;    /* boolean: true if srclen and
+					   srcbase have been
 					   decided. */
+  int                srcwin_decided_early;  /* boolean: true if srclen
+					       and srcbase were
+					       decided early. */
   xoff_t             srcwin_cksum_pos;  /* Source checksum position */
 
   // MATCH

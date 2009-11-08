@@ -224,8 +224,10 @@ struct _main_file
   xoff_t              nread;         /* for input position */
   xoff_t              nwrite;        /* for output position */
   uint8_t            *snprintf_buf;  /* internal snprintf() use */
-  xoff_t              source_position; /* for avoiding seek in getblk_func */
+  int                 size_known;    /* Set by main_set_souze */
+  xoff_t              source_position;  /* for avoiding seek in getblk_func */
   int                 seek_failed;   /* after seek fails once */
+  const char         *decode_cmdname;  /* for verbose output */
 };
 
 /* Various strings and magic values used to detect and call external
@@ -255,13 +257,14 @@ struct _main_blklru_list
 
 struct _main_blklru
 {
-  uint8_t         *blk;
-  xoff_t           blkno;
-  usize_t          size;
+  uint8_t          *blk;
+  xoff_t            blkno;
+  usize_t           size;
   main_blklru_list  link;
 };
 
-#define LRU_SIZE 32U
+#define MAX_LRU_SIZE 32U
+#define MIN_LRU_SIZE 1U
 #define XD3_MINSRCWINSZ XD3_ALLOCSIZE
 
 /* ... represented as a list (no cache index). */
@@ -478,7 +481,7 @@ main_malloc1 (usize_t size)
 {
   void* r = malloc (size);
   if (r == NULL) { XPR(NT "malloc: %s\n", xd3_mainerror (ENOMEM)); }
-  else if (option_verbose > 3) { XPR(NT "malloc: %u: %p\n", size, r); }
+  else if (option_verbose > 4) { XPR(NT "malloc: %u: %p\n", size, r); }
   return r;
 }
 
@@ -501,7 +504,7 @@ main_alloc (void   *opaque,
 static void
 main_free1 (void *opaque, void *ptr)
 {
-  if (option_verbose > 3) { XPR(NT "free: %p\n", ptr); }
+  if (option_verbose > 4) { XPR(NT "free: %p\n", ptr); }
   free (ptr);
 }
 
@@ -1030,7 +1033,7 @@ main_file_read (main_file  *ifile,
     }
   else
     {
-      if (option_verbose > 3) { XPR(NT "main read: %s: %u\n",
+      if (option_verbose > 3) { XPR(NT "read %s: %u bytes\n",
 				    ifile->filename, (*nread)); }
       ifile->nread += (*nread);
     }
@@ -1071,7 +1074,7 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
     }
   else
     {
-      if (option_verbose > 3) { XPR(NT "main write: %s: %u\n",
+      if (option_verbose > 4) { XPR(NT "write %s: %u bytes\n",
 				    ofile->filename, size); }
       ofile->nwrite += size;
     }
@@ -1137,32 +1140,6 @@ main_write_output (xd3_stream* stream, main_file *ofile)
     }
 
   return 0;
-}
-
-/* Called when the stream transitions from unknown status to
- * possibly/definitely non-seekable. */
-static void 
-main_internal_do_not_lru () 
-{
-  usize_t i;
-
-  if (do_not_lru) 
-    {
-      /* Already set */
-      return;
-    }
-
-  do_not_lru = 1;
-
-  /* It's possible that we've already ejected in a non-LRU fashion,
-   * report on that. */
-  for (i = 0; i < lru_size; i += 1)
-    {
-      if (lru[i].blkno == (xoff_t) -1) 
-	{
-	  continue;
-	}
-    }  
 }
 
 static int
@@ -2347,10 +2324,10 @@ main_input_decompress_setup (const main_extcomp     *decomp,
  * is passed to the pipe copier.  This avoids using the same size
  * buffer in both cases. */
 static int
-main_secondary_decompress_check (main_file  *ifile,
-			     uint8_t    *input_buf,
-			     usize_t     input_size,
-			     usize_t    *nread)
+main_secondary_decompress_check (main_file  *file,
+				 uint8_t    *input_buf,
+				 usize_t     input_size,
+				 usize_t    *nread)
 {
   int ret;
   usize_t i;
@@ -2358,7 +2335,7 @@ main_secondary_decompress_check (main_file  *ifile,
   usize_t check_nread;
   uint8_t check_buf[XD3_ALLOCSIZE];  /* TODO: stack limit */
 
-  if ((ret = main_file_read (ifile, check_buf,
+  if ((ret = main_file_read (file, check_buf,
 			     try_read,
 			     & check_nread, "input read failed")))
     {
@@ -2373,20 +2350,11 @@ main_secondary_decompress_check (main_file  *ifile,
 	  /* The following expr skips decompression if we are trying
 	   * to read a VCDIFF input and that is the magic number. */
 	  !((decomp->flags & RD_NONEXTERNAL) &&
-	    (ifile->flags & RD_NONEXTERNAL)) &&
+	    (file->flags & RD_NONEXTERNAL)) &&
 	  memcmp (check_buf, decomp->magic, decomp->magic_size) == 0)
 	{
-	  if (! option_quiet)
-	    {
-	      XPR(NT "%s | %s %s\n",
-		 ifile->filename,
-		 decomp->decomp_cmdname,
-		 decomp->decomp_options);
-	    }
-
-	  main_internal_do_not_lru ();
-
-	  return main_input_decompress_setup (decomp, ifile,
+	  file->size_known = 0;
+	  return main_input_decompress_setup (decomp, file,
 					      input_buf, input_size,
 					      check_buf, XD3_ALLOCSIZE,
 					      check_nread, nread);
@@ -2398,7 +2366,7 @@ main_secondary_decompress_check (main_file  *ifile,
 
   if (check_nread == try_read)
     {
-      ret = main_file_read (ifile, 
+      ret = main_file_read (file, 
 			    input_buf + try_read,
 			    input_size - try_read, 
 			    nread,
@@ -2799,7 +2767,7 @@ main_open_output (xd3_stream *stream, main_file *ofile)
 	  return ret;
 	}
 
-      if (option_verbose > 1) { XPR(NT "output file: %s\n", ofile->filename); }
+      if (option_verbose > 1) { XPR(NT "output %s\n", ofile->filename); }
     }
 
 #if EXTERNAL_COMPRESSION
@@ -2833,153 +2801,207 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 {
   int ret = 0;
   usize_t i;
-  uint8_t *tmp_buf = NULL;
+  usize_t blksize;
   xoff_t source_size = 0;
-  int source_size_known = 0;
+  main_blklru block0;
+
+  XD3_ASSERT (lru == NULL);
+  XD3_ASSERT (stream->src == NULL);
+  XD3_ASSERT (option_srcwinsz >= XD3_MINSRCWINSZ);
 
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
 
-  /* Open it, check for seekability, set required xd3_source fields. */
   if (allow_fake_source)
     {
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
-      source_size_known = 1;
     }
   else
     {
-      int stat_val;
-
       if ((ret = main_file_open (sfile, sfile->filename, XO_READ)))
 	{
-	  goto error;
+	  return ret;
 	}
 
-      stat_val = main_file_stat (sfile, &source_size);
-      if (stat_val == 0)
-	{
-	  source_size_known = 1;
-	}
-      else
-	{
-	  source_size_known = 0;
-	}
+      sfile->size_known = (main_file_stat (sfile, &source_size) == 0);
     }
 
-  if (source_size_known && source_size < option_srcwinsz)
+  if (sfile->size_known && source_size < option_srcwinsz)
     { 
-      /* Reduce sizes to actual source size, read whole file. */
-      option_srcwinsz = source_size;
-      source->blksize = source_size;
+      blksize = (source_size / MIN_LRU_SIZE);
     }
   else
     {
-      option_srcwinsz = max(option_srcwinsz, XD3_MINSRCWINSZ);
-      source->blksize = (option_srcwinsz / LRU_SIZE);
+      blksize = (option_srcwinsz / MAX_LRU_SIZE);
     }
 
-  if (source_size_known)
-    {
-      IF_DEBUG2 (DP(RINT "[main_set_source] %s size %"Q"u\n",
-		    sfile->filename, source_size));
-    }
-  else
-    {
-      IF_DEBUG2 (DP(RINT "[main_set_source] %s size not known\n",
-		    sfile->filename, source_size));
-      main_internal_do_not_lru ();
-    }
+  blksize = max (blksize, XD3_MINSRCWINSZ);
 
-  source->name     = sfile->filename;
-  source->ioh      = sfile;
-  source->curblkno = 0;
-  source->curblk   = NULL;
+  /* The API requires power-of-two blocksize, */
+  blksize = xd3_pow2_roundup (blksize);
 
-  /* DO NOT call xd3_set_source_and_size because of potential
-   * secondary compression. */
-  ret = xd3_set_source (stream, source);
-  if (ret) 
-    {
-      XPR(NT XD3_LIB_ERRMSG (stream, ret));
-      goto error;
-    }
-  XD3_ASSERT (stream->src == source);
+  memset (&block0, 0, sizeof (block0));
+  block0.blkno = (xoff_t) -1;
 
-  lru_size = (option_srcwinsz + source->blksize - 1) / source->blksize;
-  lru_size = max(lru_size, 1U);
-  IF_DEBUG1 (DP(RINT "[lru_size] == %d\n", lru_size));
-  option_srcwinsz = lru_size * source->blksize;
-
-  if (option_verbose)
-    {
-      static char winszbuf[32];
-      static char srcszbuf[32];
-      static char blkszbuf[32];
-      if (source_size_known)
-	{
-	  sprintf(srcszbuf, " size %"Q"u", source_size);
-	}
-      else
-	{
-	  strcpy(srcszbuf, " size not known");
-	}
-
-      XPR(NT "source %s winsize %s blksize %s%s\n",
-	  sfile->filename,
-	  main_format_bcnt(option_srcwinsz, winszbuf), 
-	  main_format_bcnt(source->blksize, blkszbuf),
-	  srcszbuf);
-    }
-
-  XD3_ASSERT (lru == NULL);
-
-  if ((lru = (main_blklru*)
-       main_malloc (sizeof (main_blklru) * lru_size)) == NULL)
+  /* Allocate the first block.  Even if the size is known at this
+   * point, we do not lower it because decompression may happen.  */
+  if ((block0.blk = (uint8_t*) main_malloc (blksize)) == NULL)
     {
       ret = ENOMEM;
-      goto error;
+      return ret;
     }
 
-  for (i = 0; i < lru_size; i += 1)
+  source->blksize  = blksize;
+  source->name     = sfile->filename;
+  source->ioh      = sfile;
+  source->curblkno = (xoff_t) -1;
+  source->curblk   = NULL;
+
+  /* We have to read the first block into the cache now, because
+   * size_known can still change (due to secondary
+   * decompression). Calls main_decompress_input_check() via
+   * main_read_primary_input(). */
+  lru_size = 1;
+  lru = &block0;
+  main_blklru_list_push_back (& lru_free, & lru[0]);
+  ret = main_getblk_func (stream, source, 0);
+  main_blklru_list_remove (& lru[0]);
+  lru = NULL;
+
+  if (ret != 0) 
+    {
+      main_free (block0.blk);
+
+      XPR(NT "error reading source %s: %s\n", 
+	  sfile->filename, 
+	  xd3_mainerror (ret));
+
+      return ret;
+    }
+
+  source->onblk = block0.size;
+
+  /* If the file is smaller than a block, size is known. */
+  if (!sfile->size_known && source->onblk < blksize)
+    {
+      source_size = source->onblk;
+      sfile->size_known = 1;
+    }
+
+  /* source->size_known is finally determined.  we update lru_size
+   * accordingly, and modify option_srcwinsz, which will be passed via
+   * xd3_config. */
+  if (sfile->size_known && source_size <= option_srcwinsz)
+    {
+      lru_size = (source_size + blksize - 1) / blksize;
+      option_srcwinsz = lru_size * blksize;
+    }
+  else
+    {
+      lru_size = (option_srcwinsz + blksize - 1) / blksize;
+      option_srcwinsz = lru_size * blksize;
+    }
+
+  XD3_ASSERT (lru_size >= 1);
+
+  if ((lru = (main_blklru*) main_malloc (lru_size * sizeof (main_blklru))) == NULL)
+    {
+      ret = ENOMEM;
+      return ret;
+    }
+
+  lru[0].blk = block0.blk;
+  lru[0].blkno = 0;
+  lru[0].size = source->onblk;
+
+  if (! sfile->size_known) 
+    {
+      do_not_lru = 1;
+    }
+  else if (! do_not_lru)
+    {
+      main_blklru_list_push_back (& lru_list, & lru[0]);
+    }
+
+  for (i = 1; i < lru_size; i += 1)
     {
       lru[i].blkno = (xoff_t) -1;
 
       if ((lru[i].blk = (uint8_t*) main_malloc (source->blksize)) == NULL)
 	{
 	  ret = ENOMEM;
-	  goto error;
+	  return ret;
 	}
-
-      if (! do_not_lru)
+      
+      if (do_not_lru == 0)
 	{
 	  main_blklru_list_push_back (& lru_free, & lru[i]);
 	}
     }
 
-  if ((ret = main_getblk_func (stream, source, 0)))
+  if (sfile->size_known) 
     {
-      XPR(NT "error reading first block: %s\n", xd3_mainerror (ret));
+      ret = xd3_set_source_and_size (stream, source, source_size);
+    }
+  else
+    {
+      ret = xd3_set_source (stream, source);
+    }
+
+  if (ret)
+    {
+      XPR(NT XD3_LIB_ERRMSG (stream, ret));
       return ret;
     }
 
-  return 0;
+  XD3_ASSERT (stream->src == source);
+  XD3_ASSERT (source->blksize == blksize);
 
- error:
-  IF_DEBUG2 (DP(RINT "[main_set_source] error %s\n", xd3_strerror (ret)));
-  if (tmp_buf != NULL)
+  if (option_verbose)
     {
-      main_free (tmp_buf);
+      static char srcszbuf[32];
+      static char srccntbuf[32];
+      static char winszbuf[32];
+      static char blkszbuf[32];
+      static char nbufs[32];
+
+      if (sfile->size_known)
+	{
+	  sprintf (srcszbuf, "source size %s [%"Q"u]", 
+		   main_format_bcnt (source_size, srccntbuf),
+		   source_size);
+	}
+      else
+	{
+	  strcpy(srcszbuf, "source size unknown");
+	}
+
+      nbufs[0] = 0;
+      
+      if (option_verbose > 1)
+	{
+	  sprintf(nbufs, " #bufs %u", lru_size);
+	}
+
+      XPR(NT "source %s %s blksize %s window %s%s%s\n",
+	  sfile->filename,
+	  srcszbuf,
+	  main_format_bcnt (blksize, blkszbuf),
+	  main_format_bcnt (option_srcwinsz, winszbuf),
+	  nbufs,
+	  do_not_lru ? " (FIFO)" : "");
     }
 
-  return ret;
+  return 0;
 }
 
 static usize_t
 main_get_winsize (main_file *ifile) {
   xoff_t file_size = 0;
   usize_t size = option_winsize;
+  static char iszbuf[32];
 
   if (main_file_stat (ifile, &file_size) == 0)
     {
@@ -2990,7 +3012,9 @@ main_get_winsize (main_file *ifile) {
 
   if (option_verbose > 1)
     {
-      XPR(NT "input window size: %u\n", size);
+      XPR(NT "input %s window size %s\n", 
+	  ifile->filename, 
+	  main_format_bcnt (size, iszbuf));
     }
 
   return size;
@@ -3368,7 +3392,7 @@ main_input (xd3_cmd     cmd,
 	}
       else
 	{
-	  if (option_verbose > 1)
+	  if (option_verbose > 2)
 	    {
 	      XPR(NT "compression level: %d\n", option_level);
 	    }
@@ -3590,13 +3614,15 @@ main_input (xd3_cmd     cmd,
 			XD3_ASSERT (stream.src != NULL);
 		      }
 
-		    /* Limited i-buffer size affects source copies */
-		    if (option_verbose > 1 &&
+		    /* Limited i-buffer size affects source copies
+		     * when the sourcewin is decided early. */
+		    if (option_verbose &&
+			stream.srcwin_decided_early &&
 			stream.i_slots_used > stream.iopt_size)
 		      {
 			XPR(NT "warning: input position %"Q"u overflowed "
 			    "instruction buffer, needed %u (vs. %u), "
-			    "consider raising -I\n",
+			    "consider changing -I\n",
 			    stream.current_window * winsize,
 			    stream.i_slots_used, stream.iopt_size);
 		      }
