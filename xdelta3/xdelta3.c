@@ -4557,7 +4557,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
 	  tryrem = min (tryoff, stream->match_maxback - stream->match_back);
 	  
-	  IF_DEBUG2(DP(RINT "match maxback %u trysrc %"Q"u/%u tgt %u tryrem %u\n",
+	  IF_DEBUG2(DP(RINT "[maxback] maxback %u trysrc %"Q"u/%u tgt %u tryrem %u\n",
 		       stream->match_maxback, tryblk, tryoff, streamoff, tryrem));
 
 	  /* TODO: This code can be optimized similar to xd3_match_forward() */

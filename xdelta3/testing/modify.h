@@ -23,6 +23,7 @@ public:
     : kind(kind),
       size(size),
       addr1(addr1),
+      addr2(0),
       insert(NULL) { 
     CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
@@ -32,6 +33,7 @@ public:
     : kind(kind),
       size(size),
       addr1(addr1),
+      addr2(0),
       insert(insert) { 
     CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }

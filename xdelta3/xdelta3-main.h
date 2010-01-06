@@ -226,8 +226,7 @@ struct _main_file
   uint8_t            *snprintf_buf;  /* internal snprintf() use */
   int                 size_known;    /* Set by main_set_souze */
   xoff_t              source_position;  /* for avoiding seek in getblk_func */
-  int                 seek_failed;   /* after seek fails once */
-  const char         *decode_cmdname;  /* for verbose output */
+  int                 seek_failed;   /* after seek fails once, try FIFO */
 };
 
 /* Various strings and magic values used to detect and call external
@@ -300,10 +299,10 @@ static int         option_quiet              = 0;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
 static int         option_use_secondary      = 0;
-static char*       option_secondary          = NULL;
+static const char* option_secondary          = NULL;
 static int         option_use_checksum       = 1;
 static int         option_use_altcodetable   = 0;
-static char*       option_smatch_config      = NULL;
+static const char* option_smatch_config      = NULL;
 static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* do not write output */
 static const char *option_source_filename    = NULL;
@@ -594,7 +593,7 @@ get_millisecs_since (void)
   return diff;
 }
 
-static char*
+static const char*
 main_format_bcnt (xoff_t r, char *buf)
 {
   static const char* fmts[] = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
@@ -1219,7 +1218,6 @@ main_set_secondary_flags (xd3_config *config)
 #if VCDIFF_TOOLS
 #include "xdelta3-merge.h"
 
-#if defined(_WIN32) || defined(__DJGPP__)
 /* According to the internet, Windows vsnprintf() differs from most
  * Unix implementations regarding the terminating 0 when the boundary
  * condition is met. It doesn't matter here, we don't rely on the
@@ -1232,11 +1230,29 @@ main_set_secondary_flags (xd3_config *config)
 #ifdef _WIN32
 #define vsnprintf_func _vsnprintf
 #else
-#define vsnprintf_func  vsnprintf
+#define vsnprintf_func vsnprintf
 #endif
 
+/* Prior to SVN 303 this function was only defined in DJGPP and WIN32
+ * environments and other platforms would use the builtin snprintf()
+ * with an arrangement of macros below.  In OS X 10.6, Apply made
+ * snprintf() a macro, which defeated those macros (since snprintf
+ * would be evaluated before its argument macros were expanded,
+ * therefore always define xsnprintf_func. */
+#undef PRINTF_ATTRIBUTE
+#ifdef __GNUC__
+/* Let's just assume no one uses gcc 2.x! */
+#define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
+#else
+#define PRINTF_ATTRIBUTE(x,y)
+#endif
+
+static int
+xsnprintf_func (char *str, int n, const char *fmt, ...)
+  PRINTF_ATTRIBUTE(3,4);
+
 int
-snprintf_func (char *str, int n, char *fmt, ...)
+xsnprintf_func (char *str, int n, const char *fmt, ...)
 {
   va_list a;
   int ret;
@@ -1244,20 +1260,19 @@ snprintf_func (char *str, int n, char *fmt, ...)
   ret = vsnprintf_func (str, n, fmt, a);
   va_end (a);
   if (ret < 0)
+    {
       ret = n;
+    }
   return ret;
 }
-#else
-#define snprintf_func snprintf
-#endif
 
-/* The following macros let VCDIFF printing something printf-like with
- * main_file_write(), e.g.,:
+/* The following macros let VCDIFF print using main_file_write(), 
+ * for example:
  *
  *   VC(UT "trying to be portable: %d\n", x)VE;
  */
 #define SNPRINTF_BUFSIZE 1024
-#define VC do { if (((ret = snprintf_func
+#define VC do { if (((ret = xsnprintf_func
 #define UT (char*)xfile->snprintf_buf, SNPRINTF_BUFSIZE,
 #define VE ) >= SNPRINTF_BUFSIZE			       \
   && (ret = main_print_overflow(ret)) != 0)		       \
@@ -2890,12 +2905,12 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       sfile->size_known = 1;
     }
 
-  /* source->size_known is finally determined.  we update lru_size
-   * accordingly, and modify option_srcwinsz, which will be passed via
-   * xd3_config. */
+  /* we update lru_size accordingly, and modify option_srcwinsz, which
+   * will be passed via xd3_config. */
   if (sfile->size_known && source_size <= option_srcwinsz)
     {
       lru_size = (source_size + blksize - 1) / blksize;
+      lru_size = max(1U, lru_size);
       option_srcwinsz = lru_size * blksize;
     }
   else
@@ -3361,7 +3376,8 @@ main_input (xd3_cmd     cmd,
       if (option_use_altcodetable) { stream_flags |= XD3_ALT_CODE_TABLE; }
       if (option_smatch_config)
 	{
-	  char *s = option_smatch_config, *e;
+	  const char *s = option_smatch_config;
+	  char *e;
 	  int values[XD3_SOFTCFG_VARCNT];
 	  int got;
 
@@ -3897,9 +3913,9 @@ main (int argc, char **argv)
   main_merge_list merge_order;
   main_merge *merge;
   int my_optind;
-  char *my_optarg;
-  char *my_optstr;
-  char *sfilename;
+  const char *my_optarg;
+  const char *my_optstr;
+  const char *sfilename;
   int env_argc;
   char **env_argv;
   char **free_argv;  /* malloc() in setup_environment() */
