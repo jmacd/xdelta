@@ -2,20 +2,23 @@
 class Mutator {
 public:
   virtual ~Mutator() { }
-  virtual void Mutate(SegmentMap *table, 
-		      const SegmentMap *source_table, 
+  virtual void Mutate(SegmentMap *table,
+		      const SegmentMap *source_table,
 		      MTRandom *rand) const = 0;
 };
 
 class Change {
 public:
   enum Kind {
-    MODIFY = 1,
-    ADD = 2,
-    DELETE = 3,
-    MOVE = 4,
-    COPY = 5,
-    OVERWRITE = 6,
+    MODIFY = 1,     // Mutate a certain range w/ random or supplied data
+    ADD = 2,        // Insert random or supplied data
+    DELETE = 3,     // Delete a specified range of data
+    COPY = 4,       // Copy from one region, inserting elsewhere
+    MOVE = 5,       // Copy then delete copied-from range
+    OVERWRITE = 6,  // Copy then delete copied-to range
+
+    // ADD, DELETE, and COPY change the file size
+    // MODIFY, MOVE, OVERWRITE preserve the file size
   };
 
   // Constructor for modify, add, delete.
@@ -24,7 +27,7 @@ public:
       size(size),
       addr1(addr1),
       addr2(0),
-      insert(NULL) { 
+      insert(NULL) {
     CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
 
@@ -34,17 +37,17 @@ public:
       size(size),
       addr1(addr1),
       addr2(0),
-      insert(insert) { 
+      insert(insert) {
     CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
 
-  // Constructor for move
+  // Constructor for move, copy, overwrite
   Change(Kind kind, xoff_t size, xoff_t addr1, xoff_t addr2)
     : kind(kind),
       size(size),
       addr1(addr1),
       addr2(addr2),
-      insert(NULL) { 
+      insert(NULL) {
     CHECK(kind == MOVE || kind == COPY || kind == OVERWRITE);
   }
 
@@ -72,8 +75,9 @@ public:
     // The speed of processing gigabytes of data is so slow compared with
     // these table-copy operations, no attempt to make this fast.
     SegmentMap tmp;
-    
-    for (ConstChangeListIterator iter(cl_.begin()); iter != cl_.end(); ++iter) {
+
+    for (ConstChangeListIterator iter(cl_.begin());
+	 iter != cl_.end(); ++iter) {
       const Change &ch = *iter;
       tmp.clear();
       Mutate(ch, &tmp, source_table, rand);
@@ -81,8 +85,8 @@ public:
       source_table = table;
     }
   }
-  
-  static void Mutate(const Change &ch, 
+
+  static void Mutate(const Change &ch,
 		     SegmentMap *table,
 		     const SegmentMap *source_table,
 		     MTRandom *rand) {
@@ -108,7 +112,7 @@ public:
     }
   }
 
-  static void ModifyChange(const Change &ch, 
+  static void ModifyChange(const Change &ch,
 			   SegmentMap *table,
 			   const SegmentMap *source_table,
 			   MTRandom *rand) {
@@ -117,7 +121,7 @@ public:
     xoff_t i_start = 0;
     xoff_t i_end = 0;
 
-    for (ConstSegmentMapIterator iter(source_table->begin()); 
+    for (ConstSegmentMapIterator iter(source_table->begin());
 	 iter != source_table->end();
 	 ++iter) {
       const Segment &seg = iter->second;
@@ -130,8 +134,8 @@ public:
       }
 
       if (i_start < m_start) {
-	table->insert(table->end(), 
-		      make_pair(i_start, 
+	table->insert(table->end(),
+		      make_pair(i_start,
 				seg.Subseg(0, m_start - i_start)));
       }
 
@@ -148,8 +152,8 @@ public:
       }
 
       if (i_end > m_end) {
-	table->insert(table->end(), 
-		      make_pair(m_end, 
+	table->insert(table->end(),
+		      make_pair(m_end,
 				seg.Subseg(m_end - i_start, i_end - m_end)));
       }
     }
@@ -159,7 +163,7 @@ public:
     CHECK_LE(m_end, i_end);
   }
 
-  static void AddChange(const Change &ch, 
+  static void AddChange(const Change &ch,
 			SegmentMap *table,
 			const SegmentMap *source_table,
 			MTRandom *rand) {
@@ -167,7 +171,7 @@ public:
     xoff_t i_start = 0;
     xoff_t i_end = 0;
 
-    for (ConstSegmentMapIterator iter(source_table->begin()); 
+    for (ConstSegmentMapIterator iter(source_table->begin());
 	 iter != source_table->end();
 	 ++iter) {
       const Segment &seg = iter->second;
@@ -185,8 +189,8 @@ public:
       }
 
       if (i_start < m_start) {
-	table->insert(table->end(), 
-		      make_pair(i_start, 
+	table->insert(table->end(),
+		      make_pair(i_start,
 				seg.Subseg(0, m_start - i_start)));
       }
 
@@ -198,9 +202,10 @@ public:
       }
 
       if (m_start < i_end) {
-	table->insert(table->end(), 
-		      make_pair(m_start + ch.size, 
-				seg.Subseg(m_start - i_start, i_end - m_start)));
+	table->insert(table->end(),
+		      make_pair(m_start + ch.size,
+				seg.Subseg(m_start - i_start,
+					   i_end - m_start)));
       }
     }
 
@@ -213,7 +218,7 @@ public:
     }
   }
 
-  static void DeleteChange(const Change &ch, 
+  static void DeleteChange(const Change &ch,
 			   SegmentMap *table,
 			   const SegmentMap *source_table,
 			   MTRandom *rand) {
@@ -222,7 +227,7 @@ public:
     xoff_t i_start = 0;
     xoff_t i_end = 0;
 
-    for (ConstSegmentMapIterator iter(source_table->begin()); 
+    for (ConstSegmentMapIterator iter(source_table->begin());
 	 iter != source_table->end();
 	 ++iter) {
       const Segment &seg = iter->second;
@@ -240,14 +245,14 @@ public:
       }
 
       if (i_start < m_start) {
-	table->insert(table->end(), 
-		      make_pair(i_start, 
+	table->insert(table->end(),
+		      make_pair(i_start,
 				seg.Subseg(0, m_start - i_start)));
       }
 
       if (i_end > m_end) {
-	table->insert(table->end(), 
-		      make_pair(m_end - ch.size, 
+	table->insert(table->end(),
+		      make_pair(m_end - ch.size,
 				seg.Subseg(m_end - i_start, i_end - m_end)));
       }
     }
@@ -256,19 +261,21 @@ public:
     CHECK_LE(m_end, i_end);
   }
 
-  static void MoveChange(const Change &ch, 
+  // A move is a copy followed by delete of the copied-from range.
+  static void MoveChange(const Change &ch,
 			 SegmentMap *table,
 			 const SegmentMap *source_table,
 			 MTRandom *rand) {
     SegmentMap tmp;
     CHECK_NE(ch.addr1, ch.addr2);
     CopyChange(ch, &tmp, source_table, rand);
-    Change d(Change::DELETE, ch.size, 
+    Change d(Change::DELETE, ch.size,
 	     ch.addr1 < ch.addr2 ? ch.addr1 : ch.addr1 + ch.size);
     DeleteChange(d, table, &tmp, rand);
   }
 
-  static void OverwriteChange(const Change &ch, 
+  // An overwrite is a copy followed by a delete of the copied-to range.
+  static void OverwriteChange(const Change &ch,
 			      SegmentMap *table,
 			      const SegmentMap *source_table,
 			      MTRandom *rand) {
@@ -279,7 +286,7 @@ public:
     DeleteChange(d, table, &tmp, rand);
   }
 
-  static void CopyChange(const Change &ch, 
+  static void CopyChange(const Change &ch,
 			 SegmentMap *table,
 			 const SegmentMap *source_table,
 			 MTRandom *ignore) {
@@ -289,7 +296,7 @@ public:
     xoff_t i_end = 0;
 
     // Like AddChange() with AppendCopy instead of a random segment.
-    for (ConstSegmentMapIterator iter(source_table->begin()); 
+    for (ConstSegmentMapIterator iter(source_table->begin());
 	 iter != source_table->end();
 	 ++iter) {
       const Segment &seg = iter->second;
@@ -307,16 +314,16 @@ public:
       }
 
       if (i_start < m_start) {
-	table->insert(table->end(), 
-		      make_pair(i_start, 
+	table->insert(table->end(),
+		      make_pair(i_start,
 				seg.Subseg(0, m_start - i_start)));
       }
 
       AppendCopy(table, source_table, c_start, m_start, ch.size);
 
       if (m_start < i_end) {
-	table->insert(table->end(), 
-		      make_pair(m_start + ch.size, 
+	table->insert(table->end(),
+		      make_pair(m_start + ch.size,
 				seg.Subseg(m_start - i_start, i_end - m_start)));
       }
     }
@@ -331,7 +338,7 @@ public:
 
   static void AppendCopy(SegmentMap *table,
 			 const SegmentMap *source_table,
-			 xoff_t copy_offset, 
+			 xoff_t copy_offset,
 			 xoff_t append_offset,
 			 xoff_t length) {
     ConstSegmentMapIterator pos(source_table->upper_bound(copy_offset));
@@ -340,10 +347,10 @@ public:
 
     while (got < length) {
       size_t seg_offset = copy_offset - pos->first;
-      size_t advance = min(pos->second.Size() - seg_offset, 
+      size_t advance = min(pos->second.Size() - seg_offset,
 			   (size_t)(length - got));
 
-      table->insert(table->end(), 
+      table->insert(table->end(),
 		    make_pair(append_offset,
 			      pos->second.Subseg(seg_offset,
 						 advance)));
@@ -354,7 +361,7 @@ public:
       ++pos;
     }
   }
-    
+
   ChangeList* Changes() {
     return &cl_;
   }
@@ -369,8 +376,8 @@ private:
 
 class Modify1stByte : public Mutator {
 public:
-  void Mutate(SegmentMap *table, 
-	      const SegmentMap *source_table, 
+  void Mutate(SegmentMap *table,
+	      const SegmentMap *source_table,
 	      MTRandom *rand) const {
     ChangeListMutator::Mutate(Change(Change::MODIFY, 1, 0),
 			      table, source_table, rand);

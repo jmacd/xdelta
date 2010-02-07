@@ -1,6 +1,6 @@
 /* xdelta 3 - delta compression tools and library
  * Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007,
- * 2008, 2009
+ * 2008, 2009, 2010
  * Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -323,7 +323,7 @@ static int         option_recompress_outputs = 1;
 /* This is for comparing "printdelta" output without attention to
  * copy-instruction modes. */
 #if VCDIFF_TOOLS
-static int option_print_cpymode = 1; /* Note: see reset_defaults(). */ 
+static int option_print_cpymode = 1; /* Note: see reset_defaults(). */
 #endif
 
 /* Static variables */
@@ -1111,7 +1111,7 @@ main_file_seek (main_file *xfile, xoff_t pos)
 
   if (ret)
     {
-      XPR(NT "seek to %"Q"u failed: %s: %s\n", 
+      XPR(NT "seek to %"Q"u failed: %s: %s\n",
 	  pos, xfile->filename, xd3_mainerror (ret));
     }
 
@@ -1266,7 +1266,7 @@ xsnprintf_func (char *str, int n, const char *fmt, ...)
   return ret;
 }
 
-/* The following macros let VCDIFF print using main_file_write(), 
+/* The following macros let VCDIFF print using main_file_write(),
  * for example:
  *
  *   VC(UT "trying to be portable: %d\n", x)VE;
@@ -1315,23 +1315,24 @@ main_print_window (xd3_stream* stream, main_file *xfile)
       addr_bytes = stream->addr_sect.buf - addr_before;
       inst_bytes = stream->inst_sect.buf - inst_before;
 
-      VC(UT "  %06"Q"u %03u  %s %6u", stream->dec_winstart + size, 
+      VC(UT "  %06"Q"u %03u  %s %6u", stream->dec_winstart + size,
 	 option_print_cpymode ? code : 0,
-	 xd3_rtype_to_string ((xd3_rtype) stream->dec_current1.type, option_print_cpymode),
+	 xd3_rtype_to_string ((xd3_rtype) stream->dec_current1.type,
+			      option_print_cpymode),
 	 (usize_t) stream->dec_current1.size)VE;
 
       if (stream->dec_current1.type != XD3_NOOP)
 	{
 	  if (stream->dec_current1.type >= XD3_CPY)
 	    {
-	      if (stream->dec_current1.addr >= stream->dec_cpylen) 
+	      if (stream->dec_current1.addr >= stream->dec_cpylen)
 		{
-		  VC(UT " T@%-6u", 
+		  VC(UT " T@%-6u",
 		     stream->dec_current1.addr - stream->dec_cpylen)VE;
-		} 
+		}
 	      else
 		{
-		  VC(UT " S@%-6"Q"u", 
+		  VC(UT " S@%-6"Q"u",
 		     stream->dec_cpyoff + stream->dec_current1.addr)VE;
 		}
 	    }
@@ -1352,14 +1353,14 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
 	  if (stream->dec_current2.type >= XD3_CPY)
 	    {
-	      if (stream->dec_current2.addr >= stream->dec_cpylen) 
+	      if (stream->dec_current2.addr >= stream->dec_cpylen)
 		{
-		  VC(UT " T@%-6u", 
+		  VC(UT " T@%-6u",
 		     stream->dec_current2.addr - stream->dec_cpylen)VE;
-		} 
+		}
 	      else
 		{
-		  VC(UT " S@%-6"Q"u", 
+		  VC(UT " S@%-6"Q"u",
 		     stream->dec_cpyoff + stream->dec_current2.addr)VE;
 		}
 	    }
@@ -1432,7 +1433,8 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if (xfile->snprintf_buf == NULL)
     {
-      if ((xfile->snprintf_buf = (uint8_t*)main_malloc(SNPRINTF_BUFSIZE)) == NULL)
+      if ((xfile->snprintf_buf =
+	   (uint8_t*)main_malloc(SNPRINTF_BUFSIZE)) == NULL)
 	{
 	  return ENOMEM;
 	}
@@ -1742,7 +1744,7 @@ main_merge_arguments (main_merge_list* merges)
     }
 
   if ((ret = xd3_config_stream (& merge_input, NULL)) ||
-      (ret = xd3_whole_state_init (& merge_input))) 
+      (ret = xd3_whole_state_init (& merge_input)))
     {
       XPR(NT XD3_LIB_ERRMSG (& merge_input, ret));
       return ret;
@@ -1768,7 +1770,7 @@ main_merge_arguments (main_merge_list* merges)
 	  if (count++ == 0)
 	    {
 	      /* The first merge source is the next merge input. */
-	      xd3_swap_whole_state (& recode_stream->whole_target, 
+	      xd3_swap_whole_state (& recode_stream->whole_target,
 				    & merge_input.whole_target);
 	    }
 	  else
@@ -1822,7 +1824,7 @@ main_merge_arguments (main_merge_list* merges)
       goto error;
     }
 
-  xd3_swap_whole_state (& merge_stream->whole_target, 
+  xd3_swap_whole_state (& merge_stream->whole_target,
 			& merge_input.whole_target);
   ret = 0;
  error:
@@ -1861,7 +1863,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
   /* merge_stream is set if there were arguments.  this stream's input
    * needs to be applied to the merge_stream source. */
   if ((merge_stream != NULL) &&
-      (ret = xd3_merge_input_output (stream, 
+      (ret = xd3_merge_input_output (stream,
 				     & merge_stream->whole_target)))
     {
       XPR(NT XD3_LIB_ERRMSG (stream, ret));
@@ -1918,7 +1920,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	}
 
       if (option_use_checksum &&
-	  (stream->dec_win_ind & VCD_ADLER32) != 0) 
+	  (stream->dec_win_ind & VCD_ADLER32) != 0)
 	{
 	  recode_stream->flags |= XD3_ADLER32_RECODE;
 	  recode_stream->recode_adler32 = stream->whole_target.wininfo[window_num].adler32;
@@ -1931,7 +1933,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  main_free (main_bdata);
 	  main_bdata = NULL;
 	  main_bsize = 0;
-	  if ((main_bdata = (uint8_t*) 
+	  if ((main_bdata = (uint8_t*)
 	       main_malloc (window_size)) == NULL)
 	    {
 	      return ENOMEM;
@@ -1959,7 +1961,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 
 	    case XD3_ADD:
 	      /* Adds are implicit, put them into the input buffer. */
-	      memcpy (main_bdata + window_pos, 
+	      memcpy (main_bdata + window_pos,
 		      stream->whole_target.adds + inst->addr, take);
 	      break;
 
@@ -1976,14 +1978,14 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 		  }
 		  addr = inst->addr;
 		}
-	      else 
+	      else
 		{
 		  XD3_ASSERT (inst->addr >= window_start);
 		  addr = inst->addr - window_start;
 		}
 	      IF_DEBUG2 (DP(RINT "[merge copy] winpos %u take %u addr %"Q"u mode %u\n",
 			    window_pos, take, addr, inst->mode));
-	      if ((ret = xd3_found_match (recode_stream, window_pos, take, 
+	      if ((ret = xd3_found_match (recode_stream, window_pos, take,
 					  addr, inst->mode != 0)))
 		{
 		  return ret;
@@ -2381,9 +2383,9 @@ main_secondary_decompress_check (main_file  *file,
 
   if (check_nread == try_read)
     {
-      ret = main_file_read (file, 
+      ret = main_file_read (file,
 			    input_buf + try_read,
-			    input_size - try_read, 
+			    input_size - try_read,
 			    nread,
 			    "input read failed");
     }
@@ -2732,7 +2734,7 @@ main_read_primary_input (main_file   *file,
 	{
 	  /* Application header overrides magic number. */
 	}
-      else 
+      else
 	{
 	  return main_secondary_decompress_check (file, buf, size, nread);
 	}
@@ -2844,7 +2846,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
     }
 
   if (sfile->size_known && source_size < option_srcwinsz)
-    { 
+    {
       blksize = (source_size / MIN_LRU_SIZE);
     }
   else
@@ -2885,12 +2887,12 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   main_blklru_list_remove (& lru[0]);
   lru = NULL;
 
-  if (ret != 0) 
+  if (ret != 0)
     {
       main_free (block0.blk);
 
-      XPR(NT "error reading source %s: %s\n", 
-	  sfile->filename, 
+      XPR(NT "error reading source %s: %s\n",
+	  sfile->filename,
 	  xd3_mainerror (ret));
 
       return ret;
@@ -2931,7 +2933,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   lru[0].blkno = 0;
   lru[0].size = source->onblk;
 
-  if (! sfile->size_known) 
+  if (! sfile->size_known)
     {
       do_not_lru = 1;
     }
@@ -2949,14 +2951,14 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  ret = ENOMEM;
 	  return ret;
 	}
-      
+
       if (do_not_lru == 0)
 	{
 	  main_blklru_list_push_back (& lru_free, & lru[i]);
 	}
     }
 
-  if (sfile->size_known) 
+  if (sfile->size_known)
     {
       ret = xd3_set_source_and_size (stream, source, source_size);
     }
@@ -2984,7 +2986,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (sfile->size_known)
 	{
-	  sprintf (srcszbuf, "source size %s [%"Q"u]", 
+	  sprintf (srcszbuf, "source size %s [%"Q"u]",
 		   main_format_bcnt (source_size, srccntbuf),
 		   source_size);
 	}
@@ -2994,7 +2996,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	}
 
       nbufs[0] = 0;
-      
+
       if (option_verbose > 1)
 	{
 	  sprintf(nbufs, " #bufs %u", lru_size);
@@ -3027,8 +3029,8 @@ main_get_winsize (main_file *ifile) {
 
   if (option_verbose > 1)
     {
-      XPR(NT "input %s window size %s\n", 
-	  ifile->filename, 
+      XPR(NT "input %s window size %s\n",
+	  ifile->filename,
 	  main_format_bcnt (size, iszbuf));
     }
 
@@ -3080,12 +3082,12 @@ main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_
 	}
     }
 
-  if (do_not_lru) 
+  if (do_not_lru)
     {
       int idx = blkno % lru_size;
       blru = & lru[idx];
     }
-  else 
+  else
     {
       if (! main_blklru_list_empty (& lru_free))
 	{
@@ -3140,7 +3142,7 @@ main_getblk_func (xd3_stream *stream,
       return ret;
     }
 
-  if (!is_new) 
+  if (!is_new)
     {
       source->curblkno = blkno;
       source->onblk    = blru->size;
@@ -3180,18 +3182,19 @@ main_getblk_func (xd3_stream *stream,
 	      if (option_verbose)
 		{
 		  XPR(NT "source can't seek backwards; requested block offset "
-		      "%"Q"u source position is %"Q"u\n", 
+		      "%"Q"u source position is %"Q"u\n",
 		      pos, sfile->source_position);
 		}
 
 	      sfile->seek_failed = 1;
-	      stream->msg = "non-seekable source: copy is too far back (try raising -B)";
+	      stream->msg = "non-seekable source: "
+		            "copy is too far back (try raising -B)";
 	      return XD3_TOOFARBACK;
 	    }
 
 	  if (option_verbose > 2 || (option_verbose > 1 && !sfile->seek_failed))
 	    {
-	      XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n", 
+	      XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
 		  pos - sfile->source_position,
 		  sfile->source_position);
 	    }
@@ -3218,8 +3221,8 @@ main_getblk_func (xd3_stream *stream,
 
 	      if ((ret = main_read_primary_input (sfile,
 						  (uint8_t*) blru->blk,
-						  source->blksize, 
-						  & nread, 
+						  source->blksize,
+						  & nread,
 						  1 /* source */)))
 		{
 		  return ret;
@@ -3235,7 +3238,7 @@ main_getblk_func (xd3_stream *stream,
 	      sfile->source_position += nread;
 	      blru->size = nread;
 
-	      IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u {%"Q"u} size %u\n", 
+	      IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u {%"Q"u} size %u\n",
 			    skip_blkno, blru->blkno, blru->size));
 
 	      XD3_ASSERT (sfile->source_position <= pos);
@@ -3250,9 +3253,9 @@ main_getblk_func (xd3_stream *stream,
       return ret;
     }
 
-  if ((ret = main_read_primary_input (sfile, 
-				      (uint8_t*) blru->blk, 
-				      source->blksize, 
+  if ((ret = main_read_primary_input (sfile,
+				      (uint8_t*) blru->blk,
+				      source->blksize,
 				      & nread,
 				      1 /* source */)))
     {
@@ -3461,7 +3464,7 @@ main_input (xd3_cmd     cmd,
     }
 
 #if VCDIFF_TOOLS
-  if ((cmd == CMD_MERGE || cmd == CMD_MERGE_ARG) && 
+  if ((cmd == CMD_MERGE || cmd == CMD_MERGE_ARG) &&
       (ret = xd3_whole_state_init (& stream)))
     {
       XPR(NT XD3_LIB_ERRMSG (& stream, ret));
@@ -3473,7 +3476,7 @@ main_input (xd3_cmd     cmd,
     {
       /* When not decoding, set source now.  The decoder delays this
        * step until XD3_GOTHEADER. */
-      if (sfile && sfile->filename != NULL) 
+      if (sfile && sfile->filename != NULL)
 	{
 	  if ((ret = main_set_source (& stream, cmd, sfile, & source)))
 	    {
@@ -3483,7 +3486,7 @@ main_input (xd3_cmd     cmd,
 	  XD3_ASSERT(stream.src != NULL);
 	}
     }
-  
+
   if (cmd == CMD_PRINTHDR ||
       cmd == CMD_PRINTHDRS ||
       cmd == CMD_PRINTDELTA ||
@@ -3593,7 +3596,7 @@ main_input (xd3_cmd     cmd,
 	      {
 		return EXIT_FAILURE;
 	      }
-	    
+
 	    if ((ret = output_func (& stream, ofile)) &&
 		(ret != PRINTHDR_SPECIAL))
 	      {

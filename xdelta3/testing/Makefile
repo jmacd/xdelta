@@ -1,10 +1,9 @@
-CFLAGS = -O2 -Wall -Wconversion -Wsign-compare -Wextra -Wno-unused-parameter -I.. \
+CFLAGS = -g -Wall -Wconversion -Wsign-compare -Wextra \
+	       -Wno-unused-parameter -I.. \
 	      -DGENERIC_ENCODE_TABLES=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
 	      -DXD3_USE_LARGEFILE64=1
-
-#CFLAGS = -O2 -Wall -I.. -DXD3_DEBUG=1 -DNDEBUG=1
 
 DEPS = ../*.h ../*.c *.cc *.h
 

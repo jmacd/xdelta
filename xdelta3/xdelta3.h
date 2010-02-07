@@ -1,5 +1,6 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007,
+ * 2008, 2009, 2010.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -694,7 +695,8 @@ struct _xd3_config
 					buffer */
   usize_t             srcwin_maxsz;  /* srcwin_size grows by a factor
 					of 2 when no matches are
-					found */
+					found.  encoder will not seek
+				        back further than this. */
 
   xd3_getblk_func   *getblk;        /* The three callbacks. */
   xd3_alloc_func    *alloc;
@@ -743,7 +745,7 @@ struct _xd3_source
   xoff_t              srcbase;       /* offset of this source window
 					in the source itself */
   int                 shiftby;       /* for power-of-two blocksizes */
-  int                 maskby;        /* for power-of-two blocksizes */  
+  int                 maskby;        /* for power-of-two blocksizes */
   xoff_t              cpyoff_blocks; /* offset of dec_cpyoff in blocks */
   usize_t             cpyoff_blkoff; /* offset of copy window in
 					blocks, remainder */
@@ -799,7 +801,7 @@ struct _xd3_stream
   void*             opaque;           /* private data object passed to
 					 alloc, free, and getblk */
   int               flags;            /* various options */
-  
+
   /* secondary compressor configuration */
   xd3_sec_cfg       sec_data;         /* Secondary compressor config: data */
   xd3_sec_cfg       sec_inst;         /* Secondary compressor config: inst */
@@ -1046,7 +1048,7 @@ int     xd3_decode_memory (const uint8_t *input,
  *   xd3_stream stream;
  *   xd3_config config;
  *   xd3_source src;
- * 
+ *
  *   memset (& src, 0, sizeof (src));
  *   memset (& stream, 0, sizeof (stream));
  *   memset (& config, 0, sizeof (config));
@@ -1119,7 +1121,7 @@ int     xd3_decode_stream (xd3_stream    *stream,
  *                      assert(stream->current_window == 0);
  *                      stuff;
  *                    }
- *                    // fallthrough 
+ *                    // fallthrough
  *                    case XD3_WINSTART: {
  *                      something(stream->current_window);
  *                      goto again;
@@ -1171,7 +1173,7 @@ void    xd3_free_stream   (xd3_stream    *stream);
 int     xd3_set_source    (xd3_stream    *stream,
 			   xd3_source    *source);
 
-/* If the source size is known, call this instead of xd3_set_source(). 
+/* If the source size is known, call this instead of xd3_set_source().
  * to avoid having stream->getblk called (and/or to avoid XD3_GETSRCBLK).
  *
  * Follow these steps:
@@ -1231,7 +1233,7 @@ void    xd3_init_config (xd3_config *config,
   config->flags = flags;
 }
 
-/* This supplies some input to the stream.  
+/* This supplies some input to the stream.
  *
  * For encoding, if the input is larger than the configured window
  * size (xd3_config.winsize), the entire input will be consumed and
@@ -1330,7 +1332,7 @@ void xd3_blksize_add (xoff_t *blkno,
   *blkoff += add;
   blkdiff = *blkoff >> source->shiftby;
 
-  if (blkdiff) 
+  if (blkdiff)
     {
       *blkno += blkdiff;
       *blkoff &= source->maskby;

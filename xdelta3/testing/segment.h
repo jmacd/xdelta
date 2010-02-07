@@ -6,7 +6,7 @@ class Segment {
     : size_(size),
       seed_(rand->Rand32()),
       seed_offset_(0),
-      data_(NULL) { 
+      data_(NULL) {
     CHECK_GT(size_, 0);
   }
 
@@ -14,7 +14,7 @@ class Segment {
     : size_(size),
       seed_(seed),
       seed_offset_(0),
-      data_(NULL) { 
+      data_(NULL) {
     CHECK_GT(size_, 0);
   }
 
@@ -22,12 +22,12 @@ class Segment {
     : size_(size),
       seed_(0),
       seed_offset_(0),
-      data_(data) { 
+      data_(data) {
     CHECK_GT(size_, 0);
   }
 
   size_t Size() const {
-    return size_; 
+    return size_;
   }
 
   Segment Subseg(size_t start, size_t size) const {
@@ -66,7 +66,7 @@ class Segment {
       }
     } else {
       char buf[256];
-      sprintf(buf, "size=%ld,seed=%ld,skip=%ld", size_, seed_, seed_offset_);
+      sprintf(buf, "size=%ld,seed=%ud,skip=%ld", size_, seed_, seed_offset_);
       r.append(buf);
     }
     return r;

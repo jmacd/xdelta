@@ -7,7 +7,7 @@ class Block {
 public:
   Block()
     : data_(NULL),
-      data_size_(0), 
+      data_size_(0),
       size_(0) { }
 
   ~Block() {
@@ -15,7 +15,7 @@ public:
       delete [] data_;
     }
   }
-    
+
   size_t Size() const {
     return size_;
   }
@@ -27,7 +27,7 @@ public:
 
   uint8_t* Data() const {
     if (data_ == NULL) {
-      CHECK_EQ(0, size_); 
+      CHECK_EQ(0, size_);
       data_size_ = 1;
       data_ = new uint8_t[1];
     }
@@ -42,9 +42,9 @@ public:
       data_ = new uint8_t[Constants::BLOCK_SIZE];
       data_size_ = Constants::BLOCK_SIZE;
     }
-  
+
     if (size_ + size > data_size_) {
-      uint8_t *tmp = data_;  
+      uint8_t *tmp = data_;
       while (size_ + size > data_size_) {
 	data_size_ *= 2;
       }
@@ -109,7 +109,7 @@ class FileSpec {
   // Generates a file with a known size
   void GenerateFixedSize(xoff_t size) {
     Reset();
-    
+
     for (xoff_t p = 0; p < size; ) {
       xoff_t t = min(Constants::BLOCK_SIZE, size - p);
       table_.insert(make_pair(p, Segment(t, rand_)));
@@ -172,7 +172,8 @@ class FileSpec {
 	 iter != table_.end();
 	 ++iter) {
       const Segment &seg = iter->second;
-      cerr << "Segment at " << iter->first << " (" << seg.ToString() << ")" << endl;
+      cerr << "Segment at " << iter->first
+	   << " (" << seg.ToString() << ")" << endl;
     }
   }
 
@@ -210,7 +211,7 @@ class FileSpec {
       const Segment &seg = pos->second;
 
       // The position of this segment may start before this block starts,
-      // and then the position of the data may be offset from the seeding 
+      // and then the position of the data may be offset from the seeding
       // position.
       size_t seg_offset = offset - pos->first;
       size_t advance = min(seg.Size() - seg_offset,
@@ -330,10 +331,12 @@ public:
       iter.Get(&sblock);
       tblock.SetSize(sblock.Size());
       usize_t tread;
-      CHECK_EQ(0, main_file_read(&t, tblock.Data(), tblock.Size(), &tread, "read failed"));
+      CHECK_EQ(0, main_file_read(&t,
+				 tblock.Data(),
+				 tblock.Size(), &tread, "read failed"));
       CHECK_EQ(0, CmpDifferentBlockBytes(tblock, sblock));
     }
-  
+
     CHECK_EQ(0, main_file_close(&t));
     main_file_cleanup(&t);
     return true;
@@ -345,7 +348,6 @@ protected:
 
 class TmpFile : public ExtFile {
 public:
-  // TODO this is a little unportable!
   TmpFile() {
     main_file_init(&file_);
     CHECK_EQ(0, main_file_open(&file_, Name(), XO_WRITE));
@@ -356,8 +358,8 @@ public:
   }
 
   void Append(const Block *block) {
-    CHECK_EQ(0, main_file_write(&file_, 
-				block->Data(), block->Size(), 
+    CHECK_EQ(0, main_file_write(&file_,
+				block->Data(), block->Size(),
 				"tmpfile write failed"));
   }
 

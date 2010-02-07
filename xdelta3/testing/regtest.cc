@@ -8,15 +8,20 @@ class Regtest {
 public:
   typedef typename Constants::Sizes Sizes;
 
+  struct Options {
+    size_t encode_srcwin_maxsz;
+  };
+
 #include "segment.h"
 #include "modify.h"
 #include "file.h"
 #include "cmp.h"
 #include "delta.h"
 
-void InMemoryEncodeDecode(const FileSpec &source_file, 
-			  const FileSpec &target_file, 
-			  Block *coded_data) {
+void InMemoryEncodeDecode(const FileSpec &source_file,
+			  const FileSpec &target_file,
+			  Block *coded_data,
+			  const Options &options = Options()) {
   xd3_stream encode_stream;
   xd3_config encode_config;
   xd3_source encode_source;
@@ -41,8 +46,9 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
   xd3_init_config(&decode_config, XD3_ADLER32);
 
   encode_config.winsize = Constants::WINDOW_SIZE;
+  encode_config.srcwin_maxsz = options.encode_srcwin_maxsz;
 
-  // TODO! the smatcher setup isn't working, 
+  // TODO! the smatcher setup isn't working,
 //   if (options.large_cksum_step) {
 //     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
 //     encode_config.smatcher_soft.large_step = options.large_cksum_step;
@@ -81,7 +87,8 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 
     IF_DEBUG2(DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
 		 encoding ? "encoding" : "decoding",
-		 target_iterator.Offset(), target_iterator.Offset() + target_block.Size(),
+		 target_iterator.Offset(),
+		 target_iterator.Offset() + target_block.Size(),
 		 target_iterator.Blkno(), blks, verified_bytes));
 
     if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
@@ -102,7 +109,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       msg = decode_stream.msg;
     }
 
-    IF_DEBUG2(DP(RINT "%s = %s %s\n", encoding ? "E " : " D",
+    IF_DEBUG1(DP(RINT "%s = %s %s\n", encoding ? "E " : " D",
 		 xd3_strerror(ret),
 		 msg == NULL ? "" : msg));
 
@@ -111,12 +118,12 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       if (encoding) {
 	if (coded_data != NULL) {
 	  // Optional encoded-output to the caller
-	  coded_data->Append(encode_stream.next_out, 
+	  coded_data->Append(encode_stream.next_out,
 			     encode_stream.avail_out);
 	}
 	// Feed this data to the decoder.
-	xd3_avail_input(&decode_stream, 
-			encode_stream.next_out, 
+	xd3_avail_input(&decode_stream,
+			encode_stream.next_out,
 			encode_stream.avail_out);
 	xd3_consume_output(&encode_stream);
 	encoding = false;
@@ -131,12 +138,13 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
       if (encoding) {
- 	IF_DEBUG2(DP(RINT "block %"Q"u last srcpos %"Q"u encodepos %u\n", 
+ 	IF_DEBUG1(DP(RINT "[srcblock] %"Q"u last srcpos %"Q"u "
+		     "encodepos %"Q"u\n",
 		     encode_source.getblkno,
 		     encode_stream.match_last_srcpos,
-		     encode_stream.input_position));
+		     encode_stream.input_position + encode_stream.total_in));
       }
-      
+
       source_iterator.SetBlock(src->getblkno);
       source_iterator.Get(block);
       src->curblkno = src->getblkno;
@@ -171,8 +179,8 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 	}
 	encoding = false;
       } else {
-	CHECK_EQ(0, CmpDifferentBlockBytesAtOffset(decoded_block, 
-						   target_file, 
+	CHECK_EQ(0, CmpDifferentBlockBytesAtOffset(decoded_block,
+						   target_file,
 						   verified_bytes));
 	verified_bytes += decoded_block.Size();
 	decoded_block.Reset();
@@ -210,7 +218,7 @@ void TestRandomNumbers() {
     usum += rand.Rand32();
     esum += rand.ExpRand32(1024);
   }
-  
+
   double allowed_error = 0.01;
 
   uint32_t umean = usum / rounds;
@@ -331,10 +339,11 @@ void TestModifyMutator() {
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
-    cl1.push_back(Change(Change::MODIFY, test_cases[i].size, test_cases[i].addr));
+    cl1.push_back(Change(Change::MODIFY, test_cases[i].size,
+			 test_cases[i].addr));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     CHECK_EQ(spec0.Size(), spec1.Size());
-    
+
     size_t diff = CmpDifferentBytes(spec0, spec1);
     CHECK_LE(diff, test_cases[i].size);
 
@@ -407,7 +416,8 @@ void TestDeleteMutator() {
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
-    cl1.push_back(Change(Change::DELETE, test_cases[i].size, test_cases[i].addr));
+    cl1.push_back(Change(Change::DELETE, test_cases[i].size,
+			 test_cases[i].addr));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     CHECK_EQ(spec0.Size() - test_cases[i].size, spec1.Size());
 
@@ -435,12 +445,13 @@ void TestCopyMutator() {
     // copies, it does not enter checksums.  So these tests copy data from
     // later to earlier so that checksumming will start.
     { Constants::BLOCK_SIZE / 2, Constants::BLOCK_SIZE / 2, 0 },
-    { Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE, Constants::BLOCK_SIZE, },
+    { Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE,
+      Constants::BLOCK_SIZE, },
   };
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
-    cl1.push_back(Change(Change::COPY, test_cases[i].size, 
+    cl1.push_back(Change(Change::COPY, test_cases[i].size,
 			 test_cases[i].from, test_cases[i].to));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     CHECK_EQ(spec0.Size() + test_cases[i].size, spec1.Size());
@@ -468,17 +479,21 @@ void TestMoveMutator() {
     // This is easier to test than Copy but has the same trouble as Delete.
     { Constants::BLOCK_SIZE / 2, Constants::BLOCK_SIZE / 2, 0 },
     { Constants::BLOCK_SIZE / 2, 0, Constants::BLOCK_SIZE / 2 },
-    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE },
-    { Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE, Constants::BLOCK_SIZE },
-    { Constants::BLOCK_SIZE * 3 / 2, Constants::BLOCK_SIZE, Constants::BLOCK_SIZE * 3 / 2 },
+    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE, 2 *
+      Constants::BLOCK_SIZE },
+    { Constants::BLOCK_SIZE, 2 * Constants::BLOCK_SIZE,
+      Constants::BLOCK_SIZE },
+    { Constants::BLOCK_SIZE * 3 / 2, Constants::BLOCK_SIZE,
+      Constants::BLOCK_SIZE * 3 / 2 },
 
     // This is a no-op
-    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE * 2, 3 * Constants::BLOCK_SIZE },
+    { Constants::BLOCK_SIZE, Constants::BLOCK_SIZE * 2,
+      3 * Constants::BLOCK_SIZE },
   };
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
-    cl1.push_back(Change(Change::MOVE, test_cases[i].size, 
+    cl1.push_back(Change(Change::MOVE, test_cases[i].size,
 			 test_cases[i].from, test_cases[i].to));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     CHECK_EQ(spec0.Size(), spec1.Size());
@@ -506,10 +521,11 @@ void TestOverwriteMutator() {
   Block b0, b1;
   BlockIterator(spec0).Get(&b0);
   BlockIterator(spec1).Get(&b1);
-  
+
   CHECK(memcmp(b0.Data(), b1.Data() + 20, 10) == 0);
   CHECK(memcmp(b0.Data(), b1.Data(), 20) == 0);
-  CHECK(memcmp(b0.Data() + 30, b1.Data() + 30, Constants::BLOCK_SIZE - 30) == 0);
+  CHECK(memcmp(b0.Data() + 30, b1.Data() + 30,
+	       Constants::BLOCK_SIZE - 30) == 0);
 
   cl1.clear();
   cl1.push_back(Change(Change::OVERWRITE, 10, 20, (xoff_t)0));
@@ -518,9 +534,10 @@ void TestOverwriteMutator() {
 
   BlockIterator(spec0).Get(&b0);
   BlockIterator(spec1).Get(&b1);
-  
+
   CHECK(memcmp(b0.Data() + 20, b1.Data(), 10) == 0);
-  CHECK(memcmp(b0.Data() + 10, b1.Data() + 10, Constants::BLOCK_SIZE - 10) == 0);
+  CHECK(memcmp(b0.Data() + 10, b1.Data() + 10,
+	       Constants::BLOCK_SIZE - 10) == 0);
 }
 
 // Note: this test is written to expose a problem, but the problem was
@@ -534,7 +551,7 @@ void TestNonBlockingProgress() {
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
   // This is a lazy target match
-  Change ct(Change::OVERWRITE, 22, 
+  Change ct(Change::OVERWRITE, 22,
 	    Constants::BLOCK_SIZE + 50,
 	    Constants::BLOCK_SIZE + 20);
 
@@ -598,6 +615,44 @@ void TestBlockInMemory() {
   CHECK_EQ(spec1.Blocks(Constants::WINDOW_SIZE), delta.Windows());
 }
 
+void TestFifoCopyDiscipline() {
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+
+  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 4);
+
+  // Create a half-block copy, 2.5 blocks apart. With 64-byte blocks,
+  // the file in spec0 copies @ 384 from spec1 @ 64.
+  ChangeList cl1;
+  cl1.push_back(Change(Change::MODIFY,
+		       Constants::BLOCK_SIZE / 2,
+		       0));
+  cl1.push_back(Change(Change::OVERWRITE,
+		       Constants::BLOCK_SIZE / 2,
+		       Constants::BLOCK_SIZE * 3,
+		       Constants::BLOCK_SIZE / 2));
+  cl1.push_back(Change(Change::MODIFY,
+		       Constants::BLOCK_SIZE * 3,
+		       Constants::BLOCK_SIZE));
+  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+
+  Options options1;
+  options1.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 4;
+  Block block1;
+  InMemoryEncodeDecode(spec1, spec0, &block1, options1);
+  Delta delta1(block1);
+  CHECK_EQ(4 * Constants::BLOCK_SIZE -
+	   Constants::BLOCK_SIZE / 2, delta1.AddedBytes());
+
+  Options options2;
+  options2.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 3;
+  Block block2;
+  InMemoryEncodeDecode(spec1, spec0, &block2, options2);
+  Delta delta2(block2);
+  CHECK_EQ(4 * Constants::BLOCK_SIZE, delta2.AddedBytes());
+}
+
 void FourWayMergeTest(const FileSpec &spec0,
 		      const FileSpec &spec1,
 		      const FileSpec &spec2,
@@ -631,7 +686,7 @@ void FourWayMergeTest(const FileSpec &spec0,
   mcmd.push_back(NULL);
 
   //DP(RINT "Running one merge: %s\n", CommandToString(mcmd).c_str());
-  CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1, 
+  CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1,
 			       const_cast<char**>(&mcmd[0])));
 
   ExtFile recon;
@@ -645,7 +700,7 @@ void FourWayMergeTest(const FileSpec &spec0,
   tcmd.push_back(NULL);
 
   //DP(RINT "Running one recon! %s\n", CommandToString(tcmd).c_str());
-  CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1, 
+  CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1,
 			       const_cast<char**>(&tcmd[0])));
   //DP(RINT "Should equal! %s\n", f2.Name());
 
@@ -675,7 +730,7 @@ void TestMergeCommand1() {
       if (change1 == 0) {
 	continue;
       }
-      
+
       DP(RINT "S0 = %lu\n", size0);
       DP(RINT "C1 = %lu\n", change1);
 
@@ -685,7 +740,7 @@ void TestMergeCommand1() {
       spec0.GenerateFixedSize(size0);
 
       ChangeList cl1, cl2, cl3;
-      
+
       size_t change3 = change1;
       size_t change3_pos;
 
@@ -735,7 +790,7 @@ void TestMergeCommand2() {
 	SizeIterator<size_t, Sizes> si3(&rand, 10);
 	for (; !si3.Done(); si3.Next()) {
 	  size_t size3 = si3.Get();
-	  
+
 	  // We're only interested in three sizes, strictly decreasing. */
 	  if (size3 >= size2 || size2 >= size1 || size1 >= size0) {
 	    continue;
@@ -749,7 +804,7 @@ void TestMergeCommand2() {
 	  spec0.GenerateFixedSize(size0);
 
 	  ChangeList cl1, cl2, cl3;
-      
+
 	  cl1.push_back(Change(Change::DELETE, size0 - size1, 0));
 	  cl2.push_back(Change(Change::DELETE, size0 - size2, 0));
 	  cl3.push_back(Change(Change::DELETE, size0 - size3, 0));
@@ -790,6 +845,7 @@ void MainTest() {
   TEST(TestEmptyInMemory);
   TEST(TestBlockInMemory);
   TEST(TestNonBlockingProgress);
+  TEST(TestFifoCopyDiscipline);
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
 }
