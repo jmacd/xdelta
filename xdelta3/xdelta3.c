@@ -4342,6 +4342,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 {
   xd3_source *src = stream->src;
   usize_t greedy_or_not;
+  xoff_t frontier_pos;
 
   stream->match_maxback = 0;
   stream->match_maxfwd  = 0;
@@ -4365,7 +4366,9 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   /* Implement srcwin_maxsz, which prevents the encoder from seeking
    * back further than the LRU cache maintaining FIFO discipline,
    * which causes terrible performance. */
-  if (xd3_source_eof (stream->src) - srcpos > stream->srcwin_maxsz) {
+  frontier_pos = stream->src->frontier_blkno * stream->src->blksize;
+  XD3_ASSERT (frontier_pos >= srcpos);
+  if (frontier_pos - srcpos > stream->srcwin_maxsz) {
     IF_DEBUG1(DP(RINT "[match_setup] rejected due to srcwin_maxsz "
 		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%u\n",
 		 xd3_source_eof (stream->src),

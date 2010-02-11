@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/python2.6
 # xdelta 3 - delta compression tools and library
 # Copyright (C) 2003, 2006, 2007, 2008.  Joshua P. MacDonald
 #
@@ -19,8 +19,8 @@
 # TODO: test 1.5 vs. greedy
 
 import os, sys, math, re, time, types, array, random
-import xdelta3
 import xdelta3main
+import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
 #RCSDIR = '/tmp/PRCS_read_copy'
@@ -30,8 +30,8 @@ import xdelta3main
 #SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
 #RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/net/x25'
-RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/fs'
-RCSDIR = '/Users/jmacd/src/ftp.kernel.org'
+#RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/fs'
+RCSDIR = '/Users/jmacd/src/kernel.org'
 
 #
 MIN_SIZE       = 0

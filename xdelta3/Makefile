@@ -4,11 +4,11 @@
 UNAME = $(shell uname)
 CYGWIN = $(findstring CYGWIN, $(UNAME))
 DARWIN = $(findstring Darwin, $(UNAME))
-PYVER = 2.5
+PYVER = 2.6
 
 ifeq ("$(CYGWIN)", "")
 SWIGTGT = xdelta3module.so
-PYTGT = build/lib.macosx-10.5-i386-2.5/xdelta3main.so
+PYTGT = build/lib.macosx-10.6-universal-2.6/xdelta3main.so
 else
 SWIGTGT = xdelta3module.dll
 PYTGT = build/lib.cygwin-1.5.24-i686-$(PYVER)/xdelta3main.dll
@@ -226,7 +226,8 @@ xdelta3module.so: xdelta3_wrap.o xdelta3.o
 		-lc
 else
 xdelta3module.so: xdelta3_wrap.o xdelta3.o
-	gcc -Wl,-F. -bundle -undefined dynamic_lookup $(CFLAGS) \
+	gcc-4.2 -Wl,-F. -bundle -undefined dynamic_lookup \
+		-arch x86_64 $(CFLAGS) \
 		xdelta3.o xdelta3_wrap.o -o xdelta3module.so
 endif
 
