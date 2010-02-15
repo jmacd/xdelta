@@ -2513,7 +2513,7 @@ usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
 }
 
 /* This function interfaces with the client getblk function, checks
- * its results, updates frontier_blkno, max_blkno, onlastblk. */
+ * its results, updates frontier_blkno, max_blkno, onlastblk, eof_known. */
 static int
 xd3_getblk (xd3_stream *stream, xoff_t blkno)
 {
@@ -2547,7 +2547,8 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	{
 	  source->frontier_blkno = blkno + 1;
 
-	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: source length unknown %"Q"u\n",
+	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: "
+			"source length unknown %"Q"u\n",
 			blkno,
 			xd3_source_eof (source)));
 	}
@@ -2555,7 +2556,8 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	{
 	  if (!source->eof_known)
 	    {
-	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; source length known %"Q"u\n",
+	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; "
+			    "source length known %"Q"u\n",
 			    xd3_bytes_on_srcblk (source, blkno),
 			    xd3_source_eof (source)));
 	      source->eof_known = 1;
@@ -4364,9 +4366,14 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
     }
 
   /* Implement srcwin_maxsz, which prevents the encoder from seeking
-   * back further than the LRU cache maintaining FIFO discipline,
-   * which causes terrible performance. */
-  frontier_pos = stream->src->frontier_blkno * stream->src->blksize;
+   * back further than the LRU cache maintaining FIFO discipline, (to
+   * avoid seeking). */
+  frontier_pos = stream->src->eof_known ?
+    xd3_source_eof (stream->src) :
+    (stream->src->frontier_blkno * stream->src->blksize);
+  IF_DEBUG1(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
+	       "srcwin_maxsz %u\n",
+	       frontier_pos, srcpos, stream->srcwin_maxsz));
   XD3_ASSERT (frontier_pos >= srcpos);
   if (frontier_pos - srcpos > stream->srcwin_maxsz) {
     IF_DEBUG1(DP(RINT "[match_setup] rejected due to srcwin_maxsz "

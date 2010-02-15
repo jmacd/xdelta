@@ -752,10 +752,17 @@ struct _xd3_source
   xoff_t              getblkno;      /* request block number: xd3 sets
 					current getblk request */
 
-  xoff_t              max_blkno;
-  xoff_t              frontier_blkno;
-  usize_t             onlastblk;
-  int                 eof_known;
+  /* See xd3_getblk() */
+  xoff_t              max_blkno;  /* Maximum block, if eof is known,
+				   * otherwise, equals frontier_blkno
+				   * (initially 0). */
+  xoff_t              frontier_blkno;  /* If eof is unknown, the next
+					* source position to be read.
+					* Otherwise, equal to
+					* max_blkno. */
+  usize_t             onlastblk;  /* Number of bytes on max_blkno */
+  int                 eof_known;  /* Set to true when the first
+				   * partial block is read. */
 };
 
 /* The primary xd3_stream object, used for encoding and decoding.  You

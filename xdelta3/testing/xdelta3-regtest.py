@@ -31,7 +31,7 @@ import xdelta3
 
 #RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/net/x25'
 #RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/fs'
-RCSDIR = '/Users/jmacd/src/kernel.org'
+RCSDIR = '/Users/jmacd/src/ftp.kernel.org'
 
 #
 MIN_SIZE       = 0

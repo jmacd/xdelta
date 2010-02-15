@@ -825,6 +825,7 @@ void TestMergeCommand2() {
 
 #define TEST(x) cerr << #x << "..." << endl; regtest.x()
 
+// These tests are primarily tests of the testing framework itself.
 template <class T>
 void UnitTest() {
   Regtest<T> regtest;
@@ -839,6 +840,7 @@ void UnitTest() {
   TEST(TestOverwriteMutator);
 }
 
+// These are Xdelta tests.
 template <class T>
 void MainTest() {
   Regtest<T> regtest;
@@ -852,6 +854,7 @@ void MainTest() {
 
 #undef TEST
 
+// Run the unittests, followed by xdelta tests for various constants.
 int main(int argc, char **argv) {
   UnitTest<SmallBlock>();
   MainTest<SmallBlock>();
