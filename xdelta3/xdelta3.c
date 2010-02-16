@@ -2533,7 +2533,8 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
       ret = stream->getblk (stream, source, blkno);
       if (ret != 0)
 	{
-	  IF_DEBUG1 (DP(RINT "[getblk] app error: %s\n", xd3_strerror (ret)));
+	  IF_DEBUG1 (DP(RINT "[getblk] app error blkno %"Q"u: %s\n", 
+			blkno, xd3_strerror (ret)));
 	  return ret;
 	}
     }

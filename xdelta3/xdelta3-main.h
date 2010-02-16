@@ -3213,8 +3213,8 @@ main_read_seek_source (xd3_stream *stream,
 	  sfile->source_position += nread;
 	  blru->size = nread;
 
-	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u {%"Q"u} size %u\n",
-			skip_blkno, blru->blkno, blru->size));
+	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u size %u\n",
+			skip_blkno, blru->size));
 
 	  XD3_ASSERT (sfile->source_position <= pos);
 	}
