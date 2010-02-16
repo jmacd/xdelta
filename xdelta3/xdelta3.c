@@ -2540,8 +2540,11 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 
   if (blkno >= source->frontier_blkno)
     {
-      source->max_blkno = blkno;
-      source->onlastblk = source->onblk;
+      if (blkno > source->max_blkno)
+	{
+	  source->max_blkno = blkno;
+	  source->onlastblk = source->onblk;
+	}
 
       if (source->onblk == source->blksize)
 	{
@@ -2616,7 +2619,9 @@ xd3_set_source (xd3_stream *stream,
 }
 
 int
-xd3_set_source_and_size (xd3_stream *stream, xd3_source *user_source, xoff_t source_size) {
+xd3_set_source_and_size (xd3_stream *stream, 
+			 xd3_source *user_source,
+			 xoff_t source_size) {
   int ret = xd3_set_source (stream, user_source);
   if (ret == 0)
     {
@@ -2790,7 +2795,8 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	    else
 	      {
 		stream->srcwin_decided_early = (!stream->src->eof_known ||
-						(stream->srcwin_cksum_pos < xd3_source_eof (stream->src)));
+						(stream->srcwin_cksum_pos < 
+						 xd3_source_eof (stream->src)));
 	      }
 
 	    /* xtra field indicates the copy is from the source */
@@ -5109,7 +5115,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     }
 
   IF_DEBUG1 (DP(RINT
-		"[srcwin_move_point] exited loop T=%"Q"u{%"Q"u} S=%"Q"u EOF=%"Q"u %s\n",
+		"[srcwin_move_point] exited loop T=%"Q"u{%"Q"u} "
+		"S=%"Q"u EOF=%"Q"u %s\n",
 		stream->total_in + stream->input_position,
 		logical_input_cksum_pos,
 		stream->srcwin_cksum_pos,
@@ -5120,7 +5127,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     {
       source_size = xd3_source_eof (stream->src);
 
-      if (stream->srcwin_cksum_pos >= source_size)
+      if (stream->srcwin_cksum_pos > source_size)
 	{
 	  /* This invariant is needed for xd3_source_cksum_offset() */
 	  stream->srcwin_cksum_pos = source_size;
