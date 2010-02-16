@@ -5128,7 +5128,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     {
       source_size = xd3_source_eof (stream->src);
 
-      if (stream->srcwin_cksum_pos > source_size)
+      if (stream->srcwin_cksum_pos >= source_size)
 	{
 	  /* This invariant is needed for xd3_source_cksum_offset() */
 	  stream->srcwin_cksum_pos = source_size;
