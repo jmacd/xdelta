@@ -92,9 +92,9 @@ struct LargeBlock : public BaseConstants {
   typedef LargeSizes Sizes;
 };
 
-const size_t LargeBlock::READ_SIZE = (1 << 20);
-const xoff_t LargeBlock::BLOCK_SIZE = (1 << 20);
-const size_t LargeBlock::WINDOW_SIZE = (1 << 20);
+const size_t LargeBlock::READ_SIZE = (1 << 13);
+const xoff_t LargeBlock::BLOCK_SIZE = (1 << 13);
+const size_t LargeBlock::WINDOW_SIZE = (1 << 13);
 
 struct MixedBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
@@ -126,5 +126,5 @@ struct PrimeBlock : public BaseConstants {
 };
 
 const size_t PrimeBlock::READ_SIZE = 71;
-const xoff_t PrimeBlock::BLOCK_SIZE = 7 * 127;
+const xoff_t PrimeBlock::BLOCK_SIZE = 512;  // Must be a power-of-2
 const size_t PrimeBlock::WINDOW_SIZE = 73;

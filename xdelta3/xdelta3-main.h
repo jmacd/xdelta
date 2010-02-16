@@ -387,8 +387,8 @@ static int main_help (void);
 static int
 main_version (void)
 {
-  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, Joshua MacDonald\n\");" $ */
-  DP(RINT "Xdelta version 3.0w, Copyright (C) 2007, 2008, Joshua MacDonald\n");
+  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n\");" $ */
+  DP(RINT "Xdelta version 3.0x, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n");
   DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   DP(RINT "This is free software, and you are welcome to redistribute it\n");
   DP(RINT "under certain conditions; see \"COPYING\" for details.\n");

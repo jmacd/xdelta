@@ -843,6 +843,7 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
+  cerr << "Blocksize: " << T::BLOCK_SIZE << endl;
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);
   TEST(TestBlockInMemory);
