@@ -3798,7 +3798,8 @@ xd3_encode_input (xd3_stream *stream)
 
     case ENC_SEARCH:
       IF_DEBUG2 (DP(RINT "[SEARCH] match_state %d avail_in %u %s\n",
-		    stream->match_state, stream->avail_in, stream->src ? "source" : "no source"));
+		    stream->match_state, stream->avail_in, 
+		    stream->src ? "source" : "no source"));
 
       /* Reentrant matching. */
       if (stream->src != NULL)
@@ -4368,14 +4369,13 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   /* Implement srcwin_maxsz, which prevents the encoder from seeking
    * back further than the LRU cache maintaining FIFO discipline, (to
    * avoid seeking). */
-  frontier_pos = stream->src->eof_known ?
-    xd3_source_eof (stream->src) :
-    (stream->src->frontier_blkno * stream->src->blksize);
+  frontier_pos =
+    stream->src->frontier_blkno * stream->src->blksize;
   IF_DEBUG1(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
 	       "srcwin_maxsz %u\n",
 	       frontier_pos, srcpos, stream->srcwin_maxsz));
-  XD3_ASSERT (frontier_pos >= srcpos);
-  if (frontier_pos - srcpos > stream->srcwin_maxsz) {
+  if (srcpos < frontier_pos &&
+      frontier_pos - srcpos > stream->srcwin_maxsz) {
     IF_DEBUG1(DP(RINT "[match_setup] rejected due to srcwin_maxsz "
 		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%u\n",
 		 xd3_source_eof (stream->src),

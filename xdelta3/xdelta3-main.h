@@ -339,7 +339,7 @@ static usize_t           lru_size = 0;
 static main_blklru      *lru = NULL;  /* array of lru_size elts */
 static main_blklru_list  lru_list;
 static main_blklru_list  lru_free;
-static int               do_not_lru = 0;  /* set to avoid lru */
+static int               do_src_fifo = 0;  /* set to avoid lru */
 
 static int lru_hits   = 0;
 static int lru_misses = 0;
@@ -452,7 +452,7 @@ reset_defaults(void)
   main_bsize = 0;
   lru_size = 0;
   lru = NULL;
-  do_not_lru = 0;
+  do_src_fifo = 0;
   lru_hits   = 0;
   lru_misses = 0;
   lru_filled = 0;
@@ -1032,7 +1032,7 @@ main_file_read (main_file  *ifile,
     }
   else
     {
-      if (option_verbose > 3) { XPR(NT "read %s: %u bytes\n",
+      if (option_verbose > 4) { XPR(NT "read %s: %u bytes\n",
 				    ifile->filename, (*nread)); }
       ifile->nread += (*nread);
     }
@@ -1923,7 +1923,8 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  (stream->dec_win_ind & VCD_ADLER32) != 0)
 	{
 	  recode_stream->flags |= XD3_ADLER32_RECODE;
-	  recode_stream->recode_adler32 = stream->whole_target.wininfo[window_num].adler32;
+	  recode_stream->recode_adler32 = 
+	    stream->whole_target.wininfo[window_num].adler32;
 	}
 
       window_num++;
@@ -2880,11 +2881,18 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
    * size_known can still change (due to secondary
    * decompression). Calls main_decompress_input_check() via
    * main_read_primary_input(). */
+  /* TODO(jmacd): This is a huge hack!  Fix me. */
   lru_size = 1;
   lru = &block0;
+  XD3_ASSERT (main_blklru_list_empty (& lru_free));
+  XD3_ASSERT (main_blklru_list_empty (& lru_list));
   main_blklru_list_push_back (& lru_free, & lru[0]);
   ret = main_getblk_func (stream, source, 0);
   main_blklru_list_remove (& lru[0]);
+  /* TODO(jmacd): In particular, not sure if these assertions
+   * are valid when ret != 0. */
+  XD3_ASSERT (main_blklru_list_empty (& lru_free));
+  XD3_ASSERT (main_blklru_list_empty (& lru_list));
   lru = NULL;
 
   if (ret != 0)
@@ -2923,7 +2931,8 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   XD3_ASSERT (lru_size >= 1);
 
-  if ((lru = (main_blklru*) main_malloc (lru_size * sizeof (main_blklru))) == NULL)
+  if ((lru = (main_blklru*) main_malloc (lru_size * sizeof (main_blklru)))
+      == NULL)
     {
       ret = ENOMEM;
       return ret;
@@ -2935,9 +2944,9 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   if (! sfile->size_known)
     {
-      do_not_lru = 1;
+      do_src_fifo = 1;
     }
-  else if (! do_not_lru)
+  else if (! do_src_fifo)
     {
       main_blklru_list_push_back (& lru_list, & lru[0]);
     }
@@ -2952,7 +2961,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  return ret;
 	}
 
-      if (do_not_lru == 0)
+      if (! do_src_fifo)
 	{
 	  main_blklru_list_push_back (& lru_free, & lru[i]);
 	}
@@ -3008,7 +3017,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  main_format_bcnt (blksize, blkszbuf),
 	  main_format_bcnt (option_srcwinsz, winszbuf),
 	  nbufs,
-	  do_not_lru ? " (FIFO)" : "");
+	  do_src_fifo ? " (FIFO)" : "");
     }
 
   return 0;
@@ -3042,14 +3051,15 @@ main_get_winsize (main_file *ifile) {
  *******************************************************************/
 
 static int
-main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_new)
+main_getblk_lru (xd3_source *source, xoff_t blkno, 
+		 main_blklru** blrup, int *is_new)
 {
   main_blklru *blru = NULL;
   usize_t i;
 
   (*is_new) = 0;
 
-  if (do_not_lru)
+  if (do_src_fifo)
     {
       /* Direct lookup assumes sequential scan w/o skipping blocks. */
       int idx = blkno % lru_size;
@@ -3082,7 +3092,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_
 	}
     }
 
-  if (do_not_lru)
+  if (do_src_fifo)
     {
       int idx = blkno % lru_size;
       blru = & lru[idx];
@@ -3096,6 +3106,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_
 	}
       else
 	{
+	  XD3_ASSERT (! main_blklru_list_empty (& lru_list));
 	  blru = main_blklru_list_pop_front (& lru_list);
 	  main_blklru_list_push_back (& lru_list, blru);
 	}
@@ -3105,6 +3116,110 @@ main_getblk_lru (xd3_source *source, xoff_t blkno, main_blklru** blrup, int *is_
   (*is_new) = 1;
   (*blrup) = blru;
   blru->blkno = blkno;
+  return 0;
+}
+
+static int
+main_read_seek_source (xd3_stream *stream,
+		       xd3_source *source,
+		       xoff_t      blkno) {
+  xoff_t pos = blkno * source->blksize;
+  main_file *sfile = (main_file*) source->ioh;
+  main_blklru *blru;
+  int is_new;
+  usize_t nread = 0;
+  int ret = 0;
+
+  if (!sfile->seek_failed)
+    {
+      ret = main_file_seek (sfile, pos);
+
+      if (ret == 0)
+	{
+	  sfile->source_position = pos;
+	}
+    }
+
+  /* There's a chance here, that an genuine lseek error will cause
+   * xdelta3 to shift into non-seekable mode, entering a degraded
+   * condition.  */
+  if (sfile->seek_failed || ret != 0)
+    {
+      /* For an unseekable file (or other seek error, does it
+       * matter?) */
+      if (sfile->source_position > pos)
+	{
+	  /* Could assert !IS_ENCODE(), this shouldn't happen
+	   * because of do_src_fifo during encode. */
+	  if (option_verbose)
+	    {
+	      XPR(NT "source can't seek backwards; requested block offset "
+		  "%"Q"u source position is %"Q"u\n",
+		  pos, sfile->source_position);
+	    }
+
+	  sfile->seek_failed = 1;
+	  stream->msg = "non-seekable source: "
+	    "copy is too far back (try raising -B)";
+	  return XD3_TOOFARBACK;
+	}
+
+      if (option_verbose > 2 || (option_verbose > 1 && !sfile->seek_failed))
+	{
+	  XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
+	      pos - sfile->source_position,
+	      sfile->source_position);
+	}
+
+      sfile->seek_failed = 1;
+
+      while (sfile->source_position < pos)
+	{
+	  xoff_t skip_blkno;
+	  usize_t skip_offset;
+
+	  xd3_blksize_div (sfile->source_position, source, 
+			   &skip_blkno, &skip_offset);
+
+	  /* Read past unused data */
+	  XD3_ASSERT (pos - sfile->source_position >= source->blksize);
+	  XD3_ASSERT (skip_offset == 0);
+
+	  if ((ret = main_getblk_lru (source, skip_blkno,
+				      & blru, & is_new)))
+	    {
+	      return ret;
+	    }
+
+	  XD3_ASSERT (is_new);
+
+	  if ((ret = main_read_primary_input (sfile,
+					      (uint8_t*) blru->blk,
+					      source->blksize,
+					      & nread,
+					      1 /* source */)))
+	    {
+	      return ret;
+	    }
+
+	  if (nread != source->blksize)
+	    {
+	      IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %u\n",
+			    nread));
+	      stream->msg = "non-seekable input is short";
+	      return XD3_INVALID_INPUT;
+	    }
+
+	  sfile->source_position += nread;
+	  blru->size = nread;
+
+	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u {%"Q"u} size %u\n",
+			skip_blkno, blru->blkno, blru->size));
+
+	  XD3_ASSERT (sfile->source_position <= pos);
+	}
+    }
+
   return 0;
 }
 
@@ -3126,6 +3241,7 @@ main_getblk_func (xd3_stream *stream,
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru;
   int is_new;
+  int did_seek = 0;
   usize_t nread = 0;
 
   if (allow_fake_source)
@@ -3158,97 +3274,20 @@ main_getblk_func (xd3_stream *stream,
       /* Only try to seek when the position is wrong.  This means the
        * decoder will fail when the source buffer is too small, but
        * only when the input is non-seekable. */
-      if (!sfile->seek_failed)
+      if ((ret = main_read_seek_source (stream, source, blkno)))
 	{
-	  ret = main_file_seek (sfile, pos);
-
-	  if (ret == 0)
-	    {
-	      sfile->source_position = pos;
-	    }
+	  return ret;
 	}
 
-      /* There's a chance here, that an genuine lseek error will cause
-       * xdelta3 to shift into non-seekable mode, entering a degraded
-       * condition.  */
-      if (sfile->seek_failed || ret != 0)
-	{
-	  /* For an unseekable file (or other seek error, does it
-	   * matter?) */
-	  if (sfile->source_position > pos)
-	    {
-	      /* Could assert !IS_ENCODE(), this shouldn't happen
-	       * because of do_not_lru during encode. */
-	      if (option_verbose)
-		{
-		  XPR(NT "source can't seek backwards; requested block offset "
-		      "%"Q"u source position is %"Q"u\n",
-		      pos, sfile->source_position);
-		}
-
-	      sfile->seek_failed = 1;
-	      stream->msg = "non-seekable source: "
-		            "copy is too far back (try raising -B)";
-	      return XD3_TOOFARBACK;
-	    }
-
-	  if (option_verbose > 2 || (option_verbose > 1 && !sfile->seek_failed))
-	    {
-	      XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
-		  pos - sfile->source_position,
-		  sfile->source_position);
-	    }
-
-	  sfile->seek_failed = 1;
-
-	  while (sfile->source_position < pos)
-	    {
-	      xoff_t skip_blkno;
-	      usize_t skip_offset;
-
-	      xd3_blksize_div (sfile->source_position, source, &skip_blkno, &skip_offset);
-
-	      /* Read past unused data */
-	      XD3_ASSERT (pos - sfile->source_position >= source->blksize);
-	      XD3_ASSERT (skip_offset == 0);
-
-	      if ((ret = main_getblk_lru (source, skip_blkno, & blru, & is_new)))
-		{
-		  return ret;
-		}
-
-	      XD3_ASSERT (is_new);
-
-	      if ((ret = main_read_primary_input (sfile,
-						  (uint8_t*) blru->blk,
-						  source->blksize,
-						  & nread,
-						  1 /* source */)))
-		{
-		  return ret;
-		}
-
-	      if (nread != source->blksize)
-		{
-		  IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %u\n", nread));
-		  stream->msg = "non-seekable input is short";
-		  return XD3_INVALID_INPUT;
-		}
-
-	      sfile->source_position += nread;
-	      blru->size = nread;
-
-	      IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u {%"Q"u} size %u\n",
-			    skip_blkno, blru->blkno, blru->size));
-
-	      XD3_ASSERT (sfile->source_position <= pos);
-	    }
-	}
+      /* Indicates that another call to main_getblk_lru() may be
+       * needed */
+      did_seek = 1;
     }
 
   XD3_ASSERT (sfile->source_position == pos);
 
-  if ((ret = main_getblk_lru (source, blkno, & blru, & is_new)))
+  if (did_seek &&
+      (ret = main_getblk_lru (source, blkno, & blru, & is_new)))
     {
       return ret;
     }
@@ -3265,15 +3304,22 @@ main_getblk_func (xd3_stream *stream,
   /* Save the last block read, used to handle non-seekable files. */
   sfile->source_position = pos + nread;
 
-  main_blklru_list_push_back (& lru_list, blru);
-
   if (option_verbose > 3)
     {
       if (blru->blkno != (xoff_t)-1)
 	{
-	  XPR(NT "source block %"Q"u ejects %"Q"u (lru_hits=%u, "
-	      "lru_misses=%u, lru_filled=%u)\n",
-	      blkno, blru->blkno, lru_hits, lru_misses, lru_filled);
+	  if (blru->blkno != blkno)
+	    {
+	      XPR(NT "source block %"Q"u ejects %"Q"u (lru_hits=%u, "
+		  "lru_misses=%u, lru_filled=%u)\n",
+		  blkno, blru->blkno, lru_hits, lru_misses, lru_filled);
+	    }
+	  else
+	    {
+	      XPR(NT "source block %"Q"u read (lru_hits=%u, "
+		  "lru_misses=%u, lru_filled=%u)\n",
+		  blkno, lru_hits, lru_misses, lru_filled);
+	    }
 	}
       else
 	{
@@ -3287,7 +3333,8 @@ main_getblk_func (xd3_stream *stream,
   source->onblk    = nread;
   blru->size       = nread;
 
-  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u pos %"Q"u srcpos %"Q"u\n",
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u pos %"Q"u "
+		"srcpos %"Q"u\n",
 		blkno, nread, pos, sfile->source_position));
 
   return 0;
@@ -3331,7 +3378,7 @@ main_input (xd3_cmd     cmd,
   config.iopt_size = option_iopt_size;
   config.sprevsz = option_sprevsz;
 
-  do_not_lru = 0;
+  do_src_fifo = 0;
 
   start_time = get_millisecs_now ();
 
@@ -3371,7 +3418,7 @@ main_input (xd3_cmd     cmd,
 
 #if XD3_ENCODER
     case CMD_ENCODE:
-      do_not_lru  = 1;
+      do_src_fifo  = 1;
       input_func  = xd3_encode_input;
       output_func = main_write_output;
 

@@ -170,7 +170,7 @@ xdelta3-32: $(SOURCES)
 xdelta3-debug2: $(SOURCES)
 	$(CC) -g $(CFLAGS) \
 		xdelta3.c -o xdelta3-debug2 \
-		-DXD3_DEBUG=3 \
+		-DXD3_DEBUG=2 \
 		-DXD3_MAIN=1 \
 		-DXD3_POSIX=1 \
 		-DXD3_USE_LARGEFILE64=1 \
