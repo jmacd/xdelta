@@ -150,9 +150,9 @@ static STARTUPINFO winStartupInfo;
  * inputs to the Xdelta encoder. */
 typedef enum
 {
-  RD_FIRST        = (1 << 0),
-  RD_NONEXTERNAL  = (1 << 1),
-  RD_EXTERNAL_V1  = (1 << 2),
+  RD_FIRST       = (1 << 0),
+  RD_NONEXTERNAL = (1 << 1),
+  RD_DECOMPSET   = (1 << 2),
 } xd3_read_flags;
 
 /* main_file->mode values */
@@ -388,7 +388,7 @@ static int
 main_version (void)
 {
   /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n\");" $ */
-  DP(RINT "Xdelta version 3.0x, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n");
+  DP(RINT "Xdelta version 3.0y, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n");
   DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   DP(RINT "This is free software, and you are welcome to redistribute it\n");
   DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
@@ -1923,7 +1923,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 	  (stream->dec_win_ind & VCD_ADLER32) != 0)
 	{
 	  recode_stream->flags |= XD3_ADLER32_RECODE;
-	  recode_stream->recode_adler32 = 
+	  recode_stream->recode_adler32 =
 	    stream->whole_target.wininfo[window_num].adler32;
 	}
 
@@ -2206,14 +2206,14 @@ main_pipe_copier (uint8_t    *pipe_buf,
  * the decompression command, the second process copies data to the
  * input of the first. */
 static int
-main_input_decompress_setup (const main_extcomp     *decomp,
-			     main_file              *ifile,
-			     uint8_t               *input_buf,
-			     usize_t                 input_bufsize,
-			     uint8_t               *pipe_buf,
-			     usize_t                 pipe_bufsize,
-			     usize_t                 pipe_avail,
-			     usize_t                *nread)
+main_input_decompress_setup (const main_extcomp   *decomp,
+			     main_file            *ifile,
+			     uint8_t              *input_buf,
+			     usize_t               input_bufsize,
+			     uint8_t              *pipe_buf,
+			     usize_t               pipe_bufsize,
+			     usize_t               pipe_avail,
+			     usize_t              *nread)
 {
   /* The two pipes: input and output file descriptors. */
   int outpipefd[2], inpipefd[2];
@@ -2352,6 +2352,7 @@ main_secondary_decompress_check (main_file  *file,
   usize_t try_read = min (input_size, XD3_ALLOCSIZE);
   usize_t check_nread;
   uint8_t check_buf[XD3_ALLOCSIZE];  /* TODO: stack limit */
+  const main_extcomp *decompressor = NULL;
 
   if ((ret = main_file_read (file, check_buf,
 			     try_read,
@@ -2360,23 +2361,47 @@ main_secondary_decompress_check (main_file  *file,
       return ret;
     }
 
-  for (i = 0; i < SIZEOF_ARRAY (extcomp_types); i += 1)
+  if (file->flags & RD_DECOMPSET)
     {
-      const main_extcomp *decomp = & extcomp_types[i];
-
-      if ((check_nread > decomp->magic_size) &&
-	  /* The following expr skips decompression if we are trying
-	   * to read a VCDIFF input and that is the magic number. */
-	  !((decomp->flags & RD_NONEXTERNAL) &&
-	    (file->flags & RD_NONEXTERNAL)) &&
-	  memcmp (check_buf, decomp->magic, decomp->magic_size) == 0)
+      /* This allows the application header to override the magic
+       * number, for whatever reason. */
+      decompressor = file->compressor;
+    }
+  else
+    {
+      for (i = 0; i < SIZEOF_ARRAY (extcomp_types); i += 1)
 	{
-	  file->size_known = 0;
-	  return main_input_decompress_setup (decomp, file,
-					      input_buf, input_size,
-					      check_buf, XD3_ALLOCSIZE,
-					      check_nread, nread);
+	  const main_extcomp *decomp = & extcomp_types[i];
+	  
+	  if (check_nread > decomp->magic_size)
+	    {
+	      /* The following expr checks if we are trying to read a
+	       * VCDIFF input, in which case do not treat it as
+	       * "secondary" decompression. */
+	      int skip_this_type = (decomp->flags & RD_NONEXTERNAL) &&
+  	                           (file->flags & RD_NONEXTERNAL);
+
+	      if (skip_this_type)
+		{
+		  continue;
+		}
+
+	      if (memcmp (check_buf, decomp->magic, decomp->magic_size) == 0)
+		{
+		  decompressor = decomp;
+		  break;
+		}
+	    }
 	}
+    }
+
+  if (decompressor != NULL)
+    {
+      file->size_known = 0;
+      return main_input_decompress_setup (decompressor, file,
+					  input_buf, input_size,
+					  check_buf, XD3_ALLOCSIZE,
+					  check_nread, nread);
     }
 
   /* Now read the rest of the input block. */
@@ -2655,6 +2680,7 @@ main_get_appheader_params (main_file *file, char **parsed,
   /* Set the compressor, initiate de/recompression later. */
   if (file->compressor == NULL && *parsed[1] != 0)
     {
+      file->flags |= RD_DECOMPSET;
       file->compressor = main_get_compressor (parsed[1]);
     }
 }
@@ -2723,22 +2749,13 @@ static int
 main_read_primary_input (main_file   *file,
 			 uint8_t     *buf,
 			 usize_t      size,
-			 usize_t     *nread,
-			 int          is_source)
+			 usize_t     *nread)
 {
 #if EXTERNAL_COMPRESSION
   if (option_decompress_inputs && file->flags & RD_FIRST)
     {
       file->flags &= ~RD_FIRST;
-
-      if (is_source && file->compressor == NULL)
-	{
-	  /* Application header overrides magic number. */
-	}
-      else
-	{
-	  return main_secondary_decompress_check (file, buf, size, nread);
-	}
+      return main_secondary_decompress_check (file, buf, size, nread);
     }
 #endif
 
@@ -2879,7 +2896,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   /* We have to read the first block into the cache now, because
    * size_known can still change (due to secondary
-   * decompression). Calls main_decompress_input_check() via
+   * decompression). Calls main_secondary_decompress_check() via
    * main_read_primary_input(). */
   /* TODO(jmacd): This is a huge hack!  Fix me. */
   lru_size = 1;
@@ -3051,7 +3068,7 @@ main_get_winsize (main_file *ifile) {
  *******************************************************************/
 
 static int
-main_getblk_lru (xd3_source *source, xoff_t blkno, 
+main_getblk_lru (xd3_source *source, xoff_t blkno,
 		 main_blklru** blrup, int *is_new)
 {
   main_blklru *blru = NULL;
@@ -3178,7 +3195,7 @@ main_read_seek_source (xd3_stream *stream,
 	  xoff_t skip_blkno;
 	  usize_t skip_offset;
 
-	  xd3_blksize_div (sfile->source_position, source, 
+	  xd3_blksize_div (sfile->source_position, source,
 			   &skip_blkno, &skip_offset);
 
 	  /* Read past unused data */
@@ -3196,8 +3213,7 @@ main_read_seek_source (xd3_stream *stream,
 	  if ((ret = main_read_primary_input (sfile,
 					      (uint8_t*) blru->blk,
 					      source->blksize,
-					      & nread,
-					      1 /* source */)))
+					      & nread)))
 	    {
 	      return ret;
 	    }
@@ -3295,8 +3311,7 @@ main_getblk_func (xd3_stream *stream,
   if ((ret = main_read_primary_input (sfile,
 				      (uint8_t*) blru->blk,
 				      source->blksize,
-				      & nread,
-				      1 /* source */)))
+				      & nread)))
     {
       return ret;
     }
@@ -3564,8 +3579,7 @@ main_input (xd3_cmd     cmd,
       try_read = (usize_t) min ((xoff_t) config.winsize, input_remain);
 
       if ((ret = main_read_primary_input (ifile, main_bdata,
-					  try_read, & nread,
-					  0 /* !source */)))
+					  try_read, & nread)))
 	{
 	  return EXIT_FAILURE;
 	}

@@ -57,7 +57,7 @@ CFLAGS= -Wall -Wshadow -fno-builtin
 WFLAGS= -Wextra -Wsign-compare -Wconversion -Wextra -Wno-unused-parameter
 
 # $Format: "REL=$Xdelta3Version$" $
-REL=3.0x
+REL=3.0y
 
 RELDIR = xdelta$(REL)
 
@@ -72,7 +72,7 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 	testing/cmp.h testing/delta.h testing/file.h \
 	testing/modify.h testing/random.h testing/segment.h \
 	testing/sizes.h testing/test.h testing/Makefile \
-	testing/regtest.cc README readme.txt
+	testing/regtest.cc README readme.txt xdelta3.1
 
 SWIG_FLAGS = -DXD3_DEBUG=1 \
 	      -DEXTERNAL_COMPRESSION=0 \

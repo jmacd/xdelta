@@ -43,7 +43,7 @@ void mt_init(mtrand *mt, uint32_t seed) {
     /* In the previous versions, MSBs of the seed affect   */
     /* only MSBs of the array mt[].                        */
     /* 2002/01/09 modified by Makoto Matsumoto             */
-    mt->mt_buffer_[i] = 
+    mt->mt_buffer_[i] =
 	(1812433253UL * (mt->mt_buffer_[i-1] ^ (mt->mt_buffer_[i-1] >> 30)) + i);
   }
 }
@@ -70,14 +70,14 @@ uint32_t mt_random (mtrand *mt) {
     mt->mt_buffer_[MT_LEN - 1] = mt->mt_buffer_[MT_IA - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
     mt->mt_index_ = 0;
   }
-  
+
   y = mt->mt_buffer_[mt->mt_index_++];
-  
+
   y ^= (y >> 11);
   y ^= (y << 7) & 0x9d2c5680UL;
   y ^= (y << 15) & 0xefc60000UL;
   y ^= (y >> 18);
-  
+
   return y;
 }
 
@@ -89,7 +89,7 @@ static uint32_t
 mt_exp_rand (uint32_t mean, uint32_t max_value)
 {
   double mean_d = mean;
-  double erand  = log (1.0 / (mt_random (&static_mtrand) / 
+  double erand  = log (1.0 / (mt_random (&static_mtrand) /
 			      (double)UINT32_MAX));
   uint32_t x = (uint32_t) (mean_d * erand + 0.5);
 
@@ -1961,7 +1961,7 @@ test_recode_command2 (xd3_stream *stream, int has_source,
 
   /* Now decode */
   sprintf (dcmd, "%s -fd ", program_name);
-  
+
   if (has_source)
     {
       strcat (dcmd, "-s ");
@@ -1987,14 +1987,14 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     }
 
   return 0;
-}  
+}
 
 static int
 test_recode_command (xd3_stream *stream, int ignore)
 {
   /* Things to test:
    * - with and without a source file (recode does not change)
-   * 
+   *
    * (recode may or may not change -- 8 variations)
    * - with and without adler32
    * - with and without app header
@@ -2146,6 +2146,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
   int ret;
   char buf[TESTBUFSIZE];
   const main_extcomp *ext;
+  xoff_t dsize;
 
   mt_init (& static_mtrand, 0x9f73f7fc);
 
@@ -2153,53 +2154,73 @@ test_source_decompression (xd3_stream *stream, int ignore)
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
   /* Use gzip. */
-  if ((ext = main_get_compressor ("G")) == NULL) { DP(RINT "skipped"); return 0; }
+  if ((ext = main_get_compressor ("G")) == NULL)
+    {
+      DP(RINT "skipped");
+      return 0;
+    }
 
   /* Save an uncompressed copy. */
   if ((ret = test_save_copy (TEST_TARGET_FILE))) { return ret; }
 
-  /* Compress the target. */
-  sprintf (buf, "%s %s < %s > %s", ext->recomp_cmdname,
-	   ext->recomp_options, TEST_TARGET_FILE, TEST_SOURCE_FILE);
+  /* Compress the source. */
+  sprintf (buf, "%s -1 %s < %s > %s", ext->recomp_cmdname,
+	   ext->recomp_options, TEST_COPY_FILE, TEST_SOURCE_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-
-  /* Copy back to the source. */
-  sprintf (buf, "cp -f %s %s", TEST_SOURCE_FILE, TEST_TARGET_FILE);
+  /* Compress the target. */
+  sprintf (buf, "%s -9 %s < %s > %s", ext->recomp_cmdname,
+	   ext->recomp_options, TEST_COPY_FILE, TEST_TARGET_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Now the two identical files are compressed.  Delta-encode the target,
    * with decompression. */
-  sprintf (buf, "%s -v -eq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e -A -vfq -s%s %s %s", program_name, TEST_SOURCE_FILE,
+	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
+
+  /* Check that the compressed file is small (b/c inputs are
+   * identical). */
+  if ((ret = test_file_size (TEST_DELTA_FILE, & dsize))) { return ret; }
+  /* Deltas for identical files should be very small. */
+  if (dsize > 200)
+    {
+      DP(RINT "external compression did not happen\n");
+      stream->msg = "external compression did not happen";
+      return XD3_INTERNAL;
+    }
 
   /* Decode the delta file with recompression disabled, should get an
    * uncompressed file out. */
-  sprintf (buf, "%s -v -dq -R -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  sprintf (buf, "%s -v -dq -R -s%s %s %s", program_name,
+	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (stream, TEST_COPY_FILE, TEST_RECON_FILE))) { return ret; }
+  if ((ret = compare_files (stream, TEST_COPY_FILE,
+			    TEST_RECON_FILE))) { return ret; }
 
   /* Decode the delta file with recompression, should get a compressed file
    * out.  But we can't compare compressed files directly. */
-  sprintf (buf, "%s -v -dqf -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  sprintf (buf, "%s -v -dqf -s%s %s %s", program_name,
+	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  sprintf (buf, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options, TEST_RECON_FILE, TEST_RECON2_FILE);
+  sprintf (buf, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options,
+	   TEST_RECON_FILE, TEST_RECON2_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (stream, TEST_COPY_FILE, TEST_RECON2_FILE))) { return ret; }
+  if ((ret = compare_files (stream, TEST_COPY_FILE,
+			    TEST_RECON2_FILE))) { return ret; }
 
   /* Encode with decompression disabled */
-  sprintf (buf, "%s -v -feqD -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  sprintf (buf, "%s -e -D -vfq -s%s %s %s", program_name,
+	   TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  /* Decode the delta file with recompression enabled, it doesn't matter,
-   * should get the compressed file out. */
-  sprintf (buf, "%s -v -fdq -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  /* Decode the delta file with decompression disabled, should get the
+   * identical compressed file out. */
+  sprintf (buf, "%s -d -D -vfq -s%s %s %s", program_name,
+	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE))) { return ret; }
+  if ((ret = compare_files (stream, TEST_TARGET_FILE,
+			    TEST_RECON_FILE))) { return ret; }
 
-  /* Try again with recompression disabled, it doesn't make a difference. */
-  sprintf (buf, "%s -v -fqRd -s%s %s %s", program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
-  if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (stream, TEST_TARGET_FILE, TEST_RECON_FILE))) { return ret; }
   test_cleanup();
   return 0;
 }
