@@ -358,9 +358,6 @@ static xd3_stream *merge_stream = NULL;
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
-  /* The entry for xdelta3 must be 0 because the program_name is set there. */
-  { "xdelta3",  "-cfq",  "xdelta3",    "-dcfq",  "X", "\xd6\xc3\xc4", 3,
-    RD_NONEXTERNAL },
   { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
   { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
   { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
@@ -2397,6 +2394,14 @@ main_secondary_decompress_check (main_file  *file,
 
   if (decompressor != NULL)
     {
+      if (! option_quiet)
+	{
+	  XPR(NT "externally compressed input: %s %s < %s\n",
+	      decompressor->decomp_cmdname,
+	      decompressor->decomp_options,
+	      file->filename);
+	}
+
       file->size_known = 0;
       return main_input_decompress_setup (decompressor, file,
 					  input_buf, input_size,
@@ -2811,7 +2816,7 @@ main_open_output (xd3_stream *stream, main_file *ofile)
     {
       if (! option_quiet)
 	{
-	  XPR(NT "%s %s | %s\n",
+	  XPR(NT "externally compressed output: %s %s > %s\n",
 	     ofile->compressor->recomp_cmdname,
 	     ofile->compressor->recomp_options,
 	     ofile->filename);
@@ -4008,8 +4013,6 @@ main (int argc, char **argv)
   argv = env_argv;
   argc = env_argc;
   program_name = env_argv[0];
-  extcomp_types[0].recomp_cmdname = program_name;
-  extcomp_types[0].decomp_cmdname = program_name;
 
  takearg:
   my_optarg = NULL;
