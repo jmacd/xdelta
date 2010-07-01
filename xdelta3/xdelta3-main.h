@@ -314,8 +314,10 @@ static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
 static usize_t     option_sprevsz            = XD3_DEFAULT_SPREVSZ;
 
 /* These variables are supressed to avoid their use w/o support.  main() warns
- * appropriately. */
+ * appropriately when external compression is not enabled. */
 #if EXTERNAL_COMPRESSION
+static int         num_subprocs = 0;
+static int         option_force2             = 0;
 static int         option_decompress_inputs  = 1;
 static int         option_recompress_outputs = 1;
 #endif
@@ -358,18 +360,16 @@ static xd3_stream *merge_stream = NULL;
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
-  { "bzip2",    "-cf",   "bzip2",      "-dcf",   "B", "BZh",          3, 0 },
-  { "gzip",     "-cf",   "gzip",       "-dcf",   "G", "\037\213",     2, 0 },
-  { "compress", "-cf",   "uncompress", "-cf",    "Z", "\037\235",     2, 0 },
+  { "bzip2",    "-c",   "bzip2",      "-dc",   "B", "BZh",          3, 0 },
+  { "gzip",     "-c",   "gzip",       "-dc",   "G", "\037\213",     2, 0 },
+  { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0 },
 
   /* TODO: add commandline support for magic-less formats */
-  /*{ "lzma", "-cf",   "lzma", "-dcf",   "M", "]\000", 2, 0 },*/
+  /*{ "lzma", "-c",   "lzma", "-dc",   "M", "]\000", 2, 0 },*/
 
   /* Xz is lzma with a magic number http://tukaani.org/xz/ */
-  { "xz", "-cf", "xz", "-dcf", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0 },
+  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0 },
 };
-
-// };
 
 static int main_input (xd3_cmd cmd, main_file *ifile,
                        main_file *ofile, main_file *sfile);
@@ -459,8 +459,10 @@ reset_defaults(void)
   option_use_appheader = 1;
   option_use_checksum = 1;
 #if EXTERNAL_COMPRESSION
+  option_force2 = 0;
   option_decompress_inputs  = 1;
   option_recompress_outputs = 1;
+  num_subprocs = 0;
 #endif
 #if VCDIFF_TOOLS
   option_print_cpymode = 1;
@@ -974,7 +976,7 @@ xd3_posix_io (int fd, uint8_t *buf, usize_t size,
 	    {
 	      return ret;
 	    }
-	  result = 0;
+	  continue;
 	}
 
       if (nread != NULL && result == 0) { break; }
@@ -1105,12 +1107,6 @@ main_file_seek (main_file *xfile, xoff_t pos)
   }
 # endif
 #endif
-
-  if (ret)
-    {
-      XPR(NT "seek to %"Q"u failed: %s: %s\n",
-	  pos, xfile->filename, xd3_mainerror (ret));
-    }
 
   return ret;
 }
@@ -2088,6 +2084,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
  * input-decompression pipe.
  */
 
+#include <signal.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -2095,11 +2092,14 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 /* Remember which pipe FD is which. */
 #define PIPE_READ_FD  0
 #define PIPE_WRITE_FD 1
-
-static pid_t ext_subprocs[2];
+#define MAX_SUBPROCS  4  /* max(source + copier + output,
+			        source + copier + input + copier). */
+static pid_t ext_subprocs[MAX_SUBPROCS];
 static char* ext_tmpfile = NULL;
 
-/* Like write(), but makes repeated calls to empty the buffer. */
+/* Like write(), applies to a fd instead of a main_file, for the pipe
+ * copier subprocess.  Does not print an error, to facilitate ignoring
+ * trailing garbage, see main_pipe_copier(). */
 static int
 main_pipe_write (int outfd, uint8_t *exist_buf, usize_t remain)
 {
@@ -2108,7 +2108,6 @@ main_pipe_write (int outfd, uint8_t *exist_buf, usize_t remain)
   if ((ret = xd3_posix_io (outfd, exist_buf, remain,
 			   (xd3_posix_func*) &write, NULL)))
     {
-      XPR(NT "pipe write failed: %s", xd3_mainerror (ret));
       return ret;
     }
 
@@ -2125,18 +2124,24 @@ main_waitpid_check(pid_t pid)
   if (waitpid (pid, & status, 0) < 0)
     {
       ret = get_errno ();
-      XPR(NT "compression subprocess: wait: %s\n", xd3_mainerror (ret));
+      XPR(NT "external compression [pid %d] wait: %s\n",
+	  pid, xd3_mainerror (ret));
     }
   else if (! WIFEXITED (status))
     {
       ret = ECHILD;
-      XPR(NT "compression subprocess: signal %d\n",
-	 WIFSIGNALED (status) ? WTERMSIG (status) : WSTOPSIG (status));
+      XPR(NT "external compression [pid %d] signal %d\n",
+	  pid, WIFSIGNALED (status) ? WTERMSIG (status) : WSTOPSIG (status));
     }
   else if (WEXITSTATUS (status) != 0)
     {
       ret = ECHILD;
-      XPR(NT "compression subprocess: exit %d\n", WEXITSTATUS (status));
+      if (option_verbose > 1)
+	{
+	  /* Presumably, the error was printed by the subprocess. */
+	  XPR(NT "external compression [pid %d] exit %d\n",
+	      pid, WEXITSTATUS (status));
+	}
     }
 
   return ret;
@@ -2149,7 +2154,7 @@ main_external_compression_finish (void)
   int i;
   int ret;
 
-  for (i = 0; i < 2; i += 1)
+  for (i = 0; i < num_subprocs; i += 1)
     {
       if (! ext_subprocs[i]) { continue; }
 
@@ -2174,15 +2179,55 @@ main_pipe_copier (uint8_t    *pipe_buf,
 		  int         outfd)
 {
   int ret;
+  xoff_t garbage = 0;
+
+  /* Prevent SIGPIPE signals, allow EPIPE return values instead.  This
+   * is safe to comment-out, except that the -F flag will not work
+   * properly (the parent would need to treat WTERMSIG(status) ==
+   * SIGPIPE). */
+  struct sigaction sa;
+  sa.sa_handler = SIG_IGN;
+  sigaction (SIGPIPE, &sa, NULL);
 
   for (;;)
     {
+      /* force_drain will be set when option_force and EPIPE cause us
+       * to skip data.  This is reset each time through the loop, so
+       * the break condition below works. */
+      int force_drain = 0;
       if (nread > 0 && (ret = main_pipe_write (outfd, pipe_buf, nread)))
 	{
-	  return ret;
+	  if (option_force && ret == EPIPE)
+	    {
+	      /* This causes the loop to continue reading until nread
+	       * == 0. */
+	      garbage += nread;
+	      force_drain = 1;
+	    }
+	  else if (ret == EPIPE)
+	    {
+	      XPR(NT "external compression closed the pipe\n");
+	      if (option_verbose)
+		{
+		  if (!option_force2)
+		    {
+		      XPR(NT "use -F to force the subprocess\n");
+		    }
+		  if (!option_force)
+		    {
+		      XPR(NT "use -f to force this process\n");
+		    }
+		}
+	      return ret;
+	    }
+	  else
+	    {
+	      XPR(NT "pipe write failed: %s\n", xd3_mainerror (ret));
+	      return ret;
+	    }
 	}
 
-      if (nread < pipe_bufsize)
+      if (nread < pipe_bufsize && !force_drain)
 	{
 	  break;
 	}
@@ -2194,6 +2239,11 @@ main_pipe_copier (uint8_t    *pipe_buf,
 	}
     }
 
+  if (garbage != 0)
+    {
+      XPR(NT "trailing garbage ignored in %s (%"Q"u bytes)\n",
+	  ifile->filename, garbage);
+    }
   return 0;
 }
 
@@ -2236,6 +2286,11 @@ main_input_decompress_setup (const main_extcomp   *decomp,
   /* The first child runs the decompression process: */
   if (decomp_id == 0)
     {
+      if (option_verbose > 2)
+	{
+	  XPR(NT "external decompression pid %d\n", getpid ());
+	}
+
       /* Setup pipes: write to the outpipe, read from the inpipe. */
       if (dup2 (outpipefd[PIPE_WRITE_FD], STDOUT_FILENO) < 0 ||
 	  dup2 (inpipefd[PIPE_READ_FD], STDIN_FILENO) < 0 ||
@@ -2244,7 +2299,9 @@ main_input_decompress_setup (const main_extcomp   *decomp,
 	  close (inpipefd[PIPE_READ_FD]) ||
 	  close (inpipefd[PIPE_WRITE_FD]) ||
 	  execlp (decomp->decomp_cmdname, decomp->decomp_cmdname,
-		  decomp->decomp_options, NULL))
+		  decomp->decomp_options,
+		  option_force2 ? "-f" : NULL,
+		  NULL))
 	{
 	  XPR(NT "child process %s failed to execute: %s\n",
 	      decomp->decomp_cmdname, xd3_mainerror (get_errno ()));
@@ -2253,7 +2310,8 @@ main_input_decompress_setup (const main_extcomp   *decomp,
       _exit (127);
     }
 
-  ext_subprocs[0] = decomp_id;
+  XD3_ASSERT(num_subprocs < MAX_SUBPROCS);
+  ext_subprocs[num_subprocs++] = decomp_id;
 
   if ((copier_id = fork ()) < 0)
     {
@@ -2265,6 +2323,11 @@ main_input_decompress_setup (const main_extcomp   *decomp,
   if (copier_id == 0)
     {
       int exitval = 0;
+
+      if (option_verbose > 2)
+	{
+	  XPR(NT "child pipe-copier pid %d\n", getpid ());
+	}
 
       if (close (inpipefd[PIPE_READ_FD]) ||
 	  main_pipe_copier (pipe_buf, pipe_bufsize, pipe_avail,
@@ -2279,7 +2342,8 @@ main_input_decompress_setup (const main_extcomp   *decomp,
       _exit (exitval);
     }
 
-  ext_subprocs[1] = copier_id;
+  XD3_ASSERT(num_subprocs < MAX_SUBPROCS);
+  ext_subprocs[num_subprocs++] = copier_id;
 
   /* The parent closes both pipes after duplicating the output of
    * compression. */
@@ -2369,7 +2433,7 @@ main_secondary_decompress_check (main_file  *file,
       for (i = 0; i < SIZEOF_ARRAY (extcomp_types); i += 1)
 	{
 	  const main_extcomp *decomp = & extcomp_types[i];
-	  
+
 	  if (check_nread > decomp->magic_size)
 	    {
 	      /* The following expr checks if we are trying to read a
@@ -2396,9 +2460,10 @@ main_secondary_decompress_check (main_file  *file,
     {
       if (! option_quiet)
 	{
-	  XPR(NT "externally compressed input: %s %s < %s\n",
+	  XPR(NT "externally compressed input: %s %s%s < %s\n",
 	      decompressor->decomp_cmdname,
 	      decompressor->decomp_options,
+	      (option_force2 ? " -f" : ""),
 	      file->filename);
 	}
 
@@ -2459,13 +2524,20 @@ main_recompress_output (main_file *ofile)
   /* The child runs the recompression process: */
   if (recomp_id == 0)
     {
+      if (option_verbose > 2)
+	{
+	  XPR(NT "external recompression pid %d\n", getpid ());
+	}
+
       /* Setup pipes: write to the output file, read from the pipe. */
       if (dup2 (XFNO (ofile), STDOUT_FILENO) < 0 ||
 	  dup2 (pipefd[PIPE_READ_FD], STDIN_FILENO) < 0 ||
 	  close (pipefd[PIPE_READ_FD]) ||
 	  close (pipefd[PIPE_WRITE_FD]) ||
 	  execlp (recomp->recomp_cmdname, recomp->recomp_cmdname,
-		  recomp->recomp_options, NULL))
+		  recomp->recomp_options,
+		  option_force2 ? "-f" : NULL,
+		  NULL))
 	{
 	  XPR(NT "child process %s failed to execute: %s\n",
 	      recomp->recomp_cmdname, xd3_mainerror (get_errno ()));
@@ -2474,7 +2546,8 @@ main_recompress_output (main_file *ofile)
       _exit (127);
     }
 
-  ext_subprocs[0] = recomp_id;
+  XD3_ASSERT(num_subprocs < MAX_SUBPROCS);
+  ext_subprocs[num_subprocs++] = recomp_id;
 
   /* The parent closes both pipes after duplicating the output-fd for
    * writing to the compression pipe. */
@@ -2816,10 +2889,11 @@ main_open_output (xd3_stream *stream, main_file *ofile)
     {
       if (! option_quiet)
 	{
-	  XPR(NT "externally compressed output: %s %s > %s\n",
-	     ofile->compressor->recomp_cmdname,
-	     ofile->compressor->recomp_options,
-	     ofile->filename);
+	  XPR(NT "externally compressed output: %s %s%s > %s\n",
+	      ofile->compressor->recomp_cmdname,
+	      ofile->compressor->recomp_options,
+	      (option_force2 ? " -f" : ""),
+	      ofile->filename);
 	}
 
       if ((ret = main_recompress_output (ofile)))
@@ -3162,9 +3236,6 @@ main_read_seek_source (xd3_stream *stream,
 	}
     }
 
-  /* There's a chance here, that an genuine lseek error will cause
-   * xdelta3 to shift into non-seekable mode, entering a degraded
-   * condition.  */
   if (sfile->seek_failed || ret != 0)
     {
       /* For an unseekable file (or other seek error, does it
@@ -3173,7 +3244,7 @@ main_read_seek_source (xd3_stream *stream,
 	{
 	  /* Could assert !IS_ENCODE(), this shouldn't happen
 	   * because of do_src_fifo during encode. */
-	  if (option_verbose)
+	  if (!option_quiet)
 	    {
 	      XPR(NT "source can't seek backwards; requested block offset "
 		  "%"Q"u source position is %"Q"u\n",
@@ -3186,11 +3257,19 @@ main_read_seek_source (xd3_stream *stream,
 	  return XD3_TOOFARBACK;
 	}
 
-      if (option_verbose > 2 || (option_verbose > 1 && !sfile->seek_failed))
+      /* There's a chance here, that an genuine lseek error will cause
+       * xdelta3 to shift into non-seekable mode, entering a degraded
+       * condition.  */
+      if (!sfile->seek_failed && option_verbose)
 	{
-	  XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
-	      pos - sfile->source_position,
-	      sfile->source_position);
+	  XPR(NT "source can't seek, will use FIFO for %s\n",
+	      sfile->filename);
+
+	  if (option_verbose > 1)
+	    {
+	      XPR(NT "seek error at offset %"Q"u: %s\n",
+		  pos, xd3_mainerror (ret));
+	    }
 	}
 
       sfile->seek_failed = 1;
@@ -3214,6 +3293,13 @@ main_read_seek_source (xd3_stream *stream,
 	    }
 
 	  XD3_ASSERT (is_new);
+
+	  if (option_verbose > 1)
+	    {
+	      XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
+		  pos - sfile->source_position,
+		  sfile->source_position);
+	    }
 
 	  if ((ret = main_read_primary_input (sfile,
 					      (uint8_t*) blru->blk,
@@ -3974,7 +4060,7 @@ main (int argc, char **argv)
 #endif
 {
   static const char *flags =
-    "0123456789cdefhnqvDJNORTVs:m:B:C:E:F:I:L:O:M:P:W:A::S::";
+    "0123456789cdefhnqvDFJNORTVs:m:B:C:E:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
   main_file ifile;
   main_file ofile;
@@ -4149,6 +4235,14 @@ main (int argc, char **argv)
 	  option_level = ret - '0';
 	  break;
 	case 'f': option_force = 1; break;
+	case 'F': 
+#if EXTERNAL_COMPRESSION
+	  option_force2 = 1; 
+#else
+	  XPR(NT "warning: -F option ignored, "
+	      "external compression support was not compiled\n");
+	  break;
+#endif
 	case 'v': option_verbose += 1; option_quiet = 0; break;
 	case 'q': option_quiet = 1; option_verbose = 0; break;
 	case 'c': option_stdout = 1; break;
@@ -4423,7 +4517,10 @@ main_help (void)
   DP(RINT "   -d           decompress\n");
   DP(RINT "   -e           compress%s\n",
      XD3_ENCODER ? "" : " [Not compiled]");
-  DP(RINT "   -f           force overwrite\n");
+  DP(RINT "   -f           force (overwrite, ignore trailing garbage)\n");
+#if EXTERNAL_COMPRESSION
+  DP(RINT "   -F           force the external-compression subprocess\n");
+#endif
   DP(RINT "   -h           show help\n");
   DP(RINT "   -q           be quiet\n");
   DP(RINT "   -v           be verbose (max 2)\n");
