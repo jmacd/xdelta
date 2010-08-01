@@ -153,6 +153,7 @@ typedef enum
   RD_FIRST       = (1 << 0),
   RD_NONEXTERNAL = (1 << 1),
   RD_DECOMPSET   = (1 << 2),
+  RD_MAININPUT   = (1 << 3),
 } xd3_read_flags;
 
 /* main_file->mode values */
@@ -2496,6 +2497,19 @@ main_secondary_decompress_check (main_file  *file,
 	      decompressor->decomp_options,
 	      (option_force2 ? " -f" : ""),
 	      file->filename);
+	  if (file->flags & RD_MAININPUT)
+	    {
+	      XPR(NT
+  "WARNING: the encoder is automatically decompressing the primary input\n");
+	      XPR(NT 
+  "WARNING: the decoder will automatically re-compress the primary output\n");
+	      XPR(NT 
+  "WARNING: this may result in different compressed data and checksums\n");
+	      XPR(NT 
+  "WARNING: despite being identical data; if this is an issue, use -D\n");
+	      XPR(NT 
+  "WARNING: to avoid decompression and/or manually decompress the inputs\n");
+	    }
 	}
 
       file->size_known = 0;
@@ -4400,7 +4414,7 @@ main (int argc, char **argv)
       goto cleanup;
     }
 
-  ifile.flags    = RD_FIRST;
+  ifile.flags    = RD_FIRST | RD_MAININPUT;
   sfile.flags    = RD_FIRST;
   sfile.filename = option_source_filename;
 
