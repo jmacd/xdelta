@@ -203,7 +203,7 @@ static void
 test_unlink (char* file)
 {
   char buf[TESTBUFSIZE];
-  while (_unlink (file) != 0)
+  while (unlink (file) != 0)
     {
       if (errno == ENOENT)
 	{

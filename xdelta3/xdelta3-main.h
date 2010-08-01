@@ -418,12 +418,12 @@ main_config (void)
   DP(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
   DP(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
   DP(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
-  DP(RINT "sizeof(void*)=%ld\n", sizeof(void*));
-  DP(RINT "sizeof(int)=%ld\n", sizeof(int));
-  DP(RINT "sizeof(uint32_t)=%ld\n", sizeof(uint32_t));
-  DP(RINT "sizeof(uint64_t)=%ld\n", sizeof(uint64_t));
-  DP(RINT "sizeof(usize_t)=%ld\n", sizeof(usize_t));
-  DP(RINT "sizeof(xoff_t)=%ld\n", sizeof(xoff_t));
+  DP(RINT "sizeof(void*)=%d\n", sizeof(void*));
+  DP(RINT "sizeof(int)=%d\n", sizeof(int));
+  DP(RINT "sizeof(uint32_t)=%d\n", sizeof(uint32_t));
+  DP(RINT "sizeof(uint64_t)=%d\n", sizeof(uint64_t));
+  DP(RINT "sizeof(usize_t)=%d\n", sizeof(usize_t));
+  DP(RINT "sizeof(xoff_t)=%d\n", sizeof(xoff_t));
 
   return EXIT_SUCCESS;
 }
@@ -2764,7 +2764,7 @@ main_get_appheader_params (main_file *file, char **parsed,
 	 * Possibly the name header is bad, should be off by default.
 	 * Possibly we just want to remember external/compression
 	 * settings. */
-	char *last_slash = strrchr(other->filename, '/');
+	const char *last_slash = strrchr(other->filename, '/');
 
 	if (last_slash != NULL) {
 	  usize_t dlen = (usize_t) (last_slash - other->filename);
@@ -4149,7 +4149,7 @@ main (int argc, char **argv)
     }
   while (my_optstr)
     {
-      char *s;
+      const char *s;
       my_optarg = NULL;
       if ((ret = *my_optstr++) == 0) { my_optind += 1; goto takearg; }
 
