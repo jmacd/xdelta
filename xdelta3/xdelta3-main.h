@@ -530,11 +530,12 @@ get_errno (void)
     }
   return errno;
 #else
-  DWORD errNum = GetLastError();
-  if (errNum == NO_ERROR) {
-	  errNum = XD3_INTERNAL;
-  }
-  return errNum;
+  DWORD err_num = GetLastError();
+  if (err_num == NO_ERROR) 
+    {
+      err_num = XD3_INTERNAL;
+    }
+  return err_num;
 #endif
 }
 
@@ -542,22 +543,28 @@ const char*
 xd3_mainerror(int err_num) {
 #ifndef _WIN32
 	const char* x = xd3_strerror (err_num);
-	if (x != NULL) {
-		return x;
-	}
+	if (x != NULL) 
+	  {
+	    return x;
+	  }
 	return strerror(err_num);
 #else
 	static char err_buf[256];
 	const char* x = xd3_strerror (err_num);
-	if (x != NULL) {
-		return x;
-	}
+	if (x != NULL)
+	  {
+	    return x;
+	  }
 	memset (err_buf, 0, 256);
 	FormatMessage (FORMAT_MESSAGE_FROM_SYSTEM |
 		       FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL, err_num,
-		MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
-		err_buf, 256, NULL);
+		       NULL, err_num,
+		       MAKELANGID (LANG_NEUTRAL, SUBLANG_DEFAULT),
+		       err_buf, 256, NULL);
+	if (err_buf[0] != 0 && err_buf[strlen(err_buf) - 1] == '\n')
+	  {
+	    err_buf[strlen(err_buf) - 1] = 0;
+	  }
 	return err_buf;
 #endif
 }
@@ -884,16 +891,18 @@ main_file_open (main_file *xfile, const char* name, int mode)
 
 #elif XD3_WIN32
   xfile->file = CreateFile(name,
-	  (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
-	  FILE_SHARE_READ,
-	  NULL,
-	  (mode == XO_READ) ? OPEN_EXISTING :
+			   (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
+			   FILE_SHARE_READ,
+			   NULL,
+			   (mode == XO_READ) ? 
+			   OPEN_EXISTING :
 			   (option_force ? CREATE_ALWAYS : CREATE_NEW),
-	  FILE_ATTRIBUTE_NORMAL,
-	  NULL);
-  if (xfile->file == INVALID_HANDLE_VALUE) {
-	  ret = get_errno ();
-  }
+			   FILE_ATTRIBUTE_NORMAL,
+			   NULL);
+  if (xfile->file == INVALID_HANDLE_VALUE) 
+    {
+      ret = get_errno ();
+    }
 #endif
   if (ret) { XF_ERROR ("open", name, ret); }
   else     { xfile->realname = name; xfile->nread = 0; }
@@ -905,27 +914,28 @@ main_file_stat (main_file *xfile, xoff_t *size)
 {
   int ret = 0;
 #if XD3_WIN32
+  if (GetFileType(xfile->file) != FILE_TYPE_DISK)
+    {
+      return -1;
+    }
 # if (_WIN32_WINNT >= 0x0500)
-  LARGE_INTEGER li;
-  if (GetFileSizeEx(xfile->file, &li) == 0)
-    {
-      ret = get_errno ();
-    }
-  else
-    {
-      *size = li.QuadPart;
-    }
+  {
+    LARGE_INTEGER li;
+    if (GetFileSizeEx(xfile->file, &li) == 0)
+      {
+	return get_errno ();
+      }
+    *size = li.QuadPart;
+  }
 # else
-  DWORD filesize = GetFileSize(xfile->file, NULL);
-  if (filesize == INVALID_FILE_SIZE)
-    {
-      ret = GetLastError();
-      if (ret != NO_ERROR)
-	{
-	  return ret;
-	}
-    }
-  *size = filesize;
+  {
+    DWORD filesize = GetFileSize(xfile->file, NULL);
+    if (filesize == INVALID_FILE_SIZE)
+      {
+	return get_errno ()
+      }
+    *size = filesize;
+  }
 # endif
 #else
   struct stat sbuf;
@@ -988,6 +998,39 @@ xd3_posix_io (int fd, uint8_t *buf, usize_t size,
 }
 #endif
 
+#if XD3_WIN32
+static int
+xd3_win32_io (HANDLE file, uint8_t *buf, usize_t size,
+	      int is_read, usize_t *nread)
+{
+  int ret = 0;
+  usize_t nproc = 0;
+
+  while (nproc < size)
+    {
+      DWORD nproc2;
+      if ((is_read ?
+	   ReadFile (file, buf + nproc, size - nproc, &nproc2, NULL) :
+	   WriteFile (file, buf + nproc, size - nproc, &nproc2, NULL)) == 0)
+	{
+	  ret = get_errno();
+	  if (ret != ERROR_HANDLE_EOF && ret != ERROR_BROKEN_PIPE)
+	    {
+	      return ret;
+	    }
+	  /* By falling through here, we'll break this loop in the
+	   * read case in case of eof or broken pipe. */
+	}
+
+      nproc += (usize_t) nproc2;
+
+      if (nread != NULL && nproc2 == 0) { break; }
+    }
+  if (nread != NULL) { (*nread) = nproc; }
+  return 0;
+}
+#endif
+
 /* POSIX is unbuffered, while STDIO is buffered.  main_file_read()
  * should always be called on blocks. */
 static int
@@ -1015,14 +1058,8 @@ main_file_read (main_file  *ifile,
 
 #elif XD3_POSIX
   ret = xd3_posix_io (ifile->file, buf, size, (xd3_posix_func*) &read, nread);
-
 #elif XD3_WIN32
-  DWORD nread2;
-  if (ReadFile (ifile->file, buf, size, &nread2, NULL) == 0) {
-	  ret = get_errno();
-  } else {
-      *nread = (usize_t)nread2;
-  }
+  ret = xd3_win32_io (ifile->file, buf, size, 1 /* is_read */, nread);
 #endif
 
   if (ret)
@@ -1055,15 +1092,8 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
   ret = xd3_posix_io (ofile->file, buf, size, (xd3_posix_func*) &write, NULL);
 
 #elif XD3_WIN32
-  DWORD nwrite;
-  if (WriteFile(ofile->file, buf, size, &nwrite, NULL) == 0) {
-	  ret = get_errno ();
-  } else {
-	  if (size != nwrite) {
-		  XPR(NT "Incorrect write count");
-		  ret = XD3_INTERNAL;
-	  }
-  }
+  ret = xd3_win32_io (ofile->file, buf, size, 0, NULL);
+
 #endif
 
   if (ret)
@@ -1096,15 +1126,16 @@ main_file_seek (main_file *xfile, xoff_t pos)
 # if (_WIN32_WINNT >= 0x0500)
   LARGE_INTEGER move, out;
   move.QuadPart = pos;
-  if (SetFilePointerEx(xfile->file, move, &out, FILE_BEGIN) == 0) {
-	  ret = get_errno ();
-  }
+  if (SetFilePointerEx(xfile->file, move, &out, FILE_BEGIN) == 0) 
+    {
+      ret = get_errno ();
+    }
 # else
   if (SetFilePointer(xfile->file, (LONG)pos, NULL, FILE_BEGIN) ==
-					INVALID_SET_FILE_POINTER)
-  {
-	  ret = get_errno ();
-  }
+      INVALID_SET_FILE_POINTER)
+    {
+      ret = get_errno ();
+    }
 # endif
 #endif
 
@@ -1305,8 +1336,8 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	  return ret;
 	}
 
-      addr_bytes = stream->addr_sect.buf - addr_before;
-      inst_bytes = stream->inst_sect.buf - inst_before;
+      addr_bytes = (usize_t)(stream->addr_sect.buf - addr_before);
+      inst_bytes = (usize_t)(stream->inst_sect.buf - inst_before);
 
       VC(UT "  %06"Q"u %03u  %s %6u", stream->dec_winstart + size,
 	 option_print_cpymode ? code : 0,
@@ -1629,7 +1660,7 @@ main_recode_func (xd3_stream* stream, main_file *ofile)
       option_appheader != NULL)
     {
       xd3_set_appheader (recode_stream, option_appheader,
-			 strlen ((char*) option_appheader));
+			 (usize_t) strlen ((char*) option_appheader));
     }
   else if (option_use_appheader != 0 &&
 	   option_appheader == NULL)
@@ -1867,7 +1898,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
       option_appheader != NULL)
     {
       xd3_set_appheader (recode_stream, option_appheader,
-			 strlen ((char*) option_appheader));
+			 (usize_t) strlen ((char*) option_appheader));
     }
 
   /* Enter the ENC_INPUT state and bypass the next_in == NULL test
@@ -2012,7 +2043,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
       if (window_srcset) {
 	recode_stream->srcwin_decided = 1;
 	recode_stream->src = &recode_source;
-	recode_source.srclen = window_srcmax - window_srcmin;
+	recode_source.srclen = (usize_t)(window_srcmax - window_srcmin);
 	recode_source.srcbase = window_srcmin;
 	recode_stream->taroff = recode_source.srclen;
 
@@ -2676,13 +2707,13 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 
       iname = main_apphead_string (input->filename);
       icomp = (input->compressor == NULL) ? "" : input->compressor->ident;
-      len = strlen (iname) + strlen (icomp) + 2;
+      len = (usize_t) strlen (iname) + strlen (icomp) + 2;
 
       if (sfile->filename != NULL)
 	{
 	  sname = main_apphead_string (sfile->filename);
 	  scomp = (sfile->compressor == NULL) ? "" : sfile->compressor->ident;
-	  len += strlen (sname) + strlen (scomp) + 2;
+	  len += (usize_t) strlen (sname) + strlen (scomp) + 2;
 	}
       else
 	{
@@ -2705,7 +2736,8 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 	}
     }
 
-  xd3_set_appheader (stream, appheader_used, strlen ((char*)appheader_used));
+  xd3_set_appheader (stream, appheader_used, 
+		     (usize_t) strlen ((char*)appheader_used));
 
   return 0;
 }
@@ -2735,7 +2767,7 @@ main_get_appheader_params (main_file *file, char **parsed,
 	char *last_slash = strrchr(other->filename, '/');
 
 	if (last_slash != NULL) {
-	  usize_t dlen = last_slash - other->filename;
+	  usize_t dlen = (usize_t) (last_slash - other->filename);
 
 	  XD3_ASSERT(file->filename_copy == NULL);
 	  file->filename_copy =
@@ -2944,7 +2976,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   if (sfile->size_known && source_size < option_srcwinsz)
     {
-      blksize = (source_size / MIN_LRU_SIZE);
+      blksize = (usize_t) (source_size / MIN_LRU_SIZE);
     }
   else
     {
@@ -2995,7 +3027,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
     {
       main_free (block0.blk);
 
-      XPR(NT "error reading source %s: %s\n",
+      XPR(NT "error reading source: %s: %s\n",
 	  sfile->filename,
 	  xd3_mainerror (ret));
 
@@ -3015,7 +3047,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
    * will be passed via xd3_config. */
   if (sfile->size_known && source_size <= option_srcwinsz)
     {
-      lru_size = (source_size + blksize - 1) / blksize;
+      lru_size = (usize_t) (source_size + blksize - 1) / blksize;
       lru_size = max(1U, lru_size);
       option_srcwinsz = lru_size * blksize;
     }
@@ -4014,7 +4046,7 @@ setup_environment (int argc,
     return;
   }
 
-  (*env_free) = (char*) main_malloc(strlen(v) + 1);
+  (*env_free) = (char*) main_malloc((usize_t) strlen(v) + 1);
   strcpy(*env_free, v);
 
   /* Space needed for extra args, at least # of spaces */

@@ -203,7 +203,7 @@ static void
 test_unlink (char* file)
 {
   char buf[TESTBUFSIZE];
-  while (unlink (file) != 0)
+  while (_unlink (file) != 0)
     {
       if (errno == ENOENT)
 	{
@@ -250,7 +250,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
   usize_t ts = (mt_random (&static_mtrand) % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
   usize_t ss = (mt_random (&static_mtrand) % TEST_FILE_MEAN) + TEST_FILE_MEAN / 2;
   uint8_t *buf = (uint8_t*) malloc (ts + ss), *sbuf = buf, *tbuf = buf + ss;
-  usize_t sadd = 0, sadd_max = ss * TEST_ADD_RATIO;
+  usize_t sadd = 0, sadd_max = (usize_t)(ss * TEST_ADD_RATIO);
   FILE  *tf = NULL, *sf = NULL;
   usize_t i, j;
   int ret;
@@ -269,7 +269,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
     {
       for (i = 0; i < ss; )
 	{
-	  sbuf[i++] = mt_random (&static_mtrand);
+	  sbuf[i++] = (uint8_t) mt_random (&static_mtrand);
 	}
     }
 
@@ -281,14 +281,17 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
   /* DP(RINT "ss = %u ts = %u\n", ss, ts); */
   for (i = 0; i < ts; )
     {
-      size_t left = ts - i;
-      size_t next = mt_exp_rand (TEST_ADD_MEAN, TEST_ADD_MAX);
-      size_t add_left = sadd_max - sadd;
+      usize_t left = ts - i;
+      usize_t next = mt_exp_rand ((uint32_t) TEST_ADD_MEAN, 
+				  (uint32_t) TEST_ADD_MAX);
+      usize_t add_left = sadd_max - sadd;
       double add_prob = (left == 0) ? 0 : (add_left / (double) left);
       int do_copy;
 
       next = min (left, next);
-      do_copy = (next > add_left || (mt_random (&static_mtrand) / (double)USIZE_T_MAX) >= add_prob);
+      do_copy = (next > add_left || 
+		 (mt_random (&static_mtrand) / \
+		  (double)USIZE_T_MAX) >= add_prob);
 
       if (ss_out == NULL)
 	{
@@ -302,7 +305,9 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       if (do_copy)
 	{
 	  /* Copy */
-	  size_t offset = mt_random (&static_mtrand) % ((ss_out == NULL) ? i : (ss - next));
+	  size_t offset = mt_random (&static_mtrand) % ((ss_out == NULL) ? 
+							i : 
+							(ss - next));
 	  /* DP(RINT "[%u] copy %u at %u ", i, next, offset); */
 
 	  for (j = 0; j < next; j += 1)
@@ -319,7 +324,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 	  /* DP(RINT "[%u] add %u ", i, next); */
 	  for (j = 0; j < next; j += 1)
 	    {
-	      char c = mt_random (&static_mtrand);
+	      char c = (char) mt_random (&static_mtrand);
 	      /* DP(RINT "%x%x", (c >> 4) & 0xf, c & 0xf); */
 	      tbuf[i++] = c;
 	    }
@@ -358,9 +363,9 @@ compare_files (xd3_stream *stream, const char* tgt, const char *rec)
 {
   FILE *orig, *recons;
   static uint8_t obuf[TESTBUFSIZE], rbuf[TESTBUFSIZE];
-  int offset = 0;
-  int i;
-  int oc, rc;
+  size_t offset = 0;
+  size_t i;
+  size_t oc, rc;
 
   if ((orig = fopen (tgt, "r")) == NULL)
     {
@@ -833,7 +838,8 @@ test_compress_text (xd3_stream  *stream,
 
   (*encoded_size) = 0;
 
-  xd3_set_appheader (stream, test_apphead, strlen ((char*) test_apphead));
+  xd3_set_appheader (stream, test_apphead, 
+		     (usize_t) strlen ((char*) test_apphead));
 
   if ((ret = xd3_encode_stream (stream, test_text, sizeof (test_text),
 				encoded, encoded_size, 4*sizeof (test_text)))) { goto fail; }
@@ -2365,7 +2371,10 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   xd3_config config;
   memset(&source, 0, sizeof(source));
 
-  for (i = 0; i < IDB_TGTSZ; i += 1) { buf[i] = mt_random (&static_mtrand); }
+  for (i = 0; i < IDB_TGTSZ; i += 1) 
+    { 
+      buf[i] = (uint8_t) mt_random (&static_mtrand); 
+    }
 
   stream->winsize = IDB_WINSZ;
 
@@ -2544,7 +2553,7 @@ test_string_matching (xd3_stream *stream, int ignore)
     {
       const string_match_test *test = & match_tests[i];
       char *rptr = rbuf;
-      usize_t len = strlen (test->input);
+      usize_t len = (usize_t) strlen (test->input);
 
       xd3_free_stream (stream);
       xd3_init_config (& config, 0);

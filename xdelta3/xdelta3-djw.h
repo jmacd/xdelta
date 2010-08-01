@@ -593,7 +593,7 @@ djw_compute_mtf_1_2 (djw_prefix  *prefix,
 	}
 
       /* Non-zero symbols are offset by RUN_1 */
-      prefix->mtfsym[mtf_i++] = j+RUN_1;
+      prefix->mtfsym[mtf_i++] = (uint8_t)(j+RUN_1);
       freq_out[j+RUN_1] += 1;
     }
 
@@ -1214,7 +1214,8 @@ xd3_encode_huff (xd3_stream   *stream,
 
       /* Encode: selector frequencies */
       {
-	djw_weight gbest_freq[DJW_MAX_GROUPS+1];
+	/* DJW_MAX_GROUPS +2 is for RUN_0, RUN_1 symbols. */
+	djw_weight gbest_freq[DJW_MAX_GROUPS+2];
 	djw_prefix gbest_prefix;
 	usize_t i;
 
@@ -1641,7 +1642,7 @@ xd3_decode_huff (xd3_stream     *stream,
   bit_state bstate = BIT_STATE_DECODE_INIT;
   uint8_t  *sel_group = NULL;
   usize_t    groups, gp;
-  usize_t    output_bytes = (output_end - output);
+  usize_t    output_bytes = (usize_t)(output_end - output);
   usize_t    sector_size;
   usize_t    sectors;
   int ret;

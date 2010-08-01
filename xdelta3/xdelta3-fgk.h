@@ -723,7 +723,7 @@ static usize_t fgk_nth_zero (fgk_stream* h, usize_t n)
       ret = ret->right_child;
     }
 
-  return ret - h->alphabet;
+  return (usize_t)(ret - h->alphabet);
 }
 
 /* once fgk_decode_bit returns 1, this retrieves an index into the
@@ -732,7 +732,7 @@ static usize_t fgk_nth_zero (fgk_stream* h, usize_t n)
  */
 static int fgk_decode_data (fgk_stream* h)
 {
-  usize_t elt = h->decode_ptr - h->alphabet;
+  usize_t elt = (usize_t)(h->decode_ptr - h->alphabet);
 
   if (IS_ADAPTIVE && h->decode_ptr->weight == 0) {
     usize_t i = 0;

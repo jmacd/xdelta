@@ -2804,14 +2804,16 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 	    if (inst->xtra)
 	      {
 		XD3_ASSERT (inst->addr >= src->srcbase);
-		XD3_ASSERT (inst->addr + inst->size <= src->srcbase + src->srclen);
-		addr = (inst->addr - src->srcbase);
+		XD3_ASSERT (inst->addr + inst->size <= 
+			    src->srcbase + src->srclen);
+		addr = (usize_t)(inst->addr - src->srcbase);
 		stream->n_scpy += 1;
 		stream->l_scpy += (xoff_t) inst->size;
 	      }
 	    else
 	      {
-		/* with source window: target copy address is offset by taroff. */
+		/* with source window: target copy address is offset 
+		 * by taroff. */
 		addr = stream->taroff + (usize_t) inst->addr;
 		stream->n_tcpy += 1;
 		stream->l_tcpy += (xoff_t) inst->size;
@@ -4499,18 +4501,18 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
 #if 1
 static inline int
-xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, size_t n)
+xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
 {
-  size_t i = 0;
+  int i = 0;
 #if UNALIGNED_OK
-  size_t nint = n / sizeof(int);
+  int nint = n / sizeof(int);
 
   if (nint >> 3)
     {
-      size_t j = 0;
+      int j = 0;
       const int *s1 = (const int*)s1c;
       const int *s2 = (const int*)s2c;
-      size_t nint_8 = nint - 8;
+      int nint_8 = nint - 8;
 
       while (i <= nint_8 &&
 	     s1[i++] == s2[j++] &&
@@ -4857,7 +4859,7 @@ xd3_smatch (xd3_stream *stream,
       ++ref;
     }
 
-  cmp_len = inp - (stream->next_in + stream->input_position);
+  cmp_len = (usize_t)(inp - (stream->next_in + stream->input_position));
 
   /* Verify correctness */
   XD3_ASSERT (xd3_check_smatch (stream->next_in + base,
@@ -5192,14 +5194,14 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   uint32_t       scksum = 0;
   uint32_t       scksum_state = 0;
   uint32_t       lcksum = 0;
-  usize_t         sinx;
-  usize_t         linx;
+  usize_t        sinx;
+  usize_t        linx;
   uint8_t        run_c;
-  size_t          run_l;
+  usize_t        run_l;
   int            ret;
-  usize_t         match_length;
-  usize_t         match_offset = 0;
-  usize_t         next_move_point;
+  usize_t        match_length;
+  usize_t        match_offset = 0;
+  usize_t        next_move_point;
 
   /* If there will be no compression due to settings or short input,
    * skip it entirely. */
