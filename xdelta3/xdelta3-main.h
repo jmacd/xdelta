@@ -2500,15 +2500,21 @@ main_secondary_decompress_check (main_file  *file,
 	  if (file->flags & RD_MAININPUT)
 	    {
 	      XPR(NT
-  "WARNING: the encoder is automatically decompressing the primary input\n");
+  "WARNING: the encoder is automatically decompressing the input file;\n");
 	      XPR(NT 
-  "WARNING: the decoder will automatically re-compress the primary output\n");
+  "WARNING: the decoder will automatically recompress the output file;\n");
 	      XPR(NT 
   "WARNING: this may result in different compressed data and checksums\n");
 	      XPR(NT 
   "WARNING: despite being identical data; if this is an issue, use -D\n");
 	      XPR(NT 
-  "WARNING: to avoid decompression and/or manually decompress the inputs\n");
+  "WARNING: to avoid decompression and/or use -R to avoid recompression\n");
+	      XPR(NT 
+  "WARNING: and/or manually decompress the input file; if you know the\n");
+	      XPR(NT 
+  "WARNING: compression settings that will produce identical output\n");
+	      XPR(NT
+  "WARNING: you may set those flags using the environment (e.g., GZIP=-9)\n");
 	    }
 	}
 
