@@ -386,7 +386,7 @@ static int
 main_version (void)
 {
   /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n\");" $ */
-  DP(RINT "Xdelta version 3.0y, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n");
+  DP(RINT "Xdelta version 3.0z, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonald\n");
   DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   DP(RINT "This is free software, and you are welcome to redistribute it\n");
   DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
@@ -2727,13 +2727,13 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 
       iname = main_apphead_string (input->filename);
       icomp = (input->compressor == NULL) ? "" : input->compressor->ident;
-      len = (usize_t) strlen (iname) + strlen (icomp) + 2;
+      len = (usize_t) strlen (iname) + (usize_t) strlen (icomp) + 2;
 
       if (sfile->filename != NULL)
 	{
 	  sname = main_apphead_string (sfile->filename);
 	  scomp = (sfile->compressor == NULL) ? "" : sfile->compressor->ident;
-	  len += (usize_t) strlen (sname) + strlen (scomp) + 2;
+	  len += (usize_t) strlen (sname) + (usize_t) strlen (scomp) + 2;
 	}
       else
 	{
@@ -2791,7 +2791,7 @@ main_get_appheader_params (main_file *file, char **parsed,
 
 	  XD3_ASSERT(file->filename_copy == NULL);
 	  file->filename_copy =
-	    (char*) main_malloc(dlen + 2 + strlen(file->filename));
+	    (char*) main_malloc(dlen + 2 + (usize_t) strlen(file->filename));
 
 	  strncpy(file->filename_copy, other->filename, dlen);
 	  file->filename_copy[dlen] = '/';
