@@ -264,7 +264,6 @@ struct _main_blklru
 };
 
 #define MAX_LRU_SIZE 32U
-#define MIN_LRU_SIZE 1U
 #define XD3_MINSRCWINSZ XD3_ALLOCSIZE
 
 /* ... represented as a list (no cache index). */
@@ -2991,22 +2990,39 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  return ret;
 	}
 
+      /* Allow non-seekable sources from the start.  If the file
+       * turns out to be externally compressed, size_known may change. */
       sfile->size_known = (main_file_stat (sfile, &source_size) == 0);
     }
 
-  if (sfile->size_known && source_size < option_srcwinsz)
-    {
-      blksize = (usize_t) (source_size / MIN_LRU_SIZE);
-    }
-  else
-    {
-      blksize = (option_srcwinsz / MAX_LRU_SIZE);
-    }
-
-  blksize = max (blksize, XD3_MINSRCWINSZ);
-
   /* The API requires power-of-two blocksize, */
-  blksize = xd3_pow2_roundup (blksize);
+  blksize = xd3_pow2_roundup (max (option_srcwinsz / MAX_LRU_SIZE, 
+				   XD3_MINSRCWINSZ));
+
+  /* TODO(jmacd): The organization of this code and the implementation
+   * of the LRU cache could be improved.  This is too convoluted, the
+   * code uses main_getblk_func() to read the first block, which may
+   * trigger external-decompression, in large part so that the
+   * verbose-printing and counters maintained by getblk_func are
+   * consistent.  There used to be additional optimizations going on
+   * here: (1) if the source size is known we would like to lower
+   * option_srcwinsz, if possible, (2) avoid allocating more memory
+   * than needed, and (3) also want to use a single block when
+   * source_size < option_srcwinsz, this because compression is better
+   * for larger blocks (especially due to the blockwise-reverse
+   * insertion of checksums).
+   *
+   * (3) is no longer implemented.  (2) is only implemented for files
+   * that are shorter than the default blocksize, and (1) is not
+   * implemented.  These optimizations are not taken because the code
+   * is already too complicated.
+   *
+   * The ideal solution may be to allocate a block of memory equal to
+   * half of the option_srcwinsz.  Read as much data as possible into
+   * that block.  If the entire file fits, pass one block to the
+   * library for best compression.  If not, copy the 50% block into
+   * smaller (option_srcwinsz / MAX_LRU_SIZE) blocks and proceed.  Too
+   * much effort for too little payback. */
 
   memset (&block0, 0, sizeof (block0));
   block0.blkno = (xoff_t) -1;
@@ -3026,19 +3042,19 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->curblk   = NULL;
 
   /* We have to read the first block into the cache now, because
-   * size_known can still change (due to secondary
-   * decompression). Calls main_secondary_decompress_check() via
+   * size_known can still change (due to secondary decompression). 
+   * Calls main_secondary_decompress_check() via
    * main_read_primary_input(). */
-  /* TODO(jmacd): This is a huge hack!  Fix me. */
   lru_size = 1;
   lru = &block0;
   XD3_ASSERT (main_blklru_list_empty (& lru_free));
   XD3_ASSERT (main_blklru_list_empty (& lru_list));
   main_blklru_list_push_back (& lru_free, & lru[0]);
+  /* This call is partly so that the diagnostics printed by
+   * this function appear to happen normally for the first read,
+   * which is special. */
   ret = main_getblk_func (stream, source, 0);
   main_blklru_list_remove (& lru[0]);
-  /* TODO(jmacd): In particular, not sure if these assertions
-   * are valid when ret != 0. */
   XD3_ASSERT (main_blklru_list_empty (& lru_free));
   XD3_ASSERT (main_blklru_list_empty (& lru_list));
   lru = NULL;
@@ -3063,21 +3079,19 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       sfile->size_known = 1;
     }
 
-  /* we update lru_size accordingly, and modify option_srcwinsz, which
+  /* We update lru_size accordingly, and modify option_srcwinsz, which
    * will be passed via xd3_config. */
   if (sfile->size_known && source_size <= option_srcwinsz)
     {
-      lru_size = (usize_t) (source_size + blksize - 1) / blksize;
-      lru_size = max(1U, lru_size);
-      option_srcwinsz = lru_size * blksize;
+      lru_size = (usize_t) ((source_size + blksize - 1) / blksize);
     }
   else
     {
       lru_size = (option_srcwinsz + blksize - 1) / blksize;
-      option_srcwinsz = lru_size * blksize;
     }
 
   XD3_ASSERT (lru_size >= 1);
+  option_srcwinsz = lru_size * blksize;
 
   if ((lru = (main_blklru*) main_malloc (lru_size * sizeof (main_blklru)))
       == NULL)
