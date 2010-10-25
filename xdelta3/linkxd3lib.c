@@ -23,7 +23,6 @@ int main() {
   xd3_avail_input (& stream, NULL, 0);
   xd3_consume_output (& stream);
   
-  use (xd3_bytes_on_srcblk (& source, 0));
   use (xd3_set_source (& stream, & source));
   xd3_set_flags (& stream, 0);
   
@@ -31,9 +30,6 @@ int main() {
   use (xd3_decode_input (&stream));
   use (xd3_get_appheader (& stream, NULL, NULL));
   
-  use ((int) xd3_errstring (& stream));
-  use ((int) xd3_strerror (0));
-			     
 #if XD3_ENCODER
   use (xd3_encode_input (&stream));
   use (xd3_encode_stream (& stream, NULL, 0, NULL, NULL, 0));

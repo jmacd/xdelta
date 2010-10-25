@@ -14,7 +14,8 @@ SWIGTGT = xdelta3module.dll
 PYTGT = build/lib.cygwin-1.5.24-i686-$(PYVER)/xdelta3main.dll
 endif
 
-SOURCES = xdelta3-cfgs.h \
+SOURCES = xdelta3-blkcache.h \
+          xdelta3-cfgs.h \
 	  xdelta3-decode.h \
 	  xdelta3-djw.h \
 	  xdelta3-fgk.h \
