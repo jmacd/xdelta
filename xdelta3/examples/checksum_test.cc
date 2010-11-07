@@ -2,6 +2,7 @@
 
 extern "C" {
 #include "test.h"
+#include <assert.h>
 }
 
 #include <list>

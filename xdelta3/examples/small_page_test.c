@@ -82,14 +82,13 @@ process_page (int            is_encode,
   config.freef = &process_free;
   config.opaque = (void*) ctx;
 
-  src.size = PAGE_SIZE;
   src.blksize = PAGE_SIZE;
   src.onblk = PAGE_SIZE;
   src.curblk = source;
   src.curblkno = 0;
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0 ||
-      (ret = xd3_set_source (&stream, &src)) != 0 ||
+      (ret = xd3_set_source_and_size (&stream, &src, PAGE_SIZE)) != 0 ||
       (ret = xd3_process_stream (is_encode,
 				 &stream,
 				 func, 1,
@@ -144,7 +143,7 @@ int test(int stride, int encode_flags)
 			   &output_size, OUTPUT_MAX,
 			   encode_flags)) != 0)
     {
-      fprintf (stderr, "encode failed: stride %u flags 0x%x\n", 
+      fprintf (stderr, "encode failed: stride %u flags 0x%x\n",
 	       stride, encode_flags);
       return ret;
     }
@@ -175,7 +174,7 @@ int test(int stride, int encode_flags)
 	}
     }
 
-  fprintf(stderr, "stride %d flags 0x%x size %u ", 
+  fprintf(stderr, "stride %d flags 0x%x size %u ",
 	  stride, encode_flags, output_size);
   fprintf(stderr, "%s\n", (ret == 0) ? "OK" : "FAIL");
 

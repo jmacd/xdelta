@@ -43,7 +43,7 @@ int code (
     r = fstat(fileno(SrcFile), &statbuf);
     if (r)
       return r;
-    source.size = statbuf.st_size;
+
     source.blksize = BufSize;
     source.curblk = malloc(source.blksize);
 
@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
   int r;
 
   if (argc != 3) {
-    fprintf (stderr, "usage: %s source input output\n", argv[0]);
+    fprintf (stderr, "usage: %s source input\n", argv[0]);
     return 1;
   }
 

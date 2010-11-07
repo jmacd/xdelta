@@ -19,7 +19,7 @@ static int read_whole_file(const char *name,
     fprintf(stderr, "open failed\n");
     goto exit;
   }
-  ret = main_file_stat(&file, &len, 0);
+  ret = main_file_stat(&file, &len);
   if (ret != 0) {
     fprintf(stderr, "stat failed\n");
     goto exit;
