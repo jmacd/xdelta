@@ -113,10 +113,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   else
     {
       /* Either a regular file (possibly compressed) or a FIFO
-       * (possibly compressed). */ 
+       * (possibly compressed). */
       if ((ret = main_file_open (sfile, sfile->filename, XO_READ)))
 	{
-	  return ret; 
+	  return ret;
 	}
 
       /* If the file is regular we know it's size.  If the file turns
@@ -135,7 +135,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
    * (lru_size==1) source block.  Otherwise, we know that at least
    * option_srcwinsz bytes are available.  Split the source window
    * into buffers. */
-  if ((lru = (main_blklru*) main_malloc (MAX_LRU_SIZE * 
+  if ((lru = (main_blklru*) main_malloc (MAX_LRU_SIZE *
 					 sizeof (main_blklru))) == NULL)
     {
       ret = ENOMEM;

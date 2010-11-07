@@ -282,14 +282,14 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
   for (i = 0; i < ts; )
     {
       usize_t left = ts - i;
-      usize_t next = mt_exp_rand ((uint32_t) TEST_ADD_MEAN, 
+      usize_t next = mt_exp_rand ((uint32_t) TEST_ADD_MEAN,
 				  (uint32_t) TEST_ADD_MAX);
       usize_t add_left = sadd_max - sadd;
       double add_prob = (left == 0) ? 0 : (add_left / (double) left);
       int do_copy;
 
       next = min (left, next);
-      do_copy = (next > add_left || 
+      do_copy = (next > add_left ||
 		 (mt_random (&static_mtrand) / \
 		  (double)USIZE_T_MAX) >= add_prob);
 
@@ -305,8 +305,8 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       if (do_copy)
 	{
 	  /* Copy */
-	  size_t offset = mt_random (&static_mtrand) % ((ss_out == NULL) ? 
-							i : 
+	  size_t offset = mt_random (&static_mtrand) % ((ss_out == NULL) ?
+							i :
 							(ss - next));
 	  /* DP(RINT "[%u] copy %u at %u ", i, next, offset); */
 
@@ -838,7 +838,7 @@ test_compress_text (xd3_stream  *stream,
 
   (*encoded_size) = 0;
 
-  xd3_set_appheader (stream, test_apphead, 
+  xd3_set_appheader (stream, test_apphead,
 		     (usize_t) strlen ((char*) test_apphead));
 
   if ((ret = xd3_encode_stream (stream, test_text, sizeof (test_text),
@@ -2371,9 +2371,9 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   xd3_config config;
   memset(&source, 0, sizeof(source));
 
-  for (i = 0; i < IDB_TGTSZ; i += 1) 
-    { 
-      buf[i] = (uint8_t) mt_random (&static_mtrand); 
+  for (i = 0; i < IDB_TGTSZ; i += 1)
+    {
+      buf[i] = (uint8_t) mt_random (&static_mtrand);
     }
 
   stream->winsize = IDB_WINSZ;

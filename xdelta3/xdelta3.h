@@ -1044,13 +1044,18 @@ int     xd3_decode_memory (const uint8_t *input,
 			   usize_t        avail_output,
 			   int            flags);
 
-/* This function encodes an in-memory input.  The output array must be
- * large enough to hold the output or else ENOSPC is returned.  The
- * source (if any) should be set using xd3_set_source() with a
- * single-block xd3_source.  This calls the underlying non-blocking
- * interface, xd3_encode_input(), handling the necessary input/output
- * states.  This method be considered a reference for any application
- * using xd3_encode_input() directly.
+/* This function encodes an in-memory input using a pre-configured
+ * xd3_stream.  This allows the caller to set a variety of options
+ * which are not available in the xd3_encode/decode_memory()
+ * functions.
+ *
+ * The output array must be large enough to hold the output or else
+ * ENOSPC is returned.  The source (if any) should be set using
+ * xd3_set_source_and_size() with a single-block xd3_source.  This
+ * calls the underlying non-blocking interfaces,
+ * xd3_encode/decode_input(), handling the necessary input/output
+ * states.  This method may be considered a reference for any
+ * application using xd3_encode_input() directly.
  *
  *   xd3_stream stream;
  *   xd3_config config;
@@ -1079,8 +1084,6 @@ int     xd3_decode_memory (const uint8_t *input,
  *   xd3_config_stream(&stream, &config);
  *   xd3_encode_stream(&stream, ...);
  *   xd3_free_stream(&stream);
- *
- * DO NOT USE except for testing. These methods are allocate bad buffer sizes.
  */
 int     xd3_encode_stream (xd3_stream    *stream,
 			   const uint8_t *input,
