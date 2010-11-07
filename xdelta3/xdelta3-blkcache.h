@@ -18,6 +18,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* TODO: This code is heavily revised from 3.0z but still needs major
+ * refactoring. */
+
 typedef struct _main_blklru      main_blklru;
 typedef struct _main_blklru_list main_blklru_list;
 
@@ -35,8 +38,9 @@ struct _main_blklru
   main_blklru_list  link;
 };
 
-#define MAX_LRU_SIZE 32U
-#define XD3_MINSRCWINSZ XD3_ALLOCSIZE
+/* TODO: The value for MAX_LRU_SIZE has what significance? */
+#define MAX_LRU_SIZE 32U  /* must be a power of 2 */
+#define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
 
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
@@ -62,13 +66,9 @@ static void main_lru_reset()
 
 static void main_lru_cleanup()
 {
-  int i;
-  /* TODO(jmacd): HERE YOU ARE
-   * Remove this loop, free only lru[0].blk.
-   */
-  for (i = 0; lru && i < lru_size; i += 1)
+  if (lru != NULL)
     {
-      main_free (lru[i].blk);
+      main_free (lru[0].blk);
     }
 
   main_free (lru);
@@ -90,112 +90,108 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   usize_t i;
   usize_t blksize;
   xoff_t source_size = 0;
-  main_blklru block0;
 
   XD3_ASSERT (lru == NULL);
   XD3_ASSERT (stream->src == NULL);
   XD3_ASSERT (option_srcwinsz >= XD3_MINSRCWINSZ);
 
+  /* TODO: this code needs refactoring into FIFO, LRU, FAKE.  Yuck!
+   * This is simplified from 3.0z which had issues with sizing the
+   * source buffer memory allocation and the source blocksize. */
+
+  /* LRU-specific */
   main_blklru_list_init (& lru_list);
   main_blklru_list_init (& lru_free);
 
   if (allow_fake_source)
     {
+      /* TOOLS-specific (e.g., "printdelta"). Note: Check
+       * "allow_fake_source" mode looks broken now. */
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
     }
   else
     {
+      /* Either a regular file (possibly compressed) or a FIFO
+       * (possibly compressed). */ 
       if ((ret = main_file_open (sfile, sfile->filename, XO_READ)))
 	{
-	  return ret;
+	  return ret; 
 	}
 
-      /* Allow non-seekable sources from the start.  If the file
-       * turns out to be externally compressed, size_known may change. */
+      /* If the file is regular we know it's size.  If the file turns
+       * out to be externally compressed, size_known may change. */
       sfile->size_known = (main_file_stat (sfile, &source_size) == 0);
     }
 
-  /* The API requires power-of-two blocksize, */
-  blksize = xd3_pow2_roundup (max (option_srcwinsz / MAX_LRU_SIZE,
-				   XD3_MINSRCWINSZ));
+  /* Note: The API requires a power-of-two blocksize and srcwinsz
+   * (-B).  The logic here will use a single block if the entire file
+   * is known to fit into srcwinsz. */
+  option_srcwinsz = xd3_pow2_roundup (option_srcwinsz);
 
-  /* TODO(jmacd): The organization of this code and the implementation
-   * of the LRU cache could be improved.  This is too convoluted, the
-   * code uses main_getblk_func() to read the first block, which may
-   * trigger external-decompression, in large part so that the
-   * verbose-printing and counters maintained by getblk_func are
-   * consistent.  There used to be additional optimizations going on
-   * here: (1) if the source size is known we would like to lower
-   * option_srcwinsz, if possible, (2) avoid allocating more memory
-   * than needed, and (3) also want to use a single block when
-   * source_size < option_srcwinsz, this because compression is better
-   * for larger blocks (especially due to the blockwise-reverse
-   * insertion of checksums).
-   *
-   * (3) is no longer implemented.  (2) is only implemented for files
-   * that are shorter than the default blocksize, and (1) is not
-   * implemented.  These optimizations are not taken because the code
-   * is already too complicated.
-   *
-   * The ideal solution may be to allocate a block of memory equal to
-   * half of the option_srcwinsz.  Read as much data as possible into
-   * that block.  If the entire file fits, pass one block to the
-   * library for best compression.  If not, copy the 50% block into
-   * smaller (option_srcwinsz / MAX_LRU_SIZE) blocks and proceed.  Too
-   * much effort for too little payback. */
-
-  memset (&block0, 0, sizeof (block0));
-  block0.blkno = (xoff_t) -1;
-
-  /* TODO(jmacd): HERE YOU ARE
-   * Allocate only one block of option_srcwinsz.
-   */
-  /* Allocate the first block.  Even if the size is known at this
-   * point, we do not lower it because decompression may happen.  */
-  if ((block0.blk = (uint8_t*) main_malloc (blksize)) == NULL)
+  /* Though called "lru", it is not LRU-specific.  We always allocate
+   * a maximum number of source block buffers.  If the entire file
+   * fits into srcwinsz, this buffer will stay as the only
+   * (lru_size==1) source block.  Otherwise, we know that at least
+   * option_srcwinsz bytes are available.  Split the source window
+   * into buffers. */
+  if ((lru = (main_blklru*) main_malloc (MAX_LRU_SIZE * 
+					 sizeof (main_blklru))) == NULL)
     {
       ret = ENOMEM;
       return ret;
     }
 
+  memset (lru, 0, sizeof(lru[0]) * MAX_LRU_SIZE);
+
+  /* Allocate the entire buffer. */
+  if ((lru[0].blk = (uint8_t*) main_malloc (option_srcwinsz)) == NULL)
+    {
+      ret = ENOMEM;
+      return ret;
+    }
+
+  /* Main calls main_getblk_func() once before xd3_set_source().  This
+   * is the point at which external decompression may begin.  Set the
+   * system for a single block. */
+  lru_size = 1;
+  lru[0].blkno = -1;
+  blksize = option_srcwinsz;
+  XD3_ASSERT (main_blklru_list_empty (& lru_free));
+  XD3_ASSERT (main_blklru_list_empty (& lru_list));
+
+  /* TODO: Refactor. */
+  if (! do_src_fifo)
+    {
+      main_blklru_list_push_back (& lru_free, & lru[0]);
+    }
+
+  /* Initialize xd3_source. */
   source->blksize  = blksize;
   source->name     = sfile->filename;
   source->ioh      = sfile;
   source->curblkno = (xoff_t) -1;
   source->curblk   = NULL;
 
-  /* We have to read the first block into the cache now, because
-   * size_known can still change (due to secondary decompression).
-   * Calls main_secondary_decompress_check() via
-   * main_read_primary_input(). */
-  lru_size = 1;
-  lru = &block0;
-  XD3_ASSERT (main_blklru_list_empty (& lru_free));
-  XD3_ASSERT (main_blklru_list_empty (& lru_list));
-  main_blklru_list_push_back (& lru_free, & lru[0]);
-  /* This call is partly so that the diagnostics printed by
-   * this function appear to happen normally for the first read,
-   * which is special. */
-  ret = main_getblk_func (stream, source, 0);
-  main_blklru_list_remove (& lru[0]);
-  XD3_ASSERT (main_blklru_list_empty (& lru_free));
-  XD3_ASSERT (main_blklru_list_empty (& lru_list));
-  lru = NULL;
-
-  if (ret != 0)
+  if ((ret = main_getblk_func (stream, source, 0)) != 0)
     {
-      main_free (block0.blk);
-
       XPR(NT "error reading source: %s: %s\n",
 	  sfile->filename,
 	  xd3_mainerror (ret));
-
       return ret;
     }
 
-  source->onblk = block0.size;
+  /* TODO: Refactor */
+  if (!do_src_fifo)
+    {
+      XD3_ASSERT (!main_blklru_list_empty (& lru_list));
+      main_blklru_list_remove (& lru[0]);
+    }
+  XD3_ASSERT (main_blklru_list_empty (& lru_free));
+  XD3_ASSERT (main_blklru_list_empty (& lru_list));
+
+  source->onblk = lru[0].size;  /* xd3 sets onblk */
 
   /* If the file is smaller than a block, size is known. */
   if (!sfile->size_known && source->onblk < blksize)
@@ -204,56 +200,44 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       sfile->size_known = 1;
     }
 
-  /* We update lru_size accordingly, and modify option_srcwinsz, which
-   * will be passed via xd3_config. */
-  if (sfile->size_known && source_size <= option_srcwinsz)
+  /* If the size is not known or is greater than the buffer size, we
+   * split the buffer across MAX_LRU_SIZE blocks (already allocated in
+   * "lru"). */
+  if (!sfile->size_known || source_size > option_srcwinsz)
     {
-      lru_size = (usize_t) ((source_size + blksize - 1) / blksize);
-    }
-  else
-    {
-      lru_size = (option_srcwinsz + blksize - 1) / blksize;
-    }
+      /* Modify block 0, change blocksize. */
+      lru_size = MAX_LRU_SIZE;
+      blksize = option_srcwinsz / MAX_LRU_SIZE;  /* Power of 2 */
+      source->blksize = blksize;
+      source->onblk = blksize;  /* xd3 sets onblk */
+      lru[0].size = blksize;
 
-  XD3_ASSERT (lru_size >= 1);
-  option_srcwinsz = lru_size * blksize;
-
-  if ((lru = (main_blklru*) main_malloc (lru_size * sizeof (main_blklru)))
-      == NULL)
-    {
-      ret = ENOMEM;
-      return ret;
+      /* Setup rest of blocks. */
+      for (i = 1; i < lru_size; i += 1)
+	{
+	  lru[i].blk = lru[0].blk + (blksize * i);
+	  lru[i].blkno = i;
+	  lru[i].size = blksize;
+	}
     }
-
-  lru[0].blk = block0.blk;
-  lru[0].blkno = 0;
-  lru[0].size = source->onblk;
 
   if (! sfile->size_known)
     {
+      /* If the size is not know, we must use FIFO discipline. */
       do_src_fifo = 1;
     }
   else if (! do_src_fifo)
     {
-      main_blklru_list_push_back (& lru_list, & lru[0]);
-    }
-
-  for (i = 1; i < lru_size; i += 1)
-    {
-      lru[i].blkno = (xoff_t) -1;
-
-      if ((lru[i].blk = (uint8_t*) main_malloc (source->blksize)) == NULL)
+      /* TODO: Refactor.
+       * The encoder forces FIFO, otherwise initialize the LRU data structures */
+      for (i = 0; i < lru_size; ++i)
 	{
-	  ret = ENOMEM;
-	  return ret;
-	}
-
-      if (! do_src_fifo)
-	{
-	  main_blklru_list_push_back (& lru_free, & lru[i]);
+	  main_blklru_list_push_back (& lru_list, & lru[i]);
 	}
     }
 
+  /* Call the appropriate set_source method, handle errors, print
+   * verbose message, etc. */
   if (sfile->size_known)
     {
       ret = xd3_set_source_and_size (stream, source, source_size);
@@ -580,21 +564,21 @@ main_getblk_func (xd3_stream *stream,
 	{
 	  if (blru->blkno != blkno)
 	    {
-	      XPR(NT "source block %"Q"u ejects %"Q"u (lru_hits=%u, "
+	      XPR(NT "source block %"Q"u read %u ejects %"Q"u (lru_hits=%u, "
 		  "lru_misses=%u, lru_filled=%u)\n",
-		  blkno, blru->blkno, lru_hits, lru_misses, lru_filled);
+		  blkno, nread, blru->blkno, lru_hits, lru_misses, lru_filled);
 	    }
 	  else
 	    {
-	      XPR(NT "source block %"Q"u read (lru_hits=%u, "
+	      XPR(NT "source block %"Q"u read %u (lru_hits=%u, "
 		  "lru_misses=%u, lru_filled=%u)\n",
-		  blkno, lru_hits, lru_misses, lru_filled);
+		  blkno, nread, lru_hits, lru_misses, lru_filled);
 	    }
 	}
       else
 	{
-	  XPR(NT "source block %"Q"u read (lru_hits=%u, lru_misses=%u, "
-	      "lru_filled=%u)\n", blkno, lru_hits, lru_misses, lru_filled);
+	  XPR(NT "source block %"Q"u read %u (lru_hits=%u, lru_misses=%u, "
+	      "lru_filled=%u)\n", blkno, nread, lru_hits, lru_misses, lru_filled);
 	}
     }
 

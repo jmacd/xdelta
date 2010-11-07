@@ -3034,7 +3034,7 @@ main_input (xd3_cmd     cmd,
 
 #if XD3_ENCODER
     case CMD_ENCODE:
-      do_src_fifo  = 1;
+      do_src_fifo = 1;
       input_func  = xd3_encode_input;
       output_func = main_write_output;
 
