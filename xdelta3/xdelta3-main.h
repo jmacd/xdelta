@@ -2102,7 +2102,6 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 #define MAX_SUBPROCS  4  /* max(source + copier + output,
 			        source + copier + input + copier). */
 static pid_t ext_subprocs[MAX_SUBPROCS];
-static char* ext_tmpfile = NULL;
 
 /* Like write(), applies to a fd instead of a main_file, for the pipe
  * copier subprocess.  Does not print an error, to facilitate ignoring
@@ -2169,9 +2168,27 @@ main_external_compression_finish (void)
 	{
 	  return ret;
 	}
+
+      ext_subprocs[i] = 0;
     }
 
   return 0;
+}
+
+/* Kills any outstanding compression process. */
+static void
+main_external_compression_cleanup (void)
+{
+  int i;
+
+  for (i = 0; i < num_subprocs; i += 1)
+    {
+      if (! ext_subprocs[i]) { continue; }
+
+      kill (ext_subprocs[i], SIGTERM);
+
+      ext_subprocs[i] = 0;
+    }
 }
 
 /* This runs as a forked process of main_input_decompress_setup() to
@@ -3470,11 +3487,6 @@ main_cleanup (void)
   main_bdata = NULL;
   main_bsize = 0;
 
-#if EXTERNAL_COMPRESSION
-  main_free (ext_tmpfile);
-  ext_tmpfile = NULL;
-#endif
-
   main_lru_cleanup();
 
   if (recode_stream != NULL)
@@ -3948,10 +3960,7 @@ main (int argc, char **argv)
     }
 
 #if EXTERNAL_COMPRESSION
-  if (ext_tmpfile != NULL)
-    {
-      unlink (ext_tmpfile);
-    }
+  main_external_compression_cleanup ();
 #endif
 
   main_file_cleanup (& ifile);

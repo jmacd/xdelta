@@ -155,7 +155,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
    * is the point at which external decompression may begin.  Set the
    * system for a single block. */
   lru_size = 1;
-  lru[0].blkno = -1;
+  lru[0].blkno = (xoff_t) -1;
   blksize = option_srcwinsz;
   main_blklru_list_push_back (& lru_list, & lru[0]);
 
