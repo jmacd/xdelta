@@ -2180,7 +2180,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
 
   /* Now the two identical files are compressed.  Delta-encode the target,
    * with decompression. */
-  sprintf (buf, "%s -e -A -vfq -s%s %s %s", program_name, TEST_SOURCE_FILE,
+  sprintf (buf, "%s -e -vfq -s%s %s %s", program_name, TEST_SOURCE_FILE,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 

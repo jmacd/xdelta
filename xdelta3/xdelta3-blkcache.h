@@ -47,7 +47,6 @@ XD3_MAKELIST(main_blklru_list,main_blklru,link);
 static usize_t           lru_size = 0;
 static main_blklru      *lru = NULL;  /* array of lru_size elts */
 static main_blklru_list  lru_list;
-static main_blklru_list  lru_free;
 static int               do_src_fifo = 0;  /* set to avoid lru */
 
 static int lru_hits   = 0;
@@ -101,12 +100,12 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   /* LRU-specific */
   main_blklru_list_init (& lru_list);
-  main_blklru_list_init (& lru_free);
 
   if (allow_fake_source)
     {
-      /* TOOLS-specific (e.g., "printdelta"). Note: Check
-       * "allow_fake_source" mode looks broken now. */
+      /* TODO: refactor
+       * TOOLS/recode-specific: Check "allow_fake_source" mode looks
+       * broken now. */
       sfile->mode = XO_READ;
       sfile->realname = sfile->filename;
       sfile->nread = 0;
@@ -158,14 +157,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   lru_size = 1;
   lru[0].blkno = -1;
   blksize = option_srcwinsz;
-  XD3_ASSERT (main_blklru_list_empty (& lru_free));
-  XD3_ASSERT (main_blklru_list_empty (& lru_list));
-
-  /* TODO: Refactor. */
-  if (! do_src_fifo)
-    {
-      main_blklru_list_push_back (& lru_free, & lru[0]);
-    }
+  main_blklru_list_push_back (& lru_list, & lru[0]);
 
   /* Initialize xd3_source. */
   source->blksize  = blksize;
@@ -181,15 +173,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  xd3_mainerror (ret));
       return ret;
     }
-
-  /* TODO: Refactor */
-  if (!do_src_fifo)
-    {
-      XD3_ASSERT (!main_blklru_list_empty (& lru_list));
-      main_blklru_list_remove (& lru[0]);
-    }
-  XD3_ASSERT (main_blklru_list_empty (& lru_free));
-  XD3_ASSERT (main_blklru_list_empty (& lru_list));
 
   source->onblk = lru[0].size;  /* xd3 sets onblk */
 
@@ -218,6 +201,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 	  lru[i].blk = lru[0].blk + (blksize * i);
 	  lru[i].blkno = i;
 	  lru[i].size = blksize;
+	  main_blklru_list_push_back (& lru_list, & lru[i]);
 	}
     }
 
@@ -225,15 +209,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
     {
       /* If the size is not know, we must use FIFO discipline. */
       do_src_fifo = 1;
-    }
-  else if (! do_src_fifo)
-    {
-      /* TODO: Refactor.
-       * The encoder forces FIFO, otherwise initialize the LRU data structures */
-      for (i = 0; i < lru_size; ++i)
-	{
-	  main_blklru_list_push_back (& lru_list, & lru[i]);
-	}
     }
 
   /* Call the appropriate set_source method, handle errors, print
@@ -343,17 +318,9 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
     }
   else
     {
-      if (! main_blklru_list_empty (& lru_free))
-	{
-	  blru = main_blklru_list_pop_front (& lru_free);
-	  main_blklru_list_push_back (& lru_list, blru);
-	}
-      else
-	{
-	  XD3_ASSERT (! main_blklru_list_empty (& lru_list));
-	  blru = main_blklru_list_pop_front (& lru_list);
-	  main_blklru_list_push_back (& lru_list, blru);
-	}
+      XD3_ASSERT (! main_blklru_list_empty (& lru_list));
+      blru = main_blklru_list_pop_front (& lru_list);
+      main_blklru_list_push_back (& lru_list, blru);
     }
 
   lru_filled += 1;

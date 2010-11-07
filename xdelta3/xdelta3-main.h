@@ -261,8 +261,8 @@ struct _main_merge
 
 XD3_MAKELIST(main_merge_list,main_merge,link);
 
-// TODO: really need to put options in a struct so that internal
-// callers can easily reset state.
+/* TODO: really need to put options in a struct so that internal
+ * callers can easily reset state. */
 
 #define DEFAULT_VERBOSE 0
 
@@ -311,7 +311,7 @@ static uint8_t*        appheader_used = NULL;
 static uint8_t*        main_bdata = NULL;
 static usize_t         main_bsize = 0;
 
-/* Hacks for VCDIFF tools */
+/* Hacks for VCDIFF tools, recode command. */
 static int allow_fake_source = 0;
 
 /* recode_stream is used by both recode/merge for reading vcdiff inputs */
