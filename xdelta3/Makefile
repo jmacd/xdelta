@@ -230,6 +230,7 @@ xdelta3module.so: xdelta3_wrap.o xdelta3.o
 	gcc-4.2 -Wl,-F. -bundle -undefined dynamic_lookup \
 		-arch x86_64 $(CFLAGS) \
 		xdelta3.o xdelta3_wrap.o -o xdelta3module.so
+	cp xdelta3module.so /Library/Python/2.6/site-packages
 endif
 
 xdelta3-decoder: $(SOURCES)

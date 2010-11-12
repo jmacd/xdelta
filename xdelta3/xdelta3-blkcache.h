@@ -53,7 +53,7 @@ static int lru_hits   = 0;
 static int lru_misses = 0;
 static int lru_filled = 0;
 
-static void main_lru_reset()
+static void main_lru_reset (void)
 {
   lru_size = 0;
   lru = NULL;
@@ -63,7 +63,7 @@ static void main_lru_reset()
   lru_filled = 0;
 }
 
-static void main_lru_cleanup()
+static void main_lru_cleanup (void)
 {
   if (lru != NULL)
     {
