@@ -731,8 +731,8 @@ void TestMergeCommand1() {
 	continue;
       }
 
-      DP(RINT "S0 = %lu\n", size0);
-      DP(RINT "C1 = %lu\n", change1);
+      // DP(RINT "S0 = %lu\n", size0);
+      // DP(RINT "C1 = %lu\n", change1);
 
       size_t add1_pos = size0 ? rand.Rand32() % size0 : 0;
       size_t del2_pos = size0 ? rand.Rand32() % size0 : 0;
@@ -796,10 +796,10 @@ void TestMergeCommand2() {
 	    continue;
 	  }
 
-	  DP(RINT "S0 = %lu\n", size0);
-	  DP(RINT "S1 = %lu\n", size1);
-	  DP(RINT "S2 = %lu\n", size2);
-	  DP(RINT "S3 = %lu\n", size3);
+	  // DP(RINT "S0 = %lu\n", size0);
+	  // DP(RINT "S1 = %lu\n", size1);
+	  // DP(RINT "S2 = %lu\n", size2);
+	  // DP(RINT "S3 = %lu\n", size3);
 
 	  spec0.GenerateFixedSize(size0);
 

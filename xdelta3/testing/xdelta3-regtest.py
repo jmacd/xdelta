@@ -29,9 +29,8 @@ import xdelta3
 #RCSDIR = 'G:/jmacd/PRCS_copy'
 #SAMPLEDIR = "C:/sample_data/Wesnoth/tar"
 
-#RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/net/x25'
-#RCSDIR = '/Users/jmacd/src/ftp.kernel.org/pub/scm/linux/kernel/bkcvs/linux-2.4/fs'
 RCSDIR = '/Users/jmacd/src/ftp.kernel.org'
+SAMPLEDIR = '/Users/jmacd/src/xdelta3/linux'
 
 #
 MIN_SIZE       = 0
@@ -47,7 +46,7 @@ MIN_STDDEV_PCT = 1.5
 
 # How many results per round
 MAX_RESULTS = 500
-TEST_ROUNDS = 500
+TEST_ROUNDS = 10
 KEEP_P = (0.5)
 
 # For RCS testing, what percent to select
@@ -59,7 +58,7 @@ MAX_RUN = 1000 * 1000 * 10
 
 # Testwide defaults
 ALL_ARGS = [
-    '-vv'
+    '-q'  # '-vv'
     ]
 
 # The first 7 args go to -C
@@ -141,6 +140,8 @@ TMPDIR = '/tmp/xd3regtest.%d' % os.getpid()
 RUNFILE = os.path.join(TMPDIR, 'run')
 DFILE   = os.path.join(TMPDIR, 'output')
 RFILE   = os.path.join(TMPDIR, 'recon')
+CMPTMP1 = os.path.join(TMPDIR, 'cmptmp1')
+CMPTMP2 = os.path.join(TMPDIR, 'cmptmp2')
 
 HEAD_STATE = 0
 BAR_STATE  = 1
@@ -178,16 +179,21 @@ class StatList:
         self.l      = l
         self.total  = SumList(l)
         self.mean   = self.total / float(self.cnt)
-        self.s      = math.sqrt(SumList([(x-self.mean) * (x - self.mean) for x in l]) / float(self.cnt-1))
+        self.s      = math.sqrt(SumList([(x-self.mean) * 
+                                         (x - self.mean) for x in l]) / 
+                                float(self.cnt-1))
         self.q0     = l[0]
         self.q1     = l[int(self.cnt/4.0+0.5)]
         self.q2     = l[int(self.cnt/2.0+0.5)]
         self.q3     = l[min(self.cnt-1,int((3.0*self.cnt)/4.0+0.5))]
-        self.q4     = l[self.cnt-1]+1
+        self.q4     = l[self.cnt-1]
         self.siqr   = (self.q3-self.q1)/2.0;
         self.spread = (self.q4-self.q0)
-        self.str    = '%s %d; mean %d; sdev %d; q2 %d; .5(q3-q1) %.1f; spread %d' % \
-                      (desc, self.total, self.mean, self.s, self.q2, self.siqr, self.spread)
+        if len(l) == 1:
+            self.str = '%s %s' % (desc, l[0])
+        else:
+            self.str = '%s mean %.1f: 25%-ile %d %d %d %d %d' % \
+                (desc, self.mean, self.q0, self.q1, self.q2, self.q3, self.q4)
     #end
 #end
 
@@ -230,14 +236,14 @@ class TimedTest:
         self.min_stddev_pct = min_stddev_pct
 
         self.encode_time = self.DoTest(DFILE,
-                                       lambda x: x.Encode(self.target, self.source, DFILE))
+                                       lambda x: x.Encode(self.target, 
+                                                          self.source, DFILE))
         self.encode_size = runnable.EncodeSize(DFILE)
 
         self.decode_time = self.DoTest(RFILE,
-                                       lambda x: x.Decode(DFILE, self.source, RFILE),
+                                       lambda x: x.Decode(DFILE, 
+                                                          self.source, RFILE),
                                        )
-
-        # verify
         runnable.Verify(self.target, RFILE)
     #end
 
@@ -364,7 +370,10 @@ class Xdelta3RunClass:
 #end
 
 class Xdelta3Runner:
-    def __init__(self, extra):
+    # Use "forkexec" to get special command-line only features like
+    # external compression support.
+    def __init__(self, extra, forkexec=False):
+        self.forkexec = forkexec
         self.extra = extra
     #end
 
@@ -392,7 +401,12 @@ class Xdelta3Runner:
     #end
 
     def Verify(self, target, recon):
-        RunCommand(('cmp', target, recon))
+        if target[-3:] == ".gz":
+            RunCommandIO(('gzip', '-dc'), target, CMPTMP1)
+            RunCommandIO(('gzip', '-dc'), recon, CMPTMP2)
+            RunCommand(('cmp', CMPTMP1, CMPTMP2))
+        else:
+            RunCommand(('cmp', target, recon))
     #end
 
     def EncodeSize(self, output):
@@ -401,8 +415,10 @@ class Xdelta3Runner:
 
     def Main(self, args):
         try:
-            #print 'Run %s' % (' '.join(args))
-            xdelta3.xd3_main_cmdline(args)
+            if self.forkexec:
+                RunCommand(['../xdelta3'] + args)
+            else:
+                xdelta3.xd3_main_cmdline(args)
         except Exception, e:
             raise CommandError(args, "xdelta3.main exception: %s" % e)
         #end
@@ -816,10 +832,11 @@ def GetTestRcsFiles():
         raise CommandError('', 'no RCS files')
     #end
     rcsf.Summarize()
-    print "rcsfiles: rcsfiles %d; subdirs %d; others %d; skipped %d" % (len(rcsf.rcsfiles),
-                                                                        len(rcsf.subdirs),
-                                                                        len(rcsf.others),
-                                                                        len(rcsf.skipped))
+    print "rcsfiles: rcsfiles %d; subdirs %d; others %d; skipped %d" % (
+        len(rcsf.rcsfiles),
+        len(rcsf.subdirs),
+        len(rcsf.others),
+        len(rcsf.skipped))
     print StatList([x.rcssize for x in rcsf.rcsfiles], "rcssize").str
     print StatList([x.totrev for x in rcsf.rcsfiles], "totrev").str
     return rcsf
@@ -827,6 +844,7 @@ def GetTestRcsFiles():
 
 class SampleDataTest:
     def __init__(self, dirs):
+        dirs_in = dirs
         self.pairs = []
         while dirs:
             d = dirs[0]
@@ -843,12 +861,16 @@ class SampleDataTest:
             #end
             if len(files) > 1:
                 files.sort()
-                for x in xrange(len(files) - 1):
-                    self.pairs.append((files[x], files[x+1],
-                                       '%s-%s' % (files[x], files[x+1])))
+                for x in xrange(len(files)):
+                    for y in xrange(len(files)):
+                        self.pairs.append((files[x], files[y],
+                                           '%s-%s' % (files[x], files[y])))
+                    #end
                 #end
             #end
         #end
+        print "Sample data test using %d file pairs in %s" % (
+            len(self.pairs), dirs_in)
     #end
 
     def Generator(self):
@@ -978,7 +1000,7 @@ def RandomTestConfigs(rand, input_configs, num_results):
     return outputs
 #end
 
-def RunTestLoop(rand, generator, rounds):
+def RunOptimizationLoop(rand, generator, rounds):
     configs = []
     for rnum in xrange(rounds):
         configs = RandomTestConfigs(rand, configs, MAX_RESULTS)
@@ -1192,28 +1214,50 @@ def GraphSummary(desc, results_ignore):
     #end
 #end
 
+def RunRegressionTest(pairs, rounds):
+    for args in [
+        [],
+        ['-S djw'],
+
+                 ]:
+        print "Args %s" % (args)
+        for (file1, file2, testkey) in pairs:
+            ttest = TimedTest(file1, file2, Xdelta3Runner(args, forkexec=True),
+                              skip_trials = 0,
+                              min_trials = 1,
+                              max_trials = 1)
+            print "Source %s\nTarget %s\nEncode %s\nDecode %s\nSize %s\n\n" % (
+                file1, file2,
+                ttest.encode_time.str,
+                ttest.decode_time.str,
+                ttest.encode_size)
+    #end
+#end
+
 if __name__ == "__main__":
     try:
         RunCommand(['rm', '-rf', TMPDIR])
         os.mkdir(TMPDIR)
 
-        rcsf = GetTestRcsFiles()
-        generator = rcsf.Generator()
+        #rcsf = GetTestRcsFiles()
+        #generator = rcsf.Generator()
 
-        #sample = SampleDataTest([SAMPLEDIR])
-        #generator = sample.Generator()
+        sample = SampleDataTest([SAMPLEDIR])
+        generator = sample.Generator()
 
         rand = random.Random(135135135135135)
-        RunTestLoop(rand, generator, TEST_ROUNDS)
+
+        RunRegressionTest(sample.pairs, TEST_ROUNDS)
 
         #RunSpeedTest()
 
+        # the idea below is to add the default configurations and
+        # xdelta1 to the optimization loop:
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-1', '-3', '-6']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-S', 'djw']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-1', '-S', 'djw']))
         #x3r = rcsf.AllPairsByDate(Xdelta3RunClass(['-9', '-T']))
-
         #x1r = rcsf.AllPairsByDate(Xdelta1RunClass())
 
     except CommandError:
