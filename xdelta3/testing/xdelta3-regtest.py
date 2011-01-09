@@ -806,7 +806,8 @@ class RcsFinder:
             r1, r2 = rand.sample(xrange(0, len(file.versions)), 2)
             f1sz += file.AppendVersion(f1, r1)
             f2sz += file.AppendVersion(f2, r2)
-            #m.update('%s,%s,%s ' % (file.fname[len(RCSDIR):], file.Vstr(r1), file.Vstr(r2)))
+            #m.update('%s,%s,%s ' % (file.fname[len(RCSDIR):], 
+            #file.Vstr(r1), file.Vstr(r2)))
         #end
         testkey = 'rcs%d' % self.biground
         self.biground = self.biground + 1
@@ -926,8 +927,10 @@ class RandomTest:
     def __str__(self):
         decodestr = ' %s' % self.decodetime
         return 'time %.6f%s size %d%s << %s >>%s' % (
-            self.time(), ((self.time_pos != None) and (" (%s)" % self.time_pos) or ""),
-            self.size(), ((self.size_pos != None) and (" (%s)" % self.size_pos) or ""),
+            self.time(), ((self.time_pos != None) and 
+                          (" (%s)" % self.time_pos) or ""),
+            self.size(), ((self.size_pos != None) and 
+                          (" (%s)" % self.size_pos) or ""),
             c2str(self.config()),
             decodestr)
     #end
@@ -1217,7 +1220,9 @@ def GraphSummary(desc, results_ignore):
 def RunRegressionTest(pairs, rounds):
     for args in [
         [],
-        ['-S djw'],
+        ['-S=djw'],
+        ['-B=412907520'],
+        ['-B 412907520', ],
 
                  ]:
         print "Args %s" % (args)
