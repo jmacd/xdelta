@@ -15,6 +15,8 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#ifndef XDELTA3_INTERNAL_H__
+#define XDELTA3_INTERNAL_H__
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -123,3 +125,5 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #define NTR ""
 
 #endif
+
+#endif // XDELTA3_INTERNAL_H__

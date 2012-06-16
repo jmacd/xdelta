@@ -848,28 +848,29 @@ void MainTest() {
   TEST(TestEmptyInMemory);
   TEST(TestBlockInMemory);
   TEST(TestNonBlockingProgress);
-#if 0
   TEST(TestFifoCopyDiscipline);
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
-#endif
 }
 
 #undef TEST
 
-#ifdef HACK
-#define NOT_MAIN 1
-#define XD3_MAIN 1
-#define XD3_POSIX 1
-#include "../xdelta3.c"
-
 int main(int argc, char **argv) 
-#else
-// Run the unittests, followed by xdelta tests for various constants.
-extern "C" int xd3_regtest_main(int argc, char **argv);
-extern "C" int xd3_regtest_main(int argc, char **argv) 
-#endif
 {
+  vector<const char*> mcmd;
+  string pn;
+  const char *sp = strrchr(argv[0], '/');
+  if (sp != NULL) {
+    pn.append(argv[0], sp - argv[0] + 1);
+  }
+  pn.append("xdelta3");
+  mcmd.push_back(pn.c_str());
+  mcmd.push_back("test");
+  mcmd.push_back(NULL);
+
+  CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1,
+			       const_cast<char**>(&mcmd[0])));
+
   UnitTest<SmallBlock>();
   MainTest<SmallBlock>();
   MainTest<MixedBlock>();

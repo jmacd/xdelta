@@ -22,31 +22,31 @@ public:
   };
 
   // Constructor for modify, add, delete.
-  Change(Kind kind, xoff_t size, xoff_t addr1)
-    : kind(kind),
-      size(size),
-      addr1(addr1),
+  Change(Kind kind0, xoff_t size0, xoff_t addr1_0)
+    : kind(kind0),
+      size(size0),
+      addr1(addr1_0),
       addr2(0),
       insert(NULL) {
     CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
 
   // Constructor for modify, add w/ provided data.
-  Change(Kind kind, xoff_t size, xoff_t addr1, Segment *insert)
-    : kind(kind),
-      size(size),
-      addr1(addr1),
+  Change(Kind kind0, xoff_t size0, xoff_t addr1_0, Segment *insert0)
+    : kind(kind0),
+      size(size0),
+      addr1(addr1_0),
       addr2(0),
-      insert(insert) {
+      insert(insert0) {
     CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
   }
 
   // Constructor for move, copy, overwrite
-  Change(Kind kind, xoff_t size, xoff_t addr1, xoff_t addr2)
-    : kind(kind),
-      size(size),
-      addr1(addr1),
-      addr2(addr2),
+  Change(Kind kind0, xoff_t size0, xoff_t addr1_0, xoff_t addr2_0)
+    : kind(kind0),
+      size(size0),
+      addr1(addr1_0),
+      addr2(addr2_0),
       insert(NULL) {
     CHECK(kind == MOVE || kind == COPY || kind == OVERWRITE);
   }
