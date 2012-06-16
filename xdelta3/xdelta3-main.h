@@ -1,7 +1,6 @@
-/* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007,
- * 2008, 2009, 2010, 2011
- * Joshua P. MacDonald
+/* xdelta3 - delta compression tools and library
+ * Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
+ * 2009, 2010, 2011, 2012 Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -32,10 +31,7 @@
 /* TODO list: 1. do exact gzip-like filename, stdout handling.  make a
  * .vcdiff extension, refuse to encode to stdout without -cf, etc.
  * 2. Allow the user to add a comment string to the app header without
- * disturbing the default behavior.  3. "Source file must be seekable"
- * is not actually true for encoding, given current behavior.  Allow
- * non-seekable sources?  It would in theory let you use a fifo for
- * the source.
+ * disturbing the default behavior.
  */
 
 /* On error handling and printing:
@@ -69,9 +65,22 @@
 /* Combines xd3_strerror() and strerror() */
 const char* xd3_mainerror(int err_num);
 
-/* XPRINTX (used by main) prefixes an "xdelta3: " to the output. */
-#define XPR fprintf
-#define NT stderr, "xdelta3: "
+#include "xdelta3-internal.h"
+
+int
+xsnprintf_func (char *str, int n, const char *fmt, ...)
+{
+  va_list a;
+  int ret;
+  va_start (a, fmt);
+  ret = vsnprintf_func (str, n, fmt, a);
+  va_end (a);
+  if (ret < 0)
+    {
+      ret = n;
+    }
+  return ret;
+}
 
 /* If none are set, default to posix. */
 #if (XD3_POSIX + XD3_STDIO + XD3_WIN32) == 0
@@ -93,8 +102,6 @@ const char* xd3_mainerror(int err_num);
  * error message from the library. */
 #define XD3_LIB_ERRMSG(stream, ret) "%s: %s\n", \
     xd3_errstring (stream), xd3_mainerror (ret)
-
-#include <stdio.h>  /* fprintf */
 
 #if XD3_POSIX
 #include <unistd.h> /* close, read, write... */
@@ -156,13 +163,6 @@ typedef enum
   RD_MAININPUT   = (1 << 3),
 } xd3_read_flags;
 
-/* main_file->mode values */
-typedef enum
-{
-  XO_READ  = 0,
-  XO_WRITE = 1,
-} main_file_modes;
-
 /* Main commands.  For example, CMD_PRINTHDR is the "xdelta printhdr"
  * command. */
 typedef enum
@@ -190,43 +190,8 @@ typedef enum
 #define IS_ENCODE(cmd) (0)
 #endif
 
-typedef struct _main_file        main_file;
-typedef struct _main_extcomp     main_extcomp;
 typedef struct _main_merge       main_merge;
 typedef struct _main_merge_list  main_merge_list;
-
-/* The main_file object supports abstract system calls like open,
- * close, read, write, seek, stat.  The program uses these to
- * represent both seekable files and non-seekable files.  Source files
- * must be seekable, but the target input and any output file do not
- * require seekability.
- */
-struct _main_file
-{
-#if XD3_STDIO
-  FILE               *file;
-#elif XD3_POSIX
-  int                 file;
-#elif XD3_WIN32
-  HANDLE              file;
-#endif
-
-  int                 mode;          /* XO_READ and XO_WRITE */
-  const char         *filename;      /* File name or /dev/stdin,
-				      * /dev/stdout, /dev/stderr. */
-  char               *filename_copy; /* File name or /dev/stdin,
-				      * /dev/stdout, /dev/stderr. */
-  const char         *realname;      /* File name or /dev/stdin,
-				      * /dev/stdout, /dev/stderr. */
-  const main_extcomp *compressor;    /* External compression struct. */
-  int                 flags;         /* RD_FIRST, RD_NONEXTERNAL, ... */
-  xoff_t              nread;         /* for input position */
-  xoff_t              nwrite;        /* for output position */
-  uint8_t            *snprintf_buf;  /* internal snprintf() use */
-  int                 size_known;    /* Set by main_set_souze */
-  xoff_t              source_position;  /* for avoiding seek in getblk_func */
-  int                 seek_failed;   /* after seek fails once, try FIFO */
-};
 
 /* Various strings and magic values used to detect and call external
  * compression.  See below for examples. */
@@ -346,7 +311,6 @@ static int main_getblk_func (xd3_stream *stream,
 static void main_free (void *ptr);
 static void* main_malloc (usize_t size);
 
-static int main_file_open (main_file *xfile, const char* name, int mode);
 static int main_file_stat (main_file *xfile, xoff_t *size);
 static int main_file_seek (main_file *xfile, xoff_t pos);
 static int main_read_primary_input (main_file   *file,
@@ -357,18 +321,45 @@ static int main_read_primary_input (main_file   *file,
 static const char* main_format_bcnt (xoff_t r, char *buf);
 static int main_help (void);
 
+static int xd3_merge_input_output (xd3_stream *stream,
+				   xd3_whole_state *source);
+
+
 /* The code in xdelta3-blk.h is essentially part of this unit, see
  * comments there. */
 #include "xdelta3-blkcache.h"
 
+void (*xprintf_message_func)(const char*msg) = NULL;
+
+void
+xprintf (const char *fmt, ...)
+{
+  char buf[1000];
+  va_list a;
+  int size;
+  va_start (a, fmt);
+  size = vsnprintf_func (buf, 1000, fmt, a);
+  va_end (a);
+  if (size < 0)
+    {
+      size = sizeof(buf) - 1;
+      buf[size] = 0;
+    }
+  if (xprintf_message_func != NULL) {
+    xprintf_message_func(buf);
+  } else {
+    fwrite(buf, 1, size, stderr);
+  }
+}
+
 static int
 main_version (void)
 {
-  /* $Format: "  DP(RINT \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, Joshua MacDonald\n\");" $ */
-  DP(RINT "Xdelta version 3.0.0, Copyright (C) 2007, 2008, 2009, 2010, Joshua MacDonaldn");
-  DP(RINT "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
-  DP(RINT "This is free software, and you are welcome to redistribute it\n");
-  DP(RINT "under certain conditions; see \"COPYING\" for details.\n");
+  /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, Joshua MacDonald\\n\");" $ */
+  XPR(NTR "Xdelta version 3.0.0, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, Joshua MacDonald\n");
+  XPR(NTR "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
+  XPR(NTR "This is free software, and you are welcome to redistribute it\n");
+  XPR(NTR "under certain conditions; see \"COPYING\" for details.\n");
   return EXIT_SUCCESS;
 }
 
@@ -377,33 +368,33 @@ main_config (void)
 {
   main_version ();
 
-  DP(RINT "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
-  DP(RINT "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
-  DP(RINT "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
-  DP(RINT "REGRESSION_TEST=%d\n", REGRESSION_TEST);
-  DP(RINT "SECONDARY_DJW=%d\n", SECONDARY_DJW);
-  DP(RINT "SECONDARY_FGK=%d\n", SECONDARY_FGK);
-  DP(RINT "UNALIGNED_OK=%d\n", UNALIGNED_OK);
-  DP(RINT "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
-  DP(RINT "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
-  DP(RINT "XD3_DEBUG=%d\n", XD3_DEBUG);
-  DP(RINT "XD3_ENCODER=%d\n", XD3_ENCODER);
-  DP(RINT "XD3_POSIX=%d\n", XD3_POSIX);
-  DP(RINT "XD3_STDIO=%d\n", XD3_STDIO);
-  DP(RINT "XD3_WIN32=%d\n", XD3_WIN32);
-  DP(RINT "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
-  DP(RINT "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
-  DP(RINT "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
-  DP(RINT "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
-  DP(RINT "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
-  DP(RINT "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
-  DP(RINT "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
-  DP(RINT "sizeof(void*)=%d\n", (int)sizeof(void*));
-  DP(RINT "sizeof(int)=%d\n", (int)sizeof(int));
-  DP(RINT "sizeof(uint32_t)=%d\n", (int)sizeof(uint32_t));
-  DP(RINT "sizeof(uint64_t)=%d\n", (int)sizeof(uint64_t));
-  DP(RINT "sizeof(usize_t)=%d\n", (int)sizeof(usize_t));
-  DP(RINT "sizeof(xoff_t)=%d\n", (int)sizeof(xoff_t));
+  XPR(NTR "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
+  XPR(NTR "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
+  XPR(NTR "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
+  XPR(NTR "REGRESSION_TEST=%d\n", REGRESSION_TEST);
+  XPR(NTR "SECONDARY_DJW=%d\n", SECONDARY_DJW);
+  XPR(NTR "SECONDARY_FGK=%d\n", SECONDARY_FGK);
+  XPR(NTR "UNALIGNED_OK=%d\n", UNALIGNED_OK);
+  XPR(NTR "VCDIFF_TOOLS=%d\n", VCDIFF_TOOLS);
+  XPR(NTR "XD3_ALLOCSIZE=%d\n", XD3_ALLOCSIZE);
+  XPR(NTR "XD3_DEBUG=%d\n", XD3_DEBUG);
+  XPR(NTR "XD3_ENCODER=%d\n", XD3_ENCODER);
+  XPR(NTR "XD3_POSIX=%d\n", XD3_POSIX);
+  XPR(NTR "XD3_STDIO=%d\n", XD3_STDIO);
+  XPR(NTR "XD3_WIN32=%d\n", XD3_WIN32);
+  XPR(NTR "XD3_USE_LARGEFILE64=%d\n", XD3_USE_LARGEFILE64);
+  XPR(NTR "XD3_DEFAULT_LEVEL=%d\n", XD3_DEFAULT_LEVEL);
+  XPR(NTR "XD3_DEFAULT_IOPT_SIZE=%d\n", XD3_DEFAULT_IOPT_SIZE);
+  XPR(NTR "XD3_DEFAULT_SPREVSZ=%d\n", XD3_DEFAULT_SPREVSZ);
+  XPR(NTR "XD3_DEFAULT_SRCWINSZ=%d\n", XD3_DEFAULT_SRCWINSZ);
+  XPR(NTR "XD3_DEFAULT_WINSIZE=%d\n", XD3_DEFAULT_WINSIZE);
+  XPR(NTR "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
+  XPR(NTR "sizeof(void*)=%d\n", (int)sizeof(void*));
+  XPR(NTR "sizeof(int)=%d\n", (int)sizeof(int));
+  XPR(NTR "sizeof(uint32_t)=%d\n", (int)sizeof(uint32_t));
+  XPR(NTR "sizeof(uint64_t)=%d\n", (int)sizeof(uint64_t));
+  XPR(NTR "sizeof(usize_t)=%d\n", (int)sizeof(usize_t));
+  XPR(NTR "sizeof(xoff_t)=%d\n", (int)sizeof(xoff_t));
 
   return EXIT_SUCCESS;
 }
@@ -755,7 +746,7 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
   }
 #endif
 
-static void
+void
 main_file_init (main_file *xfile)
 {
   memset (xfile, 0, sizeof (*xfile));
@@ -768,7 +759,7 @@ main_file_init (main_file *xfile)
 #endif
 }
 
-static int
+int
 main_file_isopen (main_file *xfile)
 {
 #if XD3_STDIO
@@ -782,7 +773,7 @@ main_file_isopen (main_file *xfile)
 #endif
 }
 
-static int
+int
 main_file_close (main_file *xfile)
 {
   int ret = 0;
@@ -811,7 +802,7 @@ main_file_close (main_file *xfile)
   return ret;
 }
 
-static void
+void
 main_file_cleanup (main_file *xfile)
 {
   XD3_ASSERT (xfile != NULL);
@@ -834,7 +825,7 @@ main_file_cleanup (main_file *xfile)
     }
 }
 
-static int
+int
 main_file_open (main_file *xfile, const char* name, int mode)
 {
   int ret = 0;
@@ -885,7 +876,7 @@ main_file_open (main_file *xfile, const char* name, int mode)
   return ret;
 }
 
-static int
+int
 main_file_stat (main_file *xfile, xoff_t *size)
 {
   int ret = 0;
@@ -930,7 +921,7 @@ main_file_stat (main_file *xfile, xoff_t *size)
   return ret;
 }
 
-static int
+int
 main_file_exists (main_file *xfile)
 {
   struct stat sbuf;
@@ -1009,7 +1000,7 @@ xd3_win32_io (HANDLE file, uint8_t *buf, usize_t size,
 
 /* POSIX is unbuffered, while STDIO is buffered.  main_file_read()
  * should always be called on blocks. */
-static int
+int
 main_file_read (main_file  *ifile,
 		uint8_t    *buf,
 		usize_t     size,
@@ -1052,7 +1043,7 @@ main_file_read (main_file  *ifile,
   return ret;
 }
 
-static int
+int
 main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
 {
   int ret = 0;
@@ -1217,54 +1208,6 @@ main_set_secondary_flags (xd3_config *config)
 
 #if VCDIFF_TOOLS
 #include "xdelta3-merge.h"
-
-/* According to the internet, Windows vsnprintf() differs from most
- * Unix implementations regarding the terminating 0 when the boundary
- * condition is met. It doesn't matter here, we don't rely on the
- * trailing 0.  Besides, both Windows and DJGPP vsnprintf return -1
- * upon truncation, which isn't C99 compliant. To overcome this,
- * recent MinGW runtimes provided their own vsnprintf (notice the
- * absence of the '_' prefix) but they were initially buggy.  So,
- * always use the native '_'-prefixed version with Win32. */
-#include <stdarg.h>
-#ifdef _WIN32
-#define vsnprintf_func _vsnprintf
-#else
-#define vsnprintf_func vsnprintf
-#endif
-
-/* Prior to SVN 303 this function was only defined in DJGPP and WIN32
- * environments and other platforms would use the builtin snprintf()
- * with an arrangement of macros below.  In OS X 10.6, Apply made
- * snprintf() a macro, which defeated those macros (since snprintf
- * would be evaluated before its argument macros were expanded,
- * therefore always define xsnprintf_func. */
-#undef PRINTF_ATTRIBUTE
-#ifdef __GNUC__
-/* Let's just assume no one uses gcc 2.x! */
-#define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
-#else
-#define PRINTF_ATTRIBUTE(x,y)
-#endif
-
-static int
-xsnprintf_func (char *str, int n, const char *fmt, ...)
-  PRINTF_ATTRIBUTE(3,4);
-
-int
-xsnprintf_func (char *str, int n, const char *fmt, ...)
-{
-  va_list a;
-  int ret;
-  va_start (a, fmt);
-  ret = vsnprintf_func (str, n, fmt, a);
-  va_end (a);
-  if (ret < 0)
-    {
-      ret = n;
-    }
-  return ret;
-}
 
 /* The following macros let VCDIFF print using main_file_write(),
  * for example:
@@ -1984,7 +1927,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 		  XD3_ASSERT (inst->addr >= window_start);
 		  addr = inst->addr - window_start;
 		}
-	      IF_DEBUG2 (DP(RINT "[merge copy] winpos %u take %u addr %"Q"u mode %u\n",
+	      IF_DEBUG2 (XPR(NTR "[merge copy] winpos %u take %u addr %"Q"u mode %u\n",
 			    window_pos, take, addr, inst->mode));
 	      if ((ret = xd3_found_match (recode_stream, window_pos, take,
 					  addr, inst->mode != 0)))
@@ -3562,11 +3505,10 @@ setup_environment (int argc,
   }
 }
 
-int
 #if PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
-xd3_main_cmdline (int argc, char **argv)
+int xd3_main_cmdline (int argc, char **argv)
 #else
-main (int argc, char **argv)
+int main (int argc, char **argv)
 #endif
 {
   static const char *flags =
@@ -3989,72 +3931,72 @@ main_help (void)
   main_version();
 
   /* Note: update wiki when command-line features change */
-  DP(RINT "usage: xdelta3 [command/options] [input [output]]\n");
-  DP(RINT "make patch:\n");
-  DP(RINT "\n");
-  DP(RINT "  xdelta3.exe -e -s old_file new_file delta_file\n");
-  DP(RINT "\n");
-  DP(RINT "apply patch:\n");
-  DP(RINT "\n");
-  DP(RINT "  xdelta3.exe -d -s old_file delta_file decoded_new_file\n");
-  DP(RINT "\n");
-  DP(RINT "special command names:\n");
-  DP(RINT "    config      prints xdelta3 configuration\n");
-  DP(RINT "    decode      decompress the input\n");
-  DP(RINT "    encode      compress the input%s\n",
+  XPR(NTR "usage: xdelta3 [command/options] [input [output]]\n");
+  XPR(NTR "make patch:\n");
+  XPR(NTR "\n");
+  XPR(NTR "  xdelta3.exe -e -s old_file new_file delta_file\n");
+  XPR(NTR "\n");
+  XPR(NTR "apply patch:\n");
+  XPR(NTR "\n");
+  XPR(NTR "  xdelta3.exe -d -s old_file delta_file decoded_new_file\n");
+  XPR(NTR "\n");
+  XPR(NTR "special command names:\n");
+  XPR(NTR "    config      prints xdelta3 configuration\n");
+  XPR(NTR "    decode      decompress the input\n");
+  XPR(NTR "    encode      compress the input%s\n",
      XD3_ENCODER ? "" : " [Not compiled]");
 #if REGRESSION_TEST
-  DP(RINT "    test        run the builtin tests\n");
+  XPR(NTR "    test        run the builtin tests\n");
 #endif
 #if VCDIFF_TOOLS
-  DP(RINT "special commands for VCDIFF inputs:\n");
-  DP(RINT "    printdelta  print information about the entire delta\n");
-  DP(RINT "    printhdr    print information about the first window\n");
-  DP(RINT "    printhdrs   print information about all windows\n");
-  DP(RINT "    recode      encode with new application/secondary settings\n");
-  DP(RINT "    merge       merge VCDIFF inputs (see below)\n");
+  XPR(NTR "special commands for VCDIFF inputs:\n");
+  XPR(NTR "    printdelta  print information about the entire delta\n");
+  XPR(NTR "    printhdr    print information about the first window\n");
+  XPR(NTR "    printhdrs   print information about all windows\n");
+  XPR(NTR "    recode      encode with new application/secondary settings\n");
+  XPR(NTR "    merge       merge VCDIFF inputs (see below)\n");
 #endif
-  DP(RINT "merge patches:\n");
-  DP(RINT "\n");
-  DP(RINT "  xdelta3 merge -m 1.vcdiff -m 2.vcdiff 3.vcdiff merged.vcdiff\n");
-  DP(RINT "\n");
-  DP(RINT "standard options:\n");
-  DP(RINT "   -0 .. -9     compression level\n");
-  DP(RINT "   -c           use stdout\n");
-  DP(RINT "   -d           decompress\n");
-  DP(RINT "   -e           compress%s\n",
+  XPR(NTR "merge patches:\n");
+  XPR(NTR "\n");
+  XPR(NTR "  xdelta3 merge -m 1.vcdiff -m 2.vcdiff 3.vcdiff merged.vcdiff\n");
+  XPR(NTR "\n");
+  XPR(NTR "standard options:\n");
+  XPR(NTR "   -0 .. -9     compression level\n");
+  XPR(NTR "   -c           use stdout\n");
+  XPR(NTR "   -d           decompress\n");
+  XPR(NTR "   -e           compress%s\n",
      XD3_ENCODER ? "" : " [Not compiled]");
-  DP(RINT "   -f           force (overwrite, ignore trailing garbage)\n");
+  XPR(NTR "   -f           force (overwrite, ignore trailing garbage)\n");
 #if EXTERNAL_COMPRESSION
-  DP(RINT "   -F           force the external-compression subprocess\n");
+  XPR(NTR "   -F           force the external-compression subprocess\n");
 #endif
-  DP(RINT "   -h           show help\n");
-  DP(RINT "   -q           be quiet\n");
-  DP(RINT "   -v           be verbose (max 2)\n");
-  DP(RINT "   -V           show version\n");
+  XPR(NTR "   -h           show help\n");
+  XPR(NTR "   -q           be quiet\n");
+  XPR(NTR "   -v           be verbose (max 2)\n");
+  XPR(NTR "   -V           show version\n");
 
-  DP(RINT "memory options:\n");
-  DP(RINT "   -B bytes     source window size\n");
-  DP(RINT "   -W bytes     input window size\n");
-  DP(RINT "   -P size      compression duplicates window\n");
-  DP(RINT "   -I size      instruction buffer size (0 = unlimited)\n");
+  XPR(NTR "memory options:\n");
+  XPR(NTR "   -B bytes     source window size\n");
+  XPR(NTR "   -W bytes     input window size\n");
+  XPR(NTR "   -P size      compression duplicates window\n");
+  XPR(NTR "   -I size      instruction buffer size (0 = unlimited)\n");
 
-  DP(RINT "compression options:\n");
-  DP(RINT "   -s source    source file to copy from (if any)\n");
-  DP(RINT "   -S [djw|fgk] enable/disable secondary compression\n");
-  DP(RINT "   -N           disable small string-matching compression\n");
-  DP(RINT "   -D           disable external decompression (encode/decode)\n");
-  DP(RINT "   -R           disable external recompression (decode)\n");
-  DP(RINT "   -n           disable checksum (encode/decode)\n");
-  DP(RINT "   -C           soft config (encode, undocumented)\n");
-  DP(RINT "   -A [apphead] disable/provide application header (encode)\n");
-  DP(RINT "   -J           disable output (check/compute only)\n");
-  DP(RINT "   -T           use alternate code table (test)\n");
-  DP(RINT "   -m           arguments for \"merge\"\n");
+  XPR(NTR "compression options:\n");
+  XPR(NTR "   -s source    source file to copy from (if any)\n");
+  XPR(NTR "   -S [djw|fgk] enable/disable secondary compression\n");
+  XPR(NTR "   -N           disable small string-matching compression\n");
+  XPR(NTR "   -D           disable external decompression (encode/decode)\n");
+  XPR(NTR "   -R           disable external recompression (decode)\n");
+  XPR(NTR "   -n           disable checksum (encode/decode)\n");
+  XPR(NTR "   -C           soft config (encode, undocumented)\n");
+  XPR(NTR "   -A [apphead] disable/provide application header (encode)\n");
+  XPR(NTR "   -J           disable output (check/compute only)\n");
+  XPR(NTR "   -T           use alternate code table (test)\n");
+  XPR(NTR "   -m           arguments for \"merge\"\n");
 
-  DP(RINT "the XDELTA environment variable may contain extra args:\n");
-  DP(RINT "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
-  DP(RINT "   tar --use-compress-program=xdelta3 \\\n");
-  DP(RINT "       -cf target-x.z.tar.gz.vcdiff target-x.y\n");
+  XPR(NTR "the XDELTA environment variable may contain extra args:\n");
+  XPR(NTR "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
+  XPR(NTR "   tar --use-compress-program=xdelta3 \\\n");
+  XPR(NTR "       -cf target-x.z.tar.gz.vcdiff target-x.y\n");
   return EXIT_FAILURE;
 }

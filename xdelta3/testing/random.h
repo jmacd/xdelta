@@ -3,15 +3,19 @@
  * attributed to Michael Brundage.  Thanks!
  * http://www.qbrundage.com/michaelb/pubs/essays/random_number_generation.html
  */
+#undef MT_LEN
+#undef MT_IA
 class MTRandom {
  public:
-  static const uint32_t TEST_SEED1 = 5489UL;
+  enum Constants { 
+    MT_LEN = 624,
+    MT_IA = 397,
+  };
 
-  static const int MT_LEN = 624;
-  static const int MT_IA = 397;
-  static const uint32_t UPPER_MASK = 0x80000000;
-  static const uint32_t LOWER_MASK = 0x7FFFFFFF;
-  static const uint32_t MATRIX_A = 0x9908B0DF;
+  static const uint32_t TEST_SEED1;
+  static const uint32_t UPPER_MASK;
+  static const uint32_t LOWER_MASK;
+  static const uint32_t MATRIX_A;
 
   MTRandom() {
     Init(TEST_SEED1);
@@ -115,6 +119,11 @@ class MTRandom {
   int mt_index_;
   uint32_t mt_buffer_[MT_LEN];
 };
+
+const uint32_t MTRandom::TEST_SEED1 = 5489UL;
+const uint32_t MTRandom::UPPER_MASK = 0x80000000;
+const uint32_t MTRandom::LOWER_MASK = 0x7FFFFFFF;
+const uint32_t MTRandom::MATRIX_A = 0x9908B0DF;
 
 class MTRandom8 {
 public:

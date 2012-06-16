@@ -3,7 +3,8 @@ CFLAGS = -g -Wall -Wconversion -Wsign-compare -Wextra \
 	      -DGENERIC_ENCODE_TABLES=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
-	      -DXD3_USE_LARGEFILE64=1
+	      -DXD3_USE_LARGEFILE64=1 \
+	      -DHACK -DXD3_POSIX=1
 
 DEPS = ../*.h ../*.c *.cc *.h
 

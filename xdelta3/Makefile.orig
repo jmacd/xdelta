@@ -30,6 +30,8 @@ SOURCES = xdelta3-blkcache.h \
 	  xdelta3.h
 
 TARGETS = xdelta3-debug \
+	  xdelta3-debug32 \
+	  xdelta3-debug64 \
 	  xdelta3 \
 	  xdelta3-debug2 \
 	  xdelta3-debugstdio \
@@ -53,7 +55,6 @@ PYTHON = python
 
 WIXDIR = "/cygdrive/c/Program Files/wix2.0.4820"
 
-# -arch x86_64
 CFLAGS= -Wall -Wshadow -fno-builtin
 WFLAGS= -Wextra -Wsign-compare -Wconversion -Wextra -Wno-unused-parameter
 
@@ -83,7 +84,7 @@ SWIG_FLAGS = -DXD3_DEBUG=1 \
 	      -DVCDIFF_TOOLS=1 \
 	      -DSWIG_MODULE=1
 
-all: xdelta3-debug xdelta3-debug2 xdelta3
+all: xdelta3-debug32 xdelta3-debug64 xdelta3-debug2 xdelta3
 	(cd testing && make)
 
 all-py: all $(PYTGT) $(SWIGTGT)
@@ -136,8 +137,21 @@ xdelta3: $(SOURCES)
 	      -DXD3_POSIX=1 \
 	      -DXD3_USE_LARGEFILE64=1
 
-xdelta3-debug: $(SOURCES)
-	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug \
+xdelta3-debug32: $(SOURCES)
+	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug32 \
+	        -arch i386 \
+		-DGENERIC_ENCODE_TABLES=1 \
+		-DREGRESSION_TEST=1 \
+		-DSECONDARY_DJW=1 \
+		-DSECONDARY_FGK=1 \
+		-DXD3_DEBUG=1 \
+		-DXD3_MAIN=1 \
+		-DXD3_POSIX=1 \
+		-DXD3_USE_LARGEFILE64=1
+
+xdelta3-debug64: $(SOURCES)
+	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug64 \
+	        -arch x86_64 \
 		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \

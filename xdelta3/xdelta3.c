@@ -348,11 +348,6 @@ typedef enum {
 } xd3_section_type;
 
 typedef unsigned int xd3_rtype;
-#define XD3_NOOP 0U
-#define XD3_ADD 1U
-#define  XD3_RUN 2U
-#define  XD3_CPY 3U /* XD3_CPY rtypes are represented as (XD3_CPY +
-                     * copy-mode value) */
 
 /***********************************************************************/
 
@@ -425,8 +420,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define INST_HEAD(s) ((s)->enc_heads[2])
 #define ADDR_HEAD(s) ((s)->enc_heads[3])
 
-#define SIZEOF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
-
 #define TOTAL_MODES(x) (2+(x)->acache.s_same+(x)->acache.s_near)
 
 /* Template instances. */
@@ -474,21 +467,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
   else { run_c = (c); run_l = 1; } } while (0)
 
 /* This CPP-conditional stuff can be cleaned up... */
-#if XD3_DEBUG
-#define IF_DEBUG(x) x
-#else
-#define IF_DEBUG(x)
-#endif
-#if XD3_DEBUG > 1
-#define IF_DEBUG1(x) x
-#else
-#define IF_DEBUG1(x)
-#endif
-#if XD3_DEBUG > 2
-#define IF_DEBUG2(x) x
-#else
-#define IF_DEBUG2(x)
-#endif
 #if REGRESSION_TEST
 #define IF_REGRESSION(x) x
 #else
@@ -1541,7 +1519,8 @@ xd3_round_blksize (usize_t sz, usize_t blksz)
 #define A32_DO8(buf,i)  A32_DO4(buf,i); A32_DO4(buf,i+4);
 #define A32_DO16(buf)   A32_DO8(buf,0); A32_DO8(buf,8);
 
-static unsigned long adler32 (unsigned long adler, const uint8_t *buf, usize_t len)
+static unsigned long adler32 (unsigned long adler, const uint8_t *buf, 
+			      usize_t len)
 {
     unsigned long s1 = adler & 0xffff;
     unsigned long s2 = (adler >> 16) & 0xffff;
@@ -4502,7 +4481,6 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
-#if 1
 static inline int
 xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
 {
@@ -4537,19 +4515,6 @@ xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
     }
   return i;
 }
-#else
-static inline usize_t
-xd3_forward_match(const uint8_t *s1c,
-		  const uint8_t *s2c,
-		  usize_t n) {
-  usize_t i = 0;
-  while (i < n && s1c[i] == s2c[i])
-    {
-      i++;
-    }
-  return i;
-}
-#endif
 
 /* This function expands the source match backward and forward.  It is
  * reentrant, since xd3_getblk may return XD3_GETSRCBLK, so most

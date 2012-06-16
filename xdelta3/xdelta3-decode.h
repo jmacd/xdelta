@@ -19,6 +19,8 @@
 #ifndef _XDELTA3_DECODE_H_
 #define _XDELTA3_DECODE_H_
 
+#include "xdelta3-internal.h"
+
 #define SRCORTGT(x) ((((x) & VCD_SRCORTGT) == VCD_SOURCE) ? \
                      VCD_SOURCE : ((((x) & VCD_SRCORTGT) == \
                                     VCD_TARGET) ? VCD_TARGET : 0))
@@ -222,7 +224,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
     {
       IF_DEBUG2 ({
 	static int cnt = 0;
-	DP(RINT "DECODE:%u: COPY at %"Q"u (winoffset %u) size %u winaddr %u\n",
+	XPR(NT "DECODE:%u: COPY at %"Q"u (winoffset %u) size %u winaddr %u\n",
 		 cnt++,
 		 stream->total_out + (stream->dec_position -
 				      stream->dec_cpylen),
@@ -263,7 +265,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (inst->type == XD3_ADD)
 	  {
 	    static int cnt;
-	    DP(RINT "DECODE:%d: ADD at %"Q"u (winoffset %u) size %u\n",
+	    XPR(NT "DECODE:%d: ADD at %"Q"u (winoffset %u) size %u\n",
 	       cnt++,
 	       (stream->total_out + stream->dec_position - stream->dec_cpylen),
 	       stream->dec_position - stream->dec_cpylen,
@@ -273,7 +275,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  {
 	    static int cnt;
 	    XD3_ASSERT (inst->type == XD3_RUN);
-	    DP(RINT "DECODE:%d: RUN at %"Q"u (winoffset %u) size %u\n",
+	    XPR(NT "DECODE:%d: RUN at %"Q"u (winoffset %u) size %u\n",
 	       cnt++,
 	       stream->total_out + stream->dec_position - stream->dec_cpylen,
 	       stream->dec_position - stream->dec_cpylen,
@@ -451,13 +453,13 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG1(DP(RINT "[srcfile] short at blkno %"Q"u onblk "
+		    XPR(NT "[srcfile] short at blkno %"Q"u onblk "
 				 "%u blksize %u blkoff %u take %u\n",
 				 block,
 				 source->onblk,
 				 blksize,
 				 blkoff,
-				 take));
+				 take);
 		    stream->msg = "source file too short";
 		    return XD3_INVALID_INPUT;
 		  }
@@ -502,6 +504,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
  	dst = stream->next_out + stream->avail_out;
 
 	stream->avail_out += take;
+
+	//XPR(NT "memcpy here with take=%u\n", take);
 
 	if (overlap)
 	  {
@@ -1088,7 +1092,7 @@ xd3_decode_input (xd3_stream *stream)
 			  &src->cpyoff_blocks,
 			  &src->cpyoff_blkoff);
 	  
-	  IF_DEBUG2(DP(RINT
+	  IF_DEBUG1(DP(RINT
 		       "decode cpyoff %"Q"u "
 		       "cpyblkno %"Q"u "
 		       "cpyblkoff %u "

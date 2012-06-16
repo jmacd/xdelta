@@ -1351,4 +1351,28 @@ void xd3_blksize_add (xoff_t *blkno,
   XD3_ASSERT (*blkoff < source->blksize);
 }
 
+#define XD3_NOOP 0U
+#define XD3_ADD 1U
+#define  XD3_RUN 2U
+#define  XD3_CPY 3U /* XD3_CPY rtypes are represented as (XD3_CPY +
+                     * copy-mode value) */
+
+#if XD3_DEBUG
+#define IF_DEBUG(x) x
+#else
+#define IF_DEBUG(x)
+#endif
+#if XD3_DEBUG > 1
+#define IF_DEBUG1(x) x
+#else
+#define IF_DEBUG1(x)
+#endif
+#if XD3_DEBUG > 2
+#define IF_DEBUG2(x) x
+#else
+#define IF_DEBUG2(x)
+#endif
+
+#define SIZEOF_ARRAY(x) (sizeof(x) / sizeof(x[0]))
+
 #endif /* _XDELTA3_H_ */

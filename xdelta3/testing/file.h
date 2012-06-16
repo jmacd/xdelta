@@ -363,7 +363,6 @@ public:
 				"tmpfile write failed"));
   }
 
-
   const char* Name() const {
     if (main_file_isopen(&file_)) {
       CHECK_EQ(0, main_file_close(&file_));

@@ -1,12 +1,12 @@
 // -*- Mode: C++ -*-
 
 extern "C" {
-#define NOT_MAIN 1
-#define REGRESSION_TEST 0
-#define VCDIFF_TOOLS 1
-#include "../xdelta3.c"
-#include <math.h>
+#include "../xdelta3.h"
+#include "../xdelta3-internal.h"
 }
+
+#include <math.h>
+#include <string>
 
 #define CHECK_EQ(x,y) CHECK_OP(x,y,==)
 #define CHECK_NE(x,y) CHECK_OP(x,y,!=)
@@ -25,7 +25,7 @@ extern "C" {
       cerr << __FILE__ << ":" << __LINE__ << " Actual: " << _y << endl; \
     abort(); \
     } } while (false)
-
+#undef CHECK
 #define CHECK(x) \
   do {if (!(x)) {				       \
   cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x << endl; \
@@ -34,7 +34,6 @@ extern "C" {
 
 #define DCHECK(x)
 
-#include <string>
 using std::string;
 
 #include <vector>

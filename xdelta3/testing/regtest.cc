@@ -75,7 +75,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
   bool done = false;
   bool done_after_input = false;
 
-  IF_DEBUG1 (DP(RINT "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
+  IF_DEBUG1 (XPR(NTR "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
 		source_file.Size(), Constants::BLOCK_SIZE,
 		target_file.Size(), Constants::READ_SIZE,
 		Constants::WINDOW_SIZE));
@@ -85,7 +85,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 
     xoff_t blks = target_iterator.Blocks();
 
-    IF_DEBUG2(DP(RINT "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
+    IF_DEBUG2(XPR(NTR "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
 		 encoding ? "encoding" : "decoding",
 		 target_iterator.Offset(),
 		 target_iterator.Offset() + target_block.Size(),
@@ -109,7 +109,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       msg = decode_stream.msg;
     }
 
-    IF_DEBUG1(DP(RINT "%s = %s %s\n", encoding ? "E " : " D",
+    IF_DEBUG1(XPR(NTR "%s = %s %s\n", encoding ? "E " : " D",
 		 xd3_strerror(ret),
 		 msg == NULL ? "" : msg));
 
@@ -138,7 +138,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       xd3_source *src = (encoding ? &encode_source : &decode_source);
       Block *block = (encoding ? &encode_source_block : &decode_source_block);
       if (encoding) {
- 	IF_DEBUG1(DP(RINT "[srcblock] %"Q"u last srcpos %"Q"u "
+ 	IF_DEBUG1(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
 		     "encodepos %"Q"u\n",
 		     encode_source.getblkno,
 		     encode_stream.match_last_srcpos,
@@ -229,13 +229,13 @@ void TestRandomNumbers() {
 
   if (umean < uexpect * (1.0 - allowed_error) ||
       umean > uexpect * (1.0 + allowed_error)) {
-    cerr << "uniform mean error: " << umean << " != " << uexpect << endl;
+    XPR(NT "uniform mean error: %u != %u\n", umean, uexpect);
     abort();
   }
 
   if (emean < eexpect * (1.0 - allowed_error) ||
       emean > eexpect * (1.0 + allowed_error)) {
-    cerr << "exponential mean error: " << emean << " != " << eexpect << endl;
+    XPR(NT "exponential mean error: %u != %u\n", emean, eexpect);
     abort();
   }
 }
@@ -685,7 +685,7 @@ void FourWayMergeTest(const FileSpec &spec0,
   mcmd.push_back(out.Name());
   mcmd.push_back(NULL);
 
-  //DP(RINT "Running one merge: %s\n", CommandToString(mcmd).c_str());
+  //XPR(NTR "Running one merge: %s\n", CommandToString(mcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1,
 			       const_cast<char**>(&mcmd[0])));
 
@@ -699,10 +699,10 @@ void FourWayMergeTest(const FileSpec &spec0,
   tcmd.push_back(recon.Name());
   tcmd.push_back(NULL);
 
-  //DP(RINT "Running one recon! %s\n", CommandToString(tcmd).c_str());
+  //XPR(NTR "Running one recon! %s\n", CommandToString(tcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1,
 			       const_cast<char**>(&tcmd[0])));
-  //DP(RINT "Should equal! %s\n", f2.Name());
+  //XPR(NTR "Should equal! %s\n", f2.Name());
 
   CHECK(recon.EqualsSpec(spec2));
 
@@ -731,8 +731,8 @@ void TestMergeCommand1() {
 	continue;
       }
 
-      // DP(RINT "S0 = %lu\n", size0);
-      // DP(RINT "C1 = %lu\n", change1);
+      // XPR(NTR "S0 = %lu\n", size0);
+      // XPR(NTR "C1 = %lu\n", change1);
 
       size_t add1_pos = size0 ? rand.Rand32() % size0 : 0;
       size_t del2_pos = size0 ? rand.Rand32() % size0 : 0;
@@ -796,10 +796,10 @@ void TestMergeCommand2() {
 	    continue;
 	  }
 
-	  // DP(RINT "S0 = %lu\n", size0);
-	  // DP(RINT "S1 = %lu\n", size1);
-	  // DP(RINT "S2 = %lu\n", size2);
-	  // DP(RINT "S3 = %lu\n", size3);
+	  // XPR(NTR "S0 = %lu\n", size0);
+	  // XPR(NTR "S1 = %lu\n", size1);
+	  // XPR(NTR "S2 = %lu\n", size2);
+	  // XPR(NTR "S3 = %lu\n", size3);
 
 	  spec0.GenerateFixedSize(size0);
 
@@ -823,7 +823,7 @@ void TestMergeCommand2() {
 
 };  // class Regtest<Constants>
 
-#define TEST(x) cerr << #x << "..." << endl; regtest.x()
+#define TEST(x) XPR(NTR #x "...\n"); regtest.x()
 
 // These tests are primarily tests of the testing framework itself.
 template <class T>
@@ -843,20 +843,33 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  cerr << "Blocksize: " << T::BLOCK_SIZE << endl;
+  XPR(NT "Blocksize: %"Q"u\n", T::BLOCK_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);
   TEST(TestBlockInMemory);
   TEST(TestNonBlockingProgress);
+#if 0
   TEST(TestFifoCopyDiscipline);
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
+#endif
 }
 
 #undef TEST
 
+#ifdef HACK
+#define NOT_MAIN 1
+#define XD3_MAIN 1
+#define XD3_POSIX 1
+#include "../xdelta3.c"
+
+int main(int argc, char **argv) 
+#else
 // Run the unittests, followed by xdelta tests for various constants.
-int main(int argc, char **argv) {
+extern "C" int xd3_regtest_main(int argc, char **argv);
+extern "C" int xd3_regtest_main(int argc, char **argv) 
+#endif
+{
   UnitTest<SmallBlock>();
   MainTest<SmallBlock>();
   MainTest<MixedBlock>();
