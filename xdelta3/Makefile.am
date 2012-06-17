@@ -1,4 +1,7 @@
-bin_PROGRAMS = xdelta3 xdelta3regtest
+ACLOCAL_AMFLAGS = -I m4
+
+bin_PROGRAMS = xdelta3
+noinst_PROGRAMS = xdelta3regtest
 
 common_SOURCES = \
 	  xdelta3-blkcache.h \
@@ -32,7 +35,7 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
 	 -Wextra -Wno-unused-parameter
-common_CFLAGS = $(WFLAGS) \
+common_CFLAGS = \
 	      -DGENERIC_ENCODE_TABLES=0 \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
@@ -41,12 +44,23 @@ common_CFLAGS = $(WFLAGS) \
 	      -DXD3_USE_LARGEFILE64=1 \
 	      -DXD3_MAIN=1
 
-xdelta3_CFLAGS = $(common_CFLAGS) 
+xdelta3_CFLAGS = $(WFLAGS) $(common_CFLAGS) 
 
-xdelta3regtest_CXXFLAGS = $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
-xdelta3regtest_CFLAGS = $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+xdelta3regtest_CXXFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+xdelta3regtest_CFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+
+man1_MANS = xdelta3.1
 
 EXTRA_DIST = \
+	draft-korn-vcdiff.txt \
+	examples/Makefile \
+	examples/README \
+	examples/checksum_test.cc \
+	examples/compare_test.c \
+	examples/encode_decode_test.c \
+	examples/small_page_test.c \
+	examples/speed_test.c \
+	examples/test.h \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test.xcodeproj/project.pbxproj \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/Xd3iOSAppDelegate.h \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/Xd3iOSAppDelegate.m \
@@ -60,4 +74,32 @@ EXTRA_DIST = \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/file_v2.bin \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/main.m \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Info.plist \
-	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Prefix.pch
+	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Prefix.pch \
+	Makefile.mingw \
+	Makefile.orig \
+	testing/xdelta3-regtest.py \
+	testing/xdelta3-test.py \
+	xdelta3.1 \
+	xdelta3.i \
+	xdelta3.py \
+	xdelta3.vcproj \
+	xdelta3.wxi \
+	xdelta3.wxs \
+	xdelta3_pywrap.c
+
+BUILT_SOURCES = xdelta3_pywrap.c xdelta3.py
+
+xdelta3_pywrap.c xdelta3.py : xdelta3.i
+	$(SWIG) -python -o xdelta3_pywrap.c xdelta3.i
+
+# Note: This is probably incorrect, but makes it work in simple configurations
+# (like OS X) where the site-packages directory is not in the prefix directory.
+# See commented-out AM_CONDITIONAL in configure.ac, which is not working.
+pythondir = $(PYTHON_SITE_PKG)
+pyexecdir = $(PYTHON_SITE_PKG)
+
+python_PYTHON = xdelta3.py
+pyexec_LTLIBRARIES = _xdelta3.la
+_xdelta3_la_SOURCES = $(srcdir)/xdelta3_pywrap.c $(xdelta3_SOURCES)
+_xdelta3_la_CFLAGS = $(common_CFLAGS) -DNOT_MAIN=1 $(PYTHON_CPPFLAGS)
+_xdelta3_la_LDFLAGS = -module

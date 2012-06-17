@@ -5,13 +5,6 @@
 #include "xdelta3.h"
 
 int xd3_main_cmdline (int ARGC, char **ARGV);
-
-#undef SWIG_init
-#undef SWIG_name
-
-#define SWIG_init    initxdelta3
-#define SWIG_name    "xdelta3"
-
 %}
 
 %cstring_input_binary(const char *input, unsigned int input_size);

@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/python2.7
 # xdelta 3 - delta compression tools and library
 # Copyright (C) 2003, 2006, 2007.  Joshua P. MacDonald
 #

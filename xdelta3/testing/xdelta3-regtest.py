@@ -19,7 +19,6 @@
 # TODO: test 1.5 vs. greedy
 
 import os, sys, math, re, time, types, array, random
-import xdelta3main
 import xdelta3
 
 #RCSDIR = '/mnt/polaroid/Polaroid/orbit_linux/home/jmacd/PRCS'
