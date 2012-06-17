@@ -9,7 +9,7 @@ class MTRandom {
  public:
   enum Constants { 
     MT_LEN = 624,
-    MT_IA = 397,
+    MT_IA = 397
   };
 
   static const uint32_t TEST_SEED1;

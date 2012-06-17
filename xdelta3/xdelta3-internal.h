@@ -56,7 +56,7 @@ int xd3_main_cmdline (int argc, char **argv);
 typedef enum
 {
   XO_READ  = 0,
-  XO_WRITE = 1,
+  XO_WRITE = 1
 } main_file_modes;
 
 struct _main_file

@@ -44,7 +44,7 @@ common_CFLAGS = \
 	      -DXD3_USE_LARGEFILE64=1 \
 	      -DXD3_MAIN=1
 
-xdelta3_CFLAGS = $(WFLAGS) $(common_CFLAGS) 
+xdelta3_CFLAGS = $(WFLAGS) $(common_CFLAGS) -pedantic -std=c99
 
 xdelta3regtest_CXXFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
 xdelta3regtest_CFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1

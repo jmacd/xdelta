@@ -15,7 +15,7 @@ public:
     DELETE = 3,     // Delete a specified range of data
     COPY = 4,       // Copy from one region, inserting elsewhere
     MOVE = 5,       // Copy then delete copied-from range
-    OVERWRITE = 6,  // Copy then delete copied-to range
+    OVERWRITE = 6   // Copy then delete copied-to range
 
     // ADD, DELETE, and COPY change the file size
     // MODIFY, MOVE, OVERWRITE preserve the file size
