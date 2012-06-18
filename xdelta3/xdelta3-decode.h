@@ -453,13 +453,13 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    XPR(NT "[srcfile] short at blkno %"Q"u onblk "
-				 "%u blksize %u blkoff %u take %u\n",
-				 block,
-				 source->onblk,
-				 blksize,
-				 blkoff,
-				 take);
+		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q"u onblk "
+				   "%u blksize %u blkoff %u take %u\n",
+				   block,
+				   source->onblk,
+				   blksize,
+				   blkoff,
+				   take));
 		    stream->msg = "source file too short";
 		    return XD3_INVALID_INPUT;
 		  }
@@ -504,8 +504,6 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
  	dst = stream->next_out + stream->avail_out;
 
 	stream->avail_out += take;
-
-	//XPR(NT "memcpy here with take=%u\n", take);
 
 	if (overlap)
 	  {
