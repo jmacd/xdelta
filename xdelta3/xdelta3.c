@@ -775,10 +775,6 @@ const xd3_sec_type djw_sec_type =
 #include "xdelta3-test.h"
 #endif
 
-#if PYTHON_MODULE
-#include "xdelta3-python.h"
-#endif
-
 #endif /* __XDELTA3_C_HEADER_PASS__ */
 #ifdef __XDELTA3_C_INLINE_PASS__
 

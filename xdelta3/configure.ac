@@ -13,11 +13,4 @@ AX_PKG_SWIG([])
 AX_SWIG_PYTHON
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
-
-dnl See the note in Makefile.am; this isn't working.
-dnl AM_CONDITIONAL(PYTHON_WRONG_SITE_PREFIX, [python -c 
-dnl   "import distutils.sysconfig; 
-dnl    exit(0 if distutils.sysconfig.PREFIX.startswith(
-dnl                  distutils.sysconfig.project_base) else 1)"])
-
 AC_OUTPUT

@@ -13,7 +13,6 @@ common_SOURCES = \
 	  xdelta3-list.h \
 	  xdelta3-main.h \
 	  xdelta3-merge.h \
-	  xdelta3-python.h \
 	  xdelta3-second.h \
 	  xdelta3-test.h \
           xdelta3-cfgs.h \
@@ -92,11 +91,9 @@ BUILT_SOURCES = xdelta3_pywrap.c xdelta3.py
 xdelta3_pywrap.c xdelta3.py : xdelta3.i
 	$(SWIG) -python -o xdelta3_pywrap.c xdelta3.i
 
-# Note: This is probably incorrect, but makes it work in simple configurations
-# (like OS X) where the site-packages directory is not in the prefix directory.
-# See commented-out AM_CONDITIONAL in configure.ac, which is not working.
-pythondir = $(PYTHON_SITE_PKG)
-pyexecdir = $(PYTHON_SITE_PKG)
+# OS X for some reason requires:
+# pythondir = $(PYTHON_SITE_PKG)
+# pyexecdir = $(PYTHON_SITE_PKG)
 
 python_PYTHON = xdelta3.py
 pyexec_LTLIBRARIES = _xdelta3.la
