@@ -318,7 +318,7 @@ static int main_read_primary_input (main_file   *file,
 				    usize_t      size,
 				    usize_t     *nread);
 
-static const char* main_format_bcnt (xoff_t r, char *buf);
+static const char* main_format_bcnt (xoff_t r, shortbuf *buf);
 static int main_help (void);
 
 static int xd3_merge_input_output (xd3_stream *stream,
@@ -567,7 +567,7 @@ get_millisecs_since (void)
 }
 
 static const char*
-main_format_bcnt (xoff_t r, char *buf)
+main_format_bcnt (xoff_t r, shortbuf *buf)
 {
   static const char* fmts[] = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
   usize_t i;
@@ -578,40 +578,40 @@ main_format_bcnt (xoff_t r, char *buf)
 
       if (r == 0)
 	{
-	  sprintf (buf, "0 %s", fmts[i]);
-	  return buf;
+	  short_sprintf (*buf, "0 %s", fmts[i]);
+	  return buf->buf;
 	}
 
       if (r >= 1 && r < 10)
 	{
-	  sprintf (buf, "%.2f %s", (double) r, fmts[i]);
-	  return buf;
+	  short_sprintf (*buf, "%.2f %s", (double) r, fmts[i]);
+	  return buf->buf;
 	}
 
       if (r >= 10 && r < 100)
 	{
-	  sprintf (buf, "%.1f %s", (double) r, fmts[i]);
-	  return buf;
+	  short_sprintf (*buf, "%.1f %s", (double) r, fmts[i]);
+	  return buf->buf;
 	}
 
       if (r >= 100 && r < 1000)
 	{
-	  sprintf (buf, "%"Q"u %s", r, fmts[i]);
-	  return buf;
+	  short_sprintf (*buf, "%"Q"u %s", r, fmts[i]);
+	  return buf->buf;
 	}
 
       new_r = r / 1024;
 
       if (new_r < 10)
 	{
-	  sprintf (buf, "%.2f %s", (double) r / 1024.0, fmts[i + 1]);
-	  return buf;
+	  short_sprintf (*buf, "%.2f %s", (double) r / 1024.0, fmts[i + 1]);
+	  return buf->buf;
 	}
 
       if (new_r < 100)
 	{
-	  sprintf (buf, "%.1f %s", (double) r / 1024.0, fmts[i + 1]);
-	  return buf;
+	  short_sprintf (*buf, "%.1f %s", (double) r / 1024.0, fmts[i + 1]);
+	  return buf->buf;
 	}
 
       r = new_r;
@@ -621,23 +621,32 @@ main_format_bcnt (xoff_t r, char *buf)
 }
 
 static char*
-main_format_rate (xoff_t bytes, long millis, char *buf)
+main_format_rate (xoff_t bytes, long millis, shortbuf *buf)
 {
   xoff_t r = (xoff_t)(1.0 * bytes / (1.0 * millis / 1000.0));
-  static char lbuf[32];
+  static shortbuf lbuf;
 
-  main_format_bcnt (r, lbuf);
-  sprintf (buf, "%s/s", lbuf);
-  return buf;
+  main_format_bcnt (r, &lbuf);
+  short_sprintf (*buf, "%s/s", lbuf.buf);
+  return buf->buf;
 }
 
 static char*
-main_format_millis (long millis, char *buf)
+main_format_millis (long millis, shortbuf *buf)
 {
-  if (millis < 1000)       { sprintf (buf, "%lu ms", millis); }
-  else if (millis < 10000) { sprintf (buf, "%.1f sec", millis / 1000.0); }
-  else                     { sprintf (buf, "%lu sec", millis / 1000L); }
-  return buf;
+  if (millis < 1000)
+    { 
+      short_sprintf (*buf, "%lu ms", millis); 
+    }
+  else if (millis < 10000) 
+    {
+      short_sprintf (*buf, "%.1f sec", millis / 1000.0);
+    }
+  else
+    {
+      short_sprintf (*buf, "%lu sec", millis / 1000L); 
+    }
+  return buf->buf;
 }
 
 /* A safe version of strtol for xoff_t. */
@@ -2682,12 +2691,12 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 
       if (sfile->filename == NULL)
 	{
-	  sprintf ((char*)appheader_used, "%s/%s", iname, icomp);
+	  snprintf ((char*)appheader_used, len, "%s/%s", iname, icomp);
 	}
       else
 	{
-	  sprintf ((char*)appheader_used, "%s/%s/%s/%s",
-		   iname, icomp, sname, scomp);
+	  snprintf ((char*)appheader_used, len, "%s/%s/%s/%s",
+		    iname, icomp, sname, scomp);
 	}
     }
 
@@ -2897,7 +2906,7 @@ static usize_t
 main_get_winsize (main_file *ifile) {
   xoff_t file_size = 0;
   usize_t size = option_winsize;
-  static char iszbuf[32];
+  static shortbuf iszbuf;
 
   if (main_file_stat (ifile, &file_size) == 0)
     {
@@ -2910,7 +2919,7 @@ main_get_winsize (main_file *ifile) {
     {
       XPR(NT "input %s window size %s\n",
 	  ifile->filename,
-	  main_format_bcnt (size, iszbuf));
+	  main_format_bcnt (size, &iszbuf));
     }
 
   return size;
@@ -3271,10 +3280,10 @@ main_input (xd3_cmd     cmd,
 
 		if (option_verbose)
 		  {
-		    char rrateavg[32], wrateavg[32], tm[32];
-		    char rdb[32], wdb[32];
-		    char trdb[32], twdb[32];
-		    char srcpos[32];
+		    shortbuf rrateavg, wrateavg, tm;
+		    shortbuf rdb, wdb;
+		    shortbuf trdb, twdb;
+		    shortbuf srcpos;
 		    long millis = get_millisecs_since ();
 		    usize_t this_read = (usize_t)(stream.total_in -
 						  last_total_in);
@@ -3288,25 +3297,25 @@ main_input (xd3_cmd     cmd,
 			XPR(NT "%"Q"u: in %s (%s): out %s (%s): "
 			    "total in %s: out %s: %s: srcpos %s\n",
 			    stream.current_window,
-			    main_format_bcnt (this_read, rdb),
-			    main_format_rate (this_read, millis, rrateavg),
-			    main_format_bcnt (this_write, wdb),
-			    main_format_rate (this_write, millis, wrateavg),
-			    main_format_bcnt (stream.total_in, trdb),
-			    main_format_bcnt (stream.total_out, twdb),
-			    main_format_millis (millis, tm),
-			    main_format_bcnt (sfile->source_position, srcpos));
+			    main_format_bcnt (this_read, &rdb),
+			    main_format_rate (this_read, millis, &rrateavg),
+			    main_format_bcnt (this_write, &wdb),
+			    main_format_rate (this_write, millis, &wrateavg),
+			    main_format_bcnt (stream.total_in, &trdb),
+			    main_format_bcnt (stream.total_out, &twdb),
+			    main_format_millis (millis, &tm),
+			    main_format_bcnt (sfile->source_position, &srcpos));
 		      }
 		    else
 		      {
 			XPR(NT "%"Q"u: in %s: out %s: total in %s: "
 			    "out %s: %s\n",
  			    stream.current_window,
-			    main_format_bcnt (this_read, rdb),
-			    main_format_bcnt (this_write, wdb),
-			    main_format_bcnt (stream.total_in, trdb),
-			    main_format_bcnt (stream.total_out, twdb),
-			    main_format_millis (millis, tm));
+			    main_format_bcnt (this_read, &rdb),
+			    main_format_bcnt (this_write, &wdb),
+			    main_format_bcnt (stream.total_in, &trdb),
+			    main_format_bcnt (stream.total_out, &twdb),
+			    main_format_millis (millis, &tm));
 		      }
 		  }
 	      }
@@ -3408,12 +3417,12 @@ done:
 
   if (option_verbose)
     {
-      char tm[32];
+      shortbuf tm;
       long end_time = get_millisecs_now ();
       xoff_t nwrite = ofile != NULL ? ofile->nwrite : 0;
 
       XPR(NT "finished in %s; input %"Q"u output %"Q"u bytes (%0.2f%%)\n",
-	  main_format_millis (end_time - start_time, tm),
+	  main_format_millis (end_time - start_time, &tm),
 	  ifile->nread, nwrite, 100.0 * nwrite / ifile->nread);
     }
 

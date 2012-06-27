@@ -225,7 +225,7 @@ test_unlink (char* file)
 	{
 	  break;
 	}
-      sprintf (buf, "rm -f %s", file);
+      snprintf (buf, sizeof(buf), "rm -f %s", file);
       system (buf);
     }
 }
@@ -248,13 +248,13 @@ int test_setup (void)
 {
   static int x = 0;
   x++;
-  sprintf (TEST_TARGET_FILE, "/tmp/xdtest.target.%d", x);
-  sprintf (TEST_SOURCE_FILE, "/tmp/xdtest.source.%d", x);
-  sprintf (TEST_DELTA_FILE, "/tmp/xdtest.delta.%d", x);
-  sprintf (TEST_RECON_FILE, "/tmp/xdtest.recon.%d", x);
-  sprintf (TEST_RECON2_FILE, "/tmp/xdtest.recon2.%d", x);
-  sprintf (TEST_COPY_FILE, "/tmp/xdtest.copy.%d", x);
-  sprintf (TEST_NOPERM_FILE, "/tmp/xdtest.noperm.%d", x);
+  snprintf (TEST_TARGET_FILE, TESTFILESIZE, "/tmp/xdtest.target.%d", x);
+  snprintf (TEST_SOURCE_FILE, TESTFILESIZE, "/tmp/xdtest.source.%d", x);
+  snprintf (TEST_DELTA_FILE, TESTFILESIZE, "/tmp/xdtest.delta.%d", x);
+  snprintf (TEST_RECON_FILE, TESTFILESIZE, "/tmp/xdtest.recon.%d", x);
+  snprintf (TEST_RECON2_FILE, TESTFILESIZE, "/tmp/xdtest.recon2.%d", x);
+  snprintf (TEST_COPY_FILE, TESTFILESIZE, "/tmp/xdtest.copy.%d", x);
+  snprintf (TEST_NOPERM_FILE, TESTFILESIZE, "/tmp/xdtest.noperm.%d", x);
   test_cleanup();
   return 0;
 }
@@ -439,7 +439,7 @@ test_save_copy (const char *origname)
   char buf[TESTBUFSIZE];
   int ret;
 
-  sprintf (buf, "cp -f %s %s", origname, TEST_COPY_FILE);
+  snprintf (buf, TESTBUFSIZE, "cp -f %s %s", origname, TEST_COPY_FILE);
 
   if ((ret = system (buf)) != 0)
     {
@@ -982,7 +982,7 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
   {
     char buf[TESTBUFSIZE];
     FILE *f;
-    sprintf (buf, "test_text");
+    snprintf (buf, TESTBUFSIZE, "test_text");
     f = fopen (buf, "w");
     fwrite (test_text,1,sizeof (test_text),f);
     fclose (f);
@@ -991,7 +991,7 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
   do {                                                          \
     char buf[TESTBUFSIZE];      				\
     FILE *f;                                                    \
-    sprintf (buf, "test_text.xz.%d", non_failures);             \
+    snprintf (buf, TESTBUFSIZE, "test_text.xz.%d", non_failures);	\
     f = fopen (buf, "w");                                       \
     fwrite (encoded,1,encoded_size,f);                          \
     fclose (f);                                                 \
@@ -1734,9 +1734,9 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       test_setup ();
       if ((ret = test_make_inputs (stream, NULL, & tsize))) { return ret; }
 
-      sprintf (ecmd, cmdpairs[2*i], program_name,
+      snprintf (ecmd, TESTBUFSIZE, cmdpairs[2*i], program_name,
 	       test_softcfg_str, TEST_TARGET_FILE, TEST_DELTA_FILE);
-      sprintf (dcmd, cmdpairs[2*i+1], program_name,
+      snprintf (dcmd, TESTBUFSIZE, cmdpairs[2*i+1], program_name,
 	       TEST_DELTA_FILE, TEST_RECON_FILE);
 
       /* Encode and decode. */
@@ -1812,8 +1812,8 @@ check_vcdiff_header (xd3_stream *stream,
   int ret;
   char vcmd[TESTBUFSIZE], gcmd[TESTBUFSIZE];
 
-  sprintf (vcmd, "%s printhdr -f %s %s",
-	   program_name, input, TEST_RECON2_FILE);
+  snprintf (vcmd, TESTBUFSIZE, "%s printhdr -f %s %s",
+	    program_name, input, TEST_RECON2_FILE);
 
   if ((ret = system (vcmd)) != 0)
     {
@@ -1822,8 +1822,8 @@ check_vcdiff_header (xd3_stream *stream,
       return XD3_INTERNAL;
     }
 
-  sprintf (gcmd, "grep \"%s.*%s.*\" %s > /dev/null",
-	   line_start, matches, TEST_RECON2_FILE);
+  snprintf (gcmd, TESTBUFSIZE, "grep \"%s.*%s.*\" %s > /dev/null",
+	    line_start, matches, TEST_RECON2_FILE);
 
   if (yes_or_no)
     {
@@ -1873,21 +1873,15 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     }
 
   /* First encode */
-  sprintf (ecmd, "%s %s -f ", program_name, test_softcfg_str);
-  strcat (ecmd, has_adler32 ? "" : "-n ");
-  strcat (ecmd, has_apphead ? "-A=encode_apphead " : "-A= ");
-  strcat (ecmd, has_secondary ? "-S djw " : "-S none ");
-
-  if (has_source)
-    {
-      strcat (ecmd, "-s ");
-      strcat (ecmd, TEST_SOURCE_FILE);
-      strcat (ecmd, " ");
-    }
-
-  strcat (ecmd, TEST_TARGET_FILE);
-  strcat (ecmd, " ");
-  strcat (ecmd, TEST_DELTA_FILE);
+  snprintf (ecmd, TESTBUFSIZE, "%s %s -f %s %s %s %s %s %s %s", 
+	    program_name, test_softcfg_str,
+	    has_adler32 ? "" : "-n ",
+	    has_apphead ? "-A=encode_apphead " : "-A= ",
+	    has_secondary ? "-S djw " : "-S none ",
+	    has_source ? "-s " : "",
+	    has_source ? TEST_SOURCE_FILE : "",
+	    TEST_TARGET_FILE,
+	    TEST_DELTA_FILE);
 
   if ((ret = system (ecmd)) != 0)
     {
@@ -1897,14 +1891,14 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     }
 
   /* Now recode */
-  sprintf (recmd, "%s recode %s -f ", program_name, test_softcfg_str);
-  strcat (recmd, recoded_adler32 ? "" : "-n ");
-  strcat (recmd, !change_apphead ? "" :
-	  (recoded_apphead ? "-A=recode_apphead " : "-A= "));
-  strcat (recmd, recoded_secondary ? "-S djw " : "-S none ");
-  strcat (recmd, TEST_DELTA_FILE);
-  strcat (recmd, " ");
-  strcat (recmd, TEST_COPY_FILE);
+  snprintf (recmd, TESTBUFSIZE,
+	    "%s recode %s -f %s %s %s %s %s", program_name, test_softcfg_str,
+	    recoded_adler32 ? "" : "-n ",
+	    !change_apphead ? "" : 
+	        (recoded_apphead ? "-A=recode_apphead " : "-A= "),
+	    recoded_secondary ? "-S djw " : "-S none ",
+	    TEST_DELTA_FILE,
+	    TEST_COPY_FILE);
 
   if ((ret = system (recmd)) != 0)
     {
@@ -1980,18 +1974,11 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     }
 
   /* Now decode */
-  sprintf (dcmd, "%s -fd ", program_name);
-
-  if (has_source)
-    {
-      strcat (dcmd, "-s ");
-      strcat (dcmd, TEST_SOURCE_FILE);
-      strcat (dcmd, " ");
-    }
-
-  strcat (dcmd, TEST_COPY_FILE);
-  strcat (dcmd, " ");
-  strcat (dcmd, TEST_RECON_FILE);
+  snprintf (dcmd, TESTBUFSIZE, "%s -fd %s %s %s %s ", program_name,
+	    has_source ? "-s " : "",
+	    has_source ? TEST_SOURCE_FILE : "",
+	    TEST_COPY_FILE,
+	    TEST_RECON_FILE);
 
   if ((ret = system (dcmd)) != 0)
     {
@@ -2064,14 +2051,15 @@ test_compressed_pipe (xd3_stream *stream, main_extcomp *ext, char* buf,
 
   if (do_ext_recomp)
     {
-      sprintf (decomp_buf, " | %s %s", ext->decomp_cmdname, ext->decomp_options);
+      snprintf (decomp_buf, TESTBUFSIZE,
+		" | %s %s", ext->decomp_cmdname, ext->decomp_options);
     }
   else
     {
       decomp_buf[0] = 0;
     }
 
-  sprintf (buf, "%s %s < %s | %s %s | %s %s%s > %s",
+  snprintf (buf, TESTBUFSIZE, "%s %s < %s | %s %s | %s %s%s > %s",
 	   ext->recomp_cmdname, ext->recomp_options,
 	   TEST_TARGET_FILE,
 	   program_name, comp_options,
@@ -2127,7 +2115,7 @@ test_externally_compressed_io (xd3_stream *stream, int ignore)
       main_extcomp *ext = & extcomp_types[i];
 
       /* Test for the existence of the external command first, if not skip. */
-      sprintf (buf, "%s %s < /dev/null > /dev/null", ext->recomp_cmdname, ext->recomp_options);
+      snprintf (buf, TESTBUFSIZE, "%s %s < /dev/null > /dev/null", ext->recomp_cmdname, ext->recomp_options);
 
       if ((ret = system (buf)) != 0)
 	{
@@ -2185,17 +2173,17 @@ test_source_decompression (xd3_stream *stream, int ignore)
   if ((ret = test_save_copy (TEST_TARGET_FILE))) { return ret; }
 
   /* Compress the source. */
-  sprintf (buf, "%s -1 %s < %s > %s", ext->recomp_cmdname,
+  snprintf (buf, TESTBUFSIZE, "%s -1 %s < %s > %s", ext->recomp_cmdname,
 	   ext->recomp_options, TEST_COPY_FILE, TEST_SOURCE_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   /* Compress the target. */
-  sprintf (buf, "%s -9 %s < %s > %s", ext->recomp_cmdname,
+  snprintf (buf, TESTBUFSIZE, "%s -9 %s < %s > %s", ext->recomp_cmdname,
 	   ext->recomp_options, TEST_COPY_FILE, TEST_TARGET_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Now the two identical files are compressed.  Delta-encode the target,
    * with decompression. */
-  sprintf (buf, "%s -e -vfq -s%s %s %s", program_name, TEST_SOURCE_FILE,
+  snprintf (buf, TESTBUFSIZE, "%s -e -vfq -s%s %s %s", program_name, TEST_SOURCE_FILE,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
@@ -2212,7 +2200,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
 
   /* Decode the delta file with recompression disabled, should get an
    * uncompressed file out. */
-  sprintf (buf, "%s -v -dq -R -s%s %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -v -dq -R -s%s %s %s", program_name,
 	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (TEST_COPY_FILE,
@@ -2220,23 +2208,23 @@ test_source_decompression (xd3_stream *stream, int ignore)
 
   /* Decode the delta file with recompression, should get a compressed file
    * out.  But we can't compare compressed files directly. */
-  sprintf (buf, "%s -v -dqf -s%s %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -v -dqf -s%s %s %s", program_name,
 	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  sprintf (buf, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options,
+  snprintf (buf, TESTBUFSIZE, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options,
 	   TEST_RECON_FILE, TEST_RECON2_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (TEST_COPY_FILE,
 			    TEST_RECON2_FILE))) { return ret; }
 
   /* Encode with decompression disabled */
-  sprintf (buf, "%s -e -D -vfq -s%s %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -e -D -vfq -s%s %s %s", program_name,
 	   TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Decode the delta file with decompression disabled, should get the
    * identical compressed file out. */
-  sprintf (buf, "%s -d -D -vfq -s%s %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -d -D -vfq -s%s %s %s", program_name,
 	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   if ((ret = compare_files (TEST_TARGET_FILE,
@@ -2262,21 +2250,21 @@ test_force_behavior (xd3_stream *stream, int ignore)
 
   /* Create empty target file */
   test_setup ();
-  sprintf (buf, "cp /dev/null %s", TEST_TARGET_FILE);
+  snprintf (buf, TESTBUFSIZE, "cp /dev/null %s", TEST_TARGET_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Encode to delta file */
-  sprintf (buf, "%s -e %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -e %s %s", program_name,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Encode again, should fail. */
-  sprintf (buf, "%s -q -e %s %s ", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -q -e %s %s ", program_name,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* Force it, should succeed. */
-  sprintf (buf, "%s -f -e %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -f -e %s %s", program_name,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup();
@@ -2293,26 +2281,26 @@ test_stdout_behavior (xd3_stream *stream, int ignore)
   char buf[TESTBUFSIZE];
 
   test_setup();
-  sprintf (buf, "cp /dev/null %s", TEST_TARGET_FILE);
+  snprintf (buf, TESTBUFSIZE, "cp /dev/null %s", TEST_TARGET_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Without -c, encode writes to delta file */
-  sprintf (buf, "%s -e %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -e %s %s", program_name,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* With -c, encode writes to stdout */
-  sprintf (buf, "%s -e -c %s > %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -e -c %s > %s", program_name,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Without -c, decode writes to target file name, but it fails because the
    * file exists. */
-  sprintf (buf, "%s -q -d %s ", program_name, TEST_DELTA_FILE);
+  snprintf (buf, TESTBUFSIZE, "%s -q -d %s ", program_name, TEST_DELTA_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
 
   /* With -c, decode writes to stdout */
-  sprintf (buf, "%s -d -c %s > /dev/null", program_name, TEST_DELTA_FILE);
+  snprintf (buf, TESTBUFSIZE, "%s -d -c %s > /dev/null", program_name, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup();
 
@@ -2328,29 +2316,29 @@ test_no_output (xd3_stream *stream, int ignore)
 
   test_setup ();
 
-  sprintf (buf, "touch %s && chmod 0000 %s",
+  snprintf (buf, TESTBUFSIZE, "touch %s && chmod 0000 %s",
 	   TEST_NOPERM_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   if ((ret = test_make_inputs (stream, NULL, NULL))) { return ret; }
 
   /* Try no_output encode w/out unwritable output file */
-  sprintf (buf, "%s -q -f -e %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -q -f -e %s %s", program_name,
 	   TEST_TARGET_FILE, TEST_NOPERM_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
-  sprintf (buf, "%s -J -e %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -J -e %s %s", program_name,
 	   TEST_TARGET_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
   /* Now really write the delta to test decode no-output */
-  sprintf (buf, "%s -e %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -e %s %s", program_name,
 	   TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
 
-  sprintf (buf, "%s -q -f -d %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -q -f -d %s %s", program_name,
 	   TEST_DELTA_FILE, TEST_NOPERM_FILE);
   if ((ret = do_fail (stream, buf))) { return ret; }
-  sprintf (buf, "%s -J -d %s %s", program_name,
+  snprintf (buf, TESTBUFSIZE, "%s -J -d %s %s", program_name,
 	   TEST_DELTA_FILE, TEST_NOPERM_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
   test_cleanup ();
@@ -2601,13 +2589,13 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    default: CHECK(0);
 	    }
 
-	  sprintf (rptr, "%d/%d", inst->pos, inst->size);
+	  snprintf (rptr, TESTBUFSIZE, "%d/%d", inst->pos, inst->size);
 	  rptr += strlen (rptr);
 
 	  if (inst->type == XD3_CPY)
 	    {
 	      *rptr++ = '@';
-	      sprintf (rptr, "%"Q"d", inst->addr);
+	      snprintf (rptr, TESTBUFSIZE, "%"Q"d", inst->addr);
 	      rptr += strlen (rptr);
 	    }
 

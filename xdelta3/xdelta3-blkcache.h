@@ -233,36 +233,36 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
   if (option_verbose)
     {
-      static char srcszbuf[32];
-      static char srccntbuf[32];
-      static char winszbuf[32];
-      static char blkszbuf[32];
-      static char nbufs[32];
+      static shortbuf srcszbuf;
+      static shortbuf srccntbuf;
+      static shortbuf winszbuf;
+      static shortbuf blkszbuf;
+      static shortbuf nbufs;
 
       if (sfile->size_known)
 	{
-	  sprintf (srcszbuf, "source size %s [%"Q"u]",
-		   main_format_bcnt (source_size, srccntbuf),
-		   source_size);
+	  short_sprintf (srcszbuf, "source size %s [%"Q"u]",
+			 main_format_bcnt (source_size, &srccntbuf),
+			 source_size);
 	}
       else
 	{
-	  strcpy(srcszbuf, "source size unknown");
+	  short_sprintf (srcszbuf, "%s", "source size unknown");
 	}
 
-      nbufs[0] = 0;
+      nbufs.buf[0] = 0;
 
       if (option_verbose > 1)
 	{
-	  sprintf(nbufs, " #bufs %u", lru_size);
+	  short_sprintf (nbufs, " #bufs %u", lru_size);
 	}
 
       XPR(NT "source %s %s blksize %s window %s%s%s\n",
 	  sfile->filename,
-	  srcszbuf,
-	  main_format_bcnt (blksize, blkszbuf),
-	  main_format_bcnt (option_srcwinsz, winszbuf),
-	  nbufs,
+	  srcszbuf.buf,
+	  main_format_bcnt (blksize, &blkszbuf),
+	  main_format_bcnt (option_srcwinsz, &winszbuf),
+	  nbufs.buf,
 	  do_src_fifo ? " (FIFO)" : "");
     }
 

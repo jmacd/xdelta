@@ -95,10 +95,18 @@ struct _main_file
  * absence of the '_' prefix) but they were initially buggy.  So,
  * always use the native '_'-prefixed version with Win32. */
 #ifdef _WIN32
-#define vsnprintf_func _vsnprintf
+#define vsnprintf_func(str,size,fmt,args) \
+  _vsnprintf_s(str,size,size-1,fmt,args)
 #else
 #define vsnprintf_func vsnprintf
+#define short_sprintf(sb,fmt,...) \
+  snprintf((sb).buf,sizeof((sb).buf),fmt,__VA_ARGS__)
 #endif
+
+/* Type used for short snprintf calls. */
+typedef struct {
+  char buf[48];
+} shortbuf;
 
 /* Prior to SVN 303 this function was only defined in DJGPP and WIN32
  * environments and other platforms would use the builtin snprintf()
