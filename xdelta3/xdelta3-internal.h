@@ -19,6 +19,7 @@
 #define XDELTA3_INTERNAL_H__
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 
 #ifndef _XDELTA3_INTERNAL_H_
@@ -97,11 +98,14 @@ struct _main_file
 #ifdef _WIN32
 #define vsnprintf_func(str,size,fmt,args) \
   _vsnprintf_s(str,size,size-1,fmt,args)
+#define snprintf_func(str,size,fmt,...) \
+  _snprintf_s(str,size,size-1,fmt,__VA_ARGS__)
 #else
 #define vsnprintf_func vsnprintf
-#define short_sprintf(sb,fmt,...) \
-  snprintf((sb).buf,sizeof((sb).buf),fmt,__VA_ARGS__)
+#define snprintf_func snprintf
 #endif
+#define short_sprintf(sb,fmt,...) \
+  snprintf_func((sb).buf,sizeof((sb).buf),fmt,__VA_ARGS__)
 
 /* Type used for short snprintf calls. */
 typedef struct {

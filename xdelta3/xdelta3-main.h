@@ -2691,11 +2691,11 @@ main_set_appheader (xd3_stream *stream, main_file *input, main_file *sfile)
 
       if (sfile->filename == NULL)
 	{
-	  snprintf ((char*)appheader_used, len, "%s/%s", iname, icomp);
+	  snprintf_func ((char*)appheader_used, len, "%s/%s", iname, icomp);
 	}
       else
 	{
-	  snprintf ((char*)appheader_used, len, "%s/%s/%s/%s",
+	  snprintf_func ((char*)appheader_used, len, "%s/%s/%s/%s",
 		    iname, icomp, sname, scomp);
 	}
     }

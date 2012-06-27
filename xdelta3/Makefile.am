@@ -86,17 +86,21 @@ EXTRA_DIST = \
 	xdelta3.wxs \
 	xdelta3_pywrap.c
 
-BUILT_SOURCES = xdelta3_pywrap.c xdelta3.py
+#PYFILES = xdelta3_pywrap.c xdelta3.py
+#XDELTA3PY = xdelta3.py
+#XDELTA3PYLIB = xdelta3.la
 
-xdelta3_pywrap.c xdelta3.py : xdelta3.i
-	$(SWIG) -python -o xdelta3_pywrap.c xdelta3.i
+#BUILT_SOURCES = $(PYFILES)
+
+#xdelta3_pywrap.c xdelta3.py : xdelta3.i
+#	$(SWIG) -python -o xdelta3_pywrap.c xdelta3.i
 
 # OS X for some reason requires:
 # pythondir = $(PYTHON_SITE_PKG)
 # pyexecdir = $(PYTHON_SITE_PKG)
 
-python_PYTHON = xdelta3.py
-pyexec_LTLIBRARIES = _xdelta3.la
-_xdelta3_la_SOURCES = $(srcdir)/xdelta3_pywrap.c $(xdelta3_SOURCES)
-_xdelta3_la_CFLAGS = $(common_CFLAGS) -DNOT_MAIN=1 $(PYTHON_CPPFLAGS)
-_xdelta3_la_LDFLAGS = -module
+#python_PYTHON = $(XDELTA3PY)
+#pyexec_LTLIBRARIES = $(XDELTA3PYLIB)
+#_xdelta3_la_SOURCES = $(srcdir)/xdelta3_pywrap.c $(xdelta3_SOURCES)
+#_xdelta3_la_CFLAGS = $(common_CFLAGS) -DNOT_MAIN=1 $(PYTHON_CPPFLAGS)
+#_xdelta3_la_LDFLAGS = -module
