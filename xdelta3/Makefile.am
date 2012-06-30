@@ -81,7 +81,7 @@ EXTRA_DIST = \
 	xdelta3.1 \
 	xdelta3.i \
 	xdelta3.py \
-	xdelta3.vcproj \
+	xdelta3.vcxproj \
 	xdelta3.wxi \
 	xdelta3.wxs \
 	xdelta3_pywrap.c
