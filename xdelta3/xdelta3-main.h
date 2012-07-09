@@ -2087,9 +2087,20 @@ main_waitpid_check(pid_t pid)
     }
   else if (! WIFEXITED (status))
     {
-      ret = ECHILD;
-      XPR(NT "external compression [pid %d] signal %d\n",
-	  pid, WIFSIGNALED (status) ? WTERMSIG (status) : WSTOPSIG (status));
+      // SIGPIPE will be delivered to the child process whenever it
+      // writes data after this process closes the pipe, 
+      // happens if xdelta does not require access to the entire 
+      // source file.  Considered normal.
+      if (! WIFSIGNALED (status) || WTERMSIG (status) != SIGPIPE) 
+	{
+	  ret = ECHILD;
+	  XPR(NT "external compression [pid %d] signal %d\n", pid, 
+	      WIFSIGNALED (status) ? WTERMSIG (status) : WSTOPSIG (status));
+	}
+      else if (option_verbose)
+	{
+	  XPR(NT "external compression sigpipe\n");
+	}
     }
   else if (WEXITSTATUS (status) != 0)
     {
@@ -2155,7 +2166,7 @@ main_pipe_copier (uint8_t    *pipe_buf,
 		  int         outfd)
 {
   int ret;
-  xoff_t garbage = 0;
+  xoff_t skipped = 0;
 
   /* Prevent SIGPIPE signals, allow EPIPE return values instead.  This
    * is safe to comment-out, except that the -F flag will not work
@@ -2173,28 +2184,12 @@ main_pipe_copier (uint8_t    *pipe_buf,
       int force_drain = 0;
       if (nread > 0 && (ret = main_pipe_write (outfd, pipe_buf, nread)))
 	{
-	  if (option_force && ret == EPIPE)
+	  if (ret == EPIPE)
 	    {
 	      /* This causes the loop to continue reading until nread
 	       * == 0. */
-	      garbage += nread;
+	      skipped += nread;
 	      force_drain = 1;
-	    }
-	  else if (ret == EPIPE)
-	    {
-	      XPR(NT "external compression closed the pipe\n");
-	      if (option_verbose)
-		{
-		  if (!option_force2)
-		    {
-		      XPR(NT "use -F to force the subprocess\n");
-		    }
-		  if (!option_force)
-		    {
-		      XPR(NT "use -f to force this process\n");
-		    }
-		}
-	      return ret;
 	    }
 	  else
 	    {
@@ -2215,10 +2210,10 @@ main_pipe_copier (uint8_t    *pipe_buf,
 	}
     }
 
-  if (garbage != 0)
+  if (option_verbose && skipped != 0)
     {
-      XPR(NT "trailing garbage ignored in %s (%"Q"u bytes)\n",
-	  ifile->filename, garbage);
+      XPR(NT "skipping %"Q"u bytes in %s\n",
+	  skipped, ifile->filename);
     }
   return 0;
 }
@@ -2306,6 +2301,8 @@ main_input_decompress_setup (const main_extcomp   *decomp,
 	}
 
       if (close (inpipefd[PIPE_READ_FD]) ||
+	  close (outpipefd[PIPE_READ_FD]) ||
+	  close (outpipefd[PIPE_WRITE_FD]) ||
 	  main_pipe_copier (pipe_buf, pipe_bufsize, pipe_avail,
 			    ifile, inpipefd[PIPE_WRITE_FD]) ||
 	  close (inpipefd[PIPE_WRITE_FD]))
