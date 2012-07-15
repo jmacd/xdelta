@@ -27,6 +27,7 @@
 
 #define _POSIX_SOURCE
 #define _ISOC99_SOURCE
+#define _C99_SOURCE
 
 #include <errno.h>
 #include <stdarg.h>
