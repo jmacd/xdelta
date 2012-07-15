@@ -82,11 +82,13 @@ EXTRA_DIST = \
 	testing/xdelta3-test.py \
 	xdelta3.1 \
 	xdelta3.i \
-	xdelta3.py \
 	xdelta3.vcxproj \
 	xdelta3.wxi \
-	xdelta3.wxs \
-	xdelta3_pywrap.c
+	xdelta3.wxs
+
+# Broken, removed from distribution:
+#	xdelta3_pywrap.c
+#	xdelta3.py
 
 #PYFILES = xdelta3_pywrap.c xdelta3.py
 #XDELTA3PY = xdelta3.py
