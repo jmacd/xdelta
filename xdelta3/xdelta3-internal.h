@@ -18,12 +18,7 @@
 #ifndef XDELTA3_INTERNAL_H__
 #define XDELTA3_INTERNAL_H__
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-
-#ifndef _XDELTA3_INTERNAL_H_
-#define _XDELTA3_INTERNAL_H_
+#include "xdelta3.h"
 
 typedef struct _main_file        main_file;
 typedef struct _main_extcomp     main_extcomp;
@@ -136,6 +131,12 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #define NT "xdelta3: "
 #define NTR ""
 
+#ifndef UINT32_MAX
+#define UINT32_MAX 4294967295U
+#endif
+
+#ifndef UINT64_MAX
+#define UINT64_MAX 18446744073709551615ULL
 #endif
 
 #endif // XDELTA3_INTERNAL_H__

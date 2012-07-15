@@ -2369,7 +2369,6 @@ test_identical_behavior (xd3_stream *stream, int ignore)
   xd3_source source;
   int nextencwin = 0;
   int winstarts = 0, winfinishes = 0;
-  xoff_t srcwin = XOFF_T_MAX;
   usize_t delpos = 0, recsize;
   xd3_config config;
   memset(&source, 0, sizeof(source));
@@ -2405,7 +2404,6 @@ test_identical_behavior (xd3_stream *stream, int ignore)
 	  source.curblkno = source.getblkno;
 	  source.onblk    = IDB_BLKSZ;
 	  source.curblk   = buf + source.getblkno * IDB_BLKSZ;
-	  srcwin = source.getblkno;
 	  continue;
 	}
 

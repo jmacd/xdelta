@@ -25,7 +25,13 @@
 #ifndef _XDELTA3_H_
 #define _XDELTA3_H_
 
+#define _POSIX_SOURCE
+#define _ISOC99_SOURCE
+
+#include <errno.h>
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>

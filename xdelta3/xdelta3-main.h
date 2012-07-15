@@ -3601,7 +3601,6 @@ int main (int argc, char **argv)
       s = strchr (flags, ret);
       if (s && s[1] && s[1] == ':')
 	{
-	  int eqcase = 0;
 	  int option = s[2] && s[2] == ':';
 
 	  /* Case 1, set optarg to the remaining characters. */
@@ -3638,7 +3637,6 @@ int main (int argc, char **argv)
 	    {
 	      /* Remove the = in all cases. */
 	      my_optarg += 1;
-	      eqcase = 1;
 
 	      if (option && *my_optarg == 0)
 		{

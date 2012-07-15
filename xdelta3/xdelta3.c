@@ -264,9 +264,6 @@
 #ifndef __XDELTA3_C_HEADER_PASS__
 #define __XDELTA3_C_HEADER_PASS__
 
-#include <errno.h>
-#include <string.h>
-
 #include "xdelta3.h"
 
 /***********************************************************************
@@ -569,14 +566,6 @@ static int         xd3_selftest      (void);
 
 #define UINT32_OFLOW_MASK 0xfe000000U
 #define UINT64_OFLOW_MASK 0xfe00000000000000ULL
-
-#ifndef UINT32_MAX
-#define UINT32_MAX 4294967295U
-#endif
-
-#ifndef UINT64_MAX
-#define UINT64_MAX 18446744073709551615ULL
-#endif
 
 #if SIZEOF_USIZE_T == 4
 #define USIZE_T_MAX        UINT32_MAX
@@ -2623,10 +2612,8 @@ xd3_set_source (xd3_stream *stream,
    * calculations are cheap. */
   if (!xd3_check_pow2 (src->blksize, &shiftby) == 0)
     {
-      int check;
       src->blksize = xd3_pow2_roundup(src->blksize);
-      check = xd3_check_pow2 (src->blksize, &shiftby);
-      XD3_ASSERT (check == 0);
+      xd3_check_pow2 (src->blksize, &shiftby);
       IF_DEBUG1 (DP(RINT "raising srcblksz to %u\n", src->blksize));
     }
 
