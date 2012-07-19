@@ -1161,6 +1161,10 @@ main_set_secondary_flags (xd3_config *config)
 	    {
 	      config->flags |= XD3_SEC_FGK;
 	    }
+	  else if (strcmp (option_secondary, "lzma") == 0 && HAVE_LZMA_H)
+	    {
+	      config->flags |= XD3_SEC_LZMA;
+	    }
 	  else if (strncmp (option_secondary, "djw", 3) == 0 && SECONDARY_DJW)
 	    {
 	      usize_t level = XD3_DEFAULT_SECONDARY_LEVEL;

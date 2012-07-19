@@ -200,7 +200,9 @@ static const uint8_t djw_encode_12basic[DJW_BASIC_CODES] =
 /*********************************************************************/
 
 static djw_stream*     djw_alloc           (xd3_stream *stream);
-static void            djw_init            (djw_stream *h);
+static int             djw_init            (xd3_stream *stream, 
+					    djw_stream *h,
+					    int is_encode);
 static void            djw_destroy         (xd3_stream *stream,
 					    djw_stream *h);
 
@@ -229,10 +231,11 @@ djw_alloc (xd3_stream *stream)
   return (djw_stream*) xd3_alloc (stream, sizeof (djw_stream), 1);
 }
 
-static void
-djw_init (djw_stream *h)
+static int
+djw_init (xd3_stream *stream, djw_stream *h, int is_encode)
 {
   /* Fields are initialized prior to use. */
+  return 0;
 }
 
 static void

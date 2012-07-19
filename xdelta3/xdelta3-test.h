@@ -1185,7 +1185,7 @@ static int
 sec_dist_func7 (xd3_stream *stream, xd3_output *data)
 {
   int i, ret, x;
-  for (i = 0; i < ALPHABET_SIZE*20; i += 1)
+  for (i = 0; i < ALPHABET_SIZE*200; i += 1)
     {
       x = mt_random (&static_mtrand) % ALPHABET_SIZE;
       if ((ret = xd3_emit_byte (stream, & data, x))) { return ret; }
@@ -1305,7 +1305,7 @@ test_secondary_decode (xd3_stream         *stream,
 
   if ((dec_stream = sec->alloc (stream)) == NULL) { return ENOMEM; }
 
-  sec->init (dec_stream);
+  if ((ret = sec->init (stream, dec_stream, 0)) != 0) { goto fail; }
 
   dec_input_used = dec_input;
   dec_input_end  = dec_input + compress_size;
@@ -1382,7 +1382,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 
 	  if ((ret = sec_dists[test_i] (stream, in_head))) { goto fail; }
 
-	  sec->init (enc_stream);
+	  if ((ret = sec->init (stream, enc_stream, 1)) != 0) { goto fail; }
 
 	  /* Encode data */
 	  if ((ret = sec->encode (stream, enc_stream,
@@ -1482,6 +1482,8 @@ IF_FGK (static int test_secondary_fgk  (xd3_stream *stream, usize_t gp)
 	{ return test_secondary (stream, & fgk_sec_type, gp); })
 IF_DJW (static int test_secondary_huff (xd3_stream *stream, usize_t gp)
 	{ return test_secondary (stream, & djw_sec_type, gp); })
+IF_LZMA (static int test_secondary_lzma (xd3_stream *stream, usize_t gp)
+	{ return test_secondary (stream, & lzma_sec_type, gp); })
 #endif
 
 /***********************************************************************
@@ -2818,6 +2820,7 @@ xd3_selftest (void)
   DO_TEST (decompress_single_bit_error, 0, 3);
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);
 
+  IF_LZMA (DO_TEST (decompress_single_bit_error, XD3_SEC_LZMA, 3));
   IF_FGK (DO_TEST (decompress_single_bit_error, XD3_SEC_FGK, 3));
   IF_DJW (DO_TEST (decompress_single_bit_error, XD3_SEC_DJW, 8));
 
@@ -2840,6 +2843,7 @@ xd3_selftest (void)
   DO_TEST (recode_command, 0, 0);
 #endif
 
+  IF_LZMA (DO_TEST (secondary_lzma, 0, 1));
   IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));
   IF_FGK (DO_TEST (secondary_fgk, 0, 1));
 

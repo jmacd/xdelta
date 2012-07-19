@@ -278,17 +278,17 @@
 #define VCDIFF_TOOLS XD3_MAIN
 #endif
 
-#ifndef SECONDARY_FGK             /* one from the algorithm preservation department: */
-#define SECONDARY_FGK 0           /* adaptive Huffman routines */
+#ifndef SECONDARY_FGK    /* one from the algorithm preservation department: */
+#define SECONDARY_FGK 0  /* adaptive Huffman routines */
 #endif
 
-#ifndef SECONDARY_DJW             /* semi-adaptive/static Huffman for the eventual */
-#define SECONDARY_DJW 0           /* standardization, off by default until such time. */
+#ifndef SECONDARY_DJW    /* semi-adaptive/static Huffman for the eventual */
+#define SECONDARY_DJW 0  /* standardization, off by default until such time. */
 #endif
 
-#ifndef GENERIC_ENCODE_TABLES    /* These three are the RFC-spec'd app-specific */
-#define GENERIC_ENCODE_TABLES 0  /* code features.  This is tested but not recommended */
-#endif  			 /* unless there's a real application. */
+#ifndef GENERIC_ENCODE_TABLES    /* These three are the RFC-spec app-specific */
+#define GENERIC_ENCODE_TABLES 0  /* code features.  This is tested but not */
+#endif  			 /*  recommended unless there's a real use. */
 #ifndef GENERIC_ENCODE_TABLES_COMPUTE
 #define GENERIC_ENCODE_TABLES_COMPUTE 0
 #endif
@@ -326,6 +326,7 @@
 
 typedef enum {
   VCD_DJW_ID    = 1,
+  VCD_LZMA_ID   = 2,
   VCD_FGK_ID    = 16  /* Note: these are not standard IANA-allocated IDs! */
 } xd3_secondary_ids;
 
@@ -371,7 +372,7 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define CODE_TABLE_VCDIFF_SIZE (6 * 256) /* Should fit a compressed code
 					  * table string */
 
-#define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK)
+#define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK || HAVE_LZMA_H)
 
 #define ALPHABET_SIZE      256  /* Used in test code--size of the secondary
 				 * compressor alphabet. */
@@ -630,7 +631,9 @@ struct _xd3_sec_type
   xd3_sec_stream* (*alloc)   (xd3_stream     *stream);
   void            (*destroy) (xd3_stream     *stream,
 			      xd3_sec_stream *sec);
-  void            (*init)    (xd3_sec_stream *sec);
+  int             (*init)    (xd3_stream     *stream,
+			      xd3_sec_stream *sec_stream,
+			      int             is_encode);
   int             (*decode)  (xd3_stream     *stream,
 			      xd3_sec_stream *sec_stream,
 			      const uint8_t **input,
@@ -703,6 +706,19 @@ extern const xd3_sec_type djw_sec_type;
   return XD3_INTERNAL;
 #endif
 
+#if HAVE_LZMA_H
+extern const xd3_sec_type lzma_sec_type;
+#define IF_LZMA(x) x
+#define LZMA_CASE(s) \
+  s->sec_type = & lzma_sec_type; \
+  break;
+#else
+#define IF_LZMA(x)
+#define LZMA_CASE(s) \
+  s->msg = "unavailable secondary compressor: LZMA"; \
+  return XD3_INTERNAL;
+#endif
+
 /***********************************************************************/
 
 #include "xdelta3-hash.h"
@@ -731,7 +747,7 @@ const xd3_sec_type fgk_sec_type =
   SEC_NOFLAGS,
   (xd3_sec_stream* (*)(xd3_stream*)) fgk_alloc,
   (void (*)(xd3_stream*, xd3_sec_stream*)) fgk_destroy,
-  (void (*)(xd3_sec_stream*)) fgk_init,
+  (int (*)(xd3_stream*, xd3_sec_stream*, int)) fgk_init,
   (int (*)(xd3_stream*, xd3_sec_stream*, const uint8_t**, const uint8_t*,
 	   uint8_t**, const uint8_t*)) xd3_decode_fgk,
   IF_ENCODER((int (*)(xd3_stream*, xd3_sec_stream*, xd3_output*,
@@ -748,11 +764,28 @@ const xd3_sec_type djw_sec_type =
   SEC_COUNT_FREQS,
   (xd3_sec_stream* (*)(xd3_stream*)) djw_alloc,
   (void (*)(xd3_stream*, xd3_sec_stream*)) djw_destroy,
-  (void (*)(xd3_sec_stream*)) djw_init,
+  (int (*)(xd3_stream*, xd3_sec_stream*, int)) djw_init,
   (int (*)(xd3_stream*, xd3_sec_stream*, const uint8_t**, const uint8_t*,
 	   uint8_t**, const uint8_t*)) xd3_decode_huff,
   IF_ENCODER((int (*)(xd3_stream*, xd3_sec_stream*, xd3_output*,
 		      xd3_output*, xd3_sec_cfg*))   xd3_encode_huff)
+};
+#endif
+
+#if HAVE_LZMA_H
+#include "xdelta3-lzma.h"
+const xd3_sec_type lzma_sec_type =
+{
+  VCD_LZMA_ID,
+  "lzma",
+  SEC_NOFLAGS,
+  (xd3_sec_stream* (*)(xd3_stream*)) xd3_lzma_alloc,
+  (void (*)(xd3_stream*, xd3_sec_stream*)) xd3_lzma_destroy,
+  (int (*)(xd3_stream*, xd3_sec_stream*, int)) xd3_lzma_init,
+  (int (*)(xd3_stream*, xd3_sec_stream*, const uint8_t**, const uint8_t*,
+	   uint8_t**, const uint8_t*)) xd3_decode_lzma,
+  IF_ENCODER((int (*)(xd3_stream*, xd3_sec_stream*, xd3_output*,
+		      xd3_output*, xd3_sec_cfg*))   xd3_encode_lzma)
 };
 #endif
 
@@ -1678,7 +1711,7 @@ static inline int
 xd3_emit_bytes (xd3_stream     *stream,
 		xd3_output    **outputp,
 		const uint8_t  *base,
-		usize_t          size)
+		usize_t         size)
 {
   xd3_output *output = (*outputp);
 
@@ -2381,6 +2414,8 @@ xd3_config_stream(xd3_stream *stream,
       FGK_CASE (stream);
     case XD3_SEC_DJW:
       DJW_CASE (stream);
+    case XD3_SEC_LZMA:
+      LZMA_CASE (stream);
     default:
       stream->msg = "too many secondary compressor types set";
       return XD3_INTERNAL;

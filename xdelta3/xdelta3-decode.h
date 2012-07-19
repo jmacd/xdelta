@@ -807,6 +807,8 @@ xd3_decode_input (xd3_stream *stream)
 	      FGK_CASE (stream);
 	    case VCD_DJW_ID:
 	      DJW_CASE (stream);
+	    case VCD_LZMA_ID:
+	      LZMA_CASE (stream);
 	    default:
 	      stream->msg = "unknown secondary compressor ID";
 	      return XD3_INVALID_INPUT;

@@ -106,7 +106,9 @@ struct _fgk_stream
 /*********************************************************************/
 
 static fgk_stream*     fgk_alloc           (xd3_stream *stream /*, usize_t alphabet_size */);
-static void            fgk_init            (fgk_stream *h);
+static int             fgk_init            (xd3_stream *stream,
+					    fgk_stream *h, 
+					    int is_encode);
 static int             fgk_encode_data     (fgk_stream *h,
 					    usize_t    n);
 static inline fgk_bit  fgk_get_encoded_bit (fgk_stream *h);
@@ -186,7 +188,7 @@ static fgk_stream* fgk_alloc (xd3_stream *stream /*, int alphabet_size0 */)
   return h;
 }
 
-static void fgk_init (fgk_stream *h)
+static int fgk_init (xd3_stream *stream, fgk_stream *h, int is_encode)
 {
   usize_t ui;
   ssize_t si;
@@ -219,6 +221,8 @@ static void fgk_init (fgk_stream *h)
     {
       fgk_init_node (h->alphabet + si, (usize_t) si, h->alphabet_size);
     }
+
+  return 0;
 }
 
 static void fgk_swap_ptrs(fgk_node **one, fgk_node **two)

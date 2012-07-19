@@ -29,6 +29,8 @@
 #define _ISOC99_SOURCE
 #define _C99_SOURCE
 
+#include "config.h"
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -358,7 +360,9 @@ typedef enum
 
   XD3_SEC_DJW        = (1 << 5),   /* use DJW static huffman */
   XD3_SEC_FGK        = (1 << 6),   /* use FGK adaptive huffman */
-  XD3_SEC_TYPE       = (XD3_SEC_DJW | XD3_SEC_FGK),
+  XD3_SEC_LZMA       = (1 << 24),  /* use LZMA secondary */
+
+  XD3_SEC_TYPE       = (XD3_SEC_DJW | XD3_SEC_FGK | XD3_SEC_LZMA),
 
   XD3_SEC_NODATA     = (1 << 7),   /* disable secondary compression of
 				      the data section. */
@@ -391,7 +395,7 @@ typedef enum
    * and is independent of compression level).  This is for
    * convenience, especially with xd3_encode_memory(). */
 
-  XD3_COMPLEVEL_SHIFT = 20,  /* 20 - 24 */
+  XD3_COMPLEVEL_SHIFT = 20,  /* 20 - 23 */
   XD3_COMPLEVEL_MASK = (0xF << XD3_COMPLEVEL_SHIFT),
   XD3_COMPLEVEL_1 = (1 << XD3_COMPLEVEL_SHIFT),
   XD3_COMPLEVEL_2 = (2 << XD3_COMPLEVEL_SHIFT),

@@ -7,6 +7,8 @@ AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar])
 AC_DISABLE_STATIC
 AC_PROG_CC
 AC_PROG_CXX
+AC_CHECK_HEADERS([lzma.h])
+AC_CHECK_LIB(lzma, lzma_easy_buffer_encode)
 #AM_PATH_PYTHON(,, [:])
 #AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 #AX_PYTHON_DEVEL()
