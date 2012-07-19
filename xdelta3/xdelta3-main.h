@@ -1161,7 +1161,7 @@ main_set_secondary_flags (xd3_config *config)
 	    {
 	      config->flags |= XD3_SEC_FGK;
 	    }
-	  else if (strcmp (option_secondary, "lzma") == 0 && HAVE_LZMA_H)
+	  else if (strcmp (option_secondary, "lzma") == 0 && SECONDARY_LZMA)
 	    {
 	      config->flags |= XD3_SEC_LZMA;
 	    }

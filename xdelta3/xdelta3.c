@@ -286,6 +286,12 @@
 #define SECONDARY_DJW 0  /* standardization, off by default until such time. */
 #endif
 
+#ifdef HAVE_LZMA_H
+#define SECONDARY_LZMA 1
+#else
+#define SECONDARY_LZMA 0
+#endif
+
 #ifndef GENERIC_ENCODE_TABLES    /* These three are the RFC-spec app-specific */
 #define GENERIC_ENCODE_TABLES 0  /* code features.  This is tested but not */
 #endif  			 /*  recommended unless there's a real use. */
@@ -372,7 +378,7 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define CODE_TABLE_VCDIFF_SIZE (6 * 256) /* Should fit a compressed code
 					  * table string */
 
-#define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK || HAVE_LZMA_H)
+#define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK || SECONDARY_LZMA)
 
 #define ALPHABET_SIZE      256  /* Used in test code--size of the secondary
 				 * compressor alphabet. */
@@ -706,7 +712,7 @@ extern const xd3_sec_type djw_sec_type;
   return XD3_INTERNAL;
 #endif
 
-#if HAVE_LZMA_H
+#if SECONDARY_LZMA
 extern const xd3_sec_type lzma_sec_type;
 #define IF_LZMA(x) x
 #define LZMA_CASE(s) \
@@ -772,7 +778,7 @@ const xd3_sec_type djw_sec_type =
 };
 #endif
 
-#if HAVE_LZMA_H
+#if SECONDARY_LZMA
 #include "xdelta3-lzma.h"
 const xd3_sec_type lzma_sec_type =
 {
