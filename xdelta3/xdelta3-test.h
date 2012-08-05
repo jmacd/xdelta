@@ -178,7 +178,7 @@ static int do_fail (xd3_stream *stream, const char *buf)
   if (! WIFEXITED (ret) || WEXITSTATUS (ret) != 1)
     {
       stream->msg = "command should have not succeeded";
-      XPR(NT "command was %s", buf);
+      XPR(NT "command was %s\n", buf);
       return XD3_INTERNAL;
     }
   return 0;
@@ -218,15 +218,10 @@ test_random_numbers (xd3_stream *stream, int ignore)
 static void
 test_unlink (char* file)
 {
-  char buf[TESTBUFSIZE];
-  while (unlink (file) != 0)
+  int ret;
+  if ((ret = unlink (file)) != 0 && errno != ENOENT)
     {
-      if (errno == ENOENT)
-	{
-	  break;
-	}
-      snprintf_func (buf, sizeof(buf), "rm -f %s", file);
-      system (buf);
+      XPR(NT "unlink %s failed: %s\n", file, strerror(ret));
     }
 }
 

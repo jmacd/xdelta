@@ -5,6 +5,7 @@ extern "C" {
 #include "../xdelta3-internal.h"
 }
 
+#include <unistd.h>
 #include <math.h>
 #include <string>
 

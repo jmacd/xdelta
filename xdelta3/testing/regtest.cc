@@ -108,10 +108,7 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       ret = xd3_decode_input(&decode_stream);
       msg = decode_stream.msg;
     }
-
-    IF_DEBUG1(XPR(NTR "%s = %s %s\n", encoding ? "E " : " D",
-		 xd3_strerror(ret),
-		 msg == NULL ? "" : msg));
+    (void) msg;
 
     switch (ret) {
     case XD3_OUTPUT:
@@ -193,6 +190,10 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
       goto process;
 
     default:
+      XPR(NTR "%s = %s %s\n", encoding ? "E " : " D",
+	  xd3_strerror(ret),
+	  msg == NULL ? "" : msg);
+
       CHECK_EQ(0, ret);
       CHECK_EQ(-1, ret);
     }
