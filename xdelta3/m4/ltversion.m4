@@ -1,1 +1,1 @@
-/usr/share/aclocal/ltversion.m4
+/usr/local/share/aclocal/ltversion.m4

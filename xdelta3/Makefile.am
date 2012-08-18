@@ -11,6 +11,7 @@ common_SOURCES = \
 	  xdelta3-hash.h \
 	  xdelta3-internal.h \
 	  xdelta3-list.h \
+	  xdelta3-lzma.h \
 	  xdelta3-main.h \
 	  xdelta3-merge.h \
 	  xdelta3-second.h \

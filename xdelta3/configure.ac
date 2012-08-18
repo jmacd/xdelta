@@ -1,10 +1,10 @@
-AC_INIT([Xdelta3], [3.0.3], [josh.macdonald@gmail.com], 
+AC_INIT([Xdelta3], [3.0.4], [josh.macdonald@gmail.com], 
 	[xdelta3], [http://xdelta.org/])
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
-LT_INIT
+#LT_INIT
 AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar])
-AC_DISABLE_STATIC
+#AC_DISABLE_STATIC
 AC_PROG_CC
 AC_PROG_CXX
 AC_CHECK_HEADERS([lzma.h])
