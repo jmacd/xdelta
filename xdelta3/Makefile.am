@@ -45,11 +45,11 @@ common_CFLAGS = \
 	      -DXD3_MAIN=1
 
 xdelta3_CFLAGS = $(WFLAGS) $(common_CFLAGS) -pedantic -std=c99
-xdelta3_LDFLAGS = -lm
+xdelta3_LDADD = -lm
 
 xdelta3regtest_CXXFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
 xdelta3regtest_CFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
-xdelta3regtest_LDFLAGS = -lm
+xdelta3regtest_LDADD = -lm
 
 man1_MANS = xdelta3.1
 
