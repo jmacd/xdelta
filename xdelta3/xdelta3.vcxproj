@@ -16,6 +16,22 @@
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">/DXD3_DEBUG=0 /DXD3_USE_LARGEFILE64=1 /DREGRESSION_TEST=1 /DSECONDARY_DJW=1 /DSECONDARY_FGK=1 /DXD3_MAIN=1 /DXD3_WIN32=1 /DEXTERNAL_COMPRESSION=0 /DXD3_STDIO=0 /DXD3_POSIX=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="xdelta3-blkcache.h" />
+    <ClInclude Include="xdelta3-cfgs.h" />
+    <ClInclude Include="xdelta3-decode.h" />
+    <ClInclude Include="xdelta3-djw.h" />
+    <ClInclude Include="xdelta3-fgk.h" />
+    <ClInclude Include="xdelta3-hash.h" />
+    <ClInclude Include="xdelta3-internal.h" />
+    <ClInclude Include="xdelta3-list.h" />
+    <ClInclude Include="xdelta3-lzma.h" />
+    <ClInclude Include="xdelta3-main.h" />
+    <ClInclude Include="xdelta3-merge.h" />
+    <ClInclude Include="xdelta3-second.h" />
+    <ClInclude Include="xdelta3-test.h" />
+    <ClInclude Include="xdelta3.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8F9D37B5-B78E-4816-BE61-AEF679DBF3BC}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -25,13 +41,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

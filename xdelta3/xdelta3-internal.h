@@ -23,6 +23,8 @@
 typedef struct _main_file        main_file;
 typedef struct _main_extcomp     main_extcomp;
 
+void main_buffree (void *ptr);
+void* main_bufalloc (usize_t size);
 void main_file_init (main_file *xfile);
 int main_file_close (main_file *xfile);
 void main_file_cleanup (main_file *xfile);

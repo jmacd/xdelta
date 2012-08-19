@@ -21,6 +21,8 @@
 /* TODO: This code is heavily revised from 3.0z but still needs major
  * refactoring. */
 
+#include "xdelta3-internal.h"
+
 typedef struct _main_blklru      main_blklru;
 typedef struct _main_blklru_list main_blklru_list;
 
@@ -38,8 +40,7 @@ struct _main_blklru
   main_blklru_list  link;
 };
 
-/* TODO: The value for MAX_LRU_SIZE has what significance? */
-#define MAX_LRU_SIZE 32U  /* must be a power of 2 */
+#define MAX_LRU_SIZE 32U
 #define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
 
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
@@ -67,7 +68,7 @@ static void main_lru_cleanup (void)
 {
   if (lru != NULL)
     {
-      main_free (lru[0].blk);
+      main_buffree (lru[0].blk);
     }
 
   main_free (lru);
@@ -145,7 +146,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   memset (lru, 0, sizeof(lru[0]) * MAX_LRU_SIZE);
 
   /* Allocate the entire buffer. */
-  if ((lru[0].blk = (uint8_t*) main_malloc (option_srcwinsz)) == NULL)
+  if ((lru[0].blk = (uint8_t*) main_bufalloc (option_srcwinsz)) == NULL)
     {
       ret = ENOMEM;
       return ret;
@@ -189,11 +190,11 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   if (!sfile->size_known || source_size > option_srcwinsz)
     {
       /* Modify block 0, change blocksize. */
-      lru_size = MAX_LRU_SIZE;
-      blksize = option_srcwinsz / MAX_LRU_SIZE;  /* Power of 2 */
+      blksize = option_srcwinsz / MAX_LRU_SIZE;
       source->blksize = blksize;
       source->onblk = blksize;  /* xd3 sets onblk */
       lru[0].size = blksize;
+      lru_size = MAX_LRU_SIZE;
 
       /* Setup rest of blocks. */
       for (i = 1; i < lru_size; i += 1)

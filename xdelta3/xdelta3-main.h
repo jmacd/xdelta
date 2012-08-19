@@ -391,6 +391,7 @@ main_config (void)
   XPR(NTR "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
   XPR(NTR "sizeof(void*)=%d\n", (int)sizeof(void*));
   XPR(NTR "sizeof(int)=%d\n", (int)sizeof(int));
+  XPR(NTR "sizeof(size_t)=%d\n", (int)sizeof(size_t));
   XPR(NTR "sizeof(uint32_t)=%d\n", (int)sizeof(uint32_t));
   XPR(NTR "sizeof(uint64_t)=%d\n", (int)sizeof(uint64_t));
   XPR(NTR "sizeof(usize_t)=%d\n", (int)sizeof(usize_t));
@@ -450,6 +451,14 @@ main_malloc1 (usize_t size)
   return r;
 }
 
+void* main_bufalloc (usize_t size) {
+#if XD3_WIN32
+  return VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#else
+  return main_malloc1(size);
+#endif
+}
+
 static void*
 main_malloc (usize_t size)
 {
@@ -482,6 +491,14 @@ main_free (void *ptr)
       main_free1 (NULL, ptr);
       IF_DEBUG (XD3_ASSERT(main_mallocs >= 0));
     }
+}
+
+void main_buffree (void *ptr) {
+#if XD3_WIN32
+  VirtualFree(ptr, 0, MEM_RELEASE);
+#else
+  main_free(ptr);
+#endif
 }
 
 /* This ensures that (ret = errno) always indicates failure, in case errno was
@@ -1752,7 +1769,7 @@ main_merge_arguments (main_merge_list* merges)
 
       if (main_bdata != NULL)
         {
-          main_free (main_bdata);
+          main_buffree (main_bdata);
           main_bdata = NULL;
 	  main_bsize = 0;
         }
@@ -1887,11 +1904,11 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 
       if (main_bsize < window_size)
 	{
-	  main_free (main_bdata);
+	  main_buffree (main_bdata);
 	  main_bdata = NULL;
 	  main_bsize = 0;
 	  if ((main_bdata = (uint8_t*)
-	       main_malloc (window_size)) == NULL)
+	       main_bufalloc (window_size)) == NULL)
 	    {
 	      return ENOMEM;
 	    }
@@ -3079,7 +3096,7 @@ main_input (xd3_cmd     cmd,
 
   main_bsize = winsize = main_get_winsize (ifile);
 
-  if ((main_bdata = (uint8_t*) main_malloc (winsize)) == NULL)
+  if ((main_bdata = (uint8_t*) main_bufalloc (winsize)) == NULL)
     {
       return EXIT_FAILURE;
     }
@@ -3441,7 +3458,7 @@ main_cleanup (void)
       appheader_used = NULL;
     }
 
-  main_free (main_bdata);
+  main_buffree (main_bdata);
   main_bdata = NULL;
   main_bsize = 0;
 
