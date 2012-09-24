@@ -171,13 +171,12 @@ typedef uint32_t xoff_t;
 #define USE_UINT64 (SIZEOF_USIZE_T == 8 || \
 		    SIZEOF_XOFF_T == 8 || REGRESSION_TEST)
 
-/* TODO: probably should do something better here. */
 #ifndef UNALIGNED_OK
-#if defined(__i386__) || defined(__i486__) || defined(__i586__) || \
-  defined(__i686__) || defined(_X86_) || defined(__x86_64__)
-#define UNALIGNED_OK 1
-#else
+#ifdef HAVE_ALIGNED_ACCESS_REQUIRED
 #define UNALIGNED_OK 0
+#else
+/* This generally includes all Windows builds. */
+#define UNALIGNED_OK 1
 #endif
 #endif
 

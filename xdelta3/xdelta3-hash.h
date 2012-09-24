@@ -65,14 +65,19 @@ xd3_large_cksum_update (uint32_t cksum,
 /* TODO: revisit this topic */
 #endif
 
-/* Note: small cksum is hard-coded for 4 bytes */
 #if UNALIGNED_OK
+#define UNALIGNED_READ32(dest,src) (*(dest)) = (*(uint32_t*)(src))
+#else
+#define UNALIGNED_READ32(dest,src) memcpy((dest), (src), 4);
+#endif
+
+/* TODO: small cksum is hard-coded for 4 bytes (i.e., "look" is unused) */
 static inline uint32_t
 xd3_scksum (uint32_t *state,
             const uint8_t *base,
             const usize_t look)
 {
-  (*state) = *(uint32_t*)base;
+  UNALIGNED_READ32(state, base);
   return (*state) * hash_multiplier;
 }
 static inline uint32_t
@@ -80,31 +85,9 @@ xd3_small_cksum_update (uint32_t *state,
 			const uint8_t *base,
 			usize_t look)
 {
-  (*state) = *(uint32_t*)(base+1);
+  UNALIGNED_READ32(state, base+1);
   return (*state) * hash_multiplier;
 }
-#else
-static inline uint32_t
-xd3_scksum (uint32_t *state,
-            const uint8_t *base,
-            const usize_t look)
-{
-  (*state) = (base[0] << 24 |
-              base[1] << 16 |
-              base[2] << 8 |
-              base[3]);
-  return (*state) * hash_multiplier;
-}
-static inline uint32_t
-xd3_small_cksum_update (uint32_t *state,
-			const uint8_t *base,
-			const usize_t look)
-{
-  (*state) <<= 8;
-  (*state) |= base[4];
-  return (*state) * hash_multiplier;
-}
-#endif
 
 /***********************************************************************
  Ctable stuff
