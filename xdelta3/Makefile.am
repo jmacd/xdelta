@@ -55,6 +55,7 @@ man1_MANS = xdelta3.1
 
 EXTRA_DIST = \
 	draft-korn-vcdiff.txt \
+	README \
 	examples/Makefile \
 	examples/README \
 	examples/checksum_test.cc \

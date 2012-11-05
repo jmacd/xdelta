@@ -129,10 +129,15 @@ typedef unsigned int   usize_t;
 #ifdef _MSC_VER
 #define inline
 typedef signed int     ssize_t;
+#if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned long  uint32_t;
 typedef ULONGLONG      uint64_t;
+#else
+/* For MSVC10 and above */
+#include <stdint.h>
+#endif
 #else
 /* mingw32, lcc and watcom provide a proper header */
 #include <stdint.h>
