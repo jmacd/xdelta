@@ -289,12 +289,6 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	  (*blrup) = blru;
 	  return 0;
 	}
-
-      if (blru->blkno != (xoff_t)-1 &&
-	  blru->blkno != (xoff_t)(blkno - lru_size))
-	{
-	  return XD3_TOOFARBACK;
-	}
     }
   else
     {
@@ -390,6 +384,13 @@ main_read_seek_source (xd3_stream *stream,
 
       sfile->seek_failed = 1;
 
+      if (option_verbose > 1)
+	{
+	  XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
+	      pos - sfile->source_position,
+	      sfile->source_position);
+	}
+
       while (sfile->source_position < pos)
 	{
 	  xoff_t skip_blkno;
@@ -409,13 +410,6 @@ main_read_seek_source (xd3_stream *stream,
 	    }
 
 	  XD3_ASSERT (is_new);
-
-	  if (option_verbose > 1)
-	    {
-	      XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
-		  pos - sfile->source_position,
-		  sfile->source_position);
-	    }
 
 	  if ((ret = main_read_primary_input (sfile,
 					      (uint8_t*) blru->blk,
