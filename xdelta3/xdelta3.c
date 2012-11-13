@@ -4421,9 +4421,12 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
   /* Implement srcwin_maxsz, which prevents the encoder from seeking
    * back further than the LRU cache maintaining FIFO discipline, (to
-   * avoid seeking). */
+   * avoid seeking).  Note the +1 here ensures that "frontier_pos" is
+   * the address of the next byte in the stream, and ensures that the
+   * maximum offset is less than the source window size (in
+   * blocks). */
   frontier_pos =
-    stream->src->frontier_blkno * stream->src->blksize;
+    (stream->src->frontier_blkno +1) * stream->src->blksize;
   IF_DEBUG1(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
 	       "srcwin_maxsz %u\n",
 	       frontier_pos, srcpos, stream->srcwin_maxsz));

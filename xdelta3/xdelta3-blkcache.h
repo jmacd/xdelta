@@ -384,7 +384,7 @@ main_read_seek_source (xd3_stream *stream,
 
       sfile->seek_failed = 1;
 
-      if (option_verbose > 1)
+      if (option_verbose > 1 && pos != sfile->source_position)
 	{
 	  XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
 	      pos - sfile->source_position,
