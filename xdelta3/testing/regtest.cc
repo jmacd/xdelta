@@ -46,7 +46,6 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
   xd3_init_config(&decode_config, XD3_ADLER32);
 
   encode_config.winsize = Constants::WINDOW_SIZE;
-  encode_config.srcwin_maxsz = options.encode_srcwin_maxsz;
 
   // TODO! the smatcher setup isn't working,
 //   if (options.large_cksum_step) {
@@ -63,6 +62,8 @@ void InMemoryEncodeDecode(const FileSpec &source_file,
 
   encode_source.blksize = Constants::BLOCK_SIZE;
   decode_source.blksize = Constants::BLOCK_SIZE;
+
+  encode_source.max_winsize = options.encode_srcwin_maxsz;
 
   xd3_set_source (&encode_stream, &encode_source);
   xd3_set_source (&decode_stream, &decode_source);

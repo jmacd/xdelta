@@ -166,6 +166,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->ioh      = sfile;
   source->curblkno = (xoff_t) -1;
   source->curblk   = NULL;
+  source->max_winsize = option_srcwinsz;
 
   if ((ret = main_getblk_func (stream, source, 0)) != 0)
     {
@@ -193,6 +194,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       blksize = option_srcwinsz / MAX_LRU_SIZE;
       source->blksize = blksize;
       source->onblk = blksize;  /* xd3 sets onblk */
+      source->max_winsize = blksize;
       lru[0].size = blksize;
       lru_size = MAX_LRU_SIZE;
 

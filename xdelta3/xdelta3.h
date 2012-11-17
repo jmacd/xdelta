@@ -280,8 +280,8 @@ typedef struct _xd3_wininfo            xd3_wininfo;
  * provided as NULL, the stream returns XD3_GETSRCBLK. */
 
 typedef void*  (xd3_alloc_func)    (void       *opaque,
-				    usize_t      items,
-				    usize_t      size);
+				    size_t      items,
+				    usize_t     size);
 typedef void   (xd3_free_func)     (void       *opaque,
 				    void       *address);
 
@@ -692,10 +692,6 @@ struct _xd3_config
   usize_t             iopt_size;     /* entries in the
 					instruction-optimizing
 					buffer */
-  usize_t             srcwin_maxsz;  /* srcwin_size grows by a factor
-					of 2 when no matches are
-					found.  encoder will not seek
-				        back further than this. */
 
   xd3_getblk_func   *getblk;        /* The three callbacks. */
   xd3_alloc_func    *alloc;
@@ -729,6 +725,7 @@ struct _xd3_source
   const char         *name;          /* its name, for debug/print
 					purposes */
   void               *ioh;           /* opaque handle */
+  xoff_t              max_winsize;   /* maximum visible buffer */
 
   /* getblk sets */
   xoff_t              curblkno;      /* current block number: client
@@ -798,7 +795,6 @@ struct _xd3_stream
 					 size mask */
   usize_t           iopt_size;
   usize_t           iopt_unlimited;
-  usize_t           srcwin_maxsz;
 
   /* general configuration */
   xd3_getblk_func  *getblk;           /* set nxtblk, nxtblkno to scanblkno */
@@ -840,7 +836,7 @@ struct _xd3_stream
 				       * if there is at least one
 				       * match in the buffer. */
 
-  /* SRCWIN: these variables plus srcwin_maxsz above (set by config) */
+  /* SRCWIN */
   int                srcwin_decided;    /* boolean: true if srclen and
 					   srcbase have been
 					   decided. */
@@ -1070,11 +1066,11 @@ int     xd3_decode_memory (const uint8_t *input,
  *       src.curblkno = 0;
  *       src.onblk = source_size;
  *       src.curblk = source;
+ *       src.max_winsize = source_size;
  *       xd3_set_source(&stream, &src);
  *     }
  *
  *   config.flags = flags;
- *   config.srcwin_maxsz = source_size;
  *   config.winsize = input_size;
  *
  *   ... set smatcher, appheader, encoding-table, compression-level, etc.

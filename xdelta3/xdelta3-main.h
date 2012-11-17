@@ -250,7 +250,7 @@ static const char *option_source_filename    = NULL;
 static int         option_level              = XD3_DEFAULT_LEVEL;
 static usize_t     option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
-static usize_t     option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
+static size_t      option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
 static usize_t     option_sprevsz            = XD3_DEFAULT_SPREVSZ;
 
 /* These variables are supressed to avoid their use w/o support.  main() warns
@@ -309,7 +309,7 @@ static int main_getblk_func (xd3_stream *stream,
 			     xd3_source *source,
 			     xoff_t      blkno);
 static void main_free (void *ptr);
-static void* main_malloc (usize_t size);
+static void* main_malloc (size_t size);
 
 static int main_file_stat (main_file *xfile, xoff_t *size);
 static int main_file_seek (main_file *xfile, xoff_t pos);
@@ -443,15 +443,14 @@ reset_defaults(void)
 }
 
 static void*
-main_malloc1 (usize_t size)
+main_malloc1 (size_t size)
 {
   void* r = malloc (size);
   if (r == NULL) { XPR(NT "malloc: %s\n", xd3_mainerror (ENOMEM)); }
-  else if (option_verbose > 4) { XPR(NT "malloc: %u: %p\n", size, r); }
   return r;
 }
 
-void* main_bufalloc (usize_t size) {
+void* main_bufalloc (size_t size) {
 #if XD3_WIN32
   return VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 #else
@@ -460,7 +459,7 @@ void* main_bufalloc (usize_t size) {
 }
 
 static void*
-main_malloc (usize_t size)
+main_malloc (size_t size)
 {
   void *r = main_malloc1 (size);
   if (r) { IF_DEBUG (main_mallocs += 1); }
@@ -469,7 +468,7 @@ main_malloc (usize_t size)
 
 static void*
 main_alloc (void   *opaque,
-	    usize_t  items,
+	    size_t  items,
 	    usize_t  size)
 {
   return main_malloc1 (items * size);
@@ -478,7 +477,6 @@ main_alloc (void   *opaque,
 static void
 main_free1 (void *opaque, void *ptr)
 {
-  if (option_verbose > 4) { XPR(NT "free: %p\n", ptr); }
   free (ptr);
 }
 
@@ -703,8 +701,8 @@ main_strtoxoff (const char* s, xoff_t *xo, char which)
 }
 
 static int
-main_atou (const char* arg, usize_t *xo, usize_t low,
-	   usize_t high, char which)
+main_atoux (const char* arg, xoff_t *xo, xoff_t low,
+	    xoff_t high, char which)
 {
   xoff_t x;
   int ret;
@@ -713,7 +711,7 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
 
   if (x < low)
     {
-      XPR(NT "-%c: minimum value: %u\n", which, low);
+      XPR(NT "-%c: minimum value: %"Q"u\n", which, low);
       return EXIT_FAILURE;
     }
   if (high == 0)
@@ -722,10 +720,24 @@ main_atou (const char* arg, usize_t *xo, usize_t low,
     }
   if (x > high)
     {
-      XPR(NT "-%c: maximum value: %u\n", which, high);
+      XPR(NT "-%c: maximum value: %"Q"u\n", which, high);
       return EXIT_FAILURE;
     }
-  (*xo) = (usize_t)x;
+  (*xo) = x;
+  return 0;
+}
+
+static int
+main_atou (const char* arg, usize_t *uo, usize_t low,
+	   usize_t high, char which) 
+{
+  int ret;
+  xoff_t xo;
+  if ((ret = main_atoux (arg, &xo, low, high, which)))
+    {
+      return ret;
+    }
+  *uo = (usize_t)xo;
   return 0;
 }
 
@@ -3102,7 +3114,6 @@ main_input (xd3_cmd     cmd,
     }
 
   config.winsize = winsize;
-  config.srcwin_maxsz = option_srcwinsz;
   config.getblk = main_getblk_func;
   config.flags = stream_flags;
 
@@ -3760,13 +3771,16 @@ int main (int argc, char **argv)
 	  break;
 	case 'A': if (my_optarg == NULL) { option_use_appheader = 0; }
 	          else { option_appheader = (uint8_t*) my_optarg; } break;
-	case 'B':
-	  if ((ret = main_atou (my_optarg, & option_srcwinsz, XD3_MINSRCWINSZ,
-				0, 'B')))
+	case 'B': {
+	  xoff_t bsize;
+	  if ((ret = main_atoux (my_optarg, & bsize,
+				 XD3_MINSRCWINSZ, 0, 'B')))
 	    {
 	      goto exit;
 	    }
+	  option_srcwinsz = bsize;
 	  break;
+	}
 	case 'I':
 	  if ((ret = main_atou (my_optarg, & option_iopt_size, 0,
 				0, 'I')))

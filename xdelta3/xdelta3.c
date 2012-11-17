@@ -1527,9 +1527,9 @@ xd3_swap_usize_t (usize_t* p1, usize_t* p2)
 
 /* It's not constant time, but it computes the log. */
 static int
-xd3_check_pow2 (usize_t value, usize_t *logof)
+xd3_check_pow2 (xoff_t value, usize_t *logof)
 {
-  usize_t x = 1;
+  xoff_t x = 1;
   usize_t nolog;
   if (logof == NULL) {
     logof = &nolog;
@@ -1552,6 +1552,16 @@ static usize_t
 xd3_pow2_roundup (usize_t x)
 {
   usize_t i = 1;
+  while (x > i) {
+    i <<= 1U;
+  }
+  return i;
+}
+
+static xoff_t
+xd3_xoff_roundup (xoff_t x)
+{
+  xoff_t i = 1;
   while (x > i) {
     i <<= 1U;
   }
@@ -2088,9 +2098,9 @@ xd3_decode_address (xd3_stream *stream, usize_t here,
 ***********************************************************************/
 
 static void*
-__xd3_alloc_func (void* opaque, usize_t items, usize_t size)
+__xd3_alloc_func (void* opaque, size_t items, usize_t size)
 {
-  return malloc ((size_t) items * (size_t) size);
+  return malloc (items * (size_t) size);
 }
 
 static void
@@ -2369,8 +2379,6 @@ xd3_config_stream(xd3_stream *stream,
 
   stream->winsize = config->winsize ? config->winsize : XD3_DEFAULT_WINSIZE;
   stream->sprevsz = config->sprevsz ? config->sprevsz : XD3_DEFAULT_SPREVSZ;
-  stream->srcwin_maxsz = config->srcwin_maxsz ?
-    config->srcwin_maxsz : XD3_DEFAULT_SRCWINSZ;
 
   if (config->iopt_size == 0)
     {
@@ -2651,15 +2659,23 @@ xd3_set_source (xd3_stream *stream,
 
   /* Enforce power-of-two blocksize so that source-block number
    * calculations are cheap. */
-  if (!xd3_check_pow2 (src->blksize, &shiftby) == 0)
+  if (xd3_check_pow2 (src->blksize, &shiftby) != 0)
     {
       src->blksize = xd3_pow2_roundup(src->blksize);
       xd3_check_pow2 (src->blksize, &shiftby);
-      IF_DEBUG1 (DP(RINT "raising srcblksz to %u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_blksz to %u\n", src->blksize));
     }
 
   src->shiftby = shiftby;
   src->maskby = (1 << shiftby) - 1;
+
+  if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
+    {
+      src->max_winsize = xd3_xoff_roundup(src->max_winsize);
+      IF_DEBUG1 (DP(RINT "raising src_maxsize to %"Q"u\n", src->blksize));
+    }
+  src->max_winsize = max(src->max_winsize, XD3_ALLOCSIZE);
+
   return 0;
 }
 
@@ -3678,7 +3694,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
-	  usize_t hash_values = (stream->srcwin_maxsz /
+	  usize_t hash_values = (stream->src->max_winsize /
 				 stream->smatcher.large_step);
 
 	  xd3_size_hashtable (stream,
@@ -4117,7 +4133,6 @@ xd3_process_memory (int            is_encode,
 
   if (is_encode)
     {
-      config.srcwin_maxsz = source_size;
       config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
       config.iopt_size = max(config.iopt_size, 128U);
@@ -4137,6 +4152,7 @@ xd3_process_memory (int            is_encode,
       src.onblk = source_size;
       src.curblk = source;
       src.curblkno = 0;
+      src.max_winsize = source_size;
 
       if ((ret = xd3_set_source_and_size (&stream, &src, source_size)) != 0)
 	{
@@ -4419,23 +4435,23 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
       goto bad;
     }
 
-  /* Implement srcwin_maxsz, which prevents the encoder from seeking
+  /* Implement src->max_winsize, which prevents the encoder from seeking
    * back further than the LRU cache maintaining FIFO discipline, (to
    * avoid seeking).  Note the +1 here ensures that "frontier_pos" is
    * the address of the next byte in the stream, and ensures that the
    * maximum offset is less than the source window size (in
    * blocks). */
   frontier_pos =
-    (stream->src->frontier_blkno +1) * stream->src->blksize;
+    (stream->src->frontier_blkno + 1) * stream->src->blksize;
   IF_DEBUG1(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
-	       "srcwin_maxsz %u\n",
-	       frontier_pos, srcpos, stream->srcwin_maxsz));
+	       "src->max_winsize %u\n",
+	       frontier_pos, srcpos, stream->src->max_winsize));
   if (srcpos < frontier_pos &&
-      frontier_pos - srcpos > stream->srcwin_maxsz) {
-    IF_DEBUG1(DP(RINT "[match_setup] rejected due to srcwin_maxsz "
+      frontier_pos - srcpos > stream->src->max_winsize) {
+    IF_DEBUG1(DP(RINT "[match_setup] rejected due to src->max_winsize "
 		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%u\n",
 		 xd3_source_eof (stream->src),
-		 srcpos, stream->srcwin_maxsz));
+		 srcpos, stream->src->max_winsize));
     goto bad;
   }
 
@@ -5034,7 +5050,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
    * maximum window size. */
   logical_input_cksum_pos = min((stream->total_in + stream->input_position) * 2,
 				(stream->total_in + stream->input_position) +
-				  (stream->srcwin_maxsz / 2));
+				  (stream->src->max_winsize / 2));
 
   /* If srcwin_cksum_pos is already greater, wait until the difference
    * is met. */
@@ -5060,13 +5076,13 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   /* Advance at least one source block.  With the command-line
    * defaults this means:
    *
-   * if (src->size <= srcwin_maxsz), index the entire source at once
+   * if (src->size <= src->max_winsize), index the entire source at once
    * using the position of the first non-match.  This is good for
    * small inputs, especially when the content may have moved anywhere
    * in the file (e.g., tar files).
    *
-   * if (src->size > srcwin_maxsz), index at least one block (which
-   * the command-line sets to 1/32 of srcwin_maxsz) ahead of the
+   * if (src->size > src->max_winsize), index at least one block (which
+   * the command-line sets to 1/32 of src->max_winsize) ahead of the
    * logical position.  This is good for different reasons: when a
    * long match spanning several source blocks is encountered, this
    * avoids computing checksums for those blocks.  If the data can
