@@ -714,11 +714,7 @@ main_atoux (const char* arg, xoff_t *xo, xoff_t low,
       XPR(NT "-%c: minimum value: %"Q"u\n", which, low);
       return EXIT_FAILURE;
     }
-  if (high == 0)
-    {
-      high = USIZE_T_MAX;
-    }
-  if (x > high)
+  if (high != 0 && x > high)
     {
       XPR(NT "-%c: maximum value: %"Q"u\n", which, high);
       return EXIT_FAILURE;
