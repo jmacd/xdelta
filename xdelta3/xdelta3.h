@@ -110,7 +110,6 @@
  */
 #ifndef _WIN32
 #include <stdint.h>
-typedef uint32_t usize_t;
 #else
 #define WIN32_LEAN_AND_MEAN
 #if XD3_USE_LARGEFILE64
@@ -125,10 +124,8 @@ typedef uint32_t usize_t;
 #define _WIN32_WINNT	0x0400
 #endif
 #include <windows.h>
-typedef uint32_t usize_t;
 #ifdef _MSC_VER
 #define inline
-typedef signed int     ssize_t;
 #if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
@@ -143,6 +140,8 @@ typedef ULONGLONG      uint64_t;
 #include <stdint.h>
 #endif
 #endif
+
+typedef uint32_t usize_t;
 
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
@@ -753,7 +752,7 @@ struct _xd3_source
 					* source position to be read.
 					* Otherwise, equal to
 					* max_blkno. */
-  usize_t             onlastblk;  /* Number of bytes on max_blkno */
+  xoff_t             onlastblk;  /* Number of bytes on max_blkno */
   int                 eof_known;  /* Set to true when the first
 				   * partial block is read. */
 };
@@ -1315,9 +1314,9 @@ static inline
 void xd3_blksize_div (const xoff_t offset,
 		      const xd3_source *source,
 		      xoff_t *blkno,
-		      usize_t *blkoff) {
+		      xoff_t *blkoff) {
   *blkno = (xoff_t) (offset >> source->shiftby);
-  *blkoff = (usize_t) (offset & source->maskby);
+  *blkoff = (xoff_t) (offset & source->maskby);
   XD3_ASSERT (*blkoff < source->blksize);
 }
 

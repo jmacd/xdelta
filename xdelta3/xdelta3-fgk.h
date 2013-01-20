@@ -191,7 +191,7 @@ static fgk_stream* fgk_alloc (xd3_stream *stream /*, int alphabet_size0 */)
 static int fgk_init (xd3_stream *stream, fgk_stream *h, int is_encode)
 {
   usize_t ui;
-  ssize_t si;
+  size_t si;
 
   h->root_node       = h->alphabet;
   h->decode_ptr      = h->root_node;

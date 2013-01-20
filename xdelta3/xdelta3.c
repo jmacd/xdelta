@@ -2560,9 +2560,9 @@ xoff_t xd3_source_eof(const xd3_source *src)
 }
 
 inline
-usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
+xoff_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
 {
-  usize_t r = (blkno == src->max_blkno ?
+  xoff_t r = (blkno == src->max_blkno ?
 	       src->onlastblk :
 	       src->blksize);
   return r;
@@ -3697,7 +3697,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
       if (large_comp)
 	{
 	  usize_t hash_values = (stream->src->max_winsize /
-				 stream->smatcher.large_step);
+				stream->smatcher.large_step);
 
 	  xd3_size_hashtable (stream,
 			      hash_values,
@@ -4615,9 +4615,9 @@ xd3_source_extend_match (xd3_stream *stream)
 			of the input match being tested. */
   xoff_t tryblk;    /* tryblk, tryoff are the block, offset position
 		       of matchoff */
-  usize_t tryoff;
-  usize_t tryrem;    /* tryrem is the number of matchable bytes */
-  usize_t matched;
+  xoff_t tryoff;
+  xoff_t tryrem;    /* tryrem is the number of matchable bytes */
+  xoff_t matched;
 
   IF_DEBUG2(DP(RINT "[extend match] srcpos %"Q"u\n",
 	       stream->match_srcpos));
@@ -5095,8 +5095,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       xoff_t  blkno;
       xoff_t  blkbaseoffset;
       usize_t blkrem;
-      ssize_t oldpos;  /* Using ssize_t because of a  */
-      ssize_t blkpos;  /* do { blkpos-- }
+      size_t oldpos;  /* Using ssize_t because of a  */
+      size_t blkpos;  /* do { blkpos-- }
 			  while (blkpos >= oldpos); */
       int ret;
       xd3_blksize_div (stream->srcwin_cksum_pos,
@@ -5126,7 +5126,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
       blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
 
-      if (blkpos < (ssize_t) stream->smatcher.large_look)
+      if (blkpos < (size_t) stream->smatcher.large_look)
 	{
 	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
 	  IF_DEBUG1 (DP(RINT "[srcwin_move_point] continue (end-of-block)\n"));
