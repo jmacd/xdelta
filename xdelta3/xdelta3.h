@@ -718,7 +718,7 @@ struct _xd3_config
 struct _xd3_source
 {
   /* you set */
-  usize_t             blksize;       /* block size */
+  xoff_t              blksize;       /* block size */
   const char         *name;          /* its name, for debug/print
 					purposes */
   void               *ioh;           /* opaque handle */
@@ -727,14 +727,14 @@ struct _xd3_source
   /* getblk sets */
   xoff_t              curblkno;      /* current block number: client
 					sets after getblk request */
-  usize_t             onblk;         /* number of bytes on current
+  xoff_t              onblk;         /* number of bytes on current
 					block: client sets,  must be >= 0
 				        and <= blksize */
   const uint8_t      *curblk;        /* current block array: client
 					sets after getblk request */
 
   /* xd3 sets */
-  usize_t             srclen;        /* length of this source window */
+  usize_t              srclen;        /* length of this source window */
   xoff_t              srcbase;       /* offset of this source window
 					in the source itself */
   int                 shiftby;       /* for power-of-two blocksizes */

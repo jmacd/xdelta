@@ -296,9 +296,6 @@ static main_extcomp extcomp_types[] =
   { "gzip",     "-c",   "gzip",       "-dc",   "G", "\037\213",     2, 0 },
   { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0 },
 
-  /* TODO: add commandline support for magic-less formats */
-  /*{ "lzma", "-c",   "lzma", "-dc",   "M", "]\000", 2, 0 },*/
-
   /* Xz is lzma with a magic number http://tukaani.org/xz/ */
   { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0 },
 };
@@ -3776,7 +3773,7 @@ int main (int argc, char **argv)
 	case 'B': {
 	  xoff_t bsize;
 	  if ((ret = main_atoux (my_optarg, & bsize,
-				 XD3_MINSRCWINSZ, 0, 'B')))
+				 XD3_MINSRCWINSZ, XD3_MAXSRCWINSZ, 'B')))
 	    {
 	      goto exit;
 	    }

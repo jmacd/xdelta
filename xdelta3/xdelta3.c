@@ -1529,10 +1529,10 @@ xd3_swap_usize_t (usize_t* p1, usize_t* p2)
 
 /* It's not constant time, but it computes the log. */
 static int
-xd3_check_pow2 (xoff_t value, usize_t *logof)
+xd3_check_pow2 (xoff_t value, int *logof)
 {
   xoff_t x = 1;
-  usize_t nolog;
+  int nolog;
   if (logof == NULL) {
     logof = &nolog;
   }
@@ -2653,7 +2653,7 @@ int
 xd3_set_source (xd3_stream *stream,
 		xd3_source *src)
 {
-  usize_t shiftby;
+  int shiftby;
 
   stream->src = src;
   src->srclen  = 0;
@@ -2665,7 +2665,7 @@ xd3_set_source (xd3_stream *stream,
     {
       src->blksize = xd3_pow2_roundup(src->blksize);
       xd3_check_pow2 (src->blksize, &shiftby);
-      IF_DEBUG1 (DP(RINT "raising src_blksz to %u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_blksz to %"Q"u\n", src->blksize));
     }
 
   src->shiftby = shiftby;
@@ -2674,7 +2674,7 @@ xd3_set_source (xd3_stream *stream,
   if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
     {
       src->max_winsize = xd3_xoff_roundup(src->max_winsize);
-      IF_DEBUG1 (DP(RINT "raising src_maxsize to %u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_maxsize to %"Q"u\n", src->blksize));
     }
   src->max_winsize = max(src->max_winsize, XD3_ALLOCSIZE);
 

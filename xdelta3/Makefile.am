@@ -39,7 +39,7 @@ WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
 	 -Wextra -Wno-unused-parameter
 
 C_WFLAGS = $(WFLAGS) -pedantic -std=c99
-CXX_WFLAGS = $(WFLAGS) -pedantic
+CXX_WFLAGS = $(WFLAGS)
 
 common_CFLAGS = \
 	      -DGENERIC_ENCODE_TABLES=0 \
@@ -54,7 +54,8 @@ if DEBUG_SYMBOLS
   common_CFLAGS += -g
 endif
 
-xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=1
+# For additional debugging, add -DXD3_DEBUG=1, 2, 3, ...
+xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=0
 xdelta3_LDADD = -lm
 
 xdelta3decode_CFLAGS = \
