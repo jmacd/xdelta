@@ -36,8 +36,11 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 	testing/test.h
 
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
-	 -Wextra -Wno-unused-parameter \
-	 -pedantic -std=c99
+	 -Wextra -Wno-unused-parameter
+
+C_WFLAGS = $(WFLAGS) -pedantic -std=c99
+CXX_WFLAGS = $(WFLAGS) -pedantic
+
 common_CFLAGS = \
 	      -DGENERIC_ENCODE_TABLES=0 \
 	      -DREGRESSION_TEST=1 \
@@ -51,11 +54,11 @@ if DEBUG_SYMBOLS
   common_CFLAGS += -g
 endif
 
-xdelta3_CFLAGS = $(WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=1
+xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=1
 xdelta3_LDADD = -lm
 
 xdelta3decode_CFLAGS = \
-	$(WFLAGS) \
+	$(C_WFLAGS) \
 	-DGENERIC_ENCODE_TABLES=0 \
 	-DREGRESSION_TEST=0 \
 	-DSECONDARY_DJW=0 \
@@ -68,8 +71,10 @@ xdelta3decode_CFLAGS = \
 	-DEXTERNAL_COMPRESSION=0 \
 	-DVCDIFF_TOOLS=0
 
-xdelta3regtest_CXXFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
-xdelta3regtest_CFLAGS = $(WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+xdelta3regtest_CXXFLAGS = \
+	$(CXX_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+xdelta3regtest_CFLAGS = \
+	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
 xdelta3regtest_LDADD = -lm
 
 man1_MANS = xdelta3.1
