@@ -330,7 +330,7 @@ public:
     for (BlockIterator iter(spec); !iter.Done(); iter.Next()) {
       iter.Get(&sblock);
       tblock.SetSize(sblock.Size());
-      usize_t tread;
+      size_t tread;
       CHECK_EQ(0, main_file_read(&t,
 				 tblock.Data(),
 				 tblock.Size(), &tread, "read failed"));

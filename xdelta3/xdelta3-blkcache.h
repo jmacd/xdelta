@@ -40,7 +40,7 @@ struct _main_blklru
   main_blklru_list  link;
 };
 
-#define MAX_LRU_SIZE 32U
+#define MAX_LRU_SIZE 4U
 #define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
 
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
@@ -88,8 +88,8 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 {
   int ret = 0;
   usize_t i;
-  usize_t blksize;
   xoff_t source_size = 0;
+  usize_t blksize;
 
   XD3_ASSERT (lru == NULL);
   XD3_ASSERT (stream->src == NULL);
@@ -159,6 +159,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   lru[0].blkno = (xoff_t) -1;
   blksize = option_srcwinsz;
   main_blklru_list_push_back (& lru_list, & lru[0]);
+  XD3_ASSERT (blksize != 0);
 
   /* Initialize xd3_source. */
   source->blksize  = blksize;
@@ -194,7 +195,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       blksize = option_srcwinsz / MAX_LRU_SIZE;
       source->blksize = blksize;
       source->onblk = blksize;  /* xd3 sets onblk */
-      source->max_winsize = blksize;
+      /* Note: source->max_winsize is unchanged. */
       lru[0].size = blksize;
       lru_size = MAX_LRU_SIZE;
 
@@ -291,6 +292,11 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	  (*blrup) = blru;
 	  return 0;
 	}
+      /* No going backwards in a sequential scan. */
+      if (blru->blkno != (xoff_t) -1 && blru->blkno > blkno)
+	{
+	  return XD3_TOOFARBACK;
+	}
     }
   else
     {
@@ -323,7 +329,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
   lru_filled += 1;
   (*is_new) = 1;
   (*blrup) = blru;
-  blru->blkno = blkno;
+  blru->blkno = -1;
   return 0;
 }
 
@@ -335,7 +341,7 @@ main_read_seek_source (xd3_stream *stream,
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru;
   int is_new;
-  usize_t nread = 0;
+  size_t nread = 0;
   int ret = 0;
 
   if (!sfile->seek_failed)
@@ -412,6 +418,7 @@ main_read_seek_source (xd3_stream *stream,
 	    }
 
 	  XD3_ASSERT (is_new);
+	  blru->blkno = skip_blkno;
 
 	  if ((ret = main_read_primary_input (sfile,
 					      (uint8_t*) blru->blk,
@@ -423,7 +430,7 @@ main_read_seek_source (xd3_stream *stream,
 
 	  if (nread != source->blksize)
 	    {
-	      IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %u\n",
+	      IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %zu\n",
 			    nread));
 	      stream->msg = "non-seekable input is short";
 	      return XD3_INVALID_INPUT;
@@ -461,7 +468,7 @@ main_getblk_func (xd3_stream *stream,
   main_blklru *blru;
   int is_new;
   int did_seek = 0;
-  usize_t nread = 0;
+  size_t nread = 0;
 
   if (allow_fake_source)
     {
@@ -528,21 +535,22 @@ main_getblk_func (xd3_stream *stream,
 	{
 	  if (blru->blkno != blkno)
 	    {
-	      XPR(NT "source block %"Q"u read %u ejects %"Q"u (lru_hits=%u, "
+	      XPR(NT "source block %"Q"u read %zu ejects %"Q"u (lru_hits=%u, "
 		  "lru_misses=%u, lru_filled=%u)\n",
 		  blkno, nread, blru->blkno, lru_hits, lru_misses, lru_filled);
 	    }
 	  else
 	    {
-	      XPR(NT "source block %"Q"u read %u (lru_hits=%u, "
+	      XPR(NT "source block %"Q"u read %zu (lru_hits=%u, "
 		  "lru_misses=%u, lru_filled=%u)\n",
 		  blkno, nread, lru_hits, lru_misses, lru_filled);
 	    }
 	}
       else
 	{
-	  XPR(NT "source block %"Q"u read %u (lru_hits=%u, lru_misses=%u, "
-	      "lru_filled=%u)\n", blkno, nread, lru_hits, lru_misses, lru_filled);
+	  XPR(NT "source block %"Q"u read %zu (lru_hits=%u, lru_misses=%u, "
+	      "lru_filled=%u)\n", blkno, nread, 
+	      lru_hits, lru_misses, lru_filled);
 	}
     }
 
@@ -550,8 +558,9 @@ main_getblk_func (xd3_stream *stream,
   source->curblkno = blkno;
   source->onblk    = nread;
   blru->size       = nread;
+  blru->blkno      = blkno;
 
-  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %u pos %"Q"u "
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %zu pos %"Q"u "
 		"srcpos %"Q"u\n",
 		blkno, nread, pos, sfile->source_position));
 

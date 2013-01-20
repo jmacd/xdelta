@@ -110,7 +110,7 @@
  */
 #ifndef _WIN32
 #include <stdint.h>
-typedef unsigned int usize_t;
+typedef uint32_t usize_t;
 #else
 #define WIN32_LEAN_AND_MEAN
 #if XD3_USE_LARGEFILE64
@@ -125,7 +125,7 @@ typedef unsigned int usize_t;
 #define _WIN32_WINNT	0x0400
 #endif
 #include <windows.h>
-typedef unsigned int   usize_t;
+typedef uint32_t usize_t;
 #ifdef _MSC_VER
 #define inline
 typedef signed int     ssize_t;
@@ -144,9 +144,6 @@ typedef ULONGLONG      uint64_t;
 #endif
 #endif
 
-/* TODO: note that SIZEOF_USIZE_T is never set to 8, although it should be for
- * a 64bit platform.  OTOH, may be that using 32bits is appropriate even on a
- * 64bit platform because we allocate large arrays of these values. */
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
 #ifndef _LARGEFILE_SOURCE

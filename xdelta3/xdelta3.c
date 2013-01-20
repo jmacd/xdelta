@@ -286,10 +286,12 @@
 #define SECONDARY_DJW 0  /* standardization, off by default until such time. */
 #endif
 
+#ifndef SECONDARY_LZMA
 #ifdef HAVE_LZMA_H
 #define SECONDARY_LZMA 1
 #else
 #define SECONDARY_LZMA 0
+#endif
 #endif
 
 #ifndef GENERIC_ENCODE_TABLES    /* These three are the RFC-spec app-specific */
@@ -1548,10 +1550,10 @@ xd3_check_pow2 (xoff_t value, usize_t *logof)
   return XD3_INTERNAL;
 }
 
-static usize_t
-xd3_pow2_roundup (usize_t x)
+static size_t
+xd3_pow2_roundup (size_t x)
 {
-  usize_t i = 1;
+  size_t i = 1;
   while (x > i) {
     i <<= 1U;
   }
@@ -2672,7 +2674,7 @@ xd3_set_source (xd3_stream *stream,
   if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
     {
       src->max_winsize = xd3_xoff_roundup(src->max_winsize);
-      IF_DEBUG1 (DP(RINT "raising src_maxsize to %"Q"u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_maxsize to %u\n", src->blksize));
     }
   src->max_winsize = max(src->max_winsize, XD3_ALLOCSIZE);
 
@@ -4437,19 +4439,15 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
   /* Implement src->max_winsize, which prevents the encoder from seeking
    * back further than the LRU cache maintaining FIFO discipline, (to
-   * avoid seeking).  Note the +1 here ensures that "frontier_pos" is
-   * the address of the next byte in the stream, and ensures that the
-   * maximum offset is less than the source window size (in
-   * blocks). */
-  frontier_pos =
-    (stream->src->frontier_blkno + 1) * stream->src->blksize;
-  IF_DEBUG1(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
-	       "src->max_winsize %u\n",
+   * avoid seeking). */
+  frontier_pos = stream->src->frontier_blkno * stream->src->blksize;
+  IF_DEBUG2(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
+	       "src->max_winsize %"Q"u\n",
 	       frontier_pos, srcpos, stream->src->max_winsize));
   if (srcpos < frontier_pos &&
       frontier_pos - srcpos > stream->src->max_winsize) {
     IF_DEBUG1(DP(RINT "[match_setup] rejected due to src->max_winsize "
-		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%u\n",
+		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%"Q"u\n",
 		 xd3_source_eof (stream->src),
 		 srcpos, stream->src->max_winsize));
     goto bad;
@@ -4505,7 +4503,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	    }
 	}
 
-      IF_DEBUG1(DP(RINT
+      IF_DEBUG2(DP(RINT
 		   "[match_setup] srcpos %"Q"u (tgtpos %"Q"u) "
 		   "unrestricted maxback %u maxfwd %u\n",
 		   srcpos,
@@ -4782,7 +4780,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	  stream->maxsrcaddr = match_end;
 	}
 
-      IF_DEBUG1 ({
+      IF_DEBUG2 ({
 	static int x = 0;
 	DP(RINT "[source match:%d] <inp %"Q"u %"Q"u>  <src %"Q"u %"Q"u> (%s) [ %u bytes ]\n",
 	   x++,

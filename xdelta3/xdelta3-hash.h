@@ -21,8 +21,8 @@
 
 #if XD3_DEBUG
 #define SMALL_HASH_DEBUG1(s,inp)                                  \
-  usize_t debug_state;                                            \
-  usize_t debug_hval = xd3_checksum_hash (& (s)->small_hash,      \
+  uint32_t debug_state;                                           \
+  uint32_t debug_hval = xd3_checksum_hash (& (s)->small_hash,     \
               xd3_scksum (&debug_state, (inp), (s)->smatcher.small_look))
 #define SMALL_HASH_DEBUG2(s,inp)                                  \
   XD3_ASSERT (debug_hval == xd3_checksum_hash (& (s)->small_hash, \

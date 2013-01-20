@@ -2584,7 +2584,8 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    default: CHECK(0);
 	    }
 
-	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%d/%d", inst->pos, inst->size);
+	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%d/%d", 
+			 inst->pos, inst->size);
 	  rptr += strlen (rptr);
 
 	  if (inst->type == XD3_CPY)
