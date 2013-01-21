@@ -110,7 +110,6 @@
  */
 #ifndef _WIN32
 #include <stdint.h>
-typedef uint32_t usize_t;
 #else
 #define WIN32_LEAN_AND_MEAN
 #if XD3_USE_LARGEFILE64
@@ -125,7 +124,6 @@ typedef uint32_t usize_t;
 #define _WIN32_WINNT	0x0400
 #endif
 #include <windows.h>
-typedef uint32_t usize_t;
 #ifdef _MSC_VER
 #define inline
 typedef signed int     ssize_t;
@@ -143,6 +141,8 @@ typedef ULONGLONG      uint64_t;
 #include <stdint.h>
 #endif
 #endif
+
+typedef uint32_t usize_t;
 
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
