@@ -5154,12 +5154,11 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
 
 	  stream->large_table[hval] =
-	    (usize_t) (blkbaseoffset +
-		       (xoff_t)(blkpos + HASH_CKOFFSET));
+	    (uint32_t) (blkbaseoffset + (xoff_t)(blkpos + HASH_CKOFFSET));
 
 	  IF_DEBUG (stream->large_ckcnt += 1);
 
-	  blkpos -= stream->smatcher.large_step;
+	  blkpos -= (ssize_t) stream->smatcher.large_step;
 	}
       while (blkpos >= oldpos);
 

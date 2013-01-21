@@ -808,10 +808,10 @@ struct _xd3_stream
 
   xd3_smatcher      smatcher;
 
-  usize_t           *large_table;      /* table of large checksums */
+  uint32_t          *large_table;      /* table of large checksums */
   xd3_hash_cfg       large_hash;       /* large hash config */
 
-  usize_t           *small_table;      /* table of small checksums */
+  uint32_t          *small_table;      /* table of small checksums */
   xd3_slist         *small_prev;       /* table of previous offsets,
 					  circular linked list */
   int                small_reset;      /* true if small table should

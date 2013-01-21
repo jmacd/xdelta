@@ -85,7 +85,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 		 main_file *sfile, xd3_source *source)
 {
   int ret = 0;
-  int i;
+  usize_t i;
   xoff_t source_size = 0;
 
   XD3_ASSERT (lru == NULL);
@@ -142,7 +142,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
     }
 
   /* Setup LRU blocks. */
-  for (i = MAX_LRU_SIZE - 1; i >= 0; --i)
+  for (i = 0; i < MAX_LRU_SIZE; i++)
     {
       lru[i].blk = lru[0].blk + (option_srcwinsz / MAX_LRU_SIZE) * i;
       lru[i].blkno = (xoff_t) -1;
@@ -159,7 +159,6 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->blksize = option_srcwinsz;
 
   lru_size = 1;
-  lru[0].blkno = 0;
 
   if ((ret = main_getblk_func (stream, source, 0)) != 0)
     {

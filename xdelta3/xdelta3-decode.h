@@ -454,7 +454,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		    (blkoff + take > source->onblk))
 		  {
 		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q"u onblk "
-				   "%"Q"u blksize %u blkoff %u take %u\n",
+				   "%"Q"u blksize %"Q"u blkoff %"Q"u take %u\n",
 				   block,
 				   source->onblk,
 				   blksize,
@@ -1095,7 +1095,7 @@ xd3_decode_input (xd3_stream *stream)
 	  IF_DEBUG1(DP(RINT
 		       "decode cpyoff %"Q"u "
 		       "cpyblkno %"Q"u "
-		       "cpyblkoff %u "
+		       "cpyblkoff %"Q"u "
 		       "blksize %"Q"u\n",
 		       stream->dec_cpyoff,
 		       src->cpyoff_blocks,
