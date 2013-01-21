@@ -428,7 +428,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		 * copy. */
 		xd3_source *source = stream->src;
 		xoff_t block = source->cpyoff_blocks;
-		usize_t blkoff = source->cpyoff_blkoff;
+		xoff_t blkoff = source->cpyoff_blkoff;
 		const xoff_t blksize = source->blksize;
 		int ret;
 
@@ -475,7 +475,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		  }
 		else
 		  {
-		    take = blksize - blkoff;
+		    take = (usize_t) (blksize - blkoff);
 		    inst->size -= take;
 		    inst->addr += take;
 

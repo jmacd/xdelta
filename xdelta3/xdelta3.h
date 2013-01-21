@@ -126,6 +126,7 @@
 #include <windows.h>
 #ifdef _MSC_VER
 #define inline
+typedef signed long    ssize_t;
 #if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
@@ -631,9 +632,9 @@ struct _xd3_smatcher
 /* hash table size & power-of-two hash function. */
 struct _xd3_hash_cfg
 {
-  usize_t           size;
-  usize_t           shift;
-  usize_t           mask;
+  usize_t            size;
+  usize_t            shift;
+  usize_t            mask;
 };
 
 /* the sprev list */
@@ -733,13 +734,13 @@ struct _xd3_source
 					sets after getblk request */
 
   /* xd3 sets */
-  usize_t              srclen;        /* length of this source window */
+  usize_t             srclen;        /* length of this source window */
   xoff_t              srcbase;       /* offset of this source window
 					in the source itself */
   int                 shiftby;       /* for power-of-two blocksizes */
-  int                 maskby;        /* for power-of-two blocksizes */
+  usize_t             maskby;        /* for power-of-two blocksizes */
   xoff_t              cpyoff_blocks; /* offset of dec_cpyoff in blocks */
-  usize_t             cpyoff_blkoff; /* offset of copy window in
+  xoff_t              cpyoff_blkoff; /* offset of copy window in
 					blocks, remainder */
   xoff_t              getblkno;      /* request block number: xd3 sets
 					current getblk request */
@@ -752,7 +753,7 @@ struct _xd3_source
 					* source position to be read.
 					* Otherwise, equal to
 					* max_blkno. */
-  xoff_t             onlastblk;  /* Number of bytes on max_blkno */
+  xoff_t              onlastblk;  /* Number of bytes on max_blkno */
   int                 eof_known;  /* Set to true when the first
 				   * partial block is read. */
 };
@@ -1322,11 +1323,11 @@ void xd3_blksize_div (const xoff_t offset,
 
 static inline
 void xd3_blksize_add (xoff_t *blkno,
-		      usize_t *blkoff,
+		      xoff_t *blkoff,
 		      const xd3_source *source,
 		      const usize_t add)
 {
-  usize_t blkdiff;
+  xoff_t blkdiff;
 
   /* Does not check for overflow, checked in xdelta3-decode.h. */
   *blkoff += add;

@@ -533,7 +533,7 @@ static int xd3_srcwin_move_point (xd3_stream *stream,
 static int xd3_emit_run (xd3_stream *stream, usize_t pos,
 			 usize_t size, uint8_t *run_c);
 static usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg,
-				  const usize_t cksum);
+				 const usize_t cksum);
 static xoff_t xd3_source_cksum_offset(xd3_stream *stream, usize_t low);
 static void xd3_scksum_insert (xd3_stream *stream,
 			       usize_t inx,
@@ -999,7 +999,7 @@ static void
 xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
 {
   usize_t size1, size2, mode;
-  usize_t cpy_modes = 2 + desc->near_modes + desc->same_modes;
+  usize_t cpy_modes = 2U + desc->near_modes + desc->same_modes;
   xd3_dinst *d = tbl;
 
   (d++)->type1 = XD3_RUN;
@@ -1015,7 +1015,8 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
     {
       (d++)->type1 = XD3_CPY + mode;
 
-      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; size1 += 1, d += 1)
+      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; 
+	   size1 += 1, d += 1)
 	{
 	  d->type1 = XD3_CPY + mode;
 	  d->size1 = size1;
@@ -1593,17 +1594,16 @@ xd3_round_blksize (usize_t sz, usize_t blksz)
 #define A32_DO8(buf,i)  A32_DO4(buf,i); A32_DO4(buf,i+4);
 #define A32_DO16(buf)   A32_DO8(buf,0); A32_DO8(buf,8);
 
-static unsigned long adler32 (unsigned long adler, const uint8_t *buf, 
-			      usize_t len)
+static uint32_t adler32 (uint32_t adler, const uint8_t *buf, size_t len)
 {
-    unsigned long s1 = adler & 0xffff;
-    unsigned long s2 = (adler >> 16) & 0xffff;
+    uint32_t s1 = adler & 0xffff;
+    uint32_t s2 = (adler >> 16) & 0xffff;
     int k;
 
     while (len > 0)
       {
-        k    = (len < A32_NMAX) ? len : A32_NMAX;
-        len -= k;
+        k    = (len < A32_NMAX) ? (int) len : A32_NMAX;
+        len -= (size_t) k;
 
 	while (k >= 16)
 	  {
@@ -2669,7 +2669,7 @@ xd3_set_source (xd3_stream *stream,
     }
 
   src->shiftby = shiftby;
-  src->maskby = (1 << shiftby) - 1;
+  src->maskby = (1U << shiftby) - 1;
 
   if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
     {
@@ -3697,7 +3697,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
       if (large_comp)
 	{
 	  usize_t hash_values = (stream->src->max_winsize /
-				stream->smatcher.large_step);
+				 stream->smatcher.large_step);
 
 	  xd3_size_hashtable (stream,
 			      hash_values,
@@ -4565,7 +4565,8 @@ xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
 {
   int i = 0;
 #if UNALIGNED_OK
-  int nint = n / sizeof(int);
+  const int isize = sizeof(int);
+  int nint = n / isize;
 
   if (nint >> 3)
     {
@@ -4584,7 +4585,7 @@ xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
 	     s1[i++] == s2[j++] &&
 	     s1[i++] == s2[j++]) { }
 
-      i = (i - 1) * sizeof(int);
+      i = (i - 1) * isize;
     }
 #endif
 
@@ -5094,9 +5095,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     {
       xoff_t  blkno;
       xoff_t  blkbaseoffset;
-      usize_t blkrem;
-      size_t oldpos;  /* Using ssize_t because of a  */
-      size_t blkpos;  /* do { blkpos-- }
+      xoff_t blkrem;
+      ssize_t oldpos;  /* Using ssize_t because of a  */
+      ssize_t blkpos;  /* do { blkpos-- }
 			  while (blkpos >= oldpos); */
       int ret;
       xd3_blksize_div (stream->srcwin_cksum_pos,
@@ -5126,7 +5127,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
       blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
 
-      if (blkpos < (size_t) stream->smatcher.large_look)
+      if (blkpos < (ssize_t) stream->smatcher.large_look)
 	{
 	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
 	  IF_DEBUG1 (DP(RINT "[srcwin_move_point] continue (end-of-block)\n"));

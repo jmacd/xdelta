@@ -303,7 +303,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
   lru_filled += 1;
   (*is_new) = 1;
   (*blrup) = blru;
-  blru->blkno = -1;
+  blru->blkno = (xoff_t) -1;
   return 0;
 }
 
@@ -384,7 +384,7 @@ main_read_seek_source (xd3_stream *stream,
       while (sfile->source_position < pos)
 	{
 	  xoff_t skip_blkno;
-	  usize_t skip_offset;
+	  xoff_t skip_offset;
 
 	  xd3_blksize_div (sfile->source_position, source,
 			   &skip_blkno, &skip_offset);

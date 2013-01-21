@@ -35,6 +35,8 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 	testing/sizes.h \
 	testing/test.h
 
+# Note: for extra sanity checks, enable -Wconversion. Note there
+# are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
 	 -Wextra -Wno-unused-parameter
 

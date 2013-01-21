@@ -111,11 +111,11 @@ LTYPE ## _next (ETYPE *f)                                               \
   return LTYPE ## _entry (f->LNAME.next);                               \
 }                                                                       \
                                                                         \
-static inline usize_t                                                   \
+static inline size_t                                                    \
 LTYPE ## _length (LTYPE *l)                                             \
 {                                                                       \
   LTYPE *p;                                                             \
-  int c = 0;                                                            \
+  size_t c = 0;                                                         \
                                                                         \
   for (p = l->next; p != l; p = p->next)                                \
     {                                                                   \
