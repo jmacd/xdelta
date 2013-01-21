@@ -159,6 +159,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->blksize = option_srcwinsz;
 
   lru_size = 1;
+  lru[0].blkno = 0;
 
   if ((ret = main_getblk_func (stream, source, 0)) != 0)
     {

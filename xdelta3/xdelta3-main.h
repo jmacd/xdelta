@@ -2415,7 +2415,7 @@ main_secondary_decompress_check (main_file  *file,
 {
   int ret;
   usize_t i;
-  usize_t try_read = min (input_size, XD3_ALLOCSIZE);
+  size_t try_read = min (input_size, XD3_ALLOCSIZE);
   size_t  check_nread = 0;
   uint8_t check_buf[XD3_ALLOCSIZE];  /* TODO: stack limit */
   const main_extcomp *decompressor = NULL;
@@ -3227,8 +3227,8 @@ main_input (xd3_cmd     cmd,
 		main_get_appheader (& stream, ifile, ofile, sfile);
 
 		/* Now open the source file. */
-		  if ((sfile->filename != NULL) &&
-		      (ret = main_set_source (& stream, cmd, sfile, & source)))
+		if ((sfile->filename != NULL) &&
+		    (ret = main_set_source (& stream, cmd, sfile, & source)))
 		  {
 		    return EXIT_FAILURE;
 		  }

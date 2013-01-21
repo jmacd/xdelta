@@ -4561,19 +4561,20 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 }
 
 static inline xoff_t
-xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, xoff_t n)
+xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, size_t n)
 {
-  int i = 0;
-#if UNALIGNED_OK
-  const int isize = sizeof(int);
-  int nint = (int) (n / isize);
+  size_t i = 0;
+#if UNALIGNED_OK  
+  const size_t ssize = sizeof(size_t);
+  const size_t nint = n / ssize;
 
+  /* If there are at least 8 elements */
   if (nint >> 3)
     {
-      int j = 0;
-      const int *s1 = (const int*)s1c;
-      const int *s2 = (const int*)s2c;
-      int nint_8 = nint - 8;
+      usize_t j = 0;
+      const size_t *s1 = (const size_t*)s1c;
+      const size_t *s2 = (const size_t*)s2c;
+      const size_t nint_8 = nint - 8;
 
       while (i <= nint_8 &&
 	     s1[i++] == s2[j++] &&
@@ -4585,7 +4586,7 @@ xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, xoff_t n)
 	     s1[i++] == s2[j++] &&
 	     s1[i++] == s2[j++]) { }
 
-      i = (i - 1) * isize;
+      i = (i - 1) * ssize;
     }
 #endif
 
