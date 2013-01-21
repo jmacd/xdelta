@@ -3696,8 +3696,8 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
-	  usize_t hash_values = (stream->src->max_winsize /
-				 stream->smatcher.large_step);
+	  usize_t hash_values = (usize_t) (stream->src->max_winsize /
+				 (xoff_t) stream->smatcher.large_step);
 
 	  xd3_size_hashtable (stream,
 			      hash_values,
@@ -4138,7 +4138,7 @@ xd3_process_memory (int            is_encode,
       config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
       config.iopt_size = max(config.iopt_size, 128U);
-      config.sprevsz = xd3_pow2_roundup (config.winsize);
+      config.sprevsz = (usize_t) xd3_pow2_roundup (config.winsize);
     }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)
@@ -4560,13 +4560,13 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
-static inline int
-xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
+static inline xoff_t
+xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, xoff_t n)
 {
   int i = 0;
 #if UNALIGNED_OK
   const int isize = sizeof(int);
-  int nint = n / isize;
+  int nint = (int) (n / isize);
 
   if (nint >> 3)
     {
@@ -4721,8 +4721,8 @@ xd3_source_extend_match (xd3_stream *stream)
 				  stream->next_in + streamoff,
 				  tryrem);
       tryoff += matched;
-      streamoff += matched;
-      stream->match_fwd += matched;
+      streamoff += (xoff_t) matched;
+      stream->match_fwd += (xoff_t) matched;
 
       if (tryrem != matched)
 	{

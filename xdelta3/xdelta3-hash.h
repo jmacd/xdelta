@@ -141,7 +141,7 @@ xd3_size_log2 (size_t slots)
 
   for (i = 3; i <= bits; i += 1)
     {
-      if (slots < (1U << i))
+      if (slots < (1ULL << i))
 	{
 	  /* TODO: this is compaction=1 in checksum_test.cc and maybe should
 	   * not be fixed at -1. */
