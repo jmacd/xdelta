@@ -134,14 +134,14 @@ xd3_lcksum (const uint8_t *seg, const usize_t ln)
 
 #if XD3_ENCODER
 static usize_t
-xd3_size_log2 (size_t slots)
+xd3_size_log2 (usize_t slots)
 {
-  usize_t bits = 31;
-  usize_t i;
+  int bits = 28; /* This should not be an unreasonable limit. */
+  int i;
 
   for (i = 3; i <= bits; i += 1)
     {
-      if (slots < (1ULL << i))
+      if (slots < (1U << i))
 	{
 	  /* TODO: this is compaction=1 in checksum_test.cc and maybe should
 	   * not be fixed at -1. */
@@ -155,12 +155,13 @@ xd3_size_log2 (size_t slots)
 
 static void
 xd3_size_hashtable (xd3_stream    *stream,
-		    size_t         slots,
+		    usize_t        slots,
 		    xd3_hash_cfg  *cfg)
 {
-  usize_t bits = xd3_size_log2 (slots);
+  int bits = xd3_size_log2 (slots);
 
-  cfg->size  = (1U << bits);
+  /* TODO: there's a 32-bit assumption here */
+  cfg->size  = (1 << bits);
   cfg->mask  = (cfg->size - 1);
   cfg->shift = 32 - bits;
 }

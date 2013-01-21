@@ -669,13 +669,13 @@ test_forward_match (xd3_stream *stream, int unused)
 
   for (i = 0; i < 256; i++)
     {
-      CHECK(xd3_forward_match(buf1, buf2, i) == i);
+      CHECK(xd3_forward_match(buf1, buf2, i) == (int)i);
     }
 
   for (i = 0; i < 255; i++)
     {
       buf2[i] = 1;
-      CHECK(xd3_forward_match(buf1, buf2, 256) == i);
+      CHECK(xd3_forward_match(buf1, buf2, 256) == (int)i);
       buf2[i] = 0;
     }
 

@@ -1,4 +1,4 @@
-AC_INIT([Xdelta3], [3.0.5], [josh.macdonald@gmail.com], 
+AC_INIT([Xdelta3], [3.0.6], [josh.macdonald@gmail.com], 
 	[xdelta3], [http://xdelta.org/])
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])

@@ -110,6 +110,7 @@
  */
 #ifndef _WIN32
 #include <stdint.h>
+typedef uint32_t usize_t;
 #else
 #define WIN32_LEAN_AND_MEAN
 #if XD3_USE_LARGEFILE64
@@ -124,9 +125,10 @@
 #define _WIN32_WINNT	0x0400
 #endif
 #include <windows.h>
+typedef uint32_t usize_t;
 #ifdef _MSC_VER
 #define inline
-typedef signed long    ssize_t;
+typedef signed int     ssize_t;
 #if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
@@ -141,8 +143,6 @@ typedef ULONGLONG      uint64_t;
 #include <stdint.h>
 #endif
 #endif
-
-typedef uint32_t usize_t;
 
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
@@ -632,9 +632,9 @@ struct _xd3_smatcher
 /* hash table size & power-of-two hash function. */
 struct _xd3_hash_cfg
 {
-  usize_t            size;
-  usize_t            shift;
-  usize_t            mask;
+  usize_t           size;
+  usize_t           shift;
+  usize_t           mask;
 };
 
 /* the sprev list */
@@ -718,7 +718,7 @@ struct _xd3_config
 struct _xd3_source
 {
   /* you set */
-  xoff_t              blksize;       /* block size */
+  usize_t             blksize;       /* block size */
   const char         *name;          /* its name, for debug/print
 					purposes */
   void               *ioh;           /* opaque handle */
@@ -727,7 +727,7 @@ struct _xd3_source
   /* getblk sets */
   xoff_t              curblkno;      /* current block number: client
 					sets after getblk request */
-  xoff_t              onblk;         /* number of bytes on current
+  usize_t             onblk;         /* number of bytes on current
 					block: client sets,  must be >= 0
 				        and <= blksize */
   const uint8_t      *curblk;        /* current block array: client
@@ -738,9 +738,9 @@ struct _xd3_source
   xoff_t              srcbase;       /* offset of this source window
 					in the source itself */
   int                 shiftby;       /* for power-of-two blocksizes */
-  usize_t             maskby;        /* for power-of-two blocksizes */
+  int                 maskby;        /* for power-of-two blocksizes */
   xoff_t              cpyoff_blocks; /* offset of dec_cpyoff in blocks */
-  xoff_t              cpyoff_blkoff; /* offset of copy window in
+  usize_t             cpyoff_blkoff; /* offset of copy window in
 					blocks, remainder */
   xoff_t              getblkno;      /* request block number: xd3 sets
 					current getblk request */
@@ -753,7 +753,7 @@ struct _xd3_source
 					* source position to be read.
 					* Otherwise, equal to
 					* max_blkno. */
-  xoff_t              onlastblk;  /* Number of bytes on max_blkno */
+  usize_t             onlastblk;  /* Number of bytes on max_blkno */
   int                 eof_known;  /* Set to true when the first
 				   * partial block is read. */
 };
@@ -808,10 +808,10 @@ struct _xd3_stream
 
   xd3_smatcher      smatcher;
 
-  uint32_t          *large_table;      /* table of large checksums */
+  usize_t           *large_table;      /* table of large checksums */
   xd3_hash_cfg       large_hash;       /* large hash config */
 
-  uint32_t          *small_table;      /* table of small checksums */
+  usize_t           *small_table;      /* table of small checksums */
   xd3_slist         *small_prev;       /* table of previous offsets,
 					  circular linked list */
   int                small_reset;      /* true if small table should
@@ -1315,19 +1315,19 @@ static inline
 void xd3_blksize_div (const xoff_t offset,
 		      const xd3_source *source,
 		      xoff_t *blkno,
-		      xoff_t *blkoff) {
+		      usize_t *blkoff) {
   *blkno = (xoff_t) (offset >> source->shiftby);
-  *blkoff = (xoff_t) (offset & source->maskby);
+  *blkoff = (usize_t) (offset & source->maskby);
   XD3_ASSERT (*blkoff < source->blksize);
 }
 
 static inline
 void xd3_blksize_add (xoff_t *blkno,
-		      xoff_t *blkoff,
+		      usize_t *blkoff,
 		      const xd3_source *source,
 		      const usize_t add)
 {
-  xoff_t blkdiff;
+  usize_t blkdiff;
 
   /* Does not check for overflow, checked in xdelta3-decode.h. */
   *blkoff += add;

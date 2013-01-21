@@ -33,7 +33,7 @@ static inline int xd3_decode_bits (xd3_stream     *stream,
 				   usize_t        *valuep)
 {
   usize_t value = 0;
-  usize_t vmask = 1U << nbits;
+  usize_t vmask = 1 << nbits;
 
   if (bits->cur_mask == 0x100) { goto next_byte; }
 
@@ -215,7 +215,7 @@ static inline int xd3_encode_bits (xd3_stream      *stream,
 				   usize_t           value)
 {
   int ret;
-  usize_t mask = 1U << nbits;
+  usize_t mask = 1 << nbits;
 
   XD3_ASSERT (nbits > 0);
   XD3_ASSERT (nbits < sizeof (usize_t) * 8);

@@ -533,7 +533,7 @@ static int xd3_srcwin_move_point (xd3_stream *stream,
 static int xd3_emit_run (xd3_stream *stream, usize_t pos,
 			 usize_t size, uint8_t *run_c);
 static usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg,
-				 const usize_t cksum);
+				  const usize_t cksum);
 static xoff_t xd3_source_cksum_offset(xd3_stream *stream, usize_t low);
 static void xd3_scksum_insert (xd3_stream *stream,
 			       usize_t inx,
@@ -999,7 +999,7 @@ static void
 xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
 {
   usize_t size1, size2, mode;
-  usize_t cpy_modes = 2U + desc->near_modes + desc->same_modes;
+  usize_t cpy_modes = 2 + desc->near_modes + desc->same_modes;
   xd3_dinst *d = tbl;
 
   (d++)->type1 = XD3_RUN;
@@ -1015,8 +1015,7 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
     {
       (d++)->type1 = XD3_CPY + mode;
 
-      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; 
-	   size1 += 1, d += 1)
+      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; size1 += 1, d += 1)
 	{
 	  d->type1 = XD3_CPY + mode;
 	  d->size1 = size1;
@@ -1530,10 +1529,10 @@ xd3_swap_usize_t (usize_t* p1, usize_t* p2)
 
 /* It's not constant time, but it computes the log. */
 static int
-xd3_check_pow2 (xoff_t value, int *logof)
+xd3_check_pow2 (xoff_t value, usize_t *logof)
 {
   xoff_t x = 1;
-  int nolog;
+  usize_t nolog;
   if (logof == NULL) {
     logof = &nolog;
   }
@@ -1594,16 +1593,17 @@ xd3_round_blksize (usize_t sz, usize_t blksz)
 #define A32_DO8(buf,i)  A32_DO4(buf,i); A32_DO4(buf,i+4);
 #define A32_DO16(buf)   A32_DO8(buf,0); A32_DO8(buf,8);
 
-static uint32_t adler32 (uint32_t adler, const uint8_t *buf, size_t len)
+static unsigned long adler32 (unsigned long adler, const uint8_t *buf, 
+			      usize_t len)
 {
-    uint32_t s1 = adler & 0xffff;
-    uint32_t s2 = (adler >> 16) & 0xffff;
+    unsigned long s1 = adler & 0xffff;
+    unsigned long s2 = (adler >> 16) & 0xffff;
     int k;
 
     while (len > 0)
       {
-        k    = (len < A32_NMAX) ? (int) len : A32_NMAX;
-        len -= (size_t) k;
+        k    = (len < A32_NMAX) ? len : A32_NMAX;
+        len -= k;
 
 	while (k >= 16)
 	  {
@@ -2560,9 +2560,9 @@ xoff_t xd3_source_eof(const xd3_source *src)
 }
 
 inline
-xoff_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
+usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
 {
-  xoff_t r = (blkno == src->max_blkno ?
+  usize_t r = (blkno == src->max_blkno ?
 	       src->onlastblk :
 	       src->blksize);
   return r;
@@ -2653,7 +2653,7 @@ int
 xd3_set_source (xd3_stream *stream,
 		xd3_source *src)
 {
-  int shiftby;
+  usize_t shiftby;
 
   stream->src = src;
   src->srclen  = 0;
@@ -2665,16 +2665,16 @@ xd3_set_source (xd3_stream *stream,
     {
       src->blksize = xd3_pow2_roundup(src->blksize);
       xd3_check_pow2 (src->blksize, &shiftby);
-      IF_DEBUG1 (DP(RINT "raising src_blksz to %"Q"u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_blksz to %u\n", src->blksize));
     }
 
   src->shiftby = shiftby;
-  src->maskby = (1U << shiftby) - 1;
+  src->maskby = (1 << shiftby) - 1;
 
   if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
     {
       src->max_winsize = xd3_xoff_roundup(src->max_winsize);
-      IF_DEBUG1 (DP(RINT "raising src_maxsize to %"Q"u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_maxsize to %u\n", src->blksize));
     }
   src->max_winsize = max(src->max_winsize, XD3_ALLOCSIZE);
 
@@ -3696,8 +3696,8 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
-	  usize_t hash_values = (usize_t) (stream->src->max_winsize /
-				 (xoff_t) stream->smatcher.large_step);
+	  usize_t hash_values = (stream->src->max_winsize /
+				 stream->smatcher.large_step);
 
 	  xd3_size_hashtable (stream,
 			      hash_values,
@@ -4138,7 +4138,7 @@ xd3_process_memory (int            is_encode,
       config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
       config.iopt_size = max(config.iopt_size, 128U);
-      config.sprevsz = (usize_t) xd3_pow2_roundup (config.winsize);
+      config.sprevsz = xd3_pow2_roundup (config.winsize);
     }
 
   if ((ret = xd3_config_stream (&stream, &config)) != 0)
@@ -4560,21 +4560,19 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
-static inline xoff_t
-xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, size_t n)
+static inline int
+xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
 {
-  size_t i = 0;
-#if UNALIGNED_OK  
-  const size_t ssize = sizeof(size_t);
-  const size_t nint = n / ssize;
+  int i = 0;
+#if UNALIGNED_OK
+  int nint = n / sizeof(int);
 
-  /* If there are at least 8 elements */
   if (nint >> 3)
     {
-      usize_t j = 0;
-      const size_t *s1 = (const size_t*)s1c;
-      const size_t *s2 = (const size_t*)s2c;
-      const size_t nint_8 = nint - 8;
+      int j = 0;
+      const int *s1 = (const int*)s1c;
+      const int *s2 = (const int*)s2c;
+      int nint_8 = nint - 8;
 
       while (i <= nint_8 &&
 	     s1[i++] == s2[j++] &&
@@ -4586,7 +4584,7 @@ xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, size_t n)
 	     s1[i++] == s2[j++] &&
 	     s1[i++] == s2[j++]) { }
 
-      i = (i - 1) * ssize;
+      i = (i - 1) * sizeof(int);
     }
 #endif
 
@@ -4617,9 +4615,9 @@ xd3_source_extend_match (xd3_stream *stream)
 			of the input match being tested. */
   xoff_t tryblk;    /* tryblk, tryoff are the block, offset position
 		       of matchoff */
-  xoff_t tryoff;
-  xoff_t tryrem;    /* tryrem is the number of matchable bytes */
-  xoff_t matched;
+  usize_t tryoff;
+  usize_t tryrem;    /* tryrem is the number of matchable bytes */
+  usize_t matched;
 
   IF_DEBUG2(DP(RINT "[extend match] srcpos %"Q"u\n",
 	       stream->match_srcpos));
@@ -4722,8 +4720,8 @@ xd3_source_extend_match (xd3_stream *stream)
 				  stream->next_in + streamoff,
 				  tryrem);
       tryoff += matched;
-      streamoff += (xoff_t) matched;
-      stream->match_fwd += (xoff_t) matched;
+      streamoff += matched;
+      stream->match_fwd += matched;
 
       if (tryrem != matched)
 	{
@@ -5096,7 +5094,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     {
       xoff_t  blkno;
       xoff_t  blkbaseoffset;
-      xoff_t blkrem;
+      usize_t blkrem;
       ssize_t oldpos;  /* Using ssize_t because of a  */
       ssize_t blkpos;  /* do { blkpos-- }
 			  while (blkpos >= oldpos); */
@@ -5154,11 +5152,12 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
 
 	  stream->large_table[hval] =
-	    (uint32_t) (blkbaseoffset + (xoff_t)(blkpos + HASH_CKOFFSET));
+	    (usize_t) (blkbaseoffset +
+		       (xoff_t)(blkpos + HASH_CKOFFSET));
 
 	  IF_DEBUG (stream->large_ckcnt += 1);
 
-	  blkpos -= (ssize_t) stream->smatcher.large_step;
+	  blkpos -= stream->smatcher.large_step;
 	}
       while (blkpos >= oldpos);
 

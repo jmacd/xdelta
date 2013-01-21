@@ -40,7 +40,7 @@ int main_file_read (main_file  *ifile,
 		    const char *msg);
 int main_file_write (main_file *ofile, uint8_t *buf, 
 		     usize_t size, const char *msg);
-xoff_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno);
+usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno);
 xoff_t xd3_source_eof(const xd3_source *src);
 uint32_t xd3_large_cksum_update (uint32_t cksum,
 				 const uint8_t *base,
