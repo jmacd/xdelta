@@ -352,7 +352,8 @@ xprintf (const char *fmt, ...)
   if (xprintf_message_func != NULL) {
     xprintf_message_func(buf);
   } else {
-    fwrite(buf, 1, size, stderr);
+    size_t ignore = fwrite(buf, 1, size, stderr);
+    (void) ignore;
   }
 }
 

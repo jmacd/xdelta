@@ -10,6 +10,7 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_CHECK_HEADERS([lzma.h])
 AC_CHECK_LIB(lzma, lzma_easy_buffer_encode)
+AC_CHECK_SIZEOF(size_t)
 #AM_PATH_PYTHON(,, [:])
 #AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 #AX_PYTHON_DEVEL()
