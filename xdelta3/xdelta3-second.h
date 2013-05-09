@@ -290,7 +290,7 @@ xd3_encode_secondary (xd3_stream      *stream,
   XD3_ASSERT (comp_size == xd3_sizeof_output (tmp_head));
   XD3_ASSERT (tmp_tail != NULL);
 
-  if (comp_size < (orig_size - SECONDARY_MIN_SAVINGS))
+  if (comp_size < (orig_size - SECONDARY_MIN_SAVINGS) || cfg->inefficient)
     {
       IF_DEBUG1(DP(RINT "secondary saved %u bytes: %u -> %u (%0.2f%%)\n",
 		   orig_size - comp_size, orig_size, comp_size,

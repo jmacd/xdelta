@@ -28,6 +28,8 @@ typedef struct _xd3_lzma_stream xd3_lzma_stream;
 
 struct _xd3_lzma_stream {
   lzma_stream lzma;
+  lzma_options_lzma options;
+  lzma_filter filters[2];
 };
 
 xd3_sec_stream* 
@@ -53,13 +55,23 @@ xd3_lzma_init (xd3_stream *stream, xd3_lzma_stream *sec, int is_encode)
 
   if (is_encode)
     {
-      int level = (stream->flags & XD3_COMPLEVEL_MASK) >> XD3_COMPLEVEL_SHIFT;
+      int preset = (stream->flags & XD3_COMPLEVEL_MASK) >> XD3_COMPLEVEL_SHIFT;
 
-      ret = lzma_easy_encoder (&sec->lzma, level, LZMA_CHECK_CRC32);
+      if (lzma_lzma_preset(&sec->options, preset)) 
+	{
+	  stream->msg = "invalid lzma preset";
+	  return XD3_INVALID;
+	}
+
+      sec->filters[0].id = LZMA_FILTER_LZMA2;
+      sec->filters[0].options = &sec->options;
+      sec->filters[1].id = LZMA_VLI_UNKNOWN;
+
+      ret = lzma_stream_encoder (&sec->lzma, &sec->filters[0], LZMA_CHECK_NONE);
     }
   else 
     {
-      ret = lzma_stream_decoder (&sec->lzma, UINT64_MAX, 0);
+      ret = lzma_stream_decoder (&sec->lzma, UINT64_MAX, LZMA_TELL_NO_CHECK);
     }
   
   if (ret != LZMA_OK)
@@ -87,21 +99,20 @@ int xd3_decode_lzma (xd3_stream *stream, xd3_lzma_stream *sec,
   sec->lzma.avail_out = avail_out;
   sec->lzma.next_out = output;
   
-  while (sec->lzma.avail_in != 0 || sec->lzma.avail_out != 0)
+  while (1) 
     {
-      int lret = lzma_code (&sec->lzma, LZMA_FINISH);
-
-      if (sec->lzma.avail_out == 0 || lret == LZMA_STREAM_END) 
-	{
-	  (*output_pos) = sec->lzma.next_out;
-	  (*input_pos) = sec->lzma.next_in;
-	}
+      int lret = lzma_code (&sec->lzma, LZMA_RUN);
 
       switch (lret)
 	{
-	case LZMA_STREAM_END:
-	  return 0;
+	case LZMA_NO_CHECK: 
 	case LZMA_OK:
+	  if (sec->lzma.avail_out == 0) 
+	    {
+	      (*output_pos) = sec->lzma.next_out;
+	      (*input_pos) = sec->lzma.next_in;
+	      return 0;
+	    }
 	  break;
 
 	default:
@@ -109,8 +120,6 @@ int xd3_decode_lzma (xd3_stream *stream, xd3_lzma_stream *sec,
 	  return XD3_INTERNAL;
 	}
     }
-  
-  return 0;
 }
 
 #if XD3_ENCODER
@@ -124,6 +133,7 @@ int xd3_encode_lzma (xd3_stream *stream,
 {
   lzma_action action = LZMA_RUN;
 
+  cfg->inefficient = 1;  /* Can't skip windows */
   sec->lzma.next_in = NULL;
   sec->lzma.avail_in = 0;
   sec->lzma.next_out = (output->base + output->next);
@@ -146,9 +156,10 @@ int xd3_encode_lzma (xd3_stream *stream,
 
       lret = lzma_code (&sec->lzma, action);
 
-      if (sec->lzma.avail_out == 0 || lret == LZMA_STREAM_END)
+      size_t nwrite = (output->avail - output->next) - sec->lzma.avail_out;
+
+      if (nwrite != 0) 
 	{
-	  size_t nwrite = (output->avail - output->next) - sec->lzma.avail_out;
 	  output->next += nwrite;
 
 	  if (output->next == output->avail)

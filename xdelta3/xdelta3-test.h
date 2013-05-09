@@ -118,7 +118,7 @@ mt_exp_rand (uint32_t mean, uint32_t max_value)
 
 #define MSG_IS(x) (stream->msg != NULL && strcmp ((x), stream->msg) == 0)
 
-static const usize_t TWO_MEGS_AND_DELTA = (2 << 20) + (1 << 10);
+static const usize_t TWO_MEGS_AND_DELTA = (3 << 20);
 static const usize_t ADDR_CACHE_ROUNDS = 10000;
 
 static const usize_t TEST_FILE_MEAN   = 16384;
@@ -1590,9 +1590,12 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
   xd3_stream estream, dstream;
   int ret;
   usize_t i, delsize, decsize;
+  xd3_config cfg;
+  xd3_init_config (& cfg, in_stream->flags);
+  cfg.flags |= XD3_COMPLEVEL_6;
 
-  if ((ret = xd3_config_stream (& estream, NULL)) ||
-      (ret = xd3_config_stream (& dstream, NULL)))
+  if ((ret = xd3_config_stream (& estream, & cfg)) ||
+      (ret = xd3_config_stream (& dstream, & cfg)))
     {
       goto fail;
     }
@@ -1605,7 +1608,7 @@ test_streaming (xd3_stream *in_stream, uint8_t *encbuf, uint8_t *decbuf, uint8_t
 
       if ((ret = xd3_process_stream (1, & estream, xd3_encode_input, 0,
 				     encbuf, 1 << 20,
-				     delbuf, & delsize, 1 << 10)))
+				     delbuf, & delsize, 1 << 20)))
 	{
 	  in_stream->msg = estream.msg;
 	  goto fail;
@@ -1645,11 +1648,21 @@ static int
 test_compressed_stream_overflow (xd3_stream *stream, int ignore)
 {
   int ret;
+  int i;
   uint8_t *buf;
 
   if ((buf = (uint8_t*) malloc (TWO_MEGS_AND_DELTA)) == NULL) { return ENOMEM; }
 
   memset (buf, 0, TWO_MEGS_AND_DELTA);
+  for (i = 0; i < (2 << 20); i += 256) 
+    {
+      int j;
+      int off = mt_random(& static_mtrand) % 10;
+      for (j = 0; j < 256; j++) 
+	{
+	  buf[i + j] = j + off;
+	}
+    }
 
   /* Test overflow of a 32-bit file offset. */
   if (SIZEOF_XOFF_T == 4)
@@ -1670,8 +1683,14 @@ test_compressed_stream_overflow (xd3_stream *stream, int ignore)
     }
 
   /* Test transfer of exactly 32bits worth of data. */
-  if ((ret = test_streaming (stream, buf, buf + (1 << 20), buf + (2 << 20), 1 << 12))) { goto fail; }
-
+  if ((ret = test_streaming (stream, 
+			     buf, 
+			     buf + (1 << 20), 
+			     buf + (2 << 20), 
+			     1 << 12))) 
+    {
+      goto fail;
+    }
  fail:
   free (buf);
   return ret;
@@ -2816,7 +2835,7 @@ xd3_selftest (void)
   DO_TEST (decompress_single_bit_error, 0, 3);
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);
 
-  IF_LZMA (DO_TEST (decompress_single_bit_error, XD3_SEC_LZMA, 3));
+  IF_LZMA (DO_TEST (decompress_single_bit_error, XD3_SEC_LZMA, 54));
   IF_FGK (DO_TEST (decompress_single_bit_error, XD3_SEC_FGK, 3));
   IF_DJW (DO_TEST (decompress_single_bit_error, XD3_SEC_DJW, 8));
 
@@ -2844,6 +2863,7 @@ xd3_selftest (void)
   IF_FGK (DO_TEST (secondary_fgk, 0, 1));
 
   DO_TEST (compressed_stream_overflow, 0, 0);
+  IF_LZMA (DO_TEST (compressed_stream_overflow, XD3_SEC_LZMA, 0));
 
 failure:
   test_cleanup ();
