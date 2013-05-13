@@ -39,7 +39,7 @@ struct mtrand {
   uint32_t mt_buffer_[MT_LEN];
 };
 
-int compare_files (const char* tgt, const char *rec);
+int test_compare_files (const char* tgt, const char *rec);
 void mt_init(mtrand *mt, uint32_t seed);
 uint32_t mt_random (mtrand *mt);
 int test_setup (void);
@@ -369,7 +369,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
 }
 
 int
-compare_files (const char* tgt, const char *rec)
+test_compare_files (const char* tgt, const char *rec)
 {
   FILE *orig, *recons;
   static uint8_t obuf[TESTBUFSIZE], rbuf[TESTBUFSIZE];
@@ -1771,7 +1771,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	}
 
       /* Compare the target file. */
-      if ((ret = compare_files (TEST_TARGET_FILE, TEST_RECON_FILE)))
+      if ((ret = test_compare_files (TEST_TARGET_FILE, TEST_RECON_FILE)))
 	{
 	  return ret;
 	}
@@ -1802,12 +1802,12 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
 	  return XD3_INTERNAL;
 	}
 
-      /* Also check that compare_files works.  The delta and original should
+      /* Also check that test_compare_files works.  The delta and original should
        * not be identical. */
-      if ((ret = compare_files (TEST_DELTA_FILE,
+      if ((ret = test_compare_files (TEST_DELTA_FILE,
 				TEST_TARGET_FILE)) == 0)
 	{
-	  stream->msg = "broken compare_files";
+	  stream->msg = "broken test_compare_files";
 	  return XD3_INTERNAL;
 	}
 
@@ -2004,7 +2004,7 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     }
 
   /* Now compare. */
-  if ((ret = compare_files (TEST_TARGET_FILE, TEST_RECON_FILE)))
+  if ((ret = test_compare_files (TEST_TARGET_FILE, TEST_RECON_FILE)))
     {
       return ret;
     }
@@ -2089,7 +2089,7 @@ test_compressed_pipe (xd3_stream *stream, main_extcomp *ext, char* buf,
       return XD3_INTERNAL;
     }
 
-  if ((ret = compare_files (TEST_TARGET_FILE, TEST_RECON_FILE)))
+  if ((ret = test_compare_files (TEST_TARGET_FILE, TEST_RECON_FILE)))
     {
       return XD3_INTERNAL;
     }
@@ -2219,7 +2219,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
   snprintf_func (buf, TESTBUFSIZE, "%s -v -dq -R -s%s %s %s", program_name,
 	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (TEST_COPY_FILE,
+  if ((ret = test_compare_files (TEST_COPY_FILE,
 			    TEST_RECON_FILE))) { return ret; }
 
   /* Decode the delta file with recompression, should get a compressed file
@@ -2230,7 +2230,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
   snprintf_func (buf, TESTBUFSIZE, "%s %s < %s > %s", ext->decomp_cmdname, ext->decomp_options,
 	   TEST_RECON_FILE, TEST_RECON2_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (TEST_COPY_FILE,
+  if ((ret = test_compare_files (TEST_COPY_FILE,
 			    TEST_RECON2_FILE))) { return ret; }
 
   /* Encode with decompression disabled */
@@ -2243,7 +2243,7 @@ test_source_decompression (xd3_stream *stream, int ignore)
   snprintf_func (buf, TESTBUFSIZE, "%s -d -D -vfq -s%s %s %s", program_name,
 	   TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd (stream, buf))) { return ret; }
-  if ((ret = compare_files (TEST_TARGET_FILE,
+  if ((ret = test_compare_files (TEST_TARGET_FILE,
 			    TEST_RECON_FILE))) { return ret; }
 
   test_cleanup();

@@ -9,7 +9,12 @@ public:
   typedef typename Constants::Sizes Sizes;
 
   struct Options {
+    Options() : encode_srcwin_maxsz(1<<20), 
+		block_size(Constants::BLOCK_SIZE),
+		size_known(false) { }
     size_t encode_srcwin_maxsz;
+    size_t block_size;
+    bool size_known;
   };
 
 #include "segment.h"
@@ -18,218 +23,265 @@ public:
 #include "cmp.h"
 #include "delta.h"
 
-void InMemoryEncodeDecode(const FileSpec &source_file,
-			  const FileSpec &target_file,
-			  Block *coded_data,
-			  const Options &options = Options()) {
-  xd3_stream encode_stream;
-  xd3_config encode_config;
-  xd3_source encode_source;
+  void InMemoryEncodeDecode(const FileSpec &source_file,
+			    const FileSpec &target_file,
+			    Block *coded_data,
+			    const Options &options = Options()) {
+    xd3_stream encode_stream;
+    xd3_config encode_config;
+    xd3_source encode_source;
 
-  xd3_stream decode_stream;
-  xd3_config decode_config;
-  xd3_source decode_source;
-  xoff_t verified_bytes = 0;
-  xoff_t encoded_bytes = 0;
+    xd3_stream decode_stream;
+    xd3_config decode_config;
+    xd3_source decode_source;
+    xoff_t verified_bytes = 0;
+    xoff_t encoded_bytes = 0;
 
-  if (coded_data) {
-    coded_data->Reset();
-  }
-
-  memset(&encode_stream, 0, sizeof (encode_stream));
-  memset(&encode_source, 0, sizeof (encode_source));
-
-  memset(&decode_stream, 0, sizeof (decode_stream));
-  memset(&decode_source, 0, sizeof (decode_source));
-
-  xd3_init_config(&encode_config, XD3_ADLER32);
-  xd3_init_config(&decode_config, XD3_ADLER32);
-
-  encode_config.winsize = Constants::WINDOW_SIZE;
-
-  // TODO! the smatcher setup isn't working,
-//   if (options.large_cksum_step) {
-//     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
-//     encode_config.smatcher_soft.large_step = options.large_cksum_step;
-//   }
-//   if (options.large_cksum_size) {
-//     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
-//     encode_config.smatcher_soft.large_look = options.large_cksum_size;
-//   }
-
-  CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
-  CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
-
-  encode_source.blksize = Constants::BLOCK_SIZE;
-  decode_source.blksize = Constants::BLOCK_SIZE;
-
-  encode_source.max_winsize = options.encode_srcwin_maxsz;
-
-  xd3_set_source (&encode_stream, &encode_source);
-  xd3_set_source (&decode_stream, &decode_source);
-
-  BlockIterator source_iterator(source_file, Constants::BLOCK_SIZE);
-  BlockIterator target_iterator(target_file, Constants::READ_SIZE);
-  Block encode_source_block, decode_source_block;
-  Block decoded_block, target_block;
-  bool encoding = true;
-  bool done = false;
-  bool done_after_input = false;
-
-  IF_DEBUG1 (XPR(NTR "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
-		source_file.Size(), Constants::BLOCK_SIZE,
-		target_file.Size(), Constants::READ_SIZE,
-		Constants::WINDOW_SIZE));
-
-  while (!done) {
-    target_iterator.Get(&target_block);
-
-    xoff_t blks = target_iterator.Blocks();
-
-    IF_DEBUG2(XPR(NTR "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
-		 encoding ? "encoding" : "decoding",
-		 target_iterator.Offset(),
-		 target_iterator.Offset() + target_block.Size(),
-		 target_iterator.Blkno(), blks, verified_bytes));
-
-    if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
-      xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
+    if (coded_data) {
+      coded_data->Reset();
     }
 
-    xd3_avail_input(&encode_stream, target_block.Data(), target_block.Size());
-    encoded_bytes += target_block.Size();
+    memset(&encode_stream, 0, sizeof (encode_stream));
+    memset(&encode_source, 0, sizeof (encode_source));
 
-  process:
-    int ret;
-    const char *msg;
-    if (encoding) {
-      ret = xd3_encode_input(&encode_stream);
-      msg = encode_stream.msg;
-    } else {
-      ret = xd3_decode_input(&decode_stream);
-      msg = decode_stream.msg;
-    }
-    (void) msg;
+    memset(&decode_stream, 0, sizeof (decode_stream));
+    memset(&decode_source, 0, sizeof (decode_source));
 
-    switch (ret) {
-    case XD3_OUTPUT:
+    xd3_init_config(&encode_config, XD3_ADLER32);
+    xd3_init_config(&decode_config, XD3_ADLER32);
+
+    encode_config.winsize = Constants::WINDOW_SIZE;
+
+    // TODO! the smatcher setup isn't working,
+  //   if (options.large_cksum_step) {
+  //     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+  //     encode_config.smatcher_soft.large_step = options.large_cksum_step;
+  //   }
+  //   if (options.large_cksum_size) {
+  //     encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+  //     encode_config.smatcher_soft.large_look = options.large_cksum_size;
+  //   }
+
+    CHECK_EQ(0, xd3_config_stream (&encode_stream, &encode_config));
+    CHECK_EQ(0, xd3_config_stream (&decode_stream, &decode_config));
+
+    encode_source.blksize = options.block_size;
+    decode_source.blksize = options.block_size;
+
+    encode_source.max_winsize = options.encode_srcwin_maxsz;
+    decode_source.max_winsize = options.encode_srcwin_maxsz;
+
+    if (!options.size_known) 
+      {
+	xd3_set_source (&encode_stream, &encode_source);
+	xd3_set_source (&decode_stream, &decode_source);
+      }
+    else 
+      {
+	xd3_set_source_and_size (&encode_stream, &encode_source, 
+				 source_file.Size());
+	xd3_set_source_and_size (&decode_stream, &decode_source,
+				 source_file.Size());
+      }
+
+    BlockIterator source_iterator(source_file, options.block_size);
+    BlockIterator target_iterator(target_file, Constants::READ_SIZE);
+    Block encode_source_block, decode_source_block;
+    Block decoded_block, target_block;
+    bool encoding = true;
+    bool done = false;
+    bool done_after_input = false;
+
+    IF_DEBUG1 (XPR(NTR "source %"Q"u[%"Q"u] target %"Q"u[%lu] winsize %lu\n",
+		  source_file.Size(), options.block_size,
+		  target_file.Size(), Constants::READ_SIZE,
+		  Constants::WINDOW_SIZE));
+
+    while (!done) {
+      target_iterator.Get(&target_block);
+
+      xoff_t blks = target_iterator.Blocks();
+
+      IF_DEBUG2(XPR(NTR "target in %s: %llu..%llu %"Q"u(%"Q"u) verified %"Q"u\n",
+		   encoding ? "encoding" : "decoding",
+		   target_iterator.Offset(),
+		   target_iterator.Offset() + target_block.Size(),
+		   target_iterator.Blkno(), blks, verified_bytes));
+
+      if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
+	xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
+      }
+
+      xd3_avail_input(&encode_stream, target_block.Data(), target_block.Size());
+      encoded_bytes += target_block.Size();
+
+    process:
+      int ret;
+      const char *msg;
       if (encoding) {
-	if (coded_data != NULL) {
-	  // Optional encoded-output to the caller
-	  coded_data->Append(encode_stream.next_out,
-			     encode_stream.avail_out);
+	ret = xd3_encode_input(&encode_stream);
+	msg = encode_stream.msg;
+      } else {
+	ret = xd3_decode_input(&decode_stream);
+	msg = decode_stream.msg;
+      }
+      (void) msg;
+
+      switch (ret) {
+      case XD3_OUTPUT:
+	if (encoding) {
+	  if (coded_data != NULL) {
+	    // Optional encoded-output to the caller
+	    coded_data->Append(encode_stream.next_out,
+			       encode_stream.avail_out);
+	  }
+	  // Feed this data to the decoder.
+	  xd3_avail_input(&decode_stream,
+			  encode_stream.next_out,
+			  encode_stream.avail_out);
+	  xd3_consume_output(&encode_stream);
+	  encoding = false;
+	} else {
+	  decoded_block.Append(decode_stream.next_out,
+			       decode_stream.avail_out);
+	  xd3_consume_output(&decode_stream);
 	}
-	// Feed this data to the decoder.
-	xd3_avail_input(&decode_stream,
-			encode_stream.next_out,
-			encode_stream.avail_out);
-	xd3_consume_output(&encode_stream);
-	encoding = false;
-      } else {
-	decoded_block.Append(decode_stream.next_out,
-			     decode_stream.avail_out);
-	xd3_consume_output(&decode_stream);
-      }
-      goto process;
-
-    case XD3_GETSRCBLK: {
-      xd3_source *src = (encoding ? &encode_source : &decode_source);
-      Block *block = (encoding ? &encode_source_block : &decode_source_block);
-      if (encoding) {
- 	IF_DEBUG1(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
-		     "encodepos %"Q"u\n",
-		     encode_source.getblkno,
-		     encode_stream.match_last_srcpos,
-		     encode_stream.input_position + encode_stream.total_in));
-      }
-
-      source_iterator.SetBlock(src->getblkno);
-      source_iterator.Get(block);
-      src->curblkno = src->getblkno;
-      src->onblk = block->Size();
-      src->curblk = block->Data();
-
-      goto process;
-    }
-
-    case XD3_INPUT:
-      if (!encoding) {
-	encoding = true;
 	goto process;
-      } else {
-	if (done_after_input) {
-	  done = true;
+
+      case XD3_GETSRCBLK: {
+	xd3_source *src = (encoding ? &encode_source : &decode_source);
+	Block *block = (encoding ? &encode_source_block : &decode_source_block);
+	if (encoding) {
+	  IF_DEBUG1(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
+		       "encodepos %"Q"u\n",
+		       encode_source.getblkno,
+		       encode_stream.match_last_srcpos,
+		       encode_stream.input_position + encode_stream.total_in));
+	}
+
+	source_iterator.SetBlock(src->getblkno);
+	source_iterator.Get(block);
+	src->curblkno = src->getblkno;
+	src->onblk = block->Size();
+	src->curblk = block->Data();
+
+	goto process;
+      }
+
+      case XD3_INPUT:
+	if (!encoding) {
+	  encoding = true;
+	  goto process;
+	} else {
+	  if (done_after_input) {
+	    done = true;
+	    continue;
+	  }
+
+	  if (target_block.Size() < target_iterator.BlockSize()) {
+	    encoding = false;
+	  } else {
+	    target_iterator.Next();
+	  }
 	  continue;
 	}
 
-	if (target_block.Size() < target_iterator.BlockSize()) {
+      case XD3_WINFINISH:
+	if (encoding) {
+	  if (encode_stream.flags & XD3_FLUSH) {
+	    done_after_input = true;
+	  }
 	  encoding = false;
 	} else {
-	  target_iterator.Next();
-	}
-	continue;
-      }
+	 CHECK_EQ(0, CmpDifferentBlockBytesAtOffset(decoded_block,
+						    target_file,
+						    verified_bytes));
+	 verified_bytes += decoded_block.Size();
+	 decoded_block.Reset();
+	 encoding = true;
+       }
+       goto process;
 
-    case XD3_WINFINISH:
-      if (encoding) {
-	if (encode_stream.flags & XD3_FLUSH) {
-	  done_after_input = true;
-	}
-	encoding = false;
-      } else {
-	CHECK_EQ(0, CmpDifferentBlockBytesAtOffset(decoded_block,
-						   target_file,
-						   verified_bytes));
-	verified_bytes += decoded_block.Size();
-	decoded_block.Reset();
-	encoding = true;
-      }
-      goto process;
+     case XD3_WINSTART:
+     case XD3_GOTHEADER:
+       goto process;
 
-    case XD3_WINSTART:
-    case XD3_GOTHEADER:
-      goto process;
+     default:
+       XPR(NTR "%s = %s %s\n", encoding ? "E " : " D",
+	   xd3_strerror(ret),
+	   msg == NULL ? "" : msg);
 
-    default:
-      XPR(NTR "%s = %s %s\n", encoding ? "E " : " D",
-	  xd3_strerror(ret),
-	  msg == NULL ? "" : msg);
+       CHECK_EQ(0, ret);
+       CHECK_EQ(-1, ret);
+     }
+   }
 
-      CHECK_EQ(0, ret);
-      CHECK_EQ(-1, ret);
-    }
+   CHECK_EQ(target_file.Size(), encoded_bytes);
+   CHECK_EQ(target_file.Size(), verified_bytes);
+   CHECK_EQ(0, xd3_close_stream(&decode_stream));
+   CHECK_EQ(0, xd3_close_stream(&encode_stream));
+   xd3_free_stream(&encode_stream);
+   xd3_free_stream(&decode_stream);
+ }
+
+  void MainEncodeDecode(const TmpFile &source_file,
+			const TmpFile &target_file,
+			ExtFile *coded_data,
+			const Options &options) {
+    vector<const char*> ecmd;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "-B%"Q"u", options.encode_srcwin_maxsz);
+    ecmd.push_back("xdelta3");
+    ecmd.push_back(buf);
+    ecmd.push_back("-s");
+    ecmd.push_back(source_file.Name());
+    ecmd.push_back(target_file.Name());
+    ecmd.push_back(coded_data->Name());
+    ecmd.push_back(NULL);
+
+    CHECK_EQ(0, xd3_main_cmdline(ecmd.size() - 1,
+				 const_cast<char**>(&ecmd[0])));
+
+    vector<const char*> dcmd;
+    ExtFile recon_file;
+    dcmd.push_back("xdelta3");
+    ecmd.push_back(buf);  
+    dcmd.push_back("-d");
+    dcmd.push_back("-s");
+    dcmd.push_back(source_file.Name());
+    dcmd.push_back(coded_data->Name());
+    dcmd.push_back(recon_file.Name());
+    dcmd.push_back(NULL);
+
+    CHECK_EQ(0, xd3_main_cmdline(dcmd.size() - 1,
+				 const_cast<char**>(&dcmd[0])));
+
+    CHECK_EQ(0, test_compare_files(recon_file.Name(), 
+				   target_file.Name()));
   }
 
-  CHECK_EQ(target_file.Size(), encoded_bytes);
-  CHECK_EQ(target_file.Size(), verified_bytes);
-  CHECK_EQ(0, xd3_close_stream(&decode_stream));
-  CHECK_EQ(0, xd3_close_stream(&encode_stream));
-  xd3_free_stream(&encode_stream);
-  xd3_free_stream(&decode_stream);
-}
+ //////////////////////////////////////////////////////////////////////
 
-//////////////////////////////////////////////////////////////////////
+ void TestRandomNumbers() {
+   MTRandom rand;
+   int rounds = 1<<20;
+   uint64_t usum = 0;
+   uint64_t esum = 0;
 
-void TestRandomNumbers() {
-  MTRandom rand;
-  int rounds = 1<<20;
-  uint64_t usum = 0;
-  uint64_t esum = 0;
+   for (int i = 0; i < rounds; i++) {
+     usum += rand.Rand32();
+     esum += rand.ExpRand32(1024);
+   }
 
-  for (int i = 0; i < rounds; i++) {
-    usum += rand.Rand32();
-    esum += rand.ExpRand32(1024);
-  }
+   double allowed_error = 0.01;
 
-  double allowed_error = 0.01;
+   uint32_t umean = usum / rounds;
+   uint32_t emean = esum / rounds;
 
-  uint32_t umean = usum / rounds;
-  uint32_t emean = esum / rounds;
+   uint32_t uexpect = UINT32_MAX / 2;
+   uint32_t eexpect = 1024;
 
-  uint32_t uexpect = UINT32_MAX / 2;
-  uint32_t eexpect = 1024;
-
-  if (umean < uexpect * (1.0 - allowed_error) ||
+   if (umean < uexpect * (1.0 - allowed_error) ||
       umean > uexpect * (1.0 + allowed_error)) {
     XPR(NT "uniform mean error: %u != %u\n", umean, uexpect);
     abort();
@@ -516,7 +568,7 @@ void TestOverwriteMutator() {
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE);
 
   ChangeList cl1;
-  cl1.push_back(Change(Change::OVERWRITE, 10, 0, 20));
+  cl1.push_back(Change(Change::COPYOVER, 10, 0, 20));
   spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
   CHECK_EQ(spec0.Size(), spec1.Size());
 
@@ -530,7 +582,7 @@ void TestOverwriteMutator() {
 	       Constants::BLOCK_SIZE - 30) == 0);
 
   cl1.clear();
-  cl1.push_back(Change(Change::OVERWRITE, 10, 20, (xoff_t)0));
+  cl1.push_back(Change(Change::COPYOVER, 10, 20, (xoff_t)0));
   spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
   CHECK_EQ(spec0.Size(), spec1.Size());
 
@@ -553,13 +605,13 @@ void TestNonBlockingProgress() {
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 3);
 
   // This is a lazy target match
-  Change ct(Change::OVERWRITE, 22,
+  Change ct(Change::COPYOVER, 22,
 	    Constants::BLOCK_SIZE + 50,
 	    Constants::BLOCK_SIZE + 20);
 
   // This is a source match just after the block boundary, shorter
   // than the lazy target match.
-  Change cs1(Change::OVERWRITE, 16,
+  Change cs1(Change::COPYOVER, 16,
 	     Constants::BLOCK_SIZE + 51,
 	     Constants::BLOCK_SIZE - 1);
 
@@ -617,64 +669,108 @@ void TestBlockInMemory() {
   CHECK_EQ(spec1.Blocks(Constants::WINDOW_SIZE), delta.Windows());
 }
 
-void TestFifoCopyDiscipline() {
+void TestHalfBlockCopy() {
   MTRandom rand;
   FileSpec spec0(&rand);
   FileSpec spec1(&rand);
 
   spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 4);
 
-  // Create a half-block copy, 2.5 blocks apart. With 64-byte blocks,
-  // the file in spec0 copies @ 384 from spec1 @ 64.
+  // Create a half-block copy, 2.5 blocks apart, from the second half
+  // of the source version to the first half of the target version.
+  //       0             1             2             3
+  // spec0 [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb][ccccc][bbbbb]
+  // spec1 [aaaaa][ccccc][aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
   ChangeList cl1;
   cl1.push_back(Change(Change::MODIFY,
-		       Constants::BLOCK_SIZE / 2,
+		       Constants::BLOCK_SIZE / 2,  // size
 		       0));
-  cl1.push_back(Change(Change::OVERWRITE,
-		       Constants::BLOCK_SIZE / 2,
-		       Constants::BLOCK_SIZE * 3,
+  cl1.push_back(Change(Change::COPYOVER,
+		       Constants::BLOCK_SIZE / 2,  // size
+		       Constants::BLOCK_SIZE * 3,  // offset
 		       Constants::BLOCK_SIZE / 2));
   cl1.push_back(Change(Change::MODIFY,
 		       Constants::BLOCK_SIZE * 3,
 		       Constants::BLOCK_SIZE));
   spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
 
-  Options options1;
-  options1.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 4;
-  Block block1;
-  InMemoryEncodeDecode(spec1, spec0, &block1, options1);
-  Delta delta1(block1);
-  CHECK_EQ(4 * Constants::BLOCK_SIZE -
-	   Constants::BLOCK_SIZE / 2, delta1.AddedBytes());
+  const int onecopy_adds = 
+    4 * Constants::BLOCK_SIZE - Constants::BLOCK_SIZE / 2;
+  const int nocopy_adds = 4 * Constants::BLOCK_SIZE;
 
-  Options options2;
-  options2.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 3;
-  Block block2;
-  InMemoryEncodeDecode(spec1, spec0, &block2, options2);
-  Delta delta2(block2);
-  CHECK_EQ(4 * Constants::BLOCK_SIZE, delta2.AddedBytes());
+  // Note the case b=4 is contrived: the caller should use a single block 
+  // containing the entire source, if possible.
+  for (int b = 1; b <= 4; b++)
+    {
+      Options options;
+      options.encode_srcwin_maxsz = Constants::BLOCK_SIZE * b;
+
+      Block block0;
+      Block block1;
+      InMemoryEncodeDecode(spec0, spec1, &block0, options);
+      InMemoryEncodeDecode(spec1, spec0, &block1, options);
+      Delta delta0(block0);
+      Delta delta1(block1);
+
+      // The first block never copies from the last source block, by
+      // design, because if the last source block is available when
+      // the first target block is ready, the caller is expected to
+      // use a single block.
+      CHECK_EQ(nocopy_adds, delta0.AddedBytes());
+      if (Constants::BLOCK_SIZE < 8192 || b > 2)
+      	{
+	  // For small-block inputs, the entire file is read into one
+	  // block (the min source window size is 16kB).
+	  // 
+	  // For large blocks, at least 3 blocks of source window are
+	  // needed.
+      	  CHECK_EQ(onecopy_adds, delta1.AddedBytes());
+      	}
+      else
+      	{
+	  // When there are fewer than 3 source blocks.
+      	  CHECK_EQ(nocopy_adds, delta1.AddedBytes());
+      	}
+      // XPR(NT "0=%zu 1=%zu\n", delta0.AddedBytes(), delta1.AddedBytes());
+    }
+
+  Options options;
+  options.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 4;
+  options.block_size = Constants::BLOCK_SIZE * 4;
+
+  // Test the whole-buffer case.
+  Block block0;
+  Block block1;
+  InMemoryEncodeDecode(spec0, spec1, &block0, options);
+  InMemoryEncodeDecode(spec1, spec0, &block1, options);
+  Delta delta0(block0);
+  Delta delta1(block1);
+  // This <= >= are only for blocksize = 512, which has irregular readsize.
+  CHECK_LE(onecopy_adds, delta0.AddedBytes());
+  CHECK_GE(onecopy_adds + 1, delta0.AddedBytes());
+
+  CHECK_EQ(onecopy_adds, delta1.AddedBytes());
+  // XPR(NT "0=%zu 1=%zu\n", delta0.AddedBytes(), delta1.AddedBytes());
 }
 
 void FourWayMergeTest(const FileSpec &spec0,
 		      const FileSpec &spec1,
 		      const FileSpec &spec2,
 		      const FileSpec &spec3) {
-  Block delta01, delta12, delta23;
-
-  InMemoryEncodeDecode(spec0, spec1, &delta01);
-  InMemoryEncodeDecode(spec1, spec2, &delta12);
-  InMemoryEncodeDecode(spec2, spec3, &delta23);
-
-  TmpFile f0, f1, f2, f3, d01, d12, d23;
+  TmpFile f0, f1, f2, f3;
+  ExtFile d01, d12, d23;
+  Options options;
+  options.encode_srcwin_maxsz = 
+    std::max(spec0.Size(), options.encode_srcwin_maxsz);
 
   spec0.WriteTmpFile(&f0);
   spec1.WriteTmpFile(&f1);
   spec2.WriteTmpFile(&f2);
-  spec2.WriteTmpFile(&f3);
+  spec3.WriteTmpFile(&f3);
 
-  delta01.WriteTmpFile(&d01);
-  delta12.WriteTmpFile(&d12);
-  delta23.WriteTmpFile(&d23);
+  MainEncodeDecode(f0, f1, &d01, options);
+  MainEncodeDecode(f1, f2, &d12, options);
+  MainEncodeDecode(f2, f3, &d23, options);
 
   // Merge 2
   ExtFile out;
@@ -687,7 +783,7 @@ void FourWayMergeTest(const FileSpec &spec0,
   mcmd.push_back(out.Name());
   mcmd.push_back(NULL);
 
-  //XPR(NTR "Running one merge: %s\n", CommandToString(mcmd).c_str());
+  // XPR(NTR "Running one merge: %s\n", CommandToString(mcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1,
 			       const_cast<char**>(&mcmd[0])));
 
@@ -701,14 +797,46 @@ void FourWayMergeTest(const FileSpec &spec0,
   tcmd.push_back(recon.Name());
   tcmd.push_back(NULL);
 
-  //XPR(NTR "Running one recon! %s\n", CommandToString(tcmd).c_str());
+  // XPR(NTR "Running one recon! %s\n", CommandToString(tcmd).c_str());
   CHECK_EQ(0, xd3_main_cmdline(tcmd.size() - 1,
 			       const_cast<char**>(&tcmd[0])));
-  //XPR(NTR "Should equal! %s\n", f2.Name());
+  // XPR(NTR "Should equal! %s\n", f2.Name());
 
   CHECK(recon.EqualsSpec(spec2));
 
-  /* TODO: we've only done 3-way merges, try 4-way. */
+  // Merge 3
+  ExtFile out3;
+  vector<const char*> mcmd3;
+  mcmd3.push_back("xdelta3");
+  mcmd3.push_back("merge");
+  mcmd3.push_back("-m");
+  mcmd3.push_back(d01.Name());
+  mcmd3.push_back("-m");
+  mcmd3.push_back(d12.Name());
+  mcmd3.push_back(d23.Name());
+  mcmd3.push_back(out3.Name());
+  mcmd3.push_back(NULL);
+
+  // XPR(NTR "Running one 3-merge: %s\n", CommandToString(mcmd3).c_str());
+  CHECK_EQ(0, xd3_main_cmdline(mcmd3.size() - 1,
+			       const_cast<char**>(&mcmd3[0])));
+
+  ExtFile recon3;
+  vector<const char*> tcmd3;
+  tcmd3.push_back("xdelta3");
+  tcmd3.push_back("-d");
+  tcmd3.push_back("-s");
+  tcmd3.push_back(f0.Name());
+  tcmd3.push_back(out3.Name());
+  tcmd3.push_back(recon3.Name());
+  tcmd3.push_back(NULL);
+
+  // XPR(NTR "Running one 3-recon %s\n", CommandToString(tcmd3).c_str());
+  CHECK_EQ(0, xd3_main_cmdline(tcmd3.size() - 1,
+			       const_cast<char**>(&tcmd3[0])));
+  // XPR(NTR "Should equal %s\n", f3.Name());
+
+  CHECK(recon3.EqualsSpec(spec3));
 }
 
 void TestMergeCommand1() {
@@ -735,6 +863,7 @@ void TestMergeCommand1() {
 
       // XPR(NTR "S0 = %lu\n", size0);
       // XPR(NTR "C1 = %lu\n", change1);
+      // XPR(NTR ".");
 
       size_t add1_pos = size0 ? rand.Rand32() % size0 : 0;
       size_t del2_pos = size0 ? rand.Rand32() % size0 : 0;
@@ -802,6 +931,7 @@ void TestMergeCommand2() {
 	  // XPR(NTR "S1 = %lu\n", size1);
 	  // XPR(NTR "S2 = %lu\n", size2);
 	  // XPR(NTR "S3 = %lu\n", size3);
+	  // XPR(NTR ".");
 
 	  spec0.GenerateFixedSize(size0);
 
@@ -845,12 +975,13 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  XPR(NT "Blocksize: %"Q"u\n", T::BLOCK_SIZE);
+  XPR(NT "Blocksize %"Q"u readsize %"Q"u windowsize %"Q"u\n", 
+      T::BLOCK_SIZE, T::READ_SIZE, T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);
   TEST(TestBlockInMemory);
   TEST(TestNonBlockingProgress);
-  TEST(TestFifoCopyDiscipline);
+  TEST(TestHalfBlockCopy);
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
 }
@@ -870,14 +1001,15 @@ int main(int argc, char **argv)
   mcmd.push_back("test");
   mcmd.push_back(NULL);
 
-  CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1,
-			       const_cast<char**>(&mcmd[0])));
-
   UnitTest<SmallBlock>();
   MainTest<SmallBlock>();
   MainTest<MixedBlock>();
   MainTest<PrimeBlock>();
   MainTest<OversizeBlock>();
   MainTest<LargeBlock>();
+
+  CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1,
+  			       const_cast<char**>(&mcmd[0])));
+
   return 0;
 }

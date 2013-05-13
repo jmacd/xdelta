@@ -15,10 +15,10 @@ public:
     DELETE = 3,     // Delete a specified range of data
     COPY = 4,       // Copy from one region, inserting elsewhere
     MOVE = 5,       // Copy then delete copied-from range
-    OVERWRITE = 6   // Copy then delete copied-to range
+    COPYOVER = 6   // Copy then delete copied-to range
 
     // ADD, DELETE, and COPY change the file size
-    // MODIFY, MOVE, OVERWRITE preserve the file size
+    // MODIFY, MOVE, COPYOVER preserve the file size
   };
 
   // Constructor for modify, add, delete.
@@ -28,7 +28,7 @@ public:
       addr1(addr1_0),
       addr2(0),
       insert(NULL) {
-    CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
+    CHECK(kind != MOVE && kind != COPY && kind != COPYOVER);
   }
 
   // Constructor for modify, add w/ provided data.
@@ -38,7 +38,7 @@ public:
       addr1(addr1_0),
       addr2(0),
       insert(insert0) {
-    CHECK(kind != MOVE && kind != COPY && kind != OVERWRITE);
+    CHECK(kind != MOVE && kind != COPY && kind != COPYOVER);
   }
 
   // Constructor for move, copy, overwrite
@@ -48,7 +48,7 @@ public:
       addr1(addr1_0),
       addr2(addr2_0),
       insert(NULL) {
-    CHECK(kind == MOVE || kind == COPY || kind == OVERWRITE);
+    CHECK(kind == MOVE || kind == COPY || kind == COPYOVER);
   }
 
   Kind kind;
@@ -106,7 +106,7 @@ public:
     case Change::MOVE:
       MoveChange(ch, table, source_table, rand);
       break;
-    case Change::OVERWRITE:
+    case Change::COPYOVER:
       OverwriteChange(ch, table, source_table, rand);
       break;
     }

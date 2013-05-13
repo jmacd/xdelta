@@ -1127,7 +1127,8 @@ xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_ri
 	       * it cannot be an add.  This check is more clear. */
 	      if (prev_mode >= 0 && inst->size <= desc->copyadd_add_max)
 		{
-		  const xd3_code_table_sizes *sizes = & desc->copyadd_max_sizes[prev_mode];
+		  const xd3_code_table_sizes *sizes = 
+		    & desc->copyadd_max_sizes[prev_mode];
 
 		  /* This check and the inst->size-<= above are == in
 		     the default table. */
@@ -5079,12 +5080,10 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
    * small inputs, especially when the content may have moved anywhere
    * in the file (e.g., tar files).
    *
-   * if (src->size > src->max_winsize), index at least one block (which
-   * the command-line sets to 1/32 of src->max_winsize) ahead of the
-   * logical position.  This is good for different reasons: when a
-   * long match spanning several source blocks is encountered, this
-   * avoids computing checksums for those blocks.  If the data can
-   * move anywhere, this is bad.
+   * if (src->size > src->max_winsize), index at least one block ahead
+   * of the logical position.  This is good for different reasons:
+   * when a long match spanning several source blocks is encountered,
+   * this avoids computing checksums for those blocks.
    */
   logical_input_cksum_pos += stream->src->blksize;
 
