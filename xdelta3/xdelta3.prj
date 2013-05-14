@@ -9,7 +9,7 @@
 (Checkin-Login jmacd)
 (Populate-Ignore ("\\.svn"))
 (Project-Keywords
- (Xdelta3Version "3.0.6")
+ (Xdelta3Version "3.0.7")
  )
 (Files
   (COPYING (xdelta3/b/29_COPYING 1.1 744))

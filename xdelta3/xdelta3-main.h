@@ -1,6 +1,6 @@
 /* xdelta3 - delta compression tools and library
  * Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
- * 2009, 2010, 2011, 2012 Joshua P. MacDonald
+ * 2009, 2010, 2011, 2012, 2013 Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -296,10 +296,7 @@ static main_extcomp extcomp_types[] =
   { "gzip",     "-c",   "gzip",       "-dc",   "G", "\037\213",     2, 0 },
   { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0 },
 
-  /* TODO: add commandline support for magic-less formats */
-  /*{ "lzma", "-c",   "lzma", "-dc",   "M", "]\000", 2, 0 },*/
-
-  /* Xz is lzma with a magic number http://tukaani.org/xz/ */
+  /* Xz is lzma with a magic number http://tukaani.org/xz/format.html */
   { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0 },
 };
 
@@ -360,8 +357,8 @@ xprintf (const char *fmt, ...)
 static int
 main_version (void)
 {
-  /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, Joshua MacDonald\\n\");" $ */
-  XPR(NTR "Xdelta version 3.0.6, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, Joshua MacDonald\n");
+  /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, Joshua MacDonald\\n\");" $ */
+  XPR(NTR "Xdelta version 3.0.7, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013 Joshua MacDonald\n");
   XPR(NTR "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   XPR(NTR "This is free software, and you are welcome to redistribute it\n");
   XPR(NTR "under certain conditions; see \"COPYING\" for details.\n");

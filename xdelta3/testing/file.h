@@ -342,12 +342,6 @@ public:
     return true;
   }
 
-  // Check whether a real file matches another
-  bool EqualsSpec(const ExtFile &other) const {
-    int ret = compare_files(Name(), other.Name());
-    return true;
-  }
-
 protected:
   string filename_;
 };
