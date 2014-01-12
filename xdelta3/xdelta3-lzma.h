@@ -142,7 +142,7 @@ int xd3_encode_lzma (xd3_stream *stream,
   while (1)
     {
       int lret;
-
+	  size_t nwrite;
       if (sec->lzma.avail_in == 0 && input != NULL)
 	{
 	  sec->lzma.avail_in = input->next;
@@ -156,7 +156,7 @@ int xd3_encode_lzma (xd3_stream *stream,
 
       lret = lzma_code (&sec->lzma, action);
 
-      size_t nwrite = (output->avail - output->next) - sec->lzma.avail_out;
+      nwrite = (output->avail - output->next) - sec->lzma.avail_out;
 
       if (nwrite != 0) 
 	{
