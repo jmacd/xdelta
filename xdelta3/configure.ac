@@ -1,8 +1,8 @@
-AC_INIT([Xdelta3], [3.0.7], [josh.macdonald@gmail.com], 
+AC_INIT([Xdelta3], [3.0.8], [josh.macdonald@gmail.com], 
 	[xdelta3], [http://xdelta.org/])
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
-#LT_INIT
+LT_INIT
 AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar])
 #AC_DISABLE_STATIC
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
