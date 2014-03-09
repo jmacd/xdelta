@@ -1551,7 +1551,7 @@ xd3_check_pow2 (xoff_t value, usize_t *logof)
   return XD3_INTERNAL;
 }
 
-static size_t
+size_t
 xd3_pow2_roundup (size_t x)
 {
   size_t i = 1;
@@ -2594,6 +2594,8 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 			blkno, xd3_strerror (ret)));
 	  return ret;
 	}
+      IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk "
+		    "%u blksize %u\n", blkno, source->onblk, source->blksize));
     }
 
   if (blkno >= source->frontier_blkno)
@@ -2629,8 +2631,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
     }
 
   XD3_ASSERT (source->curblk != NULL);
-  IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk %u blksize %u\n",
-		blkno, source->onblk, source->blksize));
 
   if (blkno == source->max_blkno)
     {
@@ -3697,8 +3697,8 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
-	  usize_t hash_values = (stream->src->max_winsize /
-				 stream->smatcher.large_step);
+	  usize_t hash_values = (2 * stream->src->max_winsize) /
+	                        stream->smatcher.large_step;
 
 	  xd3_size_hashtable (stream,
 			      hash_values,
@@ -4036,7 +4036,7 @@ xd3_encode_input (xd3_stream *stream)
  Client convenience functions
  ******************************************************************/
 
-static int
+int
 xd3_process_stream (int            is_encode,
 		    xd3_stream    *stream,
 		    int          (*func) (xd3_stream *),
@@ -4060,14 +4060,15 @@ xd3_process_stream (int            is_encode,
   for (;;)
     {
       int ret;
-      switch((ret = func (stream)))
+      switch ((ret = func (stream)))
 	{
 	case XD3_OUTPUT: { /* memcpy below */ break; }
 	case XD3_INPUT: {
 	  n = min(stream->winsize, input_size - ipos);
-	  if (n == 0) {
-	    goto done;
-	  }
+	  if (n == 0) 
+	    {
+	      goto done;
+	    }
 	  xd3_avail_input (stream, input + ipos, n);
 	  ipos += n;
 	  continue;
@@ -4077,7 +4078,11 @@ xd3_process_stream (int            is_encode,
 	case XD3_WINFINISH: { /* ignore */ continue; }
 	case XD3_GETSRCBLK:
 	  {
-	    stream->msg = "stream requires source input";
+	    /* When the getblk function is NULL, it is necessary to
+	     * provide the complete source as a single block using
+	     * xd3_set_source_and_size, otherwise this error.  The
+	     * library should never ask for another source block. */
+	    stream->msg = "library requested source block";
 	    return XD3_INTERNAL;
 	  }
 	case 0:
@@ -4109,7 +4114,6 @@ xd3_process_stream (int            is_encode,
 static int
 xd3_process_memory (int            is_encode,
 		    int          (*func) (xd3_stream *),
-		    int            close_stream,
 		    const uint8_t *input,
 		    usize_t        input_size,
 		    const uint8_t *source,
@@ -4137,8 +4141,6 @@ xd3_process_memory (int            is_encode,
   if (is_encode)
     {
       config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
-      config.iopt_size = min(input_size / 32, XD3_DEFAULT_IOPT_SIZE);
-      config.iopt_size = max(config.iopt_size, 128U);
       config.sprevsz = xd3_pow2_roundup (config.winsize);
     }
 
@@ -4205,7 +4207,7 @@ xd3_decode_memory (const uint8_t *input,
 		   usize_t       *output_size,
 		   usize_t        output_size_max,
 		   int            flags) {
-  return xd3_process_memory (0, & xd3_decode_input, 1,
+  return xd3_process_memory (0, & xd3_decode_input,
 			     input, input_size,
 			     source, source_size,
 			     output, output_size, output_size_max,
@@ -4236,7 +4238,7 @@ xd3_encode_memory (const uint8_t *input,
 		   usize_t        *output_size,
 		   usize_t        output_size_max,
 		   int            flags) {
-  return xd3_process_memory (1, & xd3_encode_input, 1,
+  return xd3_process_memory (1, & xd3_encode_input,
 			     input, input_size,
 			     source, source_size,
 			     output, output_size, output_size_max,
@@ -4396,8 +4398,18 @@ xd3_srcwin_setup (xd3_stream *stream)
   src->srclen  = max ((usize_t) length,
 		      stream->avail_in + (stream->avail_in >> 2));
 
-  /* OPT: If we know the source size, it might be possible to reduce
-   * srclen. */
+  if (src->eof_known)
+    {
+      /* Note: if the source size is known, we must reduce srclen or 
+       * code that expects to pass a single block w/ getblk == NULL
+       * will not function, as the code will return GETSRCBLK asking
+       * for the second block. */
+      src->srclen = min (src->srclen, xd3_source_eof(src) - src->srcbase);
+    }
+  
+  IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %llu len %llu\n",
+		src->srcbase, src->srclen));
+
   XD3_ASSERT (src->srclen);
  done:
   /* Set the taroff.  This convenience variable is used even when
@@ -4695,11 +4707,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
       if ((ret = xd3_getblk (stream, tryblk)))
 	{
-	  /* if search went too far back, continue forward. */
-	  if (ret == XD3_TOOFARBACK)
-	    {
-	      break;
-	    }
+	  XD3_ASSERT (ret != XD3_TOOFARBACK);
 
 	  /* could be a XD3_GETSRCBLK failure. */
 	  return ret;

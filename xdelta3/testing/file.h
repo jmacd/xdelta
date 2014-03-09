@@ -82,16 +82,21 @@ public:
   }
 
   void SetSize(size_t size) {
-    size_ = size;
-
+    uint8_t *t = NULL;
     if (data_size_ < size) {
       if (data_) {
-	delete [] data_;
+	t = data_;
       }
       data_ = new uint8_t[size];
       data_size_ = size;
     }
+    if (t && size < size_) {
+      memcpy(data_, t, size);
+    }
+    delete [] t;
+    size_ = size;
   }
+
 private:
   friend class BlockIterator;
 
@@ -268,6 +273,7 @@ public:
   }
 
   void SetBlock(xoff_t blkno) {
+    CHECK_LE(blkno, Blocks());
     blkno_ = blkno;
   }
 
@@ -373,4 +379,3 @@ public:
 private:
   mutable main_file file_;
 };
-

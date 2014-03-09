@@ -869,7 +869,7 @@ xd3_encode_huff (xd3_stream   *stream,
   usize_t     groups, sector_size;
   bit_state   bstate = BIT_STATE_ENCODE_INIT;
   xd3_output *in;
-  int         output_bits;
+  usize_t     output_bits;
   usize_t     input_bits;
   usize_t     input_bytes;
   usize_t     initial_offset = output->next;

@@ -47,6 +47,17 @@ uint32_t xd3_large_cksum_update (uint32_t cksum,
 				 const uint8_t *base,
 				 usize_t look);
 int xd3_encode_init_full (xd3_stream *stream);
+size_t xd3_pow2_roundup (size_t x);
+int xd3_process_stream (int            is_encode,
+			xd3_stream    *stream,
+			int          (*func) (xd3_stream *),
+			int            close_stream,
+			const uint8_t *input,
+			usize_t        input_size,
+			uint8_t       *output,
+			usize_t       *output_size,
+			usize_t        output_size_max);
+
 #if PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
 int xd3_main_cmdline (int argc, char **argv);
 #endif

@@ -77,54 +77,35 @@ const size_t BaseConstants::TEST_ROUNDS = 10;
 struct SmallBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
   static const size_t WINDOW_SIZE;
-  static const size_t READ_SIZE;
   typedef SmallSizes Sizes;
 };
 
-const size_t SmallBlock::READ_SIZE = 1<<7;
 const xoff_t SmallBlock::BLOCK_SIZE = 1<<7;
 const size_t SmallBlock::WINDOW_SIZE = 1<<7;
 
 struct LargeBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
   static const size_t WINDOW_SIZE;
-  static const size_t READ_SIZE;
   typedef LargeSizes Sizes;
 };
 
-const size_t LargeBlock::READ_SIZE = (1 << 13);
 const xoff_t LargeBlock::BLOCK_SIZE = (1 << 13);
 const size_t LargeBlock::WINDOW_SIZE = (1 << 13);
 
 struct MixedBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
   static const size_t WINDOW_SIZE;
-  static const size_t READ_SIZE;
   typedef SmallSizes Sizes;
 };
 
-const size_t MixedBlock::READ_SIZE = 1<<6;
 const xoff_t MixedBlock::BLOCK_SIZE = 1<<7;
 const size_t MixedBlock::WINDOW_SIZE = 1<<8;
 
 struct OversizeBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
   static const size_t WINDOW_SIZE;
-  static const size_t READ_SIZE;
   typedef SmallSizes Sizes;
 };
 
-const size_t OversizeBlock::READ_SIZE = (1<<6) + (1<<7);
 const xoff_t OversizeBlock::BLOCK_SIZE = 1<<8;
 const size_t OversizeBlock::WINDOW_SIZE = 1<<7;
-
-struct PrimeBlock : public BaseConstants {
-  static const xoff_t BLOCK_SIZE;
-  static const size_t WINDOW_SIZE;
-  static const size_t READ_SIZE;
-  typedef SmallSizes Sizes;
-};
-
-const size_t PrimeBlock::READ_SIZE = 71;
-const xoff_t PrimeBlock::BLOCK_SIZE = 512;  // Must be a power-of-2
-const size_t PrimeBlock::WINDOW_SIZE = 73;
