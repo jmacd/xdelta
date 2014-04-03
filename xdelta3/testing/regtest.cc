@@ -16,7 +16,7 @@ public:
 	iopt_size(XD3_DEFAULT_IOPT_SIZE),
 	smatch_cfg(XD3_SMATCH_DEFAULT) { }
 
-    size_t encode_srcwin_maxsz;
+    xoff_t encode_srcwin_maxsz;
     size_t block_size;
     bool size_known;
     usize_t iopt_size;
@@ -814,41 +814,51 @@ void TestCopyWindow() {
   const int clen = 16;
   const int size = 4096;
   const int nmov = size / clen;
-  MTRandom rand;
-  FileSpec spec0(&rand);
-  ChangeList cl;
+  const int iters = 16;
+  uint32_t added_01 = 0;
+  uint32_t added_10 = 0;
+  for (int i = 1; i <= iters; i++) {
+    MTRandom rand(MTRandom::TEST_SEED1 * i);
+    FileSpec spec0(&rand);
+    ChangeList cl;
 
-  spec0.GenerateFixedSize(size);
+    spec0.GenerateFixedSize(size);
 
-  for (int j = 0; j < nmov; j += 2)
-    {
-      cl.push_back(Change(Change::MOVE,
-			  clen, (j + 1) * clen, j * clen));
-    }
+    for (int j = 0; j < nmov; j += 2)
+      {
+	cl.push_back(Change(Change::MOVE,
+			    clen, (j + 1) * clen, j * clen));
+      }
 
-  FileSpec spec1(&rand);
-  spec0.ModifyTo(ChangeListMutator(cl), &spec1);
+    FileSpec spec1(&rand);
+    spec0.ModifyTo(ChangeListMutator(cl), &spec1);
 
-  Options options;
-  options.encode_srcwin_maxsz = size;
-  options.iopt_size = 128;
-  options.smatch_cfg = XD3_SMATCH_SLOW;
-  options.size_known = false;
+    Options options;
+    options.encode_srcwin_maxsz = size;
+    options.iopt_size = 128;
+    options.smatch_cfg = XD3_SMATCH_SLOW;
+    options.size_known = false;
 
-  Block block1;
-  InMemoryEncodeDecode(spec0, spec1, &block1, options);
-  Delta delta1(block1);
-  CHECK_EQ(0, delta1.AddedBytes());
+    Block block1;
+    InMemoryEncodeDecode(spec0, spec1, &block1, options);
+    Delta delta1(block1);
+    // Allow one missed window (e.g., hash collisions)
+    added_01 += delta1.AddedBytes();
 
-  Block block2;
-  InMemoryEncodeDecode(spec1, spec0, &block2, options);
-  Delta delta2(block2);
-  CHECK_EQ(0, delta2.AddedBytes());
+    Block block2;
+    InMemoryEncodeDecode(spec1, spec0, &block2, options);
+    Delta delta2(block2);
+    // Allow one missed window (e.g., hash collisions)
+    added_10 += delta2.AddedBytes();
 
-  Block block3;
-  Block block4;
-  EncodeDecodeAPI(spec0, spec1, &block3, options);
-  EncodeDecodeAPI(spec1, spec0, &block4, options);
+    Block block3;
+    Block block4;
+    EncodeDecodeAPI(spec0, spec1, &block3, options);
+    EncodeDecodeAPI(spec1, spec0, &block4, options);
+  }
+  // Average less than 0.5 misses (of length clen) per iteration.
+  CHECK_GE(clen * iters / 2, added_01);
+  CHECK_GE(clen * iters / 2, added_10);
 }
 
 void TestCopyFromEnd() {
@@ -857,46 +867,53 @@ void TestCopyFromEnd() {
   const int size = 4096;
   const int clen = 16;
   const int nmov = (size / 2) / clen;
-  MTRandom rand;
-  FileSpec spec0(&rand);
-  ChangeList cl;
+  const int iters = 16;
+  uint32_t added_01 = 0;
+  uint32_t added_10 = 0;
+  for (int i = 1; i <= iters; i++) {
+    MTRandom rand(MTRandom::TEST_SEED1 * i);
+    FileSpec spec0(&rand);
+    ChangeList cl;
 
-  spec0.GenerateFixedSize(size);
+    spec0.GenerateFixedSize(size);
 
-  cl.push_back(Change(Change::MODIFY, 2012, 2048));
+    cl.push_back(Change(Change::MODIFY, 2012, 2048));
 
-  for (int j = 0; j < nmov; j += 2)
-    {
-      cl.push_back(Change(Change::MOVE,
-			  clen, (j + 1) * clen, j * clen));
-    }
+    for (int j = 0; j < nmov; j += 2)
+      {
+	cl.push_back(Change(Change::MOVE,
+			    clen, (j + 1) * clen, j * clen));
+      }
 
-  cl.push_back(Change(Change::COPYOVER, 28, 4068, 3000));
-  cl.push_back(Change(Change::COPYOVER, 30, 4066, 3100));
-  cl.push_back(Change(Change::COPYOVER, 32, 4064, 3200));
+    cl.push_back(Change(Change::COPYOVER, 28, 4068, 3000));
+    cl.push_back(Change(Change::COPYOVER, 30, 4066, 3100));
+    cl.push_back(Change(Change::COPYOVER, 32, 4064, 3200));
 
-  FileSpec spec1(&rand);
-  spec0.ModifyTo(ChangeListMutator(cl), &spec1);
+    FileSpec spec1(&rand);
+    spec0.ModifyTo(ChangeListMutator(cl), &spec1);
 
-  Options options;
-  options.encode_srcwin_maxsz = size;
-  options.iopt_size = 128;
-  options.smatch_cfg = XD3_SMATCH_SLOW;
+    Options options;
+    options.encode_srcwin_maxsz = size;
+    options.iopt_size = 128;
+    options.smatch_cfg = XD3_SMATCH_SLOW;
 
-  Block block1;
-  InMemoryEncodeDecode(spec0, spec1, &block1, options);
-  Delta delta1(block1);
-  CHECK_GE(2000, delta1.AddedBytes());
+    Block block1;
+    InMemoryEncodeDecode(spec0, spec1, &block1, options);
+    Delta delta1(block1);
+    added_01 += delta1.AddedBytes();
 
-  Block block2;
-  InMemoryEncodeDecode(spec1, spec0, &block2, options);
-  Delta delta2(block2);
-  CHECK_LE(2000, delta2.AddedBytes());
+    Block block2;
+    InMemoryEncodeDecode(spec1, spec0, &block2, options);
+    Delta delta2(block2);
+    added_10 += delta2.AddedBytes();
 
-  Block block3;
-  Block block4;
-  EncodeDecodeAPI(spec0, spec1, &block3, options);
-  EncodeDecodeAPI(spec1, spec0, &block4, options);
+    Block block3;
+    Block block4;
+    EncodeDecodeAPI(spec0, spec1, &block3, options);
+    EncodeDecodeAPI(spec1, spec0, &block4, options);
+  }
+  CHECK_GE(2000 * iters, added_01);
+  CHECK_LE(2000 * iters, added_10);
 }
 
 void TestHalfBlockCopy() {

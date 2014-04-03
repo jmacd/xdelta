@@ -21,7 +21,7 @@ class MTRandom {
     Init(TEST_SEED1);
   }
 
-  MTRandom(uint32_t seed) {
+  explicit MTRandom(uint32_t seed) {
     Init(seed);
   }
 

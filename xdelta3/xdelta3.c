@@ -3697,7 +3697,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
-	  usize_t hash_values = (2 * stream->src->max_winsize) /
+	  usize_t hash_values = stream->src->max_winsize /
 	                        stream->smatcher.large_step;
 
 	  xd3_size_hashtable (stream,
