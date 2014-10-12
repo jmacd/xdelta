@@ -2810,14 +2810,15 @@ main_get_appheader (xd3_stream *stream, main_file *ifile,
 
   if (appheadsz > 0)
     {
+      const int kMaxArgs = 4;
       char *start = (char*)apphead;
       char *slash;
       int   place = 0;
-      char *parsed[4];
+      char *parsed[kMaxArgs];
 
       memset (parsed, 0, sizeof (parsed));
 
-      while ((slash = strchr (start, '/')) != NULL)
+      while ((slash = strchr (start, '/')) != NULL && place < (kMaxArgs-1))
 	{
 	  *slash = 0;
 	  parsed[place++] = start;
