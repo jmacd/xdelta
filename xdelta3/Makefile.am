@@ -44,7 +44,6 @@ C_WFLAGS = $(WFLAGS) -pedantic -std=c99
 CXX_WFLAGS = $(WFLAGS)
 
 common_CFLAGS = \
-	      -DGENERIC_ENCODE_TABLES=0 \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
@@ -62,7 +61,6 @@ xdelta3_LDADD = -lm
 
 xdelta3decode_CFLAGS = \
 	$(C_WFLAGS) \
-	-DGENERIC_ENCODE_TABLES=0 \
 	-DREGRESSION_TEST=0 \
 	-DSECONDARY_DJW=0 \
 	-DSECONDARY_FGK=0 \

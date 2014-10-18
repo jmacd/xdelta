@@ -294,16 +294,6 @@
 #endif
 #endif
 
-#ifndef GENERIC_ENCODE_TABLES    /* These three are the RFC-spec app-specific */
-#define GENERIC_ENCODE_TABLES 0  /* code features.  This is tested but not */
-#endif  			 /*  recommended unless there's a real use. */
-#ifndef GENERIC_ENCODE_TABLES_COMPUTE
-#define GENERIC_ENCODE_TABLES_COMPUTE 0
-#endif
-#ifndef GENERIC_ENCODE_TABLES_COMPUTE_PRINT
-#define GENERIC_ENCODE_TABLES_COMPUTE_PRINT 0
-#endif
-
 #if XD3_ENCODER
 #define IF_ENCODER(x) x
 #else
@@ -559,8 +549,6 @@ static void xd3_verify_small_state (xd3_stream    *stream,
 static int         xd3_decode_allocate (xd3_stream *stream, usize_t size,
 					uint8_t **copied1, usize_t *alloc1);
 
-static void        xd3_compute_code_table_string (const xd3_dinst *code_table,
-						  uint8_t *str);
 static void*       xd3_alloc (xd3_stream *stream, usize_t elts, usize_t size);
 static void        xd3_free  (xd3_stream *stream, void *ptr);
 
@@ -881,14 +869,10 @@ const uint16_t __single_hash[256] =
 
 /* The XD3_CHOOSE_INSTRUCTION calls xd3_choose_instruction with the
  * table description when GENERIC_ENCODE_TABLES are in use.  The
- * IF_GENCODETBL macro enables generic-code-table specific code. */
-#if GENERIC_ENCODE_TABLES
-#define XD3_CHOOSE_INSTRUCTION(stream,prev,inst) xd3_choose_instruction (stream->code_table_desc, prev, inst)
-#define IF_GENCODETBL(x) x
-#else
-#define XD3_CHOOSE_INSTRUCTION(stream,prev,inst) xd3_choose_instruction (prev, inst)
-#define IF_GENCODETBL(x)
-#endif
+ * IF_GENCODETBL macro enables generic-code-table specific code
+ * (removed 10/2014). */
+#define XD3_CHOOSE_INSTRUCTION(stream,prev,inst) \
+  xd3_choose_instruction (prev, inst)
 
 /* This structure maintains information needed by
  * xd3_choose_instruction to compute the code for a double instruction
@@ -949,50 +933,6 @@ static const xd3_code_table_desc __rfc3284_code_table_desc = {
   /* copyadd */
   { {4,247,1},{4,248,1},{4,249,1},{4,250,1},{4,251,1},{4,252,1},{4,253,1},{4,254,1},{4,255,1} },
 };
-
-#if GENERIC_ENCODE_TABLES
-/* An alternate code table for testing (5 near, 0 same):
- *
- *         TYPE      SIZE     MODE    TYPE     SIZE     MODE     INDEX
- *        ---------------------------------------------------------------
- *     1.  Run         0        0     Noop       0        0        0
- *     2.  Add    0, [1,23]     0     Noop       0        0      [1,24]
- *     3.  Copy   0, [4,20]     0     Noop       0        0     [25,42]
- *     4.  Copy   0, [4,20]     1     Noop       0        0     [43,60]
- *     5.  Copy   0, [4,20]     2     Noop       0        0     [61,78]
- *     6.  Copy   0, [4,20]     3     Noop       0        0     [79,96]
- *     7.  Copy   0, [4,20]     4     Noop       0        0     [97,114]
- *     8.  Copy   0, [4,20]     5     Noop       0        0    [115,132]
- *     9.  Copy   0, [4,20]     6     Noop       0        0    [133,150]
- *    10.  Add       [1,4]      0     Copy     [4,6]      0    [151,162]
- *    11.  Add       [1,4]      0     Copy     [4,6]      1    [163,174]
- *    12.  Add       [1,4]      0     Copy     [4,6]      2    [175,186]
- *    13.  Add       [1,4]      0     Copy     [4,6]      3    [187,198]
- *    14.  Add       [1,4]      0     Copy     [4,6]      4    [199,210]
- *    15.  Add       [1,4]      0     Copy     [4,6]      5    [211,222]
- *    16.  Add       [1,4]      0     Copy     [4,6]      6    [223,234]
- *    17.  Copy        4      [0,6]   Add      [1,3]      0    [235,255]
- *        --------------------------------------------------------------- */
-static const xd3_code_table_desc __alternate_code_table_desc = {
-  23, /* add sizes */
-  5,  /* near modes */
-  0,  /* same modes */
-  17, /* copy sizes */
-
-  4,  /* add-copy max add */
-  6,  /* add-copy max cpy, near */
-  0,  /* add-copy max cpy, same */
-
-  3,  /* copy-add max add */
-  4,  /* copy-add max cpy, near */
-  0,  /* copy-add max cpy, same */
-
-  /* addcopy */
-  { {6,151,3},{6,163,3},{6,175,3},{6,187,3},{6,199,3},{6,211,3},{6,223,3},{0,0,0},{0,0,0} },
-  /* copyadd */
-  { {4,235,1},{4,238,1},{4,241,1},{4,244,1},{4,247,1},{4,250,1},{4,253,1},{0,0,0},{0,0,0} },
-};
-#endif
 
 /* Computes code table entries of TBL using the specified description. */
 static void
@@ -1076,117 +1016,6 @@ xd3_rfc3284_code_table (void)
 }
 
 #if XD3_ENCODER
-#if GENERIC_ENCODE_TABLES
-/* This function generates the alternate code table. */
-static const xd3_dinst*
-xd3_alternate_code_table (void)
-{
-  static xd3_dinst __alternate_code_table[256];
-
-  if (__alternate_code_table[0].type1 != XD3_RUN)
-    {
-      xd3_build_code_table (& __alternate_code_table_desc, __alternate_code_table);
-    }
-
-  return __alternate_code_table;
-}
-
-/* This function computes the ideal second instruction INST based on
- * preceding instruction PREV.  If it is possible to issue a double
- * instruction based on this pair it sets PREV->code2, otherwise it
- * sets INST->code1. */
-static void
-xd3_choose_instruction (const xd3_code_table_desc *desc, xd3_rinst *prev, xd3_rinst *inst)
-{
-  switch (inst->type)
-    {
-    case XD3_RUN:
-      /* The 0th instruction is RUN */
-      inst->code1 = 0;
-      break;
-
-    case XD3_ADD:
-
-      if (inst->size > desc->add_sizes)
-	{
-	  /* The first instruction is non-immediate ADD */
-	  inst->code1 = 1;
-	}
-      else
-	{
-	  /* The following ADD_SIZES instructions are immediate ADDs */
-	  inst->code1 = 1 + inst->size;
-
-	  /* Now check for a possible COPY-ADD double instruction */
-	  if (prev != NULL)
-	    {
-	      int prev_mode = prev->type - XD3_CPY;
-
-	      /* If previous is a copy.  Note: as long as the previous
-	       * is not a RUN instruction, it should be a copy because
-	       * it cannot be an add.  This check is more clear. */
-	      if (prev_mode >= 0 && inst->size <= desc->copyadd_add_max)
-		{
-		  const xd3_code_table_sizes *sizes = 
-		    & desc->copyadd_max_sizes[prev_mode];
-
-		  /* This check and the inst->size-<= above are == in
-		     the default table. */
-		  if (prev->size <= sizes->cpy_max)
-		    {
-		      /* The second and third exprs are 0 in the
-			 default table. */
-		      prev->code2 = sizes->offset +
-			(sizes->mult * (prev->size - MIN_MATCH)) +
-			(inst->size - MIN_ADD);
-		    }
-		}
-	    }
-	}
-      break;
-
-    default:
-      {
-	int mode = inst->type - XD3_CPY;
-
-	/* The large copy instruction is offset by the run, large add,
-	 * and immediate adds, then multipled by the number of
-	 * immediate copies plus one (the large copy) (i.e., if there
-	 * are 15 immediate copy instructions then there are 16 copy
-	 * instructions per mode). */
-	inst->code1 = 2 + desc->add_sizes + (1 + desc->cpy_sizes) * mode;
-
-	/* Now if the copy is short enough for an immediate instruction. */
-	if (inst->size < MIN_MATCH + desc->cpy_sizes &&
-	    /* TODO: there needs to be a more comprehensive test for this
-	     * boundary condition, merge is now exercising code in which
-	     * size < MIN_MATCH is possible and it's unclear if the above
-	     * size < (MIN_MATCH + cpy_sizes) should be a <= from inspection
-	     * of the default table version below. */
-	    inst->size >= MIN_MATCH)
-	  {
-	    inst->code1 += inst->size + 1 - MIN_MATCH;
-
-	    /* Now check for a possible ADD-COPY double instruction. */
-	    if ( (prev != NULL) &&
-		 (prev->type == XD3_ADD) &&
-		 (prev->size <= desc->addcopy_add_max) )
-	      {
-		const xd3_code_table_sizes *sizes = & desc->addcopy_max_sizes[mode];
-
-		if (inst->size <= sizes->cpy_max)
-		  {
-		    prev->code2 = sizes->offset +
-		      (sizes->mult * (prev->size - MIN_ADD)) +
-		      (inst->size - MIN_MATCH);
-		  }
-	      }
-	  }
-      }
-    }
-}
-#else /* GENERIC_ENCODE_TABLES */
-
 /* This version of xd3_choose_instruction is hard-coded for the default
    table. */
 static void
@@ -1254,261 +1083,7 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
       break;
     }
 }
-#endif /* GENERIC_ENCODE_TABLES */
-
-/***********************************************************************
- Instruction table encoder/decoder
- ***********************************************************************/
-
-#if GENERIC_ENCODE_TABLES
-#if GENERIC_ENCODE_TABLES_COMPUTE == 0
-
-/* In this case, we hard-code the result of
- * compute_code_table_encoding for each alternate code table,
- * presuming that saves time/space.  This has been 131 bytes, but
- * secondary compression was turned off. */
-static const uint8_t __alternate_code_table_compressed[178] =
-{0xd6,0xc3,0xc4,0x00,0x00,0x01,0x8a,0x6f,0x40,0x81,0x27,0x8c,0x00,0x00,0x4a,0x4a,0x0d,0x02,0x01,0x03,
-0x01,0x03,0x00,0x01,0x00,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,
-0x0f,0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x00,0x01,0x01,0x01,0x02,0x02,0x02,0x03,0x03,0x03,0x04,
-0x04,0x04,0x04,0x00,0x04,0x05,0x06,0x01,0x02,0x03,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x05,0x05,0x05,
-0x06,0x06,0x06,0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x00,0x02,0x00,0x18,0x13,0x63,0x00,0x1b,0x00,0x54,
-0x00,0x15,0x23,0x6f,0x00,0x28,0x13,0x54,0x00,0x15,0x01,0x1a,0x31,0x23,0x6c,0x0d,0x23,0x48,0x00,0x15,
-0x93,0x6f,0x00,0x28,0x04,0x23,0x51,0x04,0x32,0x00,0x2b,0x00,0x12,0x00,0x12,0x00,0x12,0x00,0x12,0x00,
-0x12,0x00,0x12,0x53,0x57,0x9c,0x07,0x43,0x6f,0x00,0x34,0x00,0x0c,0x00,0x0c,0x00,0x0c,0x00,0x0c,0x00,
-0x0c,0x00,0x0c,0x00,0x15,0x00,0x82,0x6f,0x00,0x15,0x12,0x0c,0x00,0x03,0x03,0x00,0x06,0x00,};
-
-static int
-xd3_compute_alternate_table_encoding (xd3_stream *stream, const uint8_t **data, usize_t *size)
-{
-  (*data) = __alternate_code_table_compressed;
-  (*size) = sizeof (__alternate_code_table_compressed);
-  return 0;
-}
-
-#else
-
-/* The alternate code table will be computed and stored here. */
-static uint8_t __alternate_code_table_compressed[CODE_TABLE_VCDIFF_SIZE];
-static usize_t  __alternate_code_table_compressed_size;
-
-/* This function generates a delta describing the code table for
- * encoding within a VCDIFF file.  This function is NOT thread safe
- * because it is only intended that this function is used to generate
- * statically-compiled strings.  "comp_string" must be sized
- * CODE_TABLE_VCDIFF_SIZE. */
-int xd3_compute_code_table_encoding (xd3_stream *in_stream,
-				     const xd3_dinst *code_table,
-				     uint8_t *comp_string,
-				     usize_t *comp_string_size)
-{
-  /* Use DJW secondary compression if it is on by default.  This saves
-   * about 20 bytes. */
-  uint8_t dflt_string[CODE_TABLE_STRING_SIZE];
-  uint8_t code_string[CODE_TABLE_STRING_SIZE];
-
-  xd3_compute_code_table_string (xd3_rfc3284_code_table (), dflt_string);
-  xd3_compute_code_table_string (code_table, code_string);
-
-  return xd3_encode_memory (code_string, CODE_TABLE_STRING_SIZE,
-			    dflt_string, CODE_TABLE_STRING_SIZE,
-			    comp_string, comp_string_size,
-			    CODE_TABLE_VCDIFF_SIZE,
-			    /* flags */ 0);
-}
-
-/* Compute a delta between alternate and rfc3284 tables.  As soon as
- * another alternate table is added, this code should become generic.
- * For now there is only one alternate table for testing. */
-static int
-xd3_compute_alternate_table_encoding (xd3_stream *stream, const uint8_t **data, usize_t *size)
-{
-  int ret;
-
-  if (__alternate_code_table_compressed[0] == 0)
-    {
-      if ((ret = xd3_compute_code_table_encoding (stream, xd3_alternate_code_table (),
-						  __alternate_code_table_compressed,
-						  & __alternate_code_table_compressed_size)))
-	{
-	  return ret;
-	}
-
-      /* During development of a new code table, enable this variable to print
-       * the new static contents and determine its size.  At run time the
-       * table will be filled in appropriately, but at least it should have
-       * the proper size beforehand. */
-#if GENERIC_ENCODE_TABLES_COMPUTE_PRINT
-      {
-	int i;
-
-	DP(RINT, "\nstatic const usize_t __alternate_code_table_compressed_size = %u;\n",
-		 __alternate_code_table_compressed_size);
-
-	DP(RINT, "static const uint8_t __alternate_code_table_compressed[%u] =\n{",
-		 __alternate_code_table_compressed_size);
-
-	for (i = 0; i < __alternate_code_table_compressed_size; i += 1)
-	  {
-	    DP(RINT, "0x%02x,", __alternate_code_table_compressed[i]);
-	    if ((i % 20) == 19) { DP(RINT, "\n"); }
-	  }
-
-	DP(RINT, "};\n");
-      }
-#endif
-    }
-
-  (*data) = __alternate_code_table_compressed;
-  (*size) = __alternate_code_table_compressed_size;
-
-  return 0;
-}
-#endif /* GENERIC_ENCODE_TABLES_COMPUTE != 0 */
-#endif /* GENERIC_ENCODE_TABLES */
-
 #endif /* XD3_ENCODER */
-
-/* This function generates the 1536-byte string specified in sections 5.4 and
- * 7 of rfc3284, which is used to represent a code table within a VCDIFF
- * file. */
-void xd3_compute_code_table_string (const xd3_dinst *code_table, uint8_t *str)
-{
-  int i, s;
-
-  XD3_ASSERT (CODE_TABLE_STRING_SIZE == 6 * 256);
-
-  for (s = 0; s < 6; s += 1)
-    {
-      for (i = 0; i < 256; i += 1)
-	{
-	  switch (s)
-	    {
-	    case 0: *str++ = (code_table[i].type1 >= XD3_CPY ? XD3_CPY : code_table[i].type1); break;
-	    case 1: *str++ = (code_table[i].type2 >= XD3_CPY ? XD3_CPY : code_table[i].type2); break;
-	    case 2: *str++ = (code_table[i].size1); break;
-	    case 3: *str++ = (code_table[i].size2); break;
-	    case 4: *str++ = (code_table[i].type1 >= XD3_CPY ? code_table[i].type1 - XD3_CPY : 0); break;
-	    case 5: *str++ = (code_table[i].type2 >= XD3_CPY ? code_table[i].type2 - XD3_CPY : 0); break;
-	    }
-	}
-    }
-}
-
-/* This function translates the code table string into the internal representation.  The
- * stream's near and same-modes should already be set. */
-static int
-xd3_apply_table_string (xd3_stream *stream, const uint8_t *code_string)
-{
-  int i, s;
-  int modes = TOTAL_MODES (stream);
-  xd3_dinst *code_table;
-
-  if ((code_table = stream->code_table_alloc =
-       (xd3_dinst*) xd3_alloc (stream,
-			       (usize_t) sizeof (xd3_dinst),
-			       256)) == NULL)
-    {
-      return ENOMEM;
-    }
-
-  for (s = 0; s < 6; s += 1)
-    {
-      for (i = 0; i < 256; i += 1)
-	{
-	  switch (s)
-	    {
-	    case 0:
-	      if (*code_string > XD3_CPY)
-		{
-		  stream->msg = "invalid code-table opcode";
-		  return XD3_INTERNAL;
-		}
-	      code_table[i].type1 = *code_string++;
-	      break;
-	    case 1:
-	      if (*code_string > XD3_CPY)
-		{
-		  stream->msg = "invalid code-table opcode";
-		  return XD3_INTERNAL;
-		}
-	      code_table[i].type2 = *code_string++;
-	      break;
-	    case 2:
-	      if (*code_string != 0 && code_table[i].type1 == XD3_NOOP)
-		{
-		  stream->msg = "invalid code-table size";
-		  return XD3_INTERNAL;
-		}
-	      code_table[i].size1 = *code_string++;
-	      break;
-	    case 3:
-	      if (*code_string != 0 && code_table[i].type2 == XD3_NOOP)
-		{
-		  stream->msg = "invalid code-table size";
-		  return XD3_INTERNAL;
-		}
-	      code_table[i].size2 = *code_string++;
-	      break;
-	    case 4:
-	      if (*code_string >= modes)
-		{
-		  stream->msg = "invalid code-table mode";
-		  return XD3_INTERNAL;
-		}
-	      if (*code_string != 0 && code_table[i].type1 != XD3_CPY)
-		{
-		  stream->msg = "invalid code-table mode";
-		  return XD3_INTERNAL;
-		}
-	      code_table[i].type1 += *code_string++;
-	      break;
-	    case 5:
-	      if (*code_string >= modes)
-		{
-		  stream->msg = "invalid code-table mode";
-		  return XD3_INTERNAL;
-		}
-	      if (*code_string != 0 && code_table[i].type2 != XD3_CPY)
-		{
-		  stream->msg = "invalid code-table mode";
-		  return XD3_INTERNAL;
-		}
-	      code_table[i].type2 += *code_string++;
-	      break;
-	    }
-	}
-    }
-
-  stream->code_table = code_table;
-  return 0;
-}
-
-/* This function applies a code table delta and returns an actual code table. */
-static int
-xd3_apply_table_encoding (xd3_stream *in_stream, const uint8_t *data, usize_t size)
-{
-  uint8_t dflt_string[CODE_TABLE_STRING_SIZE];
-  uint8_t code_string[CODE_TABLE_STRING_SIZE];
-  usize_t code_size;
-  int ret;
-
-  xd3_compute_code_table_string (xd3_rfc3284_code_table (), dflt_string);
-
-  if ((ret = xd3_decode_memory (data, size,
-				dflt_string, CODE_TABLE_STRING_SIZE,
-				code_string, &code_size,
-				CODE_TABLE_STRING_SIZE,
-				0))) { return ret; }
-
-  if (code_size != sizeof (code_string))
-    {
-      in_stream->msg = "corrupt code-table encoding";
-      return XD3_INTERNAL;
-    }
-
-  return xd3_apply_table_string (in_stream, code_string);
-}
 
 /***********************************************************************/
 
@@ -2438,23 +2013,8 @@ xd3_config_stream(xd3_stream *stream,
       return XD3_INTERNAL;
     }
 
-  /* Check/set encoder code table. */
-  switch (stream->flags & XD3_ALT_CODE_TABLE) {
-  case 0:
-    stream->code_table_desc = & __rfc3284_code_table_desc;
-    stream->code_table_func = xd3_rfc3284_code_table;
-    break;
-#if GENERIC_ENCODE_TABLES
-  case XD3_ALT_CODE_TABLE:
-    stream->code_table_desc = & __alternate_code_table_desc;
-    stream->code_table_func = xd3_alternate_code_table;
-    stream->comp_table_func = xd3_compute_alternate_table_encoding;
-    break;
-#endif
-  default:
-    stream->msg = "alternate code table support was not compiled";
-    return XD3_INTERNAL;
-  }
+  stream->code_table_desc = & __rfc3284_code_table_desc;
+  stream->code_table_func = xd3_rfc3284_code_table;
 
   /* Check sprevsz */
   if (smatcher->small_chain == 1 &&
@@ -3420,11 +2980,8 @@ xd3_emit_hdr (xd3_stream *stream)
     {
       usize_t hdr_ind = 0;
       int use_appheader  = stream->enc_appheader != NULL;
-      int use_gencodetbl = GENERIC_ENCODE_TABLES &&
-	(stream->code_table_desc != & __rfc3284_code_table_desc);
 
       if (use_secondary)  { hdr_ind |= VCD_SECONDARY; }
-      if (use_gencodetbl) { hdr_ind |= VCD_CODETABLE; }
       if (use_appheader)  { hdr_ind |= VCD_APPHEADER; }
 
       if ((ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
@@ -3449,31 +3006,6 @@ xd3_emit_hdr (xd3_stream *stream)
 	  return ret;
 	}
 #endif
-
-      /* Compressed code table */
-      if (use_gencodetbl)
-	{
-	  usize_t code_table_size;
-	  const uint8_t *code_table_data;
-
-	  if ((ret = stream->comp_table_func (stream, & code_table_data,
-					      & code_table_size)))
-	    {
-	      return ret;
-	    }
-
-	  if ((ret = xd3_emit_size (stream, & HDR_TAIL (stream),
-				    code_table_size + 2)) ||
-	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
-				    stream->code_table_desc->near_modes)) ||
-	      (ret = xd3_emit_byte (stream, & HDR_TAIL (stream),
-				    stream->code_table_desc->same_modes)) ||
-	      (ret = xd3_emit_bytes (stream, & HDR_TAIL (stream),
-				     code_table_data, code_table_size)))
-	    {
-	      return ret;
-	    }
-	}
 
       /* Application header */
       if (use_appheader)

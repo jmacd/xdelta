@@ -1550,42 +1550,6 @@ test_choose_instruction (xd3_stream *stream, int ignore)
 }
 
 /***********************************************************************
- TEST INSTRUCTION TABLE CODING
- ***********************************************************************/
-
-#if GENERIC_ENCODE_TABLES
-/* Test that encoding and decoding a code table works */
-static int
-test_encode_code_table (xd3_stream *stream, int ignore)
-{
-  int ret;
-  const uint8_t *comp_data;
-  usize_t comp_size;
-
-  if ((ret = xd3_compute_alternate_table_encoding (stream, & comp_data, & comp_size)))
-    {
-      return ret;
-    }
-
-  stream->acache.s_near = __alternate_code_table_desc.near_modes;
-  stream->acache.s_same = __alternate_code_table_desc.same_modes;
-
-  if ((ret = xd3_apply_table_encoding (stream, comp_data, comp_size)))
-    {
-      return ret;
-    }
-
-  if (memcmp (stream->code_table, xd3_alternate_code_table (), sizeof (xd3_dinst) * 256) != 0)
-    {
-      stream->msg = "wrong code table reconstruction";
-      return XD3_INTERNAL;
-    }
-
-  return 0;
-}
-#endif
-
-/***********************************************************************
  64BIT STREAMING
  ***********************************************************************/
 
@@ -2897,15 +2861,11 @@ xd3_selftest (void)
   DO_TEST (forward_match, 0, 0);
 
   DO_TEST (address_cache, 0, 0);
-  IF_GENCODETBL (DO_TEST (address_cache, XD3_ALT_CODE_TABLE, 0));
 
   DO_TEST (string_matching, 0, 0);
   DO_TEST (choose_instruction, 0, 0);
   DO_TEST (identical_behavior, 0, 0);
   DO_TEST (in_memory, 0, 0);
-
-  IF_GENCODETBL (DO_TEST (choose_instruction, XD3_ALT_CODE_TABLE, 0));
-  IF_GENCODETBL (DO_TEST (encode_code_table, 0, 0));
 
   DO_TEST (iopt_flush_instructions, 0, 0);
   DO_TEST (source_cksum_offset, 0, 0);
@@ -2916,11 +2876,6 @@ xd3_selftest (void)
   IF_LZMA (DO_TEST (decompress_single_bit_error, XD3_SEC_LZMA, 54));
   IF_FGK (DO_TEST (decompress_single_bit_error, XD3_SEC_FGK, 3));
   IF_DJW (DO_TEST (decompress_single_bit_error, XD3_SEC_DJW, 8));
-
-  /* There are many expected non-failures for ALT_CODE_TABLE because
-   * not all of the instruction codes are used. */
-  IF_GENCODETBL (
-	 DO_TEST (decompress_single_bit_error, XD3_ALT_CODE_TABLE, 224));
 
 #if SHELL_TESTS
   DO_TEST (force_behavior, 0, 0);

@@ -241,7 +241,6 @@ static uint8_t*    option_appheader          = NULL;
 static int         option_use_secondary      = 0;
 static const char* option_secondary          = NULL;
 static int         option_use_checksum       = 1;
-static int         option_use_altcodetable   = 0;
 static const char* option_smatch_config      = NULL;
 static int         option_no_compress        = 0;
 static int         option_no_output          = 0; /* do not write output */
@@ -371,8 +370,6 @@ main_config (void)
   main_version ();
 
   XPR(NTR "EXTERNAL_COMPRESSION=%d\n", EXTERNAL_COMPRESSION);
-  XPR(NTR "GENERIC_ENCODE_TABLES=%d\n", GENERIC_ENCODE_TABLES);
-  XPR(NTR "GENERIC_ENCODE_TABLES_COMPUTE=%d\n", GENERIC_ENCODE_TABLES_COMPUTE);
   XPR(NTR "REGRESSION_TEST=%d\n", REGRESSION_TEST);
   XPR(NTR "SECONDARY_DJW=%d\n", SECONDARY_DJW);
   XPR(NTR "SECONDARY_FGK=%d\n", SECONDARY_FGK);
@@ -413,7 +410,6 @@ reset_defaults(void)
   option_appheader = NULL;
   option_use_secondary = 0;
   option_secondary = NULL;
-  option_use_altcodetable = 0;
   option_smatch_config = NULL;
   option_no_compress = 0;
   option_no_output = 0;
@@ -3041,7 +3037,6 @@ main_input (xd3_cmd     cmd,
       output_func = main_write_output;
 
       if (option_no_compress)      { stream_flags |= XD3_NOCOMPRESS; }
-      if (option_use_altcodetable) { stream_flags |= XD3_ALT_CODE_TABLE; }
       if (option_smatch_config)
 	{
 	  const char *s = option_smatch_config;
@@ -3558,7 +3553,7 @@ int main (int argc, char **argv)
 #endif
 {
   static const char *flags =
-    "0123456789cdefhnqvDFJNORTVs:m:B:C:E:I:L:O:M:P:W:A::S::";
+    "0123456789cdefhnqvDFJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
   main_file ifile;
   main_file ofile;
@@ -3758,7 +3753,6 @@ int main (int argc, char **argv)
 
 	case 'n': option_use_checksum = 0; break;
 	case 'N': option_no_compress = 1; break;
-	case 'T': option_use_altcodetable = 1; break;
 	case 'C': option_smatch_config = my_optarg; break;
 	case 'J': option_no_output = 1; break;
 	case 'S': if (my_optarg == NULL)
@@ -4038,7 +4032,6 @@ main_help (void)
   XPR(NTR "   -C           soft config (encode, undocumented)\n");
   XPR(NTR "   -A [apphead] disable/provide application header (encode)\n");
   XPR(NTR "   -J           disable output (check/compute only)\n");
-  XPR(NTR "   -T           use alternate code table (test)\n");
   XPR(NTR "   -m           arguments for \"merge\"\n");
 
   XPR(NTR "the XDELTA environment variable may contain extra args:\n");

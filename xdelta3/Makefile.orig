@@ -79,7 +79,6 @@ EXTRA = Makefile COPYING linkxd3lib.c badcopy.c xdelta3.swig \
 SWIG_FLAGS = -DXD3_DEBUG=1 \
 	      -DEXTERNAL_COMPRESSION=0 \
 	      -DXD3_USE_LARGEFILE64=1 \
-	      -DGENERIC_ENCODE_TABLES=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DVCDIFF_TOOLS=1 \
 	      -DSWIG_MODULE=1
@@ -128,7 +127,6 @@ wix: xdelta3.wxs xdelta3.wxi readme.txt Release\xdelta3.exe
 
 xdelta3: $(SOURCES)
 	$(CC) $(CFLAGS) -O3 xdelta3.c -lm -o xdelta3 \
-	      -DGENERIC_ENCODE_TABLES=0 \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
@@ -140,7 +138,6 @@ xdelta3: $(SOURCES)
 xdelta3-debug32: $(SOURCES)
 	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug32 \
 	        -arch i386 \
-		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
@@ -152,7 +149,6 @@ xdelta3-debug32: $(SOURCES)
 xdelta3-debug64: $(SOURCES)
 	$(CC) -g $(CFLAGS) xdelta3.c -lm -o xdelta3-debug64 \
 	        -arch x86_64 \
-		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
@@ -163,7 +159,6 @@ xdelta3-debug64: $(SOURCES)
 
 xdelta3-warnings: $(SOURCES)
 	$(CC) -g $(CFLAGS) $(WFLAGS) xdelta3.c -lm -o xdelta3-warnings \
-		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
@@ -189,7 +184,6 @@ xdelta3-debug2: $(SOURCES)
 		-DXD3_MAIN=1 \
 		-DXD3_POSIX=1 \
 		-DXD3_USE_LARGEFILE64=1 \
-		-DGENERIC_ENCODE_TABLES=1 \
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_DJW=1 \
 		-DSECONDARY_FGK=1 \
@@ -198,7 +192,6 @@ xdelta3-debug2: $(SOURCES)
 xdelta3-debugstdio: $(SOURCES)
 	$(CC) -g $(CFLAGS) xdelta3.c -o xdelta3-debugstdio \
 		-DXD3_MAIN=1 \
-		-DGENERIC_ENCODE_TABLES=1 \
 		-DXD3_USE_LARGEFILE64=1 \
 		-DXD3_STDIO=1 \
 		-DREGRESSION_TEST=1 \
@@ -304,8 +297,6 @@ xdelta3-everything: $(SOURCES)
 		-DREGRESSION_TEST=1 \
 		-DSECONDARY_FGK=1 \
 		-DSECONDARY_DJW=1 \
-		-DGENERIC_ENCODE_TABLES=1 \
-		-DGENERIC_ENCODE_TABLES_COMPUTE=1 \
 		-DXD3_POSIX=1 \
 		-DEXTERNAL_COMPRESSION=1 \
 		-DXD3_DEBUG=1 \

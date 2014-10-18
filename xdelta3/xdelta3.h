@@ -349,7 +349,7 @@ typedef enum {
   XD3_INVALID_INPUT = -17712, /* invalid input/decoder error */
   XD3_NOSECOND    = -17713, /* when secondary compression finds no
 			       improvement. */
-  XD3_UNIMPLEMENTED = -17714  /* currently VCD_TARGET */
+  XD3_UNIMPLEMENTED = -17714  /* currently VCD_TARGET, VCD_CODETABLE */
 } xd3_rvalues;
 
 /* special values in config->flags */
@@ -384,9 +384,6 @@ typedef enum
 				      the encoder. */
   XD3_ADLER32_NOVER  = (1 << 11),  /* disable checksum verification in
 				      the decoder. */
-
-  XD3_ALT_CODE_TABLE = (1 << 12),  /* for testing th
-				      e alternate code table encoding. */
 
   XD3_NOCOMPRESS     = (1 << 13),  /* disable ordinary data
 				    * compression feature, only search

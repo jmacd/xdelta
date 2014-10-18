@@ -841,27 +841,7 @@ xd3_decode_input (xd3_stream *stream)
 
       if ((stream->dec_hdr_ind & VCD_CODETABLE) != 0)
 	{
-	  /* Get the code table data. */
-	  if ((stream->dec_codetbl == NULL) &&
-	      (stream->dec_codetbl =
-	       (uint8_t*) xd3_alloc (stream,
-				     stream->dec_codetblsz, 1)) == NULL)
-	    {
-	      return ENOMEM;
-	    }
-
-	  if ((ret = xd3_decode_bytes (stream, stream->dec_codetbl,
-				       & stream->dec_codetblbytes,
-				       stream->dec_codetblsz)))
-	    {
-	      return ret;
-	    }
-
-	  if ((ret = xd3_apply_table_encoding (stream, stream->dec_codetbl,
-					       stream->dec_codetblbytes)))
-	    {
-	      return ret;
-	    }
+	  return XD3_UNIMPLEMENTED;
 	}
       else
 	{
