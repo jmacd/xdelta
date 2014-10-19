@@ -55,7 +55,8 @@ xd3_lzma_init (xd3_stream *stream, xd3_lzma_stream *sec, int is_encode)
 
   if (is_encode)
     {
-      int preset = (stream->flags & XD3_COMPLEVEL_MASK) >> XD3_COMPLEVEL_SHIFT;
+      uint32_t preset = 
+	(stream->flags & XD3_COMPLEVEL_MASK) >> XD3_COMPLEVEL_SHIFT;
 
       if (lzma_lzma_preset(&sec->options, preset)) 
 	{

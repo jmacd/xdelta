@@ -738,8 +738,8 @@ struct _xd3_source
   usize_t             srclen;        /* length of this source window */
   xoff_t              srcbase;       /* offset of this source window
 					in the source itself */
-  int                 shiftby;       /* for power-of-two blocksizes */
-  int                 maskby;        /* for power-of-two blocksizes */
+  usize_t             shiftby;       /* for power-of-two blocksizes */
+  usize_t             maskby;        /* for power-of-two blocksizes */
   xoff_t              cpyoff_blocks; /* offset of dec_cpyoff in blocks */
   usize_t             cpyoff_blkoff; /* offset of copy window in
 					blocks, remainder */
@@ -800,7 +800,7 @@ struct _xd3_stream
   xd3_free_func    *free;             /* free function */
   void*             opaque;           /* private data object passed to
 					 alloc, free, and getblk */
-  int               flags;            /* various options */
+  uint32_t          flags;            /* various options */
 
   /* secondary compressor configuration */
   xd3_sec_cfg       sec_data;         /* Secondary compressor config: data */
@@ -1292,7 +1292,7 @@ usize_t xd3_encoder_srclen (xd3_stream *stream) {
 
 /* Checks for legal flag changes. */
 static inline
-void xd3_set_flags (xd3_stream *stream, int flags)
+void xd3_set_flags (xd3_stream *stream, uint32_t flags)
 {
   /* The bitwise difference should contain only XD3_FLUSH or
      XD3_SKIP_WINDOW */

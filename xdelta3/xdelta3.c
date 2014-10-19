@@ -495,9 +495,9 @@ static int         xd3_emit_bytes (xd3_stream     *stream,
 				   usize_t          size);
 
 static int         xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
-				    xd3_rinst *second, usize_t code);
+				    xd3_rinst *second, uint8_t code);
 static int         xd3_emit_single (xd3_stream *stream, xd3_rinst *single,
-				    usize_t code);
+				    uint8_t code);
 
 static usize_t      xd3_sizeof_output (xd3_output *output);
 static void        xd3_encode_reset (xd3_stream *stream);
@@ -619,7 +619,7 @@ const char* xd3_strerror (int ret)
 
 struct _xd3_sec_type
 {
-  int         id;
+  uint8_t       id;
   const char *name;
   xd3_secondary_flags flags;
 
@@ -651,7 +651,7 @@ struct _xd3_sec_type
 typedef struct _bit_state bit_state;
 struct _bit_state
 {
-  usize_t cur_byte;
+  uint8_t cur_byte;
   usize_t cur_mask;
 };
 
@@ -890,24 +890,32 @@ struct _xd3_code_table_desc
   /* Assumes a single RUN instruction */
   /* Assumes that MIN_MATCH is 4 */
 
-  uint8_t add_sizes;            /* Number of immediate-size single adds (default 17) */
+  uint8_t add_sizes;            /* Number of immediate-size single
+				   adds (default 17) */
   uint8_t near_modes;           /* Number of near copy modes (default 4) */
   uint8_t same_modes;           /* Number of same copy modes (default 3) */
-  uint8_t cpy_sizes;            /* Number of immediate-size single copies (default 15) */
+  uint8_t cpy_sizes;            /* Number of immediate-size single
+				   copies (default 15) */
 
-  uint8_t addcopy_add_max;      /* Maximum add size for an add-copy double instruction,
-				   all modes (default 4) */
-  uint8_t addcopy_near_cpy_max; /* Maximum cpy size for an add-copy double instruction,
-				   up through VCD_NEAR modes (default 6) */
-  uint8_t addcopy_same_cpy_max; /* Maximum cpy size for an add-copy double instruction,
-				   VCD_SAME modes (default 4) */
+  uint8_t addcopy_add_max;      /* Maximum add size for an add-copy
+				   double instruction, all modes
+				   (default 4) */
+  uint8_t addcopy_near_cpy_max; /* Maximum cpy size for an add-copy
+				   double instruction, up through
+				   VCD_NEAR modes (default 6) */
+  uint8_t addcopy_same_cpy_max; /* Maximum cpy size for an add-copy
+				   double instruction, VCD_SAME modes
+				   (default 4) */
 
-  uint8_t copyadd_add_max;      /* Maximum add size for a copy-add double instruction,
-				   all modes (default 1) */
-  uint8_t copyadd_near_cpy_max; /* Maximum cpy size for a copy-add double instruction,
-				   up through VCD_NEAR modes (default 4) */
-  uint8_t copyadd_same_cpy_max; /* Maximum cpy size for a copy-add double instruction,
-				   VCD_SAME modes (default 4) */
+  uint8_t copyadd_add_max;      /* Maximum add size for a copy-add
+				   double instruction, all modes
+				   (default 1) */
+  uint8_t copyadd_near_cpy_max; /* Maximum cpy size for a copy-add
+				   double instruction, up through
+				   VCD_NEAR modes (default 4) */
+  uint8_t copyadd_same_cpy_max; /* Maximum cpy size for a copy-add
+				   double instruction, VCD_SAME modes
+				   (default 4) */
 
   xd3_code_table_sizes addcopy_max_sizes[MAX_MODES];
   xd3_code_table_sizes copyadd_max_sizes[MAX_MODES];
@@ -929,16 +937,19 @@ static const xd3_code_table_desc __rfc3284_code_table_desc = {
   4,  /* copy-add max cpy, same */
 
   /* addcopy */
-  { {6,163,3},{6,175,3},{6,187,3},{6,199,3},{6,211,3},{6,223,3},{4,235,1},{4,239,1},{4,243,1} },
+  { {6,163,3},{6,175,3},{6,187,3},{6,199,3},{6,211,3},{6,223,3},
+    {4,235,1},{4,239,1},{4,243,1} },
   /* copyadd */
-  { {4,247,1},{4,248,1},{4,249,1},{4,250,1},{4,251,1},{4,252,1},{4,253,1},{4,254,1},{4,255,1} },
+  { {4,247,1},{4,248,1},{4,249,1},{4,250,1},{4,251,1},{4,252,1},
+    {4,253,1},{4,254,1},{4,255,1} },
 };
 
 /* Computes code table entries of TBL using the specified description. */
 static void
 xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
 {
-  usize_t size1, size2, mode;
+  uint8_t size1, size2;
+  uint8_t mode;
   usize_t cpy_modes = 2 + desc->near_modes + desc->same_modes;
   xd3_dinst *d = tbl;
 
@@ -955,7 +966,8 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
     {
       (d++)->type1 = XD3_CPY + mode;
 
-      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; size1 += 1, d += 1)
+      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; 
+	   size1 += 1, d += 1)
 	{
 	  d->type1 = XD3_CPY + mode;
 	  d->size1 = size1;
@@ -1047,7 +1059,7 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 
     default:
       {
-	int mode = inst->type - XD3_CPY;
+	uint8_t mode = inst->type - XD3_CPY;
 
 	XD3_ASSERT (inst->type >= XD3_CPY && inst->type < 12);
 
@@ -1064,8 +1076,9 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 		if ( (inst->size <= 6) &&
 		     (mode       <= 5) )
 		  {
-		    prev->code2 = 163 + (mode * 12) + (3 * (prev->size - 1)) + (inst->size - 4);
-
+		    prev->code2 = (uint8_t)(163 + (mode * 12) + 
+					    (3 * (prev->size - 1)) + 
+					    (inst->size - 4));
 		    XD3_ASSERT (prev->code2 <= 234);
 		  }
 		else if ( (inst->size == 4) &&
@@ -1126,10 +1139,10 @@ xd3_check_pow2 (xoff_t value, usize_t *logof)
   return XD3_INTERNAL;
 }
 
-size_t
-xd3_pow2_roundup (size_t x)
+usize_t
+xd3_pow2_roundup (usize_t x)
 {
-  size_t i = 1;
+  usize_t i = 1;
   while (x > i) {
     i <<= 1U;
   }
@@ -1161,7 +1174,8 @@ xd3_round_blksize (usize_t sz, usize_t blksz)
  ***********************************************************************/
 
 #define A32_BASE 65521L /* Largest prime smaller than 2^16 */
-#define A32_NMAX 5552   /* NMAX is the largest n such that 255n(n+1)/2 + (n+1)(BASE-1) <= 2^32-1 */
+#define A32_NMAX 5552   /* NMAX is the largest n such that 255n(n+1)/2
+			   + (n+1)(BASE-1) <= 2^32-1 */
 
 #define A32_DO1(buf,i)  {s1 += buf[i]; s2 += s1;}
 #define A32_DO2(buf,i)  A32_DO1(buf,i); A32_DO1(buf,i+1);
@@ -1169,11 +1183,10 @@ xd3_round_blksize (usize_t sz, usize_t blksz)
 #define A32_DO8(buf,i)  A32_DO4(buf,i); A32_DO4(buf,i+4);
 #define A32_DO16(buf)   A32_DO8(buf,0); A32_DO8(buf,8);
 
-static unsigned long adler32 (unsigned long adler, const uint8_t *buf, 
-			      usize_t len)
+static uint32_t adler32 (uint32_t adler, const uint8_t *buf, usize_t len)
 {
-    unsigned long s1 = adler & 0xffff;
-    unsigned long s2 = (adler >> 16) & 0xffff;
+    uint32_t s1 = adler & 0xffffU;
+    uint32_t s2 = (adler >> 16) & 0xffffU;
     int k;
 
     while (len > 0)
@@ -1556,7 +1569,8 @@ xd3_encode_address (xd3_stream *stream,
 		    uint8_t* mode)
 {
   usize_t d, bestd;
-  usize_t i, bestm, ret;
+  usize_t i, bestm;
+  int ret;
   xd3_addr_cache* acache = & stream->acache;
 
 #define SMALLEST_INT(x) do { if (((x) & ~127U) == 0) { goto good; } } while (0)
@@ -2869,7 +2883,7 @@ xd3_iopt_last_matched (xd3_stream *stream)
  ***********************************************************/
 
 static int
-xd3_emit_single (xd3_stream *stream, xd3_rinst *single, usize_t code)
+xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint8_t code)
 {
   int has_size = stream->code_table[code].size1 == 0;
   int ret;
@@ -2898,7 +2912,7 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, usize_t code)
 
 static int
 xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
-                 xd3_rinst *second, usize_t code)
+                 xd3_rinst *second, uint8_t code)
 {
   int ret;
 
@@ -2968,8 +2982,8 @@ xd3_emit_hdr (xd3_stream *stream)
   int  use_secondary = stream->sec_type != NULL;
   int  use_adler32   = stream->flags & (XD3_ADLER32 | XD3_ADLER32_RECODE);
   int  vcd_source    = xd3_encoder_used_source (stream);
-  usize_t win_ind = 0;
-  usize_t del_ind = 0;
+  uint8_t win_ind = 0;
+  uint8_t del_ind = 0;
   usize_t enc_len;
   usize_t tgt_len;
   usize_t data_len;
@@ -2978,7 +2992,7 @@ xd3_emit_hdr (xd3_stream *stream)
 
   if (stream->current_window == 0)
     {
-      usize_t hdr_ind = 0;
+      uint8_t hdr_ind = 0;
       int use_appheader  = stream->enc_appheader != NULL;
 
       if (use_secondary)  { hdr_ind |= VCD_SECONDARY; }
@@ -3229,6 +3243,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
+	  /* TODO(jmacd) Need to check for overflow here. */
 	  usize_t hash_values = stream->src->max_winsize /
 	                        stream->smatcher.large_step;
 
@@ -3927,6 +3942,7 @@ xd3_srcwin_setup (xd3_stream *stream)
    * issued, but we have to decide the source window base and length
    * now.  */
   src->srcbase = stream->match_minaddr;
+  /* TODO(jmacd) Need to check for overflow here. */
   src->srclen  = max ((usize_t) length,
 		      stream->avail_in + (stream->avail_in >> 2));
 
@@ -4105,19 +4121,19 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   return 1;
 }
 
-static inline int
-xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, int n)
+static inline usize_t
+xd3_forward_match(const uint8_t *s1c, const uint8_t *s2c, usize_t n)
 {
-  int i = 0;
+  usize_t i = 0;
 #if UNALIGNED_OK
-  int nint = n / sizeof(int);
+  usize_t nint = n / sizeof(int);
 
   if (nint >> 3)
     {
-      int j = 0;
+      usize_t j = 0;
       const int *s1 = (const int*)s1c;
       const int *s2 = (const int*)s2c;
-      int nint_8 = nint - 8;
+      usize_t nint_8 = nint - 8;
 
       while (i <= nint_8 &&
 	     s1[i++] == s2[j++] &&

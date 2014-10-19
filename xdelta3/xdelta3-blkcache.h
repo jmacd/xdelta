@@ -129,7 +129,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   /* Note: The API requires a power-of-two blocksize and srcwinsz
    * (-B).  The logic here will use a single block if the entire file
    * is known to fit into srcwinsz. */
-  option_srcwinsz = xd3_pow2_roundup (option_srcwinsz);
+  option_srcwinsz = xd3_xoff_roundup (option_srcwinsz);
 
   /* Though called "lru", it is not LRU-specific.  We always allocate
    * a maximum number of source block buffers.  If the entire file

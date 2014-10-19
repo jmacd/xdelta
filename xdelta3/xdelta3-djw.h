@@ -343,7 +343,7 @@ static inline void
 djw_update_1_2 (int *mtf_run, usize_t *mtf_i,
 		uint8_t *mtfsym, djw_weight *freq)
 {
-  int code;
+  uint8_t code;
   
   do
     {
@@ -395,10 +395,10 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
   usize_t heap_last; /* Index of the last _valid_ heap entry. */
   usize_t ents_size; /* Number of entries, including 0th fake entry */
   usize_t  overflow;  /* Number of code lengths that overflow */
-  uint32_t total_bits;
+  usize_t total_bits;
   usize_t i;
 
-  IF_DEBUG (uint32_t first_bits = 0);
+  IF_DEBUG (usize_t first_bits = 0);
 
   /* Insert real symbol frequences. */
   for (i = 0; i < asize; i += 1)
@@ -444,7 +444,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
   if (heap_last == 1)
     {
       /* Pick either the first or last symbol. */
-      int s = freq[0] ? asize-1 : 0;
+      usize_t s = freq[0] ? asize-1 : 0;
       ents[s+1].freq = 1;
       goto again;
     }

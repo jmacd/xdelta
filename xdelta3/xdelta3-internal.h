@@ -47,7 +47,7 @@ uint32_t xd3_large_cksum_update (uint32_t cksum,
 				 const uint8_t *base,
 				 usize_t look);
 int xd3_encode_init_full (xd3_stream *stream);
-size_t xd3_pow2_roundup (size_t x);
+usize_t xd3_pow2_roundup (usize_t x);
 int xd3_process_stream (int            is_encode,
 			xd3_stream    *stream,
 			int          (*func) (xd3_stream *),
@@ -136,7 +136,7 @@ typedef struct {
 #endif
 
 /* Underlying xprintf() */
-int xsnprintf_func (char *str, int n, const char *fmt, ...)
+int xsnprintf_func (char *str, size_t n, const char *fmt, ...)
   PRINTF_ATTRIBUTE(3,4);
 
 /* XPR(NT "", ...) (used by main) prefixes an "xdelta3: " to the output. */

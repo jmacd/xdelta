@@ -136,8 +136,8 @@ xd3_lcksum (const uint8_t *seg, const usize_t ln)
 static usize_t
 xd3_size_log2 (usize_t slots)
 {
-  int bits = 28; /* This should not be an unreasonable limit. */
-  int i;
+  usize_t bits = 31;
+  usize_t i;
 
   for (i = 3; i <= bits; i += 1)
     {
@@ -158,7 +158,7 @@ xd3_size_hashtable (xd3_stream    *stream,
 		    usize_t        slots,
 		    xd3_hash_cfg  *cfg)
 {
-  int bits = xd3_size_log2 (slots);
+  usize_t bits = xd3_size_log2 (slots);
 
   /* TODO: there's a 32-bit assumption here */
   cfg->size  = (1 << bits);

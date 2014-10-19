@@ -68,7 +68,7 @@ const char* xd3_mainerror(int err_num);
 #include "xdelta3-internal.h"
 
 int
-xsnprintf_func (char *str, int n, const char *fmt, ...)
+xsnprintf_func (char *str, size_t n, const char *fmt, ...)
 {
   va_list a;
   int ret;
@@ -3041,7 +3041,7 @@ main_input (xd3_cmd     cmd,
 	{
 	  const char *s = option_smatch_config;
 	  char *e;
-	  int values[XD3_SOFTCFG_VARCNT];
+	  usize_t values[XD3_SOFTCFG_VARCNT];
 	  int got;
 
 	  config.smatch_cfg = XD3_SMATCH_SOFT;
