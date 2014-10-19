@@ -224,13 +224,14 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
     {
       IF_DEBUG2 ({
 	static int cnt = 0;
-	XPR(NT "DECODE:%u: COPY at %"Q"u (winoffset %u) size %u winaddr %u\n",
-		 cnt++,
-		 stream->total_out + (stream->dec_position -
-				      stream->dec_cpylen),
-		 (stream->dec_position - stream->dec_cpylen),
-		 inst->size,
-		 inst->addr);
+	XPR(NT "DECODE:%u: COPY at %"Q" (winoffset %"Z") "
+	    "size %"Z" winaddr %"Z"\n",
+	    cnt++,
+	    stream->total_out + (stream->dec_position -
+				 stream->dec_cpylen),
+	    (stream->dec_position - stream->dec_cpylen),
+	    inst->size,
+	    inst->addr);
       });
 
       if ((ret = xd3_decode_address (stream,
@@ -265,7 +266,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (inst->type == XD3_ADD)
 	  {
 	    static int cnt;
-	    XPR(NT "DECODE:%d: ADD at %"Q"u (winoffset %u) size %u\n",
+	    XPR(NT "DECODE:%d: ADD at %"Q" (winoffset %"Z") size %"Z"\n",
 	       cnt++,
 	       (stream->total_out + stream->dec_position - stream->dec_cpylen),
 	       stream->dec_position - stream->dec_cpylen,
@@ -275,7 +276,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  {
 	    static int cnt;
 	    XD3_ASSERT (inst->type == XD3_RUN);
-	    XPR(NT "DECODE:%d: RUN at %"Q"u (winoffset %u) size %u\n",
+	    XPR(NT "DECODE:%d: RUN at %"Q" (winoffset %"Z") size %"Z"\n",
 	       cnt++,
 	       stream->total_out + stream->dec_position - stream->dec_cpylen,
 	       stream->dec_position - stream->dec_cpylen,
@@ -453,8 +454,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q"u onblk "
-				   "%u blksize %u blkoff %u take %u\n",
+		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q" onblk "
+				   "%"Z" blksize %"Z" blkoff %"Z" take %"Z"\n",
 				   block,
 				   source->onblk,
 				   blksize,
@@ -916,7 +917,7 @@ xd3_decode_input (xd3_stream *stream)
 
 	stream->dec_state = DEC_CPYLEN;
 
-	IF_DEBUG2 (DP(RINT "--------- TARGET WINDOW %"Q"u -----------\n",
+	IF_DEBUG2 (DP(RINT "--------- TARGET WINDOW %"Q" -----------\n",
 		      stream->current_window));
       }
 
@@ -1073,8 +1074,8 @@ xd3_decode_input (xd3_stream *stream)
 			  &src->cpyoff_blkoff);
 	  
 	  IF_DEBUG1(DP(RINT
-		       "decode cpyoff %"Q"u "
-		       "cpyblkno %"Q"u "
+		       "decode cpyoff %"Q" "
+		       "cpyblkno %"Q" "
 		       "cpyblkoff %u "
 		       "blksize %u\n",
 		       stream->dec_cpyoff,

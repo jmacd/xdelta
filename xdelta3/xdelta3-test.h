@@ -139,7 +139,10 @@ static char   TEST_RECON2_FILE[TESTFILESIZE];
 static char   TEST_COPY_FILE[TESTFILESIZE];
 static char   TEST_NOPERM_FILE[TESTFILESIZE];
 
-#define CHECK(cond) if (!(cond)) { XPR(NT "check failure: " #cond); abort(); }
+#define CHECK(cond)						\
+  if (!(cond)) {						\
+    XPR(NT __FILE__":%d: check failure: " #cond, __LINE__);	\
+    abort(); }
 
 #if SHELL_TESTS
 /* Use a fixed soft config so that test values are fixed.  See also
@@ -199,7 +202,7 @@ test_random_numbers (xd3_stream *stream, int ignore)
 
   for (i = 0; i < n_rounds; i += 1)
     {
-      sum += mt_exp_rand (mean, USIZE_T_MAX);
+      sum += mt_exp_rand (mean, UINT32_MAX);
     }
 
   average = (double) sum / (double) n_rounds;
@@ -411,7 +414,7 @@ test_compare_files (const char* tgt, const char *rec)
 	{
 	  if (obuf[i] != rbuf[i])
  	    {
-	      XPR(NT "byte %u (read %u @ %"Q"u) %d != %d\n",
+	      XPR(NT "byte %u (read %u @ %"Q") %d != %d\n",
 		  (int)i, (int)oc, offset, obuf[i], rbuf[i]);
 	      diffs++;
 	      return XD3_INTERNAL;
@@ -677,13 +680,13 @@ test_forward_match (xd3_stream *stream, int unused)
 
   for (i = 0; i < 256; i++)
     {
-      CHECK(xd3_forward_match(buf1, buf2, i) == (int)i);
+      CHECK(xd3_forward_match(buf1, buf2, i) == i);
     }
 
   for (i = 0; i < 255; i++)
     {
       buf2[i] = 1;
-      CHECK(xd3_forward_match(buf1, buf2, 256) == (int)i);
+      CHECK(xd3_forward_match(buf1, buf2, 256) == i);
       buf2[i] = 0;
     }
 
@@ -732,7 +735,7 @@ test_address_cache (xd3_stream *stream, int unused)
       usize_t prev_i;
       usize_t nearby;
 
-      p         = (mt_random (&static_mtrand) / (double)USIZE_T_MAX);
+      p         = (mt_random (&static_mtrand) / (double)UINT32_MAX);
       prev_i    = mt_random (&static_mtrand) % offset;
       nearby    = (mt_random (&static_mtrand) % 256) % offset;
       nearby    = max (1U, nearby);
@@ -763,9 +766,13 @@ test_address_cache (xd3_stream *stream, int unused)
 
   for (offset = 1; offset < ADDR_CACHE_ROUNDS; offset += 1)
     {
-      uint32_t addr;
+      usize_t addr;
 
-      if ((ret = xd3_decode_address (stream, offset, modes[offset], & buf, buf_max, & addr))) { return ret; }
+      if ((ret = xd3_decode_address (stream, offset, modes[offset], 
+				     & buf, buf_max, & addr))) 
+	{ 
+	  return ret; 
+	}
 
       if (addr != addrs[offset])
 	{
@@ -1391,7 +1398,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	  if ((ret = sec->encode (stream, enc_stream,
 				  in_head, out_head, & cfg)))
 	    {
-	      XPR(NT "test %u: encode: %s", test_i, stream->msg);
+	      XPR(NT "test %"Z": encode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1430,7 +1437,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 					    compress_size, dec_input,
 					    dec_correct, dec_output)))
 	    {
-	      XPR(NT "test %u: decode: %s", test_i, stream->msg);
+	      XPR(NT "test %"Z": decode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1759,7 +1766,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
 	{
 	  XPR(NT "test encode with size ratio %.4f, "
-	     "expected < %.4f (%"Q"u, %"Q"u)\n",
+	     "expected < %.4f (%"Q", %"Q")\n",
 	    ratio, TEST_ADD_RATIO + TEST_EPSILON, dsize, tsize);
 	  stream->msg = "strange encoding";
 	  return XD3_INTERNAL;
@@ -2645,14 +2652,14 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    default: CHECK(0);
 	    }
 
-	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%d/%d",
+	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Z"/%"Z"",
 			 inst->pos, inst->size);
 	  rptr += strlen (rptr);
 
 	  if (inst->type == XD3_CPY)
 	    {
 	      *rptr++ = '@';
-	      snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Q"d", inst->addr);
+	      snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Q, inst->addr);
 	      rptr += strlen (rptr);
 	    }
 
@@ -2668,7 +2675,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 
       if (strcmp (rbuf, test->result) != 0)
 	{
-	  XPR(NT "test %u: expected %s: got %s", i, test->result, rbuf);
+	  XPR(NT "test %"Z": expected %s: got %s", i, test->result, rbuf);
 	  stream->msg = "wrong result";
 	  return XD3_INTERNAL;
 	}
@@ -2743,6 +2750,7 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
 /*
  * This tests the 32/64bit ambiguity for source-window matching.
  */
+#if !XD3_USE_LARGEWINDOW64
 static int
 test_source_cksum_offset (xd3_stream *stream, int ignore)
 {
@@ -2788,6 +2796,7 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
   }
   return 0;
 }
+#endif /* !XD3_USE_LARGEWINDOW64 */
 
 static int
 test_in_memory (xd3_stream *stream, int ignore)
@@ -2868,7 +2877,9 @@ xd3_selftest (void)
   DO_TEST (in_memory, 0, 0);
 
   DO_TEST (iopt_flush_instructions, 0, 0);
+#if !XD3_USE_LARGEWINDOW64
   DO_TEST (source_cksum_offset, 0, 0);
+#endif
 
   DO_TEST (decompress_single_bit_error, 0, 3);
   DO_TEST (decompress_single_bit_error, XD3_ADLER32, 3);

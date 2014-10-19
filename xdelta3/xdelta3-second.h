@@ -122,7 +122,7 @@ xd3_decode_secondary (xd3_stream      *stream,
 		      xd3_desect      *sect,
 		      xd3_sec_stream **sec_streamp)
 {
-  uint32_t dec_size;
+  usize_t dec_size;
   uint8_t *out_used;
   int ret;
 

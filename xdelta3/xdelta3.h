@@ -17,7 +17,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* To know more about Xdelta, start by reading xdelta3.c.  If you are
+/* To learn more about Xdelta, start by reading xdelta3.c.  If you are
  * ready to use the API, continue reading here.  There are two
  * interfaces -- xd3_encode_input and xd3_decode_input -- plus a dozen
  * or so related calls.  This interface is styled after Zlib. */
@@ -87,8 +87,7 @@
 #define XD3_DEFAULT_SPREVSZ (1U<<18)
 #endif
 
-/* The default compression level
- */
+/* The default compression level */
 #ifndef XD3_DEFAULT_LEVEL
 #define XD3_DEFAULT_LEVEL 3
 #endif
@@ -101,6 +100,12 @@
 #define XD3_USE_LARGEFILE64 1
 #endif
 
+/* The default source window size is limited to 2GB unless
+ * XD3_USE_LARGEWINDOW64 is defined to 1. */
+#ifndef XD3_USE_LARGEWINDOW64
+#define XD3_USE_LARGEWINDOW64 0
+#endif
+
 /* Sizes and addresses within VCDIFF windows are represented as usize_t
  *
  * For source-file offsets and total file sizes, total input and
@@ -109,6 +114,8 @@
  * the 32bit boundary [xdelta3-test.h]).
  */
 #ifndef _WIN32
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <stdint.h>
 #else
 #define WIN32_LEAN_AND_MEAN
@@ -142,8 +149,6 @@ typedef ULONGLONG      uint64_t;
 #endif
 #endif
 
-typedef uint32_t usize_t;
-
 #if XD3_USE_LARGEFILE64
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
 #ifndef _LARGEFILE_SOURCE
@@ -153,23 +158,43 @@ typedef uint32_t usize_t;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-typedef uint64_t xoff_t;
 #define SIZEOF_XOFF_T 8
-#define SIZEOF_USIZE_T 4
-#ifndef WIN32
-#if SIZEOF_SIZE_T == 8
-#define Q "z"
-#else
-#define Q "ll"
+typedef uint64_t xoff_t;
+
+#ifndef _WIN32
+#define Q PRIu64
+//#define Qd PRId64
+#else /* _WIN32 */
+#define Q "I64u"
+//#define Qd "I64d"
 #endif
-#else
-#define Q "I64"
-#endif
-#else
-typedef uint32_t xoff_t;
+
+#else /* XD3_USE_LARGEFILE64 */
+
 #define SIZEOF_XOFF_T 4
+typedef uint32_t xoff_t;
+
+#define Q "u"
+//#define Qd "d"
+
+#endif /* XD3_USE_LARGEFILE64 */
+
+#if XD3_USE_LARGEWINDOW64
+
+#if !XD3_USE_LARGEFILE64
+#error "Invalid configuration"
+#endif
+
+#define SIZEOF_USIZE_T 8
+typedef uint64_t usize_t;
+
+#define Z Q
+#else /* XD3_USE_LARGEWINDOW64 */
+
 #define SIZEOF_USIZE_T 4
-#define Q
+typedef uint32_t usize_t;
+
+#define Z "u"
 #endif
 
 #define USE_UINT32 (SIZEOF_USIZE_T == 4 || \
@@ -302,9 +327,12 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
 
 
 #if XD3_DEBUG
-#define XD3_ASSERT(x) \
-    do { if (! (x)) { DP(RINT "%s:%d: XD3 assertion failed: %s\n", __FILE__, __LINE__, #x); \
-    abort (); } } while (0)
+#define XD3_ASSERT(x)				     \
+  do {						     \
+    if (! (x)) {				     \
+      DP(RINT "%s:%d: XD3 assertion failed: %s\n",   \
+	 __FILE__, __LINE__, #x);		     \
+      abort (); } } while (0)
 #else
 #define XD3_ASSERT(x) (void)0
 #endif  /* XD3_DEBUG */
@@ -556,9 +584,9 @@ struct _xd3_dinst
 /* the decoded form of a single (half) instruction. */
 struct _xd3_hinst
 {
-  uint8_t     type;
-  uint32_t    size;  /* TODO: why decode breaks if this is usize_t? */
-  uint32_t    addr;  /* TODO: why decode breaks if this is usize_t? */
+  uint8_t    type;
+  usize_t    size;
+  usize_t    addr;
 };
 
 /* the form of a whole-file instruction */
@@ -585,7 +613,7 @@ struct _xd3_desect
 {
   const uint8_t *buf;
   const uint8_t *buf_max;
-  uint32_t       size;  /* TODO: why decode breaks if this is usize_t? */
+  usize_t        size;
   usize_t        pos;
 
   /* used in xdelta3-decode.h */
@@ -898,13 +926,11 @@ struct _xd3_stream
 
   usize_t           dec_secondid;     /* Optional secondary compressor ID. */
 
-  /* TODO: why decode breaks if this is usize_t? */
-  uint32_t          dec_codetblsz;    /* Optional code table: length. */
+  usize_t           dec_codetblsz;    /* Optional code table: length. */
   uint8_t          *dec_codetbl;      /* Optional code table: storage. */
   usize_t           dec_codetblbytes; /* Optional code table: position. */
 
-  /* TODO: why decode breaks if this is usize_t? */
-  uint32_t          dec_appheadsz;    /* Optional application header:
+  usize_t           dec_appheadsz;    /* Optional application header:
 					 size. */
   uint8_t          *dec_appheader;    /* Optional application header:
 					 storage */
@@ -915,15 +941,12 @@ struct _xd3_stream
   uint8_t           dec_cksum[4];     /* Optional checksum: storage. */
   uint32_t          dec_adler32;      /* Optional checksum: value. */
 
-  /* TODO: why decode breaks if this is usize_t? */
-  uint32_t           dec_cpylen;       /* length of copy window
+  usize_t            dec_cpylen;       /* length of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
   xoff_t             dec_cpyoff;       /* offset of copy window
 					  (VCD_SOURCE or VCD_TARGET) */
-  /* TODO: why decode breaks if this is usize_t? */
-  uint32_t           dec_enclen;       /* length of delta encoding */
-  /* TODO: why decode breaks if this is usize_t? */
-  uint32_t           dec_tgtlen;       /* length of target window */
+  usize_t            dec_enclen;       /* length of delta encoding */
+  usize_t            dec_tgtlen;       /* length of target window */
 
 #if USE_UINT64
   uint64_t          dec_64part;       /* part of a decoded uint64_t */
