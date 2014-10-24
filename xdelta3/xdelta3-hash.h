@@ -19,6 +19,8 @@
 #ifndef _XDELTA3_HASH_H_
 #define _XDELTA3_HASH_H_
 
+#include "xdelta3-internal.h"
+
 #if XD3_DEBUG
 #define SMALL_HASH_DEBUG1(s,inp)                                  \
   uint32_t debug_state;                                           \
@@ -40,14 +42,6 @@ static const uint32_t hash_multiplier = 1597334677U;
 /***********************************************************************
  Permute stuff
  ***********************************************************************/
-
-#if HASH_PERMUTE == 0
-#define PERMUTE(x) (x)
-#else
-#define PERMUTE(x) (__single_hash[(uint32_t)x])
-
-extern const uint16_t __single_hash[256];
-#endif
 
 /* Update the checksum state. */
 #if ADLER_LARGE_CKSUM
@@ -104,8 +98,8 @@ xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum)
  ***********************************************************************/
 
 #if ADLER_LARGE_CKSUM
-static inline uint32_t
-xd3_lcksum (const uint8_t *seg, const usize_t ln)
+inline usize_t
+xd3_large_cksum (const uint8_t *seg, const usize_t ln)
 {
   usize_t i = 0;
   uint32_t low  = 0;
@@ -120,23 +114,14 @@ xd3_lcksum (const uint8_t *seg, const usize_t ln)
   return ((high & 0xffff) << 16) | (low & 0xffff);
 }
 #else
-static inline uint32_t
-xd3_lcksum (const uint8_t *seg, const usize_t ln)
-{
-  usize_t i, j;
-  uint32_t h = 0;
-  for (i = 0, j = ln - 1; i < ln; ++i, --j) {
-    h += PERMUTE(seg[i]) * hash_multiplier_powers[j];
-  }
-  return h;
-}
+/* TODO */
 #endif
 
 #if XD3_ENCODER
 static usize_t
-xd3_size_log2 (usize_t slots)
+xd3_size_hashtable_bits (usize_t slots)
 {
-  usize_t bits = 31;
+  usize_t bits = (SIZEOF_USIZE_T * 8) - 1;
   usize_t i;
 
   for (i = 3; i <= bits; i += 1)
@@ -158,12 +143,11 @@ xd3_size_hashtable (xd3_stream    *stream,
 		    usize_t        slots,
 		    xd3_hash_cfg  *cfg)
 {
-  usize_t bits = xd3_size_log2 (slots);
+  usize_t bits = xd3_size_hashtable_bits (slots);
 
-  /* TODO: there's a 32-bit assumption here */
   cfg->size  = (1 << bits);
   cfg->mask  = (cfg->size - 1);
-  cfg->shift = 32 - bits;
+  cfg->shift = (SIZEOF_USIZE_T * 8) - bits;
 }
 #endif
 

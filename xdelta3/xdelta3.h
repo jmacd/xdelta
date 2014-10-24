@@ -100,7 +100,7 @@
 #define XD3_USE_LARGEFILE64 1
 #endif
 
-/* The default source window size is limited to 2GB unless
+/* The source window size is limited to 2GB unless
  * XD3_USE_LARGEWINDOW64 is defined to 1. */
 #ifndef XD3_USE_LARGEWINDOW64
 #define XD3_USE_LARGEWINDOW64 0
@@ -163,10 +163,8 @@ typedef uint64_t xoff_t;
 
 #ifndef _WIN32
 #define Q PRIu64
-//#define Qd PRId64
 #else /* _WIN32 */
 #define Q "I64u"
-//#define Qd "I64d"
 #endif
 
 #else /* XD3_USE_LARGEFILE64 */
@@ -175,7 +173,6 @@ typedef uint64_t xoff_t;
 typedef uint32_t xoff_t;
 
 #define Q "u"
-//#define Qd "d"
 
 #endif /* XD3_USE_LARGEFILE64 */
 
@@ -1340,8 +1337,8 @@ void xd3_blksize_div (const xoff_t offset,
 		      const xd3_source *source,
 		      xoff_t *blkno,
 		      usize_t *blkoff) {
-  *blkno = (xoff_t) (offset >> source->shiftby);
-  *blkoff = (usize_t) (offset & source->maskby);
+  *blkno = offset >> source->shiftby;
+  *blkoff = offset & source->maskby;
   XD3_ASSERT (*blkoff < source->blksize);
 }
 

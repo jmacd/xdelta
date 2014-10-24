@@ -947,7 +947,7 @@ xd3_decode_input (xd3_stream *stream)
       /* Check copy window bounds: VCD_TARGET window may not exceed
 	 current position. */
       if ((stream->dec_win_ind & VCD_TARGET) &&
-	  (stream->dec_cpyoff + (xoff_t) stream->dec_cpylen >
+	  (stream->dec_cpyoff + stream->dec_cpylen >
 	   stream->dec_winstart))
 	{
 	  stream->msg = "VCD_TARGET window out of bounds";
@@ -1087,7 +1087,7 @@ xd3_decode_input (xd3_stream *stream)
       /* xd3_decode_emit returns XD3_OUTPUT on every success. */
       if ((ret = xd3_decode_emit (stream)) == XD3_OUTPUT)
 	{
-	  stream->total_out += (xoff_t) stream->avail_out;
+	  stream->total_out += stream->avail_out;
 	}
 
       return ret;

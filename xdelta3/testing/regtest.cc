@@ -90,7 +90,7 @@ public:
     bool done = false;
     bool done_after_input = false;
 
-    IF_DEBUG1 (XPR(NTR "source %"Q"u[%"Q"u] target %"Q"u winsize %lu\n",
+    IF_DEBUG1 (XPR(NTR "source %"Q"[%"Q"] target %"Q" winsize %lu\n",
 		  source_file.Size(), options.block_size,
 		  target_file.Size(),
 		  Constants::WINDOW_SIZE));
@@ -100,8 +100,8 @@ public:
 
       xoff_t blks = target_iterator.Blocks();
 
-      IF_DEBUG2(XPR(NTR "target in %s: %"Q"u..%"Q"u %"Q"u(%"Q"u) "
-		    "verified %"Q"u\n",
+      IF_DEBUG2(XPR(NTR "target in %s: %"Q"..%"Q" %"Q"(%"Q") "
+		    "verified %"Q"\n",
 		   encoding ? "encoding" : "decoding",
 		   target_iterator.Offset(),
 		   target_iterator.Offset() + target_block.Size(),
@@ -151,8 +151,8 @@ public:
 	xd3_source *src = (encoding ? &encode_source : &decode_source);
 	Block *block = (encoding ? &encode_source_block : &decode_source_block);
 	if (encoding) {
-	  IF_DEBUG1(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
-		       "encodepos %"Q"u\n",
+	  IF_DEBUG1(XPR(NTR "[srcblock] %"Q" last srcpos %"Q" "
+		       "encodepos %"Q"\n",
 		       encode_source.getblkno,
 		       encode_stream.match_last_srcpos,
 		       encode_stream.input_position + encode_stream.total_in));
@@ -229,7 +229,7 @@ public:
 			const Options &options) {
     vector<const char*> ecmd;
     char wbuf[16];
-    snprintf(wbuf, sizeof(wbuf), "-B%"Q"u", options.encode_srcwin_maxsz);
+    snprintf(wbuf, sizeof(wbuf), "-B%"Q, options.encode_srcwin_maxsz);
     ecmd.push_back("xdelta3");
     ecmd.push_back(wbuf);
     ecmd.push_back("-s");
@@ -1222,7 +1222,7 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  XPR(NT "Blocksize %"Q"u windowsize %"Q"u\n",
+  XPR(NT "Blocksize %"Q" windowsize %zu\n",
       T::BLOCK_SIZE, T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);

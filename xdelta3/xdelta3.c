@@ -375,9 +375,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define ALPHABET_SIZE      256  /* Used in test code--size of the secondary
 				 * compressor alphabet. */
 
-#define HASH_PERMUTE       1    /* The input is permuted by random nums */
-#define ADLER_LARGE_CKSUM  1    /* Adler checksum vs. RK checksum */
-
 #define HASH_CKOFFSET      1U   /* Table entries distinguish "no-entry" from
 				 * offset 0 using this offset. */
 
@@ -552,9 +549,14 @@ static int         xd3_decode_allocate (xd3_stream *stream, usize_t size,
 static void*       xd3_alloc (xd3_stream *stream, usize_t elts, usize_t size);
 static void        xd3_free  (xd3_stream *stream, void *ptr);
 
+#if USE_UINT32
 static int         xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
 				      const uint8_t *max, uint32_t *valp);
-
+#endif
+#if USE_UINT64
+static int         xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
+				      const uint8_t *max, uint64_t *valp);
+#endif
 #if REGRESSION_TEST
 static int         xd3_selftest      (void);
 #endif
@@ -1433,7 +1435,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 #define IF_SIZEOF64(x) if (num < (1ULL << (7 * (x)))) return (x);
 
 #if USE_UINT32
-static inline uint32_t
+usize_t
 xd3_sizeof_uint32_t (uint32_t num)
 {
   IF_SIZEOF32(1);
@@ -1443,41 +1445,39 @@ xd3_sizeof_uint32_t (uint32_t num)
   return 5;
 }
 
-static inline int
+int
 xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_32part, UINT32_OFLOW_MASK); }
 
-static inline int
+int
 xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
 		   const uint8_t *max, uint32_t *valp)
 { READ_INTEGER_TYPE (uint32_t, UINT32_OFLOW_MASK); }
 
 #if XD3_ENCODER
-static inline int
+int
 xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
 { EMIT_INTEGER_TYPE (); }
 #endif
 #endif
 
 #if USE_UINT64
-static inline int
+int
 xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
 { DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
 
 #if XD3_ENCODER
-static inline int
+int
 xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 { EMIT_INTEGER_TYPE (); }
 #endif
 
-/* These are tested but not used */
-#if REGRESSION_TEST
-static int
+int
 xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
 		   const uint8_t *max, uint64_t *valp)
 { READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
 
-static uint32_t
+usize_t
 xd3_sizeof_uint64_t (uint64_t num)
 {
   IF_SIZEOF64(1);
@@ -1492,7 +1492,6 @@ xd3_sizeof_uint64_t (uint64_t num)
 
   return 10;
 }
-#endif
 
 #endif
 
@@ -2130,7 +2129,7 @@ xd3_config_stream(xd3_stream *stream,
 inline
 xoff_t xd3_source_eof(const xd3_source *src)
 {
-  xoff_t r = (src->blksize * src->max_blkno) + (xoff_t)src->onlastblk;
+  xoff_t r = (src->blksize * src->max_blkno) + src->onlastblk;
   return r;
 }
 
@@ -2443,22 +2442,22 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 		XD3_ASSERT (inst->addr >= src->srcbase);
 		XD3_ASSERT (inst->addr + inst->size <=
 			    src->srcbase + src->srclen);
-		addr = (usize_t)(inst->addr - src->srcbase);
+		addr = inst->addr - src->srcbase;
 		stream->n_scpy += 1;
-		stream->l_scpy += (xoff_t) inst->size;
+		stream->l_scpy += inst->size;
 	      }
 	    else
 	      {
 		/* with source window: target copy address is offset
 		 * by taroff. */
-		addr = stream->taroff + (usize_t) inst->addr;
+		addr = stream->taroff + inst->addr;
 		stream->n_tcpy += 1;
-		stream->l_tcpy += (xoff_t) inst->size;
+		stream->l_tcpy += inst->size;
 	      }
 	  }
 	else
 	  {
-	    addr = (usize_t) inst->addr;
+	    addr = inst->addr;
 	    stream->n_tcpy += 1;
 	    stream->l_tcpy += inst->size;
 	  }
@@ -3254,9 +3253,10 @@ xd3_encode_init (xd3_stream *stream, int full_init)
 
       if (small_comp)
 	{
-	  /* TODO: This is under devel: used to have min(sprevsz) here, which sort
-	   * of makes sense, but observed fast performance w/ larger tables, which
-	   * also sort of makes sense. @@@ */
+	  /* TODO: This is under devel: used to have min(sprevsz)
+	   * here, which sort of makes sense, but observed fast
+	   * performance w/ larger tables, which also sort of makes
+	   * sense. @@@ */
 	  usize_t hash_values = stream->winsize;
 
 	  xd3_size_hashtable (stream,
@@ -3523,7 +3523,7 @@ xd3_encode_input (xd3_stream *stream)
       stream->enc_state  = ENC_POSTOUT;
       stream->next_out   = stream->enc_current->base;
       stream->avail_out  = stream->enc_current->next;
-      stream->total_out += (xoff_t) stream->avail_out;
+      stream->total_out += stream->avail_out;
 
       /* If there is any output in this buffer, return it, otherwise
        * fall through to handle the next buffer or finish the window
@@ -3548,7 +3548,7 @@ xd3_encode_input (xd3_stream *stream)
 	  goto enc_output;
 	}
 
-      stream->total_in += (xoff_t) stream->avail_in;
+      stream->total_in += stream->avail_in;
       stream->enc_state = ENC_POSTWIN;
 
       IF_DEBUG2 (DP(RINT "[WINFINISH:%"Q"] in=%"Q"\n",
@@ -3887,7 +3887,7 @@ xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 static xoff_t
 xd3_source_cksum_offset(xd3_stream *stream, usize_t low)
 {
-  return (xoff_t) low;
+  return low;
 }
 #endif
 
@@ -3921,7 +3921,7 @@ xd3_srcwin_setup (xd3_stream *stream)
    * use smaller windows. */
   length = stream->match_maxaddr - stream->match_minaddr;
 
-  x = (xoff_t) USIZE_T_MAX;
+  x = USIZE_T_MAX;
   if (length > x)
     {
       stream->msg = "source window length overflow (not 64bit)";
@@ -4049,7 +4049,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
        * 0--src->size.  We compare the usize_t
        * match_maxfwd/match_maxback against the xoff_t
        * src->size/srcpos values and take the min. */
-      if (srcpos < (xoff_t) stream->match_maxback)
+      if (srcpos < stream->match_maxback)
 	{
 	  stream->match_maxback = (usize_t) srcpos;
 	}
@@ -4058,7 +4058,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	{
 	  xoff_t srcavail = xd3_source_eof (stream->src) - srcpos;
 
-	  if (srcavail < (xoff_t) stream->match_maxfwd)
+	  if (srcavail < stream->match_maxfwd)
 	    {
 	      stream->match_maxfwd = (usize_t) srcavail;
 	    }
@@ -4079,7 +4079,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
   /* Restricted case: fail if the srcpos lies outside the source window */
   if ((srcpos < src->srcbase) ||
-      (srcpos > (src->srcbase + (xoff_t) src->srclen)))
+      (srcpos > (src->srcbase + src->srclen)))
     {
       IF_DEBUG1(DP(RINT "[match_setup] restricted source window failure\n"));
       goto bad;
@@ -4094,7 +4094,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	  stream->match_maxback = srcavail;
 	}
 
-      srcavail = (usize_t) (src->srcbase + (xoff_t) src->srclen - srcpos);
+      srcavail = src->srcbase + src->srclen - srcpos;
       if (srcavail < stream->match_maxfwd)
 	{
 	  stream->match_maxfwd = srcavail;
@@ -4558,7 +4558,7 @@ xd3_verify_large_state (xd3_stream    *stream,
 			const uint8_t *inp,
 			uint32_t          x_cksum)
 {
-  uint32_t cksum = xd3_lcksum (inp, stream->smatcher.large_look);
+  uint32_t cksum = xd3_large_cksum (inp, stream->smatcher.large_look);
   XD3_ASSERT (cksum == x_cksum);
 }
 static void
@@ -4702,7 +4702,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
       do
 	{
-	  uint32_t cksum = xd3_lcksum (stream->src->curblk + blkpos,
+	  uint32_t cksum = xd3_large_cksum (stream->src->curblk + blkpos,
 				       stream->smatcher.large_look);
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
 
@@ -4865,7 +4865,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 	  return ret;
 	}
 
-      lcksum = xd3_lcksum (inp, LLOOK);
+      lcksum = xd3_large_cksum (inp, LLOOK);
     }
 
   /* TRYLAZYLEN: True if a certain length match should be followed by

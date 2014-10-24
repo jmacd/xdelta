@@ -42,7 +42,8 @@ struct _main_blklru
 
 #define MAX_LRU_SIZE 32U
 #define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
-#define XD3_MAXSRCWINSZ (1ULL << 31)
+#define XD3_MAXSRCWINSZ (1ULL << (SIZEOF_USIZE_T * 8 - 1))
+#define XD3_INVALID_OFFSET XOFF_T_MAX
 
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
@@ -157,7 +158,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
    * is the point at which external decompression may begin.  Set the
    * system for a single block. */
   lru_size = 1;
-  lru[0].blkno = (xoff_t) -1;
+  lru[0].blkno = XD3_INVALID_OFFSET;
   blksize = option_srcwinsz;
   main_blklru_list_push_back (& lru_list, & lru[0]);
   XD3_ASSERT (blksize != 0);
@@ -166,7 +167,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->blksize  = blksize;
   source->name     = sfile->filename;
   source->ioh      = sfile;
-  source->curblkno = (xoff_t) -1;
+  source->curblkno = XD3_INVALID_OFFSET;
   source->curblk   = NULL;
   source->max_winsize = option_srcwinsz;
 
@@ -294,7 +295,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	  return 0;
 	}
       /* No going backwards in a sequential scan. */
-      if (blru->blkno != (xoff_t) -1 && blru->blkno > blkno)
+      if (blru->blkno != XD3_INVALID_OFFSET && blru->blkno > blkno)
 	{
 	  return XD3_TOOFARBACK;
 	}
@@ -330,7 +331,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
   lru_filled += 1;
   (*is_new) = 1;
   (*blrup) = blru;
-  blru->blkno = -1;
+  blru->blkno = XD3_INVALID_OFFSET;
   return 0;
 }
 
@@ -532,7 +533,7 @@ main_getblk_func (xd3_stream *stream,
 
   if (option_verbose > 3)
     {
-      if (blru->blkno != (xoff_t)-1)
+      if (blru->blkno != XD3_INVALID_OFFSET)
 	{
 	  if (blru->blkno != blkno)
 	    {

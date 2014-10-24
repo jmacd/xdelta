@@ -249,9 +249,8 @@ static const char *option_source_filename    = NULL;
 static int         option_level              = XD3_DEFAULT_LEVEL;
 static usize_t     option_iopt_size          = XD3_DEFAULT_IOPT_SIZE;
 static usize_t     option_winsize            = XD3_DEFAULT_WINSIZE;
-/* Note: option_srcwinsz is restricted from [16Kb, 4Gb], because
- * addresses in the large hash checksum are 32 bits.  The flag is read
- * as xoff_t, so that 4Gb != 0. */
+
+/* option_srcwinsz is restricted to [16kB, 2GB] when usize_t is 32 bits. */
 static xoff_t      option_srcwinsz           = XD3_DEFAULT_SRCWINSZ;
 static usize_t     option_sprevsz            = XD3_DEFAULT_SPREVSZ;
 
@@ -307,10 +306,6 @@ static void main_get_appheader (xd3_stream *stream, main_file *ifile,
 static int main_getblk_func (xd3_stream *stream,
 			     xd3_source *source,
 			     xoff_t      blkno);
-static void main_free (void *ptr);
-static void* main_malloc (size_t size);
-
-static int main_file_stat (main_file *xfile, xoff_t *size);
 static int main_file_seek (main_file *xfile, xoff_t pos);
 static int main_read_primary_input (main_file   *file,
 				    uint8_t     *buf,
@@ -458,7 +453,7 @@ void* main_bufalloc (size_t size) {
 #endif
 }
 
-static void*
+void*
 main_malloc (size_t size)
 {
   void *r = main_malloc1 (size);
@@ -480,7 +475,7 @@ main_free1 (void *opaque, void *ptr)
   free (ptr);
 }
 
-static void
+void
 main_free (void *ptr)
 {
   if (ptr)
@@ -551,7 +546,7 @@ xd3_mainerror(int err_num) {
 #endif
 }
 
-static long
+long
 get_millisecs_now (void)
 {
 #ifndef _WIN32
@@ -1340,7 +1335,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      if (stream->dec_current2.addr >= stream->dec_cpylen)
 		{
-		  VC(UT " T@%-6"Q,
+		  VC(UT " T@%-6"Z,
 		     stream->dec_current2.addr - stream->dec_cpylen)VE;
 		}
 	      else

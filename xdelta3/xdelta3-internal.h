@@ -31,6 +31,7 @@ void main_file_cleanup (main_file *xfile);
 int main_file_isopen (main_file *xfile);
 int main_file_open (main_file *xfile, const char* name, int mode);
 int main_file_exists (main_file *xfile);
+int main_file_stat (main_file *xfile, xoff_t *size);
 int xd3_whole_append_window (xd3_stream *stream);
 int xd3_main_cmdline (int argc, char **argv);
 int main_file_read (main_file  *ifile,
@@ -40,6 +41,9 @@ int main_file_read (main_file  *ifile,
 		    const char *msg);
 int main_file_write (main_file *ofile, uint8_t *buf, 
 		     usize_t size, const char *msg);
+void* main_malloc (size_t size);
+void main_free (void *ptr);
+
 int test_compare_files (const char* f0, const char* f1);
 usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno);
 xoff_t xd3_source_eof(const xd3_source *src);
@@ -48,6 +52,7 @@ uint32_t xd3_large_cksum_update (uint32_t cksum,
 				 usize_t look);
 int xd3_encode_init_full (xd3_stream *stream);
 usize_t xd3_pow2_roundup (usize_t x);
+long get_millisecs_now ();
 int xd3_process_stream (int            is_encode,
 			xd3_stream    *stream,
 			int          (*func) (xd3_stream *),
@@ -152,5 +157,19 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #ifndef UINT64_MAX
 #define UINT64_MAX 18446744073709551615ULL
 #endif
+
+/* TODO Eliminate this framework... */
+#define HASH_PERMUTE       1    /* The input is permuted by random nums */
+#define ADLER_LARGE_CKSUM  1    /* Adler checksum vs. RK checksum */
+
+#if HASH_PERMUTE == 0
+#define PERMUTE(x) (x)
+#else
+#define PERMUTE(x) (__single_hash[x])
+
+extern const uint16_t __single_hash[256];
+#endif
+
+usize_t xd3_large_cksum (const uint8_t *seg, const usize_t ln);
 
 #endif // XDELTA3_INTERNAL_H__
