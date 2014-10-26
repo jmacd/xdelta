@@ -1,5 +1,5 @@
 /* xdelta3 - delta compression tools and library
- * Copyright (C) 2011, 2012 Joshua P. MacDonald
+ * Copyright (C) 2011, 2012, 2014 Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,9 +47,6 @@ void main_free (void *ptr);
 int test_compare_files (const char* f0, const char* f1);
 usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno);
 xoff_t xd3_source_eof(const xd3_source *src);
-uint32_t xd3_large_cksum_update (uint32_t cksum,
-				 const uint8_t *base,
-				 usize_t look);
 int xd3_encode_init_full (xd3_stream *stream);
 usize_t xd3_pow2_roundup (usize_t x);
 long get_millisecs_now ();
@@ -158,18 +155,9 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #define UINT64_MAX 18446744073709551615ULL
 #endif
 
-/* TODO Eliminate this framework... */
-#define HASH_PERMUTE       1    /* The input is permuted by random nums */
-#define ADLER_LARGE_CKSUM  1    /* Adler checksum vs. RK checksum */
-
-#if HASH_PERMUTE == 0
-#define PERMUTE(x) (x)
-#else
-#define PERMUTE(x) (__single_hash[x])
-
-extern const uint16_t __single_hash[256];
-#endif
-
 usize_t xd3_large_cksum (const uint8_t *seg, const usize_t ln);
+usize_t xd3_large_cksum_update (usize_t cksum,
+				const uint8_t *base,
+				usize_t look);
 
-#endif // XDELTA3_INTERNAL_H__
+#endif /* XDELTA3_INTERNAL_H__ */

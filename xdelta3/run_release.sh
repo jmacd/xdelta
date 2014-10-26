@@ -1,9 +1,17 @@
 #!/bin/sh
 
-CFLAGS=-O2
-CXXFLAGS=-O2
 CC=clang 
 CXX=clang++
+
+#CC=gcc
+#CXX=g++
+
+# These are updated below
+CFLAGS=
+CXXFLAGS=
+
+# Place C/C++ common flags here
+COMMON=-O3
 
 export CFLAGS
 export CXXFLAGS
@@ -25,9 +33,9 @@ rm -rf build
 # autoconf
 
 function resetflag {
-    CFLAGS="-$1 -I$LIBBASE/$MACH/include"
-    CXXFLAGS="-$1 -I$LIBBASE/$MACH/include"
-    LDFLAGS="-$1 -L$LIBBASE/$MACH/lib"
+    CFLAGS="$COMMON -$1 -I$LIBBASE/$MACH/include"
+    CXXFLAGS="$COMMON -$1 -I$LIBBASE/$MACH/include"
+    LDFLAGS="$COMMON -$1 -L$LIBBASE/$MACH/lib"
 }    
 
 function addflag {
@@ -44,7 +52,7 @@ function buildit {
     D=build/$MACH/${sizebits}size-${offsetbits}off
     mkdir -p $D
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
-    (cd $D && make && make install)
+    (cd $D && make xdelta3checksum)
     #echo Running regtest.
     #(cd $D && ./xdelta3regtest)
 }
@@ -67,5 +75,5 @@ function buildall {
     buildit 64 64
 }
 
-buildall m32
 buildall m64
+buildall m32

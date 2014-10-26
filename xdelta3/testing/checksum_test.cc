@@ -28,37 +28,32 @@ struct true_type { };
 struct false_type { };
 
 template <typename Word>
-int bitsof();
+usize_t bitsof();
 
 template<>
-int bitsof<uint32_t>() {
+usize_t bitsof<uint32_t>() {
   return 32;
 }
 
 template<>
-int bitsof<uint64_t>() {
+usize_t bitsof<uint64_t>() {
   return 64;
 }
 
-struct plain {
-  usize_t operator()(const uint8_t &c) {
-    return c;
-  }
-};
-
-struct randperm {
-  usize_t operator()(const uint8_t &c) {
-    return __single_hash[c];
+template <typename Word>
+struct hhash {  // shift "s" bits leaving the high bits as a hash value for
+		// this checksum, which are the most "distant" in terms of the
+		// spectral test for the rabin_karp MLCG.  For short windows,
+		// the high bits aren't enough, XOR "mask" worth of these in.
+  Word operator()(const Word t, const Word s, const Word mask) {
+    return (t >> s) ^ (t & mask);
   }
 };
 
 template <typename Word>
-struct hhash {  // take "h" of the high-bits as a hash value for this
-		// checksum, which are the most "distant" in terms of the
-		// spectral test for the rabin_karp MLCG.  For short windows,
-		// the high bits aren't enough, XOR "mask" worth of these in.
-  Word operator()(const Word& t, const int &h, const int &mask) {
-    return (t >> h) ^ (t & mask);
+struct nonhash {
+  Word operator()(const Word t, const Word h, const Word mask) {
+    return (t >> h) & mask;
   }
 };
 
@@ -77,18 +72,16 @@ uint64_t good_word<uint64_t>() {
 
 // CLASSES
 
-#define SELF Word, CksumSize, CksumSkip, Permute, Hash, Compaction
+#define SELF Word, CksumSize, CksumSkip, Hash, Compaction
 #define MEMBER template <typename Word,		\
 			 int CksumSize,		\
 			 int CksumSkip,		\
-			 typename Permute,	\
 			 typename Hash,		\
                          int Compaction>
 
 MEMBER
 struct cksum_params {
   typedef Word word_type;
-  typedef Permute permute_type;
   typedef Hash hash_type;
 
   static const int cksum_size = CksumSize;
@@ -116,7 +109,7 @@ struct rabin_karp : public cksum_params<SELF> {
   Word step(const uint8_t *ptr) {
     Word h = 0;
     for (int i = 0; i < CksumSize; i++) {
-      h += Permute()(ptr[i]) * powers[i];
+      h += (ptr[i]) * powers[i];
     }
     return h;
   }
@@ -128,8 +121,7 @@ struct rabin_karp : public cksum_params<SELF> {
 
   Word incr(const uint8_t *ptr) {
     incr_state = multiplier * incr_state -
-      product * Permute()(ptr[-1]) +
-      Permute()(ptr[CksumSize - 1]);
+      product * (ptr[-1]) + (ptr[CksumSize - 1]);
     return incr_state;
   }
 
@@ -140,7 +132,7 @@ struct rabin_karp : public cksum_params<SELF> {
 };
 
 MEMBER
-struct adler32_cksum : public cksum_params<SELF> {
+struct large_cksum : public cksum_params<SELF> {
   Word step(const uint8_t *ptr) {
     return xd3_large_cksum (ptr, CksumSize);
   }
@@ -168,15 +160,15 @@ struct file_stats {
   typedef typename table_type::iterator table_iterator;
   typedef typename ptr_list::iterator ptr_iterator;
 
-  int CksumSize;
-  int cksum_skip;
-  int unique;
-  int unique_values;
-  int count;
+  usize_t cksum_size;
+  usize_t cksum_skip;
+  usize_t unique;
+  usize_t unique_values;
+  usize_t count;
   table_type table;
 
-  file_stats(int size, int skip)
-    : CksumSize(size),
+  file_stats(usize_t size, usize_t skip)
+    : cksum_size(size),
       cksum_skip(skip),
       unique(0),
       unique_values(0),
@@ -204,7 +196,7 @@ struct file_stats {
     for (ptr_iterator p_i = pl.begin();
 	 p_i != pl.end();
 	 ++p_i) {
-      if (memcmp(*p_i, ptr, CksumSize) == 0) {
+      if (memcmp(*p_i, ptr, cksum_size) == 0) {
 	return;
       }
     }
@@ -228,28 +220,20 @@ struct test_result_base {
   }
   virtual void reset() = 0;
   virtual void print() = 0;
-  virtual void get(const uint8_t* buf, const int buf_size, int iters) = 0;
+  virtual void get(const uint8_t* buf, const size_t buf_size, 
+		   usize_t iters) = 0;
   virtual void stat() = 0;
-  virtual int count() = 0;
-  virtual int dups() = 0;
+  virtual usize_t count() = 0;
+  virtual usize_t dups() = 0;
   virtual double uniqueness() = 0;
   virtual double fullness() = 0;
   virtual double collisions() = 0;
   virtual double coverage() = 0;
   virtual double compression() = 0;
   virtual double time() = 0;
-  virtual double score() = 0;
-  virtual void set_score(double min_dups_frac, double min_time) = 0;
   virtual double total_time() = 0;
-  virtual int total_count() = 0;
-  virtual int total_dups() = 0;
-};
-
-struct compare_h {
-  bool operator()(test_result_base *a,
-		  test_result_base *b) {
-    return a->score() < b->score();
-  }
+  virtual usize_t total_count() = 0;
+  virtual usize_t total_dups() = 0;
 };
 
 template <typename Checksum>
@@ -257,25 +241,24 @@ struct test_result : public test_result_base {
   Checksum cksum;
   const char *test_name;
   file_stats<typename Checksum::word_type> fstats;
-  int test_size;
-  int n_steps;
-  int n_incrs;
-  int s_bits;
-  int s_mask;
-  int t_entries;
-  int h_bits;
-  int h_buckets_full;
-  double h_score;
+  usize_t test_size;
+  usize_t n_steps;
+  usize_t n_incrs;
+  typename Checksum::word_type s_bits;
+  typename Checksum::word_type s_mask;
+  usize_t t_entries;
+  usize_t h_bits;
+  usize_t h_buckets_full;
   char *hash_table;
   long accum_millis;
-  int accum_iters;
+  usize_t accum_iters;
 
   // These are not reset
   double accum_time;
-  int accum_count;
-  int accum_dups;
-  int accum_colls;
-  int accum_size;
+  usize_t accum_count;
+  usize_t accum_dups;
+  usize_t accum_colls;
+  size_t accum_size;
 
   test_result(const char *name)
     : test_name(name),
@@ -297,18 +280,18 @@ struct test_result : public test_result_base {
 
   void reset() {
     // size of file
-    test_size = -1;
+    test_size = 0;
 
     // count
-    n_steps = -1;
-    n_incrs = -1;
+    n_steps = 0;
+    n_incrs = 0;
 
     // four values used by new_table()/summarize_table()
-    s_bits = -1;
-    s_mask = -1;
-    t_entries = -1;
-    h_bits = -1;
-    h_buckets_full = -1;
+    s_bits = 0;
+    s_mask = 0;
+    t_entries = 0;
+    h_bits = 0;
+    h_buckets_full = 0;
 
     accum_millis = 0;
     accum_iters = 0;
@@ -322,7 +305,7 @@ struct test_result : public test_result_base {
     }
   }
 
-  int count() {
+  usize_t count() {
     if (Checksum::cksum_skip == 1) {
       return n_incrs;
     } else {
@@ -330,12 +313,17 @@ struct test_result : public test_result_base {
     }
   }
 
-  int dups() {
+  usize_t dups() {
     return fstats.count - fstats.unique;
   }
 
-  int colls() {
-    return fstats.unique - fstats.unique_values;
+  /* Fraction of distinct strings of length cksum_size which are not
+   * represented in the hash table. */
+  double collisions() {
+    return (fstats.unique - fstats.unique_values) / fstats.unique;
+  }
+  usize_t colls() {
+    return (fstats.unique - fstats.unique_values);
   }
 
   double uniqueness() {
@@ -344,10 +332,6 @@ struct test_result : public test_result_base {
 
   double fullness() {
     return (double) h_buckets_full / (1 << h_bits);
-  }
-
-  double collisions() {
-    return (double) colls() / fstats.unique;
   }
 
   double coverage() {
@@ -362,28 +346,19 @@ struct test_result : public test_result_base {
     return (double) accum_millis / accum_iters;
   }
 
-  double score() {
-    return h_score;
-  }
-
-  void set_score(double min_compression, double min_time) {
-    h_score = (compression() - 0.99 * min_compression)
-      * (time() - 0.99 * min_time);
-  }
-
   double total_time() {
     return accum_time;
   }
 
-  int total_count() {
+  usize_t total_count() {
     return accum_count;
   }
 
-  int total_dups() {
+  usize_t total_dups() {
     return accum_dups;
   }
 
-  int total_colls() {
+  usize_t total_colls() {
     return accum_dups;
   }
 
@@ -400,26 +375,29 @@ struct test_result : public test_result_base {
       fprintf(stderr, "internal error: %d != %d\n", fstats.count, count());
       abort();
     }
-    printf("%s: (%u#%u) count %u uniq %0.2f%% full %u (%0.4f%% coll %0.4f%%) "
-	   "covers %0.2f%% w/ 2^%d @ %.4f MB/s %u iters\n",
+    {
+      static int hdr_cnt = 0;
+      if (hdr_cnt++ % 20 == 0) {
+	printf("Name\tConf\tCount\tUniq\tFull\tColl\tCov\tMB/s\tIters\n");
+      }
+    }
+    printf("%s\t%d/%d/1<<%d\t%u\t%0.2f\t%.2f\t%.2f\t%.2f\t%.4f\t%u\n",
 	   test_name,
 	   Checksum::cksum_size,
 	   Checksum::cksum_skip,
-	   count(),
-	   100.0 * uniqueness(),
-	   h_buckets_full,
-	   100.0 * fullness(),
-	   100.0 * collisions(),
-	   100.0 * coverage(),
 	   h_bits,
+	   count(),
+	   uniqueness(),
+	   fullness(),
+	   collisions(),
+	   coverage(),
 	   0.001 * accum_iters * test_size / accum_millis,
 	   accum_iters);
   }
 
-  int size_log2 (int slots)
-  {
-    int bits = bitsof<typename Checksum::word_type>() - 1;
-    int i;
+  usize_t size_log2 (usize_t slots) {
+    usize_t bits = bitsof<typename Checksum::word_type>() - 1;
+    usize_t i;
 
     for (i = 3; i <= bits; i += 1) {
       if (slots <= (1 << i)) {
@@ -430,31 +408,31 @@ struct test_result : public test_result_base {
     return bits;
   }
 
-  void new_table(int entries) {
+  void new_table(usize_t entries) {
     t_entries = entries;
     h_bits = size_log2(entries);
 
-    int n = 1 << h_bits;
+    usize_t n = 1 << h_bits;
 
     s_bits = bitsof<typename Checksum::word_type>() - h_bits;
-    s_mask = n - 1;
+    s_mask = n - 1U;
 
     hash_table = new char[n / 8];
     memset(hash_table, 0, n / 8);
   }
 
-  int get_table_bit(int i) {
+  int get_table_bit(usize_t i) {
     return hash_table[i/8] & (1 << i%8);
   }
 
-  int set_table_bit(int i) {
+  int set_table_bit(usize_t i) {
     return hash_table[i/8] |= (1 << i%8);
   }
 
   void summarize_table() {
-    int n = 1 << h_bits;
-    int f = 0;
-    for (int i = 0; i < n; i++) {
+    usize_t n = 1 << h_bits;
+    usize_t f = 0;
+    for (usize_t i = 0; i < n; i++) {
       if (get_table_bit(i)) {
 	f++;
       }
@@ -462,12 +440,12 @@ struct test_result : public test_result_base {
     h_buckets_full = f;
   }
 
-  void get(const uint8_t* buf, const int buf_size, int test_iters) {
+  void get(const uint8_t* buf, const size_t buf_size, usize_t test_iters) {
     typename Checksum::hash_type hash;
     const uint8_t *ptr;
     const uint8_t *end;
+    usize_t periods;
     int last_offset;
-    int periods;
     int stop;
 
     test_size = buf_size;
@@ -488,7 +466,7 @@ struct test_result : public test_result_base {
     // Compute file stats once.
     if (fstats.unique_values == 0) {
       if (Checksum::cksum_skip == 1) {
-	for (int i = 0; i <= buf_size - Checksum::cksum_size; i++) {
+	for (size_t i = 0; i <= buf_size - Checksum::cksum_size; i++) {
 	  fstats.update(hash(cksum.step(buf + i), s_bits, s_mask), buf + i);
 	}
       } else {
@@ -507,7 +485,7 @@ struct test_result : public test_result_base {
     if (Checksum::cksum_skip != 1) {
       new_table(n_steps);
 
-      for (int i = 0; i < test_iters; i++) {
+      for (usize_t i = 0; i < test_iters; i++) {
 	ptr = buf + last_offset;
 	end = buf + stop;
 
@@ -528,7 +506,7 @@ struct test_result : public test_result_base {
 
       new_table(n_incrs);
 
-      for (int i = 0; i < test_iters; i++) {
+      for (usize_t i = 0; i < test_iters; i++) {
 	ptr = buf;
 	end = buf + stop;
 
@@ -608,29 +586,31 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-#define TEST(T,Z,S,P,H,C)                                      \
-  test_result<rabin_karp<T,Z,S,P,H<T>,C>>			\
-    _rka_ ## T ## _ ## Z ## _ ## S ## _ ## P ## _ ## H ## _ ## C	\
-    ("rka_" #T "_" #Z "_" #S "_" #P "_" #H "_" #C);		\
-  test_result<adler32_cksum<T,Z,S,P,H<T>,C>>			        \
-    _a32_ ## T ## _ ## Z ## _ ## S ## _ ## P ## _ ## H ## _ ## C	\
-    ("a32_" #T "_" #Z "_" #S "_" #P "_" #H "_" #C)
+#define TEST(T,Z,S,H,C)                                      \
+  test_result<rabin_karp<T,Z,S,H<T>,C>>			\
+    _rka_ ## T ## _ ## Z ## _ ## S ## _ ## H ## _ ## C	\
+    ("rka_" #T "_" #Z "_" #S "_" #H "_" #C);		\
+  test_result<large_cksum<T,Z,S,H<T>,C>>			        \
+    _xck_ ## T ## _ ## Z ## _ ## S ## _ ## H ## _ ## C			\
+    ("xck_" #T "_" #Z "_" #S "_" #H "_" #C)
 
 
 #define TESTS(SIZE, SKIP)				\
-  TEST(uint32_t, SIZE, SKIP, randperm, hhash, 1);	\
-  TEST(uint32_t, SIZE, SKIP, plain, hhash, 1);		\
-  TEST(uint32_t, SIZE, SKIP, randperm, hhash, 2);	\
-  TEST(uint32_t, SIZE, SKIP, plain, hhash, 2);		\
-  TEST(uint32_t, SIZE, SKIP, randperm, hhash, 3);       \
-  TEST(uint32_t, SIZE, SKIP, plain, hhash, 3)
+  TEST(uint32_t, SIZE, SKIP, nonhash, 1);		\
+  TEST(uint32_t, SIZE, SKIP, nonhash, 2);		\
+  TEST(uint32_t, SIZE, SKIP, hhash, 1);			\
+  TEST(uint32_t, SIZE, SKIP, hhash, 2);			\
+  TEST(uint64_t, SIZE, SKIP, nonhash, 1);		\
+  TEST(uint64_t, SIZE, SKIP, nonhash, 2);               \
+  TEST(uint64_t, SIZE, SKIP, hhash, 1);			\
+  TEST(uint64_t, SIZE, SKIP, hhash, 2)
   
-  // TESTS(9, 9);
+  TESTS(9, 9);
   // TESTS(9, 15);
-  // TESTS(15, 15);
+  TESTS(15, 15);
   TESTS(127, 127);
   // TESTS(127, 211);
-  // TESTS(211, 211);
+  TESTS(211, 211);
 
   for (i = 1; i < argc; i++) {
     if ((ret = read_whole_file(argv[i],
@@ -650,7 +630,7 @@ int main(int argc, char** argv) {
       test_result_base *test = *iter;
       test->reset();
 
-      int iters = 100;
+      usize_t iters = 100;
       long start_test = get_millisecs_now();
 
       do {

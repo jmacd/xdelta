@@ -42,7 +42,7 @@ xdelta3checksum_SOURCES = $(common_SOURCES) \
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
-	 -Wno-unused-parameter # -Weverything #-Wconversion
+	 -Wno-unused-parameter # -Wconversion
 
 
 C_WFLAGS = $(WFLAGS) -pedantic -std=c99

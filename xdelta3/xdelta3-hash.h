@@ -1,5 +1,6 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
+ * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007, 2011, 2012, 2014.
+ * Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -34,36 +35,16 @@
 #define SMALL_HASH_DEBUG2(s,inp)
 #endif /* XD3_DEBUG */
 
-/* This is a good hash multiplier for 32-bit LCGs: see "linear
- * congruential generators of different sizes and good lattice
- * structure" */
-static const uint32_t hash_multiplier = 1597334677U;
-
-/***********************************************************************
- Permute stuff
- ***********************************************************************/
-
-/* Update the checksum state. */
-#if ADLER_LARGE_CKSUM
-inline uint32_t
-xd3_large_cksum_update (uint32_t cksum,
-			const uint8_t *base,
-			usize_t look) {
-  uint32_t old_c = PERMUTE(base[0]);
-  uint32_t new_c = PERMUTE(base[look]);
-  uint32_t low   = ((cksum & 0xffff) - old_c + new_c) & 0xffff;
-  uint32_t high  = ((cksum >> 16) - (old_c * look) + low) & 0xffff;
-  return (high << 16) | low;
-}
-#else
-/* TODO: revisit this topic */
-#endif
-
 #if UNALIGNED_OK
 #define UNALIGNED_READ32(dest,src) (*(dest)) = (*(uint32_t*)(src))
 #else
 #define UNALIGNED_READ32(dest,src) memcpy((dest), (src), 4);
 #endif
+
+/* This is a good hash multiplier for 32-bit LCGs: see "linear
+ * congruential generators of different sizes and good lattice
+ * structure" */
+static const uint32_t hash_multiplier = 1597334677U;
 
 /* TODO: small cksum is hard-coded for 4 bytes (i.e., "look" is unused) */
 static inline uint32_t
@@ -83,41 +64,111 @@ xd3_small_cksum_update (uint32_t *state,
   return (*state) * hash_multiplier;
 }
 
-/***********************************************************************
- Ctable stuff
- ***********************************************************************/
-
 static inline usize_t
 xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum)
 {
   return (cksum >> cfg->shift) ^ (cksum & cfg->mask);
 }
 
-/***********************************************************************
- Cksum function
- ***********************************************************************/
+#if XD3_ENCODER
+#define PERMUTE32(x) (__single_hash32[x])
+extern const uint16_t __single_hash32[256];
 
-#if ADLER_LARGE_CKSUM
-inline usize_t
-xd3_large_cksum (const uint8_t *seg, const usize_t ln)
+inline uint32_t
+xd3_large32_cksum (const uint8_t *seg, const usize_t ln)
 {
+  static const uint32_t kBits = 16;
+  static const uint32_t kMask = 0xffff;
   usize_t i = 0;
   uint32_t low  = 0;
   uint32_t high = 0;
 
   for (; i < ln; i += 1)
     {
-      low  += PERMUTE(*seg++);
+      low  += PERMUTE32(*seg++);
       high += low;
     }
 
-  return ((high & 0xffff) << 16) | (low & 0xffff);
+  return ((high & kMask) << kBits) | (low & kMask);
 }
-#else
-/* TODO */
-#endif
 
-#if XD3_ENCODER
+inline uint32_t
+xd3_large32_cksum_update (uint32_t cksum,
+			  const uint8_t *base,
+			  usize_t look) 
+{
+  static const uint32_t kBits = 16;
+  static const uint32_t kMask = 0xffff;
+  uint32_t old_c = PERMUTE32(base[0]);
+  uint32_t new_c = PERMUTE32(base[look]);
+  uint32_t low   = ((cksum & kMask) - old_c + new_c) & kMask;
+  uint32_t high  = ((cksum >> kBits) - (old_c * look) + low) & kMask;
+  return (high << kBits) | low;
+}
+
+#undef PERMUTE32
+
+#define PERMUTE64(x) (__single_hash64[x])
+extern const uint32_t __single_hash64[256];
+
+inline uint64_t
+xd3_large64_cksum (const uint8_t *seg, const usize_t len)
+{
+  static const uint64_t kBits = 32;
+  static const uint64_t kMask = 0xffffffff;
+  usize_t i = 0;
+  uint64_t low  = 0;
+  uint64_t high = 0;
+
+  for (; i < len; i += 1)
+    {
+      low  += PERMUTE64(*seg++);
+      high += low;
+    }
+
+  return ((high & kMask) << kBits) | (low & kMask);
+}
+
+inline uint64_t
+xd3_large64_cksum_update (uint64_t cksum,
+			  const uint8_t *base,
+			  usize_t look) 
+{
+  static const uint64_t kBits = 32;
+  static const uint64_t kMask = 0xffffffff;
+  uint64_t old_c = PERMUTE64(base[0]);
+  uint64_t new_c = PERMUTE64(base[look]);
+  uint64_t low   = ((cksum & kMask) - old_c + new_c) & kMask;
+  uint64_t high  = ((cksum >> kBits) - (old_c * look) + low) & kMask;
+  return (high << kBits) | low;
+}
+
+#undef PERMUTE64
+
+inline usize_t
+xd3_large_cksum (const uint8_t *seg, const usize_t len) 
+{
+  if (SIZEOF_USIZE_T == 4) 
+    {
+      return xd3_large32_cksum (seg, len);     
+    }
+  else
+    {
+      return xd3_large64_cksum (seg, len);
+    }
+}
+
+inline usize_t
+xd3_large_cksum_update (usize_t cksum,
+			const uint8_t *base,
+			usize_t look) {
+#if SIZEOF_USIZE_T == 4
+  return xd3_large32_cksum_update (cksum, base, look);
+#else
+  return xd3_large64_cksum_update (cksum, base, look);
+#endif
+}
+
 static usize_t
 xd3_size_hashtable_bits (usize_t slots)
 {
@@ -139,16 +190,16 @@ xd3_size_hashtable_bits (usize_t slots)
 }
 
 static void
-xd3_size_hashtable (xd3_stream    *stream,
-		    usize_t        slots,
-		    xd3_hash_cfg  *cfg)
+xd3_size_hashtable (xd3_stream   *stream,
+		    usize_t       slots,
+		    xd3_hash_cfg *cfg)
 {
   usize_t bits = xd3_size_hashtable_bits (slots);
 
-  cfg->size  = (1 << bits);
+  cfg->size  = (1U << bits);
   cfg->mask  = (cfg->size - 1);
   cfg->shift = (SIZEOF_USIZE_T * 8) - bits;
 }
-#endif
 
 #endif
+#endif /* _XDELTA3_HASH_H_ */

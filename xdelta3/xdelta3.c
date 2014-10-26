@@ -535,7 +535,7 @@ static void xd3_verify_run_state (xd3_stream    *stream,
 				  uint8_t       *x_run_c);
 static void xd3_verify_large_state (xd3_stream *stream,
 				    const uint8_t *inp,
-				    uint32_t x_cksum);
+				    usize_t x_cksum);
 static void xd3_verify_small_state (xd3_stream    *stream,
 				    const uint8_t *inp,
 				    uint32_t          x_cksum);
@@ -567,17 +567,17 @@ static int         xd3_selftest      (void);
 #define UINT64_OFLOW_MASK 0xfe00000000000000ULL
 
 #if SIZEOF_USIZE_T == 4
-#define USIZE_T_MAX        UINT32_MAX
-#define xd3_decode_size   xd3_decode_uint32_t
-#define xd3_emit_size     xd3_emit_uint32_t
-#define xd3_sizeof_size   xd3_sizeof_uint32_t
-#define xd3_read_size     xd3_read_uint32_t
+#define USIZE_T_MAX             UINT32_MAX
+#define xd3_decode_size         xd3_decode_uint32_t
+#define xd3_emit_size           xd3_emit_uint32_t
+#define xd3_sizeof_size         xd3_sizeof_uint32_t
+#define xd3_read_size           xd3_read_uint32_t
 #elif SIZEOF_USIZE_T == 8
-#define USIZE_T_MAX        UINT64_MAX
-#define xd3_decode_size   xd3_decode_uint64_t
-#define xd3_emit_size     xd3_emit_uint64_t
-#define xd3_sizeof_size   xd3_sizeof_uint64_t
-#define xd3_read_size     xd3_read_uint64_t
+#define USIZE_T_MAX             UINT64_MAX
+#define xd3_decode_size         xd3_decode_uint64_t
+#define xd3_emit_size           xd3_emit_uint64_t
+#define xd3_sizeof_size         xd3_sizeof_uint64_t
+#define xd3_read_size           xd3_read_uint64_t
 #endif
 
 #if SIZEOF_XOFF_T == 4
@@ -798,10 +798,9 @@ const xd3_sec_type lzma_sec_type =
 #endif /* __XDELTA3_C_HEADER_PASS__ */
 #ifdef __XDELTA3_C_INLINE_PASS__
 
-const uint16_t __single_hash[256] =
+const uint16_t __single_hash32[256] =
 {
-  /* Random numbers generated using SLIB's pseudo-random number generator.
-   * This hashes the input alphabet. */
+  /* This hashes the input alphabet (Scheme SLIB pseudo-random). */
   0xbcd1, 0xbb65, 0x42c2, 0xdffe, 0x9666, 0x431b, 0x8504, 0xeb46,
   0x6379, 0xd460, 0xcf14, 0x53cf, 0xdb51, 0xdb08, 0x12c8, 0xf602,
   0xe766, 0x2394, 0x250d, 0xdcbb, 0xa678, 0x02af, 0xa5c6, 0x7ea6,
@@ -834,6 +833,75 @@ const uint16_t __single_hash[256] =
   0x1738, 0xd9a8, 0x19ea, 0x2d33, 0x9698, 0x2fe9, 0x323f, 0xcde2,
   0x6d71, 0xe37d, 0xb697, 0x2c4f, 0x4373, 0x9102, 0x075d, 0x8e25,
   0x1672, 0xec28, 0x6acb, 0x86cc, 0x186e, 0x9414, 0xd674, 0xd1a5
+};
+
+const uint32_t __single_hash64[256] =
+{
+  /* http://random.org 2014.10.24 */
+  0xd25e9f0a, 0xb1af9d5e, 0xb753dfa2, 0x157050f7,  /* 0 */
+  0xc84b072c, 0xdd14fe7c, 0xf92208c3, 0xdf08a0c0,
+  0x63a5c118, 0x76f5d90f, 0xa2f8b93e, 0xb6c12d22,
+  0xaf074957, 0x966fb7d9, 0x62f7b785, 0xb40e8a09,
+  0x0a811d5d, 0x323a6daa, 0xb62f7c5b, 0xfdcb9a53,
+  0xf25a9067, 0x4506bc7a, 0xff58a74b, 0x5ae62817,
+  0x74097675, 0x722c0fd9, 0x116a2a66, 0x65f76728,
+  0x72c79651, 0xe043cf9d, 0x64b867c7, 0x6604834f,
+  0xcdca58a6, 0x0f164e2d, 0x24515f05, 0x632cdbf8,
+  0x18091d4a, 0x3eff4128, 0x673d1c33, 0xd8e10c71,
+  0x1a3edf11, 0xba52892f, 0xa56949e0, 0xf3e1dd77,  /* 10 */
+  0x86fcbe3e, 0x138d66d0, 0x4fc98359, 0xc22e5dd6,
+  0xc59f2267, 0x6c6dd739, 0xe03da190, 0x07e8469c,
+  0xadcfb02c, 0x00d3b0d9, 0xa1f44918, 0x8bd84d87,
+  0x08ec9ec1, 0xbbcd156f, 0xb57718e3, 0x3177e752,
+  0xf52a4d70, 0xde7aaad9, 0x075f1da0, 0x21ba00c6,
+  0xb9469a5c, 0xcf08d5ba, 0x91ac9edc, 0xc6167b63,
+  0xc1974919, 0xc8c8d195, 0x4b1996dd, 0xeff8991c,
+  0xf7f66c6b, 0x25b012e2, 0x59d12a98, 0xea40d3cc,
+  0x41f9970b, 0xec48101a, 0xa3bdcf90, 0x99f16905,
+  0x27af6c97, 0xc849af37, 0x49cad89b, 0xf48c2278,  /* 20 */
+  0x5529c3d8, 0x9e7d6dce, 0x16feb52d, 0xf1b0aca1,
+  0xaf28fccb, 0x48e4ce3c, 0xc4436617, 0x64524e3e,
+  0x61806681, 0x6384f2d7, 0x1172880f, 0x34a5ef5f,
+  0xcc8cc0a8, 0x66e8f100, 0x2866085f, 0xba9b1b2d,
+  0x51285949, 0x2be4b574, 0x889b1ef5, 0x3dbe920d,
+  0x9277a62f, 0x0584a9f6, 0x085d8fc4, 0x4b5d403d,
+  0x4e46ca78, 0x3294c2f9, 0x29313e70, 0xe4f09b24,
+  0xe73b331c, 0x072f5552, 0x2e390b78, 0xea0021ca,
+  0xd8f40320, 0xed0e16fd, 0x7de9cf7a, 0xf17e3d6c,
+  0x8df1bd85, 0x052cae67, 0x3486e512, 0x3a1c09b8,  /* 30 */
+  0x6c2a7b4e, 0x83455753, 0xbc0353ac, 0x0ffe20b6,
+  0x5fdcef85, 0x010f506c, 0x595ce972, 0xe28680d0,
+  0xa7e216b2, 0xa392ee0f, 0x25b73faa, 0x2b1f4983,
+  0xeeaefe98, 0x1d3d9cbc, 0x6aebe97b, 0x8b7b3584,
+  0x9e6a9a07, 0xd37f1e99, 0x4ac2a441, 0x8ae9a213,
+  0x7d0e27d7, 0x5de54b9a, 0x8621de1f, 0xf0f2f866,
+  0xcb08d275, 0x49c3f87e, 0xd5ee68c1, 0x9802fc77,
+  0x68be6c5e, 0x65aa8c27, 0xf423d5f7, 0x10ec5502,
+  0x9909bce1, 0x509cdf1b, 0x338fea72, 0x2733e9bf,
+  0xf92f4fd7, 0x87738ea2, 0x931a8bbc, 0x0a5c9155,  /* 40 */
+  0xbe5edd9b, 0xadbf5838, 0x0338f8d2, 0x290da210,
+  0x390c37d8, 0xe7cffae8, 0x20617ebe, 0x464322dd,
+  0x7b3c4e78, 0xac142dcb, 0x2d5cef76, 0xd8fe49fc,
+  0x60f4e9a9, 0x7473816f, 0x0dc35f39, 0x5eed80c1,
+  0x0cb55ab6, 0x1d3ac541, 0x13c7f529, 0x7bffdf4a,
+  0xe334785b, 0x85263ec1, 0xd132ae56, 0x7c868b9e,
+  0x47f60638, 0x1012b979, 0x81c31dd3, 0x1af868c8,
+  0x0c5d0742, 0xd1b3e1a2, 0x5873200a, 0xf848465c,
+  0x0fc4d596, 0x609c18af, 0xc9f5a480, 0xd1a94a84,
+  0xa1431a3f, 0x7de8bb1a, 0x25f1256b, 0x1dcc732c,  /* 50 */
+  0x6aa1549a, 0xa2367281, 0x32f2a77e, 0x82e62a0f,
+  0x045cbb56, 0x74b2027c, 0xd71a32d9, 0x022e7cb5,
+  0xe99be177, 0x60222fdf, 0xd69681ca, 0x9008ee2c,
+  0x32923db4, 0xcf82bf97, 0x38960a5b, 0xb3503d5b,
+  0x9bd4c7f2, 0x33c029c8, 0x1ef504a3, 0xdb249d3b,
+  0x91e89676, 0x4ca43b36, 0x9191433c, 0x465d5dc4,
+  0xf4dcb118, 0x9d11dd00, 0xb592f058, 0xdbe5ce30,
+  0x74790d92, 0x779850a8, 0x7180d25b, 0xfa951d99,
+  0x5990935a, 0x921cb022, 0x3b7c39bc, 0x6a38a7c7,
+  0xdc22703b, 0x142bab3b, 0x4e3d9479, 0x44bb8482,  /* 60 */
+  0x8043abce, 0xfebe832a, 0x8e6a2f98, 0x4d43c4fe,
+  0xd192a70a, 0x802f3c3a, 0x5d11bbab, 0x2665d241,
+  0xb3f3a680, 0x3a8d223f, 0xcf82cdb4, 0x4ed28743,
 };
 
 /****************************************************************
@@ -952,7 +1020,7 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
 {
   uint8_t size1, size2;
   uint8_t mode;
-  usize_t cpy_modes = 2 + desc->near_modes + desc->same_modes;
+  usize_t cpy_modes = 2U + desc->near_modes + desc->same_modes;
   xd3_dinst *d = tbl;
 
   (d++)->type1 = XD3_RUN;
@@ -968,7 +1036,7 @@ xd3_build_code_table (const xd3_code_table_desc *desc, xd3_dinst *tbl)
     {
       (d++)->type1 = XD3_CPY + mode;
 
-      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes; 
+      for (size1 = MIN_MATCH; size1 < MIN_MATCH + desc->cpy_sizes;
 	   size1 += 1, d += 1)
 	{
 	  d->type1 = XD3_CPY + mode;
@@ -1078,8 +1146,8 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 		if ( (inst->size <= 6) &&
 		     (mode       <= 5) )
 		  {
-		    prev->code2 = (uint8_t)(163 + (mode * 12) + 
-					    (3 * (prev->size - 1)) + 
+		    prev->code2 = (uint8_t)(163 + (mode * 12) +
+					    (3 * (prev->size - 1)) +
 					    (inst->size - 4));
 		    XD3_ASSERT (prev->code2 <= 234);
 		  }
@@ -1358,10 +1426,10 @@ xd3_emit_bytes (xd3_stream     *stream,
  Integer encoder/decoder functions
  **********************************************************************/
 
-#define DECODE_INTEGER_TYPE(PART,OFLOW)                                \
+#define DECODE_INTEGER_TYPE(TYPE,PART,OFLOW)			       \
   while (stream->avail_in != 0)                                        \
     {                                                                  \
-      usize_t next = stream->next_in[0];                               \
+      TYPE next = stream->next_in[0];				       \
                                                                        \
       DECODE_INPUT(1);                                                 \
                                                                        \
@@ -1386,8 +1454,8 @@ xd3_emit_bytes (xd3_stream     *stream,
 
 #define READ_INTEGER_TYPE(TYPE, OFLOW)                                 \
   TYPE val = 0;                                                        \
+  TYPE next;							       \
   const uint8_t *inp = (*inpp);                                        \
-  usize_t next;                                                        \
                                                                        \
   do                                                                   \
     {                                                                  \
@@ -1447,7 +1515,7 @@ xd3_sizeof_uint32_t (uint32_t num)
 
 int
 xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
-{ DECODE_INTEGER_TYPE (stream->dec_32part, UINT32_OFLOW_MASK); }
+{ DECODE_INTEGER_TYPE (uint32_t, stream->dec_32part, UINT32_OFLOW_MASK); }
 
 int
 xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
@@ -1464,7 +1532,7 @@ xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
 #if USE_UINT64
 int
 xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
-{ DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
+{ DECODE_INTEGER_TYPE (uint64_t, stream->dec_64part, UINT64_OFLOW_MASK); }
 
 #if XD3_ENCODER
 int
@@ -2525,7 +2593,8 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
     {
       if (stream->iout->code2 != 0)
 	{
-	  if ((ret = xd3_emit_double (stream, stream->iout, inst, stream->iout->code2))) { return ret; }
+	  if ((ret = xd3_emit_double (stream, stream->iout, inst, 
+				      stream->iout->code2))) { return ret; }
 
 	  xd3_iopt_free_nonadd (stream, stream->iout);
 	  xd3_iopt_free_nonadd (stream, inst);
@@ -3612,7 +3681,7 @@ xd3_process_stream (int            is_encode,
 	case XD3_OUTPUT: { /* memcpy below */ break; }
 	case XD3_INPUT: {
 	  n = min(stream->winsize, input_size - ipos);
-	  if (n == 0) 
+	  if (n == 0)
 	    {
 	      goto done;
 	    }
@@ -3948,13 +4017,13 @@ xd3_srcwin_setup (xd3_stream *stream)
 
   if (src->eof_known)
     {
-      /* Note: if the source size is known, we must reduce srclen or 
+      /* Note: if the source size is known, we must reduce srclen or
        * code that expects to pass a single block w/ getblk == NULL
        * will not function, as the code will return GETSRCBLK asking
        * for the second block. */
       src->srclen = min (src->srclen, xd3_source_eof(src) - src->srcbase);
     }
-  
+
   IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %llu len %llu\n",
 		src->srcbase, src->srclen));
 
@@ -4545,7 +4614,7 @@ xd3_smatch (xd3_stream *stream,
 static void
 xd3_verify_small_state (xd3_stream    *stream,
 			const uint8_t *inp,
-			uint32_t          x_cksum)
+			uint32_t       x_cksum)
 {
   uint32_t state;
   uint32_t cksum = xd3_scksum (&state, inp, stream->smatcher.small_look);
@@ -4556,9 +4625,9 @@ xd3_verify_small_state (xd3_stream    *stream,
 static void
 xd3_verify_large_state (xd3_stream    *stream,
 			const uint8_t *inp,
-			uint32_t          x_cksum)
+			usize_t        x_cksum)
 {
-  uint32_t cksum = xd3_large_cksum (inp, stream->smatcher.large_look);
+  usize_t cksum = xd3_large_cksum (inp, stream->smatcher.large_look);
   XD3_ASSERT (cksum == x_cksum);
 }
 static void
@@ -4702,7 +4771,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
       do
 	{
-	  uint32_t cksum = xd3_large_cksum (stream->src->curblk + blkpos,
+	  usize_t cksum = xd3_large_cksum (stream->src->curblk + blkpos,
 				       stream->smatcher.large_look);
 	  usize_t hval = xd3_checksum_hash (& stream->large_hash, cksum);
 
@@ -4795,7 +4864,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   const uint8_t *inp;
   uint32_t       scksum = 0;
   uint32_t       scksum_state = 0;
-  uint32_t       lcksum = 0;
+  usize_t        lcksum = 0;
   usize_t        sinx;
   usize_t        linx;
   uint8_t        run_c;

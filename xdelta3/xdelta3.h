@@ -1,6 +1,6 @@
 /* xdelta 3 - delta compression tools and library
  * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007,
- * 2008, 2009, 2010, 2011, 2012, 2013.  Joshua P. MacDonald
+ * 2008, 2009, 2010, 2011, 2012, 2013, 2014.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -720,7 +720,7 @@ struct _xd3_config
   xd3_alloc_func    *alloc;
   xd3_free_func     *freef;
   void              *opaque;        /* Not used. */
-  int                flags;         /* stream->flags are initialized
+  uint32_t           flags;         /* stream->flags are initialized
 				     * from xd3_config & never
 				     * modified by the library.  Use
 				     * xd3_set_flags to modify flags
@@ -1249,7 +1249,7 @@ const char* xd3_strerror (int ret);
    specified flags. */
 static inline
 void    xd3_init_config (xd3_config *config,
-			 int         flags)
+			 uint32_t    flags)
 {
   memset (config, 0, sizeof (*config));
   config->flags = flags;
