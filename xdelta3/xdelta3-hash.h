@@ -72,6 +72,7 @@ xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum)
   return (cksum >> cfg->shift) ^ (cksum & cfg->mask);
 }
 
+#if SIZEOF_USIZE_T == 4
 inline uint32_t
 xd3_large32_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look)
 {
@@ -88,7 +89,9 @@ xd3_large32_cksum_update (xd3_hash_cfg *cfg, const uint32_t cksum,
 {
   return xd3_hash_multiplier32 * cksum - cfg->multiplier * base[0] + base[look];
 }
+#endif
 
+#if SIZEOF_USIZE_T == 8
 inline uint64_t
 xd3_large64_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look)
 {
@@ -105,6 +108,7 @@ xd3_large64_cksum_update (xd3_hash_cfg *cfg, const uint64_t cksum,
 {
   return xd3_hash_multiplier64 * cksum - cfg->multiplier * base[0] + base[look];
 }
+#endif
 
 static usize_t
 xd3_size_hashtable_bits (usize_t slots)

@@ -176,9 +176,9 @@ struct with_stream : public cksum_params<SELF> {
 };
 
 MEMBER
-struct large64_cksum : public with_stream<SELF> {
+struct large_cksum : public with_stream<SELF> {
   Word step(const uint8_t *ptr) {
-    return xd3_large64_cksum (&this->stream.large_hash, ptr, CksumSize);
+    return xd3_large_cksum (&this->stream.large_hash, ptr, CksumSize);
   }
 
   Word state0(const uint8_t *ptr) {
@@ -187,17 +187,26 @@ struct large64_cksum : public with_stream<SELF> {
   }
 
   Word incr(const uint8_t *ptr) {
-    incr_state = xd3_large64_cksum_update (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
+    incr_state = xd3_large_cksum_update (&this->stream.large_hash, 
+					 incr_state, ptr - 1, CksumSize);
     return incr_state;
   }
 
   Word incr_state;
 };
 
+#if SIZEOF_USIZE_T == 4
+#define xd3_large_cksum_old         xd3_large32_cksum_old
+#define xd3_large_cksum_update_old  xd3_large32_cksum_update_old
+#elif SIZEOF_USIZE_T == 8
+#define xd3_large_cksum_old         xd3_large64_cksum_old
+#define xd3_large_cksum_update_old  xd3_large64_cksum_update_old
+#endif
+
 MEMBER
-struct large64_cksum_old : public with_stream<SELF> {
+struct large_cksum_old : public with_stream<SELF> {
   Word step(const uint8_t *ptr) {
-    return xd3_large64_cksum_old (&this->stream.large_hash, ptr, CksumSize);
+    return xd3_large_cksum_old (&this->stream.large_hash, ptr, CksumSize);
   }
 
   Word state0(const uint8_t *ptr) {
@@ -206,65 +215,12 @@ struct large64_cksum_old : public with_stream<SELF> {
   }
 
   Word incr(const uint8_t *ptr) {
-    incr_state = xd3_large64_cksum_update_old (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
+    incr_state = xd3_large_cksum_update_old (&this->stream.large_hash, 
+					     incr_state, ptr - 1, CksumSize);
     return incr_state;
   }
 
   Word incr_state;
-};
-
-MEMBER
-struct large32_cksum : public with_stream<SELF> {
-  Word step(const uint8_t *ptr) {
-    return xd3_large32_cksum (&this->stream.large_hash, ptr, CksumSize);
-  }
-
-  Word state0(const uint8_t *ptr) {
-    incr_state = step(ptr);
-    return incr_state;
-  }
-
-  Word incr(const uint8_t *ptr) {
-    incr_state = xd3_large32_cksum_update (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
-    return incr_state;
-  }
-
-  Word incr_state;
-};
-
-MEMBER
-struct large32_cksum_old : public with_stream<SELF> {
-  Word step(const uint8_t *ptr) {
-    return xd3_large32_cksum_old (&this->stream.large_hash, ptr, CksumSize);
-  }
-
-  Word state0(const uint8_t *ptr) {
-    incr_state = step(ptr);
-    return incr_state;
-  }
-
-  Word incr(const uint8_t *ptr) {
-    incr_state = xd3_large32_cksum_update_old (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
-    return incr_state;
-  }
-
-  Word incr_state;
-};
-
-MEMBER
-struct large_cksum 
-  : std::conditional<std::is_same<Word, uint32_t>::value,
-		     large32_cksum<SELF>, 
-		     large64_cksum<SELF>>::type
-{
-};
-
-MEMBER
-struct large_cksum_old 
-  : std::conditional<std::is_same<Word, uint32_t>::value,
-		     large32_cksum_old<SELF>, 
-		     large64_cksum_old<SELF>>::type
-{
 };
 
 // TESTS
@@ -717,11 +673,9 @@ int main(int argc, char** argv) {
     _old_ ## T ## _ ## Z ## _ ## S ## _ ## C		\
     ("old_" #T "_" #Z "_" #S "_" #C)
 
-#define TESTS(SIZE, SKIP)				\
-  TEST(uint32_t, SIZE, SKIP, 1);			\
-  TEST(uint32_t, SIZE, SKIP, 2);			\
-  TEST(uint64_t, SIZE, SKIP, 1);			\
-  TEST(uint64_t, SIZE, SKIP, 2)
+#define TESTS(SIZE, SKIP)	 \
+  TEST(usize_t, SIZE, SKIP, 1);  \
+  TEST(usize_t, SIZE, SKIP, 2)
   
   TESTS(9, 1);
   TESTS(9, 9);

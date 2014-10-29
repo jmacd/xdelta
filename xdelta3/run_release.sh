@@ -4,15 +4,15 @@
 CC=clang 
 CXX=clang++
 # or
-#CC=gcc
-#CXX=g++
+CC=gcc
+CXX=g++
 
 # These are updated below, 
 CFLAGS=     # Do not set here
 CXXFLAGS=   # Do not set here
 
 # Place C/C++ common flags here
-#COMMON=-O3
+COMMON=-O3
 
 export CFLAGS
 export CXXFLAGS
@@ -53,9 +53,7 @@ function buildit {
     D=build/$MACH/${sizebits}size-${offsetbits}off
     mkdir -p $D
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
-    #(cd $D && make all)
-    #echo Running regtest.
-    #(cd $D && ./xdelta3regtest)
+    (cd $D && make all)
 }
 
 function buildall {

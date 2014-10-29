@@ -2174,7 +2174,7 @@ xd3_set_source (xd3_stream *stream,
     }
 
   src->shiftby = shiftby;
-  src->maskby = (1 << shiftby) - 1;
+  src->maskby = (1ULL << shiftby) - 1ULL;
 
   if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
     {
