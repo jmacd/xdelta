@@ -7,6 +7,16 @@
 #include <map>
 #include <algorithm>
 
+extern "C" {
+uint32_t xd3_large32_cksum_old (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
+uint32_t xd3_large32_cksum_update_old (xd3_hash_cfg *cfg, uint32_t cksum, 
+				       const uint8_t *base, const usize_t look);
+
+uint64_t xd3_large64_cksum_old (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
+uint64_t xd3_large64_cksum_update_old (xd3_hash_cfg *cfg, uint64_t cksum, 
+				       const uint8_t *base, const usize_t look);
+}
+
 using std::list;
 using std::map;
 using std::vector;
@@ -23,6 +33,14 @@ uint64_t good_64bit_values[] = {
   1181783497276652981ULL, 4292484099903637661ULL,
   7664345821815920749ULL, // ...
 };
+
+void print_header() {
+  static int hdr_cnt = 0;
+  if (hdr_cnt++ % 20 == 0) {
+    printf("Name\t\t\t\tConf\t\tCount\tUniq\tFull\tCover\tColls"
+	   "\tMB/s\tIters\t#Colls\n");
+  }
+}
 
 struct true_type { };
 struct false_type { };
@@ -47,13 +65,6 @@ struct hhash {  // shift "s" bits leaving the high bits as a hash value for
 		// the high bits aren't enough, XOR "mask" worth of these in.
   Word operator()(const Word t, const Word s, const Word mask) {
     return (t >> s) ^ (t & mask);
-  }
-};
-
-template <typename Word>
-struct nonhash {
-  Word operator()(const Word t, const Word h, const Word mask) {
-    return (t >> h) & mask;
   }
 };
 
@@ -92,14 +103,18 @@ struct cksum_params {
 MEMBER
 struct rabin_karp : public cksum_params<SELF> {
   // (a^cksum_size-1 c_0) + (a^cksum_size-2 c_1) ...
-  rabin_karp() {
-    multiplier = good_word<Word>();
-    powers = new Word[CksumSize];
-    powers[CksumSize - 1] = 1;
+  rabin_karp()
+    : powers(make_powers()),
+      product(powers[0] * good_word<Word>()),
+      incr_state(0) { }
+
+  static Word* make_powers() {
+    Word *p = new Word[CksumSize];
+    p[CksumSize - 1] = 1;
     for (int i = CksumSize - 2; i >= 0; i--) {
-      powers[i] = powers[i + 1] * multiplier;
+      p[i] = p[i + 1] * good_word<Word>();
     }
-    product = powers[0] * multiplier;
+    return p;
   }
 
   ~rabin_karp() {
@@ -120,21 +135,50 @@ struct rabin_karp : public cksum_params<SELF> {
   }
 
   Word incr(const uint8_t *ptr) {
-    incr_state = multiplier * incr_state -
+    incr_state = good_word<Word>() * incr_state -
       product * (ptr[-1]) + (ptr[CksumSize - 1]);
     return incr_state;
   }
 
-  Word *powers;
-  Word  product;
-  Word  multiplier;
-  Word  incr_state;
+  const Word *const powers;
+  const Word  product;
+  Word        incr_state;
 };
 
 MEMBER
-struct large_cksum : public cksum_params<SELF> {
+struct with_stream : public cksum_params<SELF> {
+  xd3_stream stream;
+
+  with_stream()
+  {
+    xd3_config cfg;
+    memset (&stream, 0, sizeof (stream));
+    xd3_init_config (&cfg, 0);
+    cfg.smatch_cfg = XD3_SMATCH_SOFT;
+    cfg.smatcher_soft.large_look = CksumSize;
+    cfg.smatcher_soft.large_step = CksumSkip;
+    cfg.smatcher_soft.small_look = 4;
+    cfg.smatcher_soft.small_chain = 4;
+    cfg.smatcher_soft.small_lchain = 4;
+    cfg.smatcher_soft.max_lazy = 4;
+    cfg.smatcher_soft.long_enough = 4;
+    CHECK_EQ(0, xd3_config_stream (&stream, &cfg));
+
+    CHECK_EQ(0, xd3_size_hashtable (&stream,
+				    1<<10 /* ignored */,
+				    stream.smatcher.large_look,
+				    & stream.large_hash));
+  }
+  ~with_stream() 
+  {
+    xd3_free_stream (&stream);
+  }
+};
+
+MEMBER
+struct large64_cksum : public with_stream<SELF> {
   Word step(const uint8_t *ptr) {
-    return xd3_large_cksum (ptr, CksumSize);
+    return xd3_large64_cksum (&this->stream.large_hash, ptr, CksumSize);
   }
 
   Word state0(const uint8_t *ptr) {
@@ -143,11 +187,84 @@ struct large_cksum : public cksum_params<SELF> {
   }
 
   Word incr(const uint8_t *ptr) {
-    incr_state = xd3_large_cksum_update (incr_state, ptr - 1, CksumSize);
+    incr_state = xd3_large64_cksum_update (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
     return incr_state;
   }
 
   Word incr_state;
+};
+
+MEMBER
+struct large64_cksum_old : public with_stream<SELF> {
+  Word step(const uint8_t *ptr) {
+    return xd3_large64_cksum_old (&this->stream.large_hash, ptr, CksumSize);
+  }
+
+  Word state0(const uint8_t *ptr) {
+    incr_state = step(ptr);
+    return incr_state;
+  }
+
+  Word incr(const uint8_t *ptr) {
+    incr_state = xd3_large64_cksum_update_old (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
+    return incr_state;
+  }
+
+  Word incr_state;
+};
+
+MEMBER
+struct large32_cksum : public with_stream<SELF> {
+  Word step(const uint8_t *ptr) {
+    return xd3_large32_cksum (&this->stream.large_hash, ptr, CksumSize);
+  }
+
+  Word state0(const uint8_t *ptr) {
+    incr_state = step(ptr);
+    return incr_state;
+  }
+
+  Word incr(const uint8_t *ptr) {
+    incr_state = xd3_large32_cksum_update (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
+    return incr_state;
+  }
+
+  Word incr_state;
+};
+
+MEMBER
+struct large32_cksum_old : public with_stream<SELF> {
+  Word step(const uint8_t *ptr) {
+    return xd3_large32_cksum_old (&this->stream.large_hash, ptr, CksumSize);
+  }
+
+  Word state0(const uint8_t *ptr) {
+    incr_state = step(ptr);
+    return incr_state;
+  }
+
+  Word incr(const uint8_t *ptr) {
+    incr_state = xd3_large32_cksum_update_old (&this->stream.large_hash, incr_state, ptr - 1, CksumSize);
+    return incr_state;
+  }
+
+  Word incr_state;
+};
+
+MEMBER
+struct large_cksum 
+  : std::conditional<std::is_same<Word, uint32_t>::value,
+		     large32_cksum<SELF>, 
+		     large64_cksum<SELF>>::type
+{
+};
+
+MEMBER
+struct large_cksum_old 
+  : std::conditional<std::is_same<Word, uint32_t>::value,
+		     large32_cksum_old<SELF>, 
+		     large64_cksum_old<SELF>>::type
+{
 };
 
 // TESTS
@@ -193,13 +310,21 @@ struct file_stats {
 
     ptr_list &pl = table[word];
 
+    int collisions = 0;
     for (ptr_iterator p_i = pl.begin();
 	 p_i != pl.end();
 	 ++p_i) {
       if (memcmp(*p_i, ptr, cksum_size) == 0) {
 	return;
       }
+      collisions++;
     }
+    if (collisions >= 10000)
+      {
+	fprintf(stderr, "Something is not right, lots of collisions=%d\n", 
+		collisions);
+	abort();
+      }
 
     unique++;
     pl.push_back(ptr);
@@ -320,7 +445,7 @@ struct test_result : public test_result_base {
   /* Fraction of distinct strings of length cksum_size which are not
    * represented in the hash table. */
   double collisions() {
-    return (fstats.unique - fstats.unique_values) / fstats.unique;
+    return (fstats.unique - fstats.unique_values) / (double) fstats.unique;
   }
   usize_t colls() {
     return (fstats.unique - fstats.unique_values);
@@ -375,13 +500,8 @@ struct test_result : public test_result_base {
       fprintf(stderr, "internal error: %d != %d\n", fstats.count, count());
       abort();
     }
-    {
-      static int hdr_cnt = 0;
-      if (hdr_cnt++ % 20 == 0) {
-	printf("Name\tConf\tCount\tUniq\tFull\tColl\tCov\tMB/s\tIters\n");
-      }
-    }
-    printf("%s\t%d/%d/1<<%d\t%u\t%0.2f\t%.2f\t%.2f\t%.2f\t%.4f\t%u\n",
+    print_header();
+    printf("%s\t%d/%d 2^%d\t%u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t%u\t%u\n",
 	   test_name,
 	   Checksum::cksum_size,
 	   Checksum::cksum_skip,
@@ -389,10 +509,11 @@ struct test_result : public test_result_base {
 	   count(),
 	   uniqueness(),
 	   fullness(),
-	   collisions(),
 	   coverage(),
+	   collisions(),
 	   0.001 * accum_iters * test_size / accum_millis,
-	   accum_iters);
+	   accum_iters,
+	   colls());
   }
 
   usize_t size_log2 (usize_t slots) {
@@ -445,8 +566,8 @@ struct test_result : public test_result_base {
     const uint8_t *ptr;
     const uint8_t *end;
     usize_t periods;
-    int last_offset;
-    int stop;
+    int64_t last_offset;
+    int64_t stop;
 
     test_size = buf_size;
     last_offset = buf_size - Checksum::cksum_size;
@@ -472,7 +593,7 @@ struct test_result : public test_result_base {
       } else {
 	ptr = buf + last_offset;
 	end = buf + stop;
-		
+
 	for (; ptr != end; ptr -= Checksum::cksum_skip) {
 	  fstats.update(hash(cksum.step(ptr), s_bits, s_mask), ptr);
 	}
@@ -503,7 +624,6 @@ struct test_result : public test_result_base {
     }
 
     if (Checksum::cksum_skip == 1) {
-
       new_table(n_incrs);
 
       for (usize_t i = 0; i < test_iters; i++) {
@@ -516,7 +636,7 @@ struct test_result : public test_result_base {
 
 	for (; ptr != end; ptr++) {
 	  typename Checksum::word_type w = cksum.incr(ptr);
-	  assert(w == cksum.step(ptr));
+	  CHECK_EQ(w, cksum.step(ptr));
 	  set_table_bit(hash(w, s_bits, s_mask));
 	}
       }
@@ -586,30 +706,30 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-#define TEST(T,Z,S,H,C)                                      \
-  test_result<rabin_karp<T,Z,S,H<T>,C>>			\
-    _rka_ ## T ## _ ## Z ## _ ## S ## _ ## H ## _ ## C	\
-    ("rka_" #T "_" #Z "_" #S "_" #H "_" #C);		\
-  test_result<large_cksum<T,Z,S,H<T>,C>>			        \
-    _xck_ ## T ## _ ## Z ## _ ## S ## _ ## H ## _ ## C			\
-    ("xck_" #T "_" #Z "_" #S "_" #H "_" #C)
-
+#define TEST(T,Z,S,C)					\
+  test_result<rabin_karp<T,Z,S,hhash<T>,C>>		\
+    _rka_ ## T ## _ ## Z ## _ ## S ## _ ## C		\
+    ("rka_" #T "_" #Z "_" #S "_" #C);			\
+  test_result<large_cksum<T,Z,S,hhash<T>,C>>		\
+    _xck_ ## T ## _ ## Z ## _ ## S ## _ ## C		\
+    ("xck_" #T "_" #Z "_" #S "_" #C);			\
+  test_result<large_cksum_old<T,Z,S,hhash<T>,C>>	\
+    _old_ ## T ## _ ## Z ## _ ## S ## _ ## C		\
+    ("old_" #T "_" #Z "_" #S "_" #C)
 
 #define TESTS(SIZE, SKIP)				\
-  TEST(uint32_t, SIZE, SKIP, nonhash, 1);		\
-  TEST(uint32_t, SIZE, SKIP, nonhash, 2);		\
-  TEST(uint32_t, SIZE, SKIP, hhash, 1);			\
-  TEST(uint32_t, SIZE, SKIP, hhash, 2);			\
-  TEST(uint64_t, SIZE, SKIP, nonhash, 1);		\
-  TEST(uint64_t, SIZE, SKIP, nonhash, 2);               \
-  TEST(uint64_t, SIZE, SKIP, hhash, 1);			\
-  TEST(uint64_t, SIZE, SKIP, hhash, 2)
+  TEST(uint32_t, SIZE, SKIP, 1);			\
+  TEST(uint32_t, SIZE, SKIP, 2);			\
+  TEST(uint64_t, SIZE, SKIP, 1);			\
+  TEST(uint64_t, SIZE, SKIP, 2)
   
+  TESTS(9, 1);
   TESTS(9, 9);
-  // TESTS(9, 15);
+  TESTS(15, 1);
   TESTS(15, 15);
+  TESTS(127, 1);
   TESTS(127, 127);
-  // TESTS(127, 211);
+  TESTS(211, 1);
   TESTS(211, 211);
 
   for (i = 1; i < argc; i++) {
@@ -630,7 +750,7 @@ int main(int argc, char** argv) {
       test_result_base *test = *iter;
       test->reset();
 
-      usize_t iters = 100;
+      usize_t iters = 200;
       long start_test = get_millisecs_now();
 
       do {

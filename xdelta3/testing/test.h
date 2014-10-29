@@ -18,8 +18,8 @@ extern "C" {
 
 #define CHECK_OP(x,y,OP) \
   do { \
-    typeof(x) _x(x); \
-    typeof(x) _y(y); \
+    __typeof__(x) _x(x); \
+    __typeof__(x) _y(y); \
     if (!(_x OP _y)) { \
       cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x " " #OP " " #y << endl; \
       cerr << __FILE__ << ":" << __LINE__ << " Expected: " << _x << endl; \
@@ -68,5 +68,3 @@ pair<T, U> make_pair(const T& t, const U& u) {
 
 using std::min;
 using std::max;
-
-

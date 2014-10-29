@@ -658,9 +658,13 @@ struct _xd3_smatcher
 /* hash table size & power-of-two hash function. */
 struct _xd3_hash_cfg
 {
-  usize_t           size;
-  usize_t           shift;
-  usize_t           mask;
+  usize_t  size;       // Number of buckets
+  usize_t  shift;
+  usize_t  mask;
+  usize_t  look;       // How wide is this checksum
+  usize_t  multiplier; // K * powers[0]
+  usize_t *powers;     // Array of [0,look) where powers[look-1] == 1
+                       // and powers[N] = powers[N+1]*K (Rabin-Karp)
 };
 
 /* the sprev list */

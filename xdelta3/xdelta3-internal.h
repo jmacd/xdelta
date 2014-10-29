@@ -64,6 +64,10 @@ int xd3_process_stream (int            is_encode,
 int xd3_main_cmdline (int argc, char **argv);
 #endif
 
+#if REGRESSION_TEST
+int xd3_selftest (void);
+#endif
+
 /* main_file->mode values */
 typedef enum
 {
@@ -155,9 +159,59 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #define UINT64_MAX 18446744073709551615ULL
 #endif
 
-usize_t xd3_large_cksum (const uint8_t *seg, const usize_t ln);
-usize_t xd3_large_cksum_update (usize_t cksum,
-				const uint8_t *base,
-				usize_t look);
+#define UINT32_OFLOW_MASK 0xfe000000U
+#define UINT64_OFLOW_MASK 0xfe00000000000000ULL
+
+#if SIZEOF_USIZE_T == 4
+#define USIZE_T_MAX             UINT32_MAX
+#define xd3_decode_size         xd3_decode_uint32_t
+#define xd3_emit_size           xd3_emit_uint32_t
+#define xd3_sizeof_size         xd3_sizeof_uint32_t
+#define xd3_read_size           xd3_read_uint32_t
+#define xd3_large_cksum         xd3_large32_cksum
+#define xd3_large_cksum_update  xd3_large32_cksum_update
+#define xd3_hash_multiplier     xd3_hash_multiplier32
+#elif SIZEOF_USIZE_T == 8
+#define USIZE_T_MAX             UINT64_MAX
+#define xd3_decode_size         xd3_decode_uint64_t
+#define xd3_emit_size           xd3_emit_uint64_t
+#define xd3_sizeof_size         xd3_sizeof_uint64_t
+#define xd3_read_size           xd3_read_uint64_t
+#define xd3_large_cksum         xd3_large64_cksum
+#define xd3_large_cksum_update  xd3_large64_cksum_update
+#define xd3_hash_multiplier     xd3_hash_multiplier64
+#endif
+
+#if SIZEOF_XOFF_T == 4
+#define XOFF_T_MAX        UINT32_MAX
+#define xd3_decode_offset xd3_decode_uint32_t
+#define xd3_emit_offset   xd3_emit_uint32_t
+#elif SIZEOF_XOFF_T == 8
+#define XOFF_T_MAX        UINT64_MAX
+#define xd3_decode_offset xd3_decode_uint64_t
+#define xd3_emit_offset   xd3_emit_uint64_t
+#endif
+
+#define USIZE_T_OVERFLOW(a,b) ((USIZE_T_MAX - (usize_t) (a)) < (usize_t) (b))
+#define XOFF_T_OVERFLOW(a,b) ((XOFF_T_MAX - (xoff_t) (a)) < (xoff_t) (b))
+
+int xd3_size_hashtable (xd3_stream   *stream,
+			usize_t       slots,
+			usize_t       look,
+			xd3_hash_cfg *cfg);
+
+usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum);
+
+#if USE_UINT32
+uint32_t xd3_large32_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
+uint32_t xd3_large32_cksum_update (xd3_hash_cfg *cfg, uint32_t cksum, 
+				   const uint8_t *base, const usize_t look);
+#endif /* USE_UINT32 */
+
+#if USE_UINT64
+uint64_t xd3_large64_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
+uint64_t xd3_large64_cksum_update (xd3_hash_cfg *cfg, uint64_t cksum, 
+				   const uint8_t *base, const usize_t look);
+#endif /* USE_UINT64 */
 
 #endif /* XDELTA3_INTERNAL_H__ */

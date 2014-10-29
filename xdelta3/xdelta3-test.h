@@ -1556,6 +1556,45 @@ test_choose_instruction (xd3_stream *stream, int ignore)
   return 0;
 }
 
+static int
+test_checksum_step (xd3_stream *stream, int ignore)
+{
+  const int bufsize = 128;
+  uint8_t buf[bufsize];
+  for (int i = 0; i < bufsize; i++)
+    {
+      buf[i] = mt_random (&static_mtrand) & 0xff;
+    }
+
+  for (usize_t cksize = 4; cksize <= 32; cksize += 3)
+    {
+      xd3_hash_cfg h1;
+      usize_t x;
+      int ret;
+
+      if ((ret = xd3_size_hashtable (stream, XD3_ALLOCSIZE, cksize, &h1)) != 0)
+	{
+	  return ret;
+	}
+
+      x = xd3_large_cksum (&h1, buf, cksize);
+      for (usize_t pos = 0; pos <= (bufsize - cksize); pos++)
+	{
+	  usize_t y = xd3_large_cksum (&h1, buf + pos, cksize);
+	  if (x != y)
+	    {
+	      stream->msg = "checksum != incremental checksum";
+	      return XD3_INTERNAL;
+	    }
+	  x = xd3_large_cksum_update (&h1, x, buf + pos, cksize);
+	}
+
+      xd3_free (stream, h1.powers);
+    }
+
+  return 0;
+}
+
 /***********************************************************************
  64BIT STREAMING
  ***********************************************************************/
@@ -2839,8 +2878,7 @@ test_in_memory (xd3_stream *stream, int ignore)
  TEST MAIN
  ***********************************************************************/
 
-static int
-xd3_selftest (void)
+int xd3_selftest (void)
 {
 #define DO_TEST(fn,flags,arg)                                         \
   do {                                                                \
@@ -2867,8 +2905,8 @@ xd3_selftest (void)
   DO_TEST (encode_decode_uint32_t, 0, 0);
   DO_TEST (encode_decode_uint64_t, 0, 0);
   DO_TEST (usize_t_overflow, 0, 0);
+  DO_TEST (checksum_step, 0, 0);
   DO_TEST (forward_match, 0, 0);
-
   DO_TEST (address_cache, 0, 0);
 
   DO_TEST (string_matching, 0, 0);
