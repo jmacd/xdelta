@@ -53,7 +53,6 @@ function buildit {
     D=build/$MACH/${sizebits}size-${offsetbits}off
     mkdir -p $D
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
-    (cd $D && make all)
 }
 
 function buildall {
@@ -63,10 +62,10 @@ function buildall {
     addflag -DXD3_USE_LARGEWINDOW64=0
     buildit 32 32
 
-    # resetflag $MACH
-    # addflag -DXD3_USE_LARGEFILE64=1
-    # addflag -DXD3_USE_LARGEWINDOW64=0
-    # buildit 32 64
+    resetflag $MACH
+    addflag -DXD3_USE_LARGEFILE64=1
+    addflag -DXD3_USE_LARGEWINDOW64=0
+    buildit 32 64
 
     resetflag $MACH
     addflag -DXD3_USE_LARGEFILE64=1

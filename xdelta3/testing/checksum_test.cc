@@ -4,8 +4,9 @@
 #include <assert.h>
 #include <list>
 #include <vector>
-#include <map>
 #include <algorithm>
+
+#include "../cpp-btree/btree_map.h"
 
 extern "C" {
 uint32_t xd3_large32_cksum_old (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
@@ -17,8 +18,8 @@ uint64_t xd3_large64_cksum_update_old (xd3_hash_cfg *cfg, uint64_t cksum,
 				       const uint8_t *base, const usize_t look);
 }
 
+using btree::btree_map;
 using std::list;
-using std::map;
 using std::vector;
 
 // MLCG parameters
@@ -229,7 +230,7 @@ template <typename Word>
 struct file_stats {
   typedef std::list<const uint8_t*> ptr_list;
   typedef Word word_type;
-  typedef std::map<word_type, ptr_list> table_type;
+  typedef btree::btree_map<word_type, ptr_list> table_type;
   typedef typename table_type::iterator table_iterator;
   typedef typename ptr_list::iterator ptr_iterator;
 
@@ -264,12 +265,13 @@ struct file_stats {
       table.insert(std::make_pair(word, ptr_list()));
     }
 
-    ptr_list &pl = table[word];
+    ptr_list &pl = table[word]; // ???
 
     int collisions = 0;
     for (ptr_iterator p_i = pl.begin();
 	 p_i != pl.end();
 	 ++p_i) {
+      // TODO !!! Use btree here too duh
       if (memcmp(*p_i, ptr, cksum_size) == 0) {
 	return;
       }
@@ -662,10 +664,9 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+// TODO: The xdelta3-hash.h code is identical now; add sameness test.
+// using rabin_karp<> template.
 #define TEST(T,Z,S,C)					\
-  test_result<rabin_karp<T,Z,S,hhash<T>,C>>		\
-    _rka_ ## T ## _ ## Z ## _ ## S ## _ ## C		\
-    ("rka_" #T "_" #Z "_" #S "_" #C);			\
   test_result<large_cksum<T,Z,S,hhash<T>,C>>		\
     _xck_ ## T ## _ ## Z ## _ ## S ## _ ## C		\
     ("xck_" #T "_" #Z "_" #S "_" #C);			\
@@ -678,13 +679,13 @@ int main(int argc, char** argv) {
   TEST(usize_t, SIZE, SKIP, 2)
   
   TESTS(9, 1);
-  TESTS(9, 9);
-  TESTS(15, 1);
-  TESTS(15, 15);
-  TESTS(127, 1);
-  TESTS(127, 127);
-  TESTS(211, 1);
-  TESTS(211, 211);
+  // TESTS(9, 9);
+  // TESTS(15, 1);
+  // TESTS(15, 15);
+  // TESTS(127, 1);
+  // TESTS(127, 127);
+  // TESTS(211, 1);
+  // TESTS(211, 211);
 
   for (i = 1; i < argc; i++) {
     if ((ret = read_whole_file(argv[i],
@@ -704,7 +705,7 @@ int main(int argc, char** argv) {
       test_result_base *test = *iter;
       test->reset();
 
-      usize_t iters = 200;
+      usize_t iters = 1; // TODO
       long start_test = get_millisecs_now();
 
       do {
