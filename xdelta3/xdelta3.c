@@ -349,7 +349,9 @@ typedef unsigned int xd3_rtype;
 
 #include "xdelta3-list.h"
 
+#if XD3_ENCODER
 XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
+#endif
 
 /***********************************************************************/
 

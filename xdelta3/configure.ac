@@ -8,9 +8,13 @@ AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar])
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
 AC_PROG_CXX
+AC_CHECK_SIZEOF(size_t)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
 AC_CHECK_HEADERS([lzma.h])
 AC_CHECK_LIB(lzma, lzma_easy_buffer_encode)
-AC_CHECK_SIZEOF(size_t)
+
 #AM_PATH_PYTHON(,, [:])
 #AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 #AX_PYTHON_DEVEL()
@@ -21,6 +25,7 @@ dnl --enable-debug-symbols : build with debug symbols?
 AC_ARG_ENABLE(debug-symbols,
    AS_HELP_STRING(--enable-debug-symbols,[Build with debug symbols (default is NO)]),,enableval=no)
 AM_CONDITIONAL([DEBUG_SYMBOLS], [test ${enableval} = "yes"])
+
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])

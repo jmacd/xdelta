@@ -49,6 +49,8 @@
 
 /*********************************************************************/
 
+#include <limits.h>
+
 #ifndef XD3_POSIX
 #define XD3_POSIX 0
 #endif
@@ -669,14 +671,17 @@ main_strtoxoff (const char* s, xoff_t *xo, char which)
   XD3_ASSERT(s && *s != 0);
 
   {
-    /* Should check LONG_MIN, LONG_MAX, LLONG_MIN, LLONG_MAX? */
-#if SIZEOF_XOFF_T == 4
-    long xx = strtol (s, &e, 0);
+#if SIZEOF_XOFF_T == SIZEOF_LONG_LONG
+    unsigned long long xx = strtoull (s, &e, 0);
+    unsigned long long bad = ULLONG_MAX;
+#elif SIZEOF_XOFF_T <= SIZEOF_LONG
+    unsigned long xx = strtoul (s, &e, 0);
+    unsigned long long bad = ULONG_MAX;
 #else
-    long long xx = strtoll (s, &e, 0);
+    /* Something wrong with SIZEOF_XOFF_T, SIZEOF_LONG, etc. */
 #endif
 
-    if (xx < 0)
+    if (xx == bad)
       {
 	XPR(NT "-%c: negative integer: %s\n", which, s);
 	return EXIT_FAILURE;
@@ -703,7 +708,7 @@ main_atoux (const char* arg, xoff_t *xo, xoff_t low,
   int ret;
 
   if ((ret = main_strtoxoff (arg, & x, which))) { return ret; }
-
+  XPR(NT "SEE -%c: value %"Q" low %"Q" high %"Q"\n", which, x, low, high);
   if (x < low)
     {
       XPR(NT "-%c: minimum value: %"Q"\n", which, low);
