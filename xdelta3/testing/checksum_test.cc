@@ -38,8 +38,8 @@ uint64_t good_64bit_values[] = {
 void print_header() {
   static int hdr_cnt = 0;
   if (hdr_cnt++ % 20 == 0) {
-    printf("Name\t\t\t\tConf\t\tCount\tUniq\tFull\tCover\tColls"
-	   "\tMB/s\tIters\t#Colls\n");
+    printf("%-32sConf\t\tCount\tUniq\tFull\tCover\tColls"
+	   "\tMB/s\tIters\t#Colls\n", "Name");
   }
 }
 
@@ -228,11 +228,10 @@ struct large_cksum_old : public with_stream<SELF> {
 
 template <typename Word>
 struct file_stats {
-  typedef std::list<const uint8_t*> ptr_list;
+  typedef const uint8_t* ptr_type;
   typedef Word word_type;
-  typedef btree::btree_map<word_type, ptr_list> table_type;
+  typedef btree::btree_multimap<word_type, ptr_type> table_type;
   typedef typename table_type::iterator table_iterator;
-  typedef typename ptr_list::iterator ptr_iterator;
 
   usize_t cksum_size;
   usize_t cksum_skip;
@@ -256,40 +255,34 @@ struct file_stats {
     table.clear();
   }
 
-  void update(const word_type &word, const uint8_t *ptr) {
+  void update(word_type word, ptr_type ptr) {
     table_iterator t_i = table.find(word);
 
     count++;
-
-    if (t_i == table.end()) {
-      table.insert(std::make_pair(word, ptr_list()));
-    }
-
-    ptr_list &pl = table[word]; // ???
-
-    int collisions = 0;
-    for (ptr_iterator p_i = pl.begin();
-	 p_i != pl.end();
-	 ++p_i) {
-      // TODO !!! Use btree here too duh
-      if (memcmp(*p_i, ptr, cksum_size) == 0) {
-	return;
+    if (t_i != table.end()) {
+      int collisions = 0;
+      for (table_iterator p_i = t_i;
+	   p_i != table.end() && p_i->first == word;
+	   ++p_i) {
+	if (memcmp(p_i->second, ptr, cksum_size) == 0) {
+	  return;
+	}
+	collisions++;
       }
-      collisions++;
-    }
-    if (collisions >= 10000)
-      {
+      if (collisions >= 1000) {
 	fprintf(stderr, "Something is not right, lots of collisions=%d\n", 
 		collisions);
 	abort();
       }
-
+    } else {
+      unique_values++;
+    }
     unique++;
-    pl.push_back(ptr);
+    table.insert(std::make_pair(word, ptr));
+    return;
   }
 
   void freeze() {
-    unique_values = table.size();
     table.clear();
   }
 };
@@ -459,7 +452,8 @@ struct test_result : public test_result_base {
       abort();
     }
     print_header();
-    printf("%s\t%d/%d 2^%d\t%u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t%u\t%u\n",
+    printf("%-32s%d/%d 2^%" Z "\t%" Z "\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
+	   "%" Z "\t%" Z "\n",
 	   test_name,
 	   Checksum::cksum_size,
 	   Checksum::cksum_skip,
@@ -607,17 +601,6 @@ struct test_result : public test_result_base {
   }
 };
 
-template <typename Word>
-void print_array(const char *tname) {
-  printf("static const %s hash_multiplier[64] = {\n", tname);
-  Word p = 1;
-  for (int i = 0; i < 64; i++) {
-    printf("  %uU,\n", p);
-    p *= good_word<Word>();
-  }
-  printf("};\n", tname);
-}
-
 static int read_whole_file(const char *name,
 			   uint8_t **buf_ptr,
 			   size_t *buf_len) {
@@ -677,15 +660,43 @@ int main(int argc, char** argv) {
 #define TESTS(SIZE, SKIP)	 \
   TEST(usize_t, SIZE, SKIP, 1);  \
   TEST(usize_t, SIZE, SKIP, 2)
-  
+   
+  TESTS(5, 1);
+  TESTS(6, 1);
+  TESTS(7, 1);
+  TESTS(8, 1);
   TESTS(9, 1);
-  // TESTS(9, 9);
-  // TESTS(15, 1);
-  // TESTS(15, 15);
-  // TESTS(127, 1);
-  // TESTS(127, 127);
-  // TESTS(211, 1);
-  // TESTS(211, 211);
+  TESTS(10, 1);
+  TESTS(11, 1);
+  TESTS(12, 1);
+  TESTS(13, 1);
+  TESTS(14, 1);
+  TESTS(15, 1);
+  TESTS(16, 1);
+  TESTS(17, 1);
+  TESTS(18, 1);
+  TESTS(19, 1);
+  TESTS(20, 1);
+  TESTS(21, 1);
+  TESTS(22, 1);
+  TESTS(23, 1);
+  TESTS(24, 1);
+  TESTS(25, 1);
+  TESTS(26, 1);
+  TESTS(27, 1);
+  TESTS(28, 1);
+  TESTS(29, 1);
+  TESTS(30, 1);
+  TESTS(31, 1);
+  TESTS(32, 1);
+  TESTS(33, 1);
+  TESTS(34, 1);
+  TESTS(35, 1);
+  TESTS(36, 1);
+  TESTS(37, 1);
+  TESTS(38, 1);
+  TESTS(39, 1);
+
 
   for (i = 1; i < argc; i++) {
     if ((ret = read_whole_file(argv[i],
@@ -705,7 +716,7 @@ int main(int argc, char** argv) {
       test_result_base *test = *iter;
       test->reset();
 
-      usize_t iters = 1; // TODO
+      usize_t iters = 1;
       long start_test = get_millisecs_now();
 
       do {

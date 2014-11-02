@@ -53,6 +53,7 @@ function buildit {
     D=build/$MACH/${sizebits}size-${offsetbits}off
     mkdir -p $D
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
+    (cd $D && make xdelta3checksum)
 }
 
 function buildall {
