@@ -1,16 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
+
 	"xdelta"
 )
 
 const (
-	blocksize = 1<<20
-	prog = "/Users/jmacd/src/xdelta/xdelta3/xdelta3"
+	blocksize = 1<<16
+	winsize = 1<<26
+	prog = "/Users/jmacd/src/xdelta/xdelta3/build/m64/64size-64off/xdelta3"
 	seed = 1422253499919909358
 )
 
@@ -26,10 +30,14 @@ func drain(f io.ReadCloser) <-chan []byte {
 	return c
 }
 
-func empty(f io.ReadCloser) {
+func empty(f io.ReadCloser, desc string) {
 	go func() {
-		if _, err := ioutil.ReadAll(f); err != nil {
-			panic(err)
+		s := bufio.NewScanner(f)
+		for s.Scan() {
+			os.Stderr.Write([]byte(fmt.Sprint(desc, ": ", s.Text(), "\n")))
+		}
+		if err := s.Err(); err != nil {
+			fmt.Println("error reading input:", err)
 		}
 	}()
 }
@@ -52,7 +60,7 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 		panic(err)
 	}
 	encodeout := drain(run.Stdout)
-	empty(run.Stderr)
+	empty(run.Stderr, "encode")
 
 	write(run.Stdin, []byte(target))
 	write(run.Srcin, []byte(source))
@@ -67,7 +75,7 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 	}
 
 	decodeout := drain(run.Stdout)
-	empty(run.Stderr)
+	empty(run.Stderr, "decode")
 
 	write(run.Stdin, <-encodeout)
 	write(run.Srcin, []byte(source))
@@ -121,12 +129,12 @@ func compareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length int64) {
 	}
 }
 
-func offsetTest(r *xdelta.Runner, p *xdelta.Program, offset, length int64) {
-	enc, err := r.Exec(p, true, []string{"-e"})
+func offsetTest(r *xdelta.Runner, p *xdelta.Program, offset, bufsize, length int64) {
+	enc, err := r.Exec(p, true, []string{"-e", "-1", "-n", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)})
 	if err != nil {
 		panic(err)
 	}
-	dec, err := r.Exec(p, true, []string{"-d"})
+	dec, err := r.Exec(p, true, []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)})
 	if err != nil {
 		panic(err)
 	}
@@ -136,8 +144,8 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, offset, length int64) {
 	go copyStreams(enc.Stdout, dec.Stdin)
 	go compareStreams(dec.Stdout, read, length)
 
-	empty(enc.Stderr)  // Use these?
-	empty(dec.Stderr)
+	empty(enc.Stderr, "encode")
+	empty(dec.Stderr, "decode")
 
 	// TODO: seems possible to use one WriteRstreams call to generate
 	// the source and target for both encoder and decoder.  Why not?
@@ -163,5 +171,5 @@ func main() {
 
 	smokeTest(r, prog)
 
-	offsetTest(r, prog, 0, 1024 << 20)
+	offsetTest(r, prog, 1 << 31, 1 << 32, 1 << 33)
 }

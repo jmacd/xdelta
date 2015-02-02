@@ -708,7 +708,7 @@ main_atoux (const char* arg, xoff_t *xo, xoff_t low,
   int ret;
 
   if ((ret = main_strtoxoff (arg, & x, which))) { return ret; }
-  XPR(NT "SEE -%c: value %"Q" low %"Q" high %"Q"\n", which, x, low, high);
+
   if (x < low)
     {
       XPR(NT "-%c: minimum value: %"Q"\n", which, low);

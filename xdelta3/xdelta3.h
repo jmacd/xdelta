@@ -71,7 +71,7 @@
  *
  * 8-16MB is reasonable, probably don't need to go larger. */
 #ifndef XD3_HARDMAXWINSIZE
-#define XD3_HARDMAXWINSIZE (1U<<24)
+#define XD3_HARDMAXWINSIZE (1U<<26)
 #endif
 /* The IOPT_SIZE value sets the size of a buffer used to batch
  * overlapping copy instructions before they are optimized by picking

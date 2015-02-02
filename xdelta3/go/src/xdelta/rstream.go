@@ -16,20 +16,21 @@ func WriteRstreams(seed, offset, len int64,
 	go writeOne(seed, offset, len, second)
 }
 
-func writeOne(seed, offset, len int64, stream io.WriteCloser) {
+func writeOne(seed, offset, len int64, stream io.WriteCloser) error {
 	if offset != 0 {
 		// Fill with other random data until the offset
-		writeRand(rand.New(rand.NewSource(^seed)),
-			offset, stream)
+		if err := writeRand(rand.New(rand.NewSource(^seed)), offset, stream); err != nil {
+			return err
+		}
 	}
-	writeRand(rand.New(rand.NewSource(seed)),
-		len - offset, stream)
-	if err := stream.Close(); err != nil {
-		panic(err)
+	if err := writeRand(rand.New(rand.NewSource(seed)),
+		len - offset, stream); err != nil {
+		return err
 	}
+	return stream.Close()
 }
 
-func writeRand(r *rand.Rand, len int64, s io.Writer) {
+func writeRand(r *rand.Rand, len int64, s io.Writer) error {
 	blk := make([]byte, blocksize)
 	for len > 0 {
 		fillRand(r, blk)
@@ -38,10 +39,11 @@ func writeRand(r *rand.Rand, len int64, s io.Writer) {
 			c = int(len)
 		}
 		if _, err := s.Write(blk[0:c]); err != nil {
-			panic(err)
+			return err
 		}
 		len -= int64(c)
 	}
+	return nil
 }
 
 func fillRand(r *rand.Rand, blk []byte) {

@@ -52,6 +52,7 @@ function buildit {
     echo CXXFLAGS=$CXXFLAGS
     D=build/$MACH/${sizebits}size-${offsetbits}off
     mkdir -p $D
+    echo "Configuring $D ..."
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
     #(cd $D && make all && make test)
 }

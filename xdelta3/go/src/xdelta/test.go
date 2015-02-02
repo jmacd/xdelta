@@ -83,15 +83,16 @@ func (r *Runner) Exec(p *Program, srcfifo bool, flags []string) (*Run, error) {
 	return run, nil
 }
 
-func writeFifo(srcfile string, read io.Reader) {
+func writeFifo(srcfile string, read io.Reader) error {
 	fifo, err := os.OpenFile(srcfile, os.O_WRONLY, 0600)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	if _, err := io.Copy(fifo, read); err != nil {
-		panic(err)
+		return err
 	}
 	if err := fifo.Close(); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }

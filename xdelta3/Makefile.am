@@ -1,4 +1,5 @@
 ACLOCAL_AMFLAGS = -I m4
+AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = xdelta3
 noinst_PROGRAMS = xdelta3regtest xdelta3decode xdelta3checksum
