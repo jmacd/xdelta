@@ -3,7 +3,7 @@ AC_INIT([Xdelta3], [3.0.8], [josh.macdonald@gmail.com],
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
-AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar])
+AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar subdir-objects])
 #AC_DISABLE_STATIC
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
