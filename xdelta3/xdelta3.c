@@ -1265,7 +1265,7 @@ xd3_decode_bytes (xd3_stream *stream, uint8_t *buf, usize_t *pos, usize_t size)
 	}
 
       want = size - *pos;
-      take = min (want, stream->avail_in);
+      take = xd3_min (want, stream->avail_in);
 
       memcpy (buf + *pos, stream->next_in, (size_t) take);
 
@@ -1325,7 +1325,7 @@ xd3_emit_bytes (xd3_stream     *stream,
 	  output = (*outputp) = aoutput;
 	}
 
-      take = min (output->avail - output->next, size);
+      take = xd3_min (output->avail - output->next, size);
 
       memcpy (output->base + output->next, base, (size_t) take);
 
@@ -2237,7 +2237,7 @@ xd3_set_source (xd3_stream *stream,
       src->max_winsize = xd3_xoff_roundup(src->max_winsize);
       IF_DEBUG1 (DP(RINT "raising src_maxsize to %u\n", src->blksize));
     }
-  src->max_winsize = max(src->max_winsize, XD3_ALLOCSIZE);
+  src->max_winsize = xd3_max (src->max_winsize, XD3_ALLOCSIZE);
 
   return 0;
 }
@@ -2683,7 +2683,7 @@ xd3_iopt_flush_instructions (xd3_stream *stream, int force)
 	  /* Try to balance the length of both instructions, but avoid
 	   * making both longer than MAX_MATCH_SPLIT . */
 	  average = gap / 2;
-	  newsize = min (MAX_MATCH_SPLIT, gap - average);
+	  newsize = xd3_min (MAX_MATCH_SPLIT, gap - average);
 
 	  /* Should be possible to simplify this code. */
 	  if (newsize > r1->size)
@@ -3160,7 +3160,7 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
 
   /* Copy into the buffer. */
   room = stream->winsize - stream->buf_avail;
-  take = min (room, stream->avail_in);
+  take = xd3_min (room, stream->avail_in);
 
   memcpy (stream->buf_in + stream->buf_avail, stream->next_in, take);
 
@@ -3239,7 +3239,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
 
       if (small_comp)
 	{
-	  /* TODO: This is under devel: used to have min(sprevsz) here, which sort
+	  /* TODO: This is under devel: used to have min (sprevsz) here, which sort
 	   * of makes sense, but observed fast performance w/ larger tables, which
 	   * also sort of makes sense. @@@ */
 	  usize_t hash_values = stream->winsize;
@@ -3580,7 +3580,7 @@ xd3_process_stream (int            is_encode,
 		    usize_t        output_size_max)
 {
   usize_t ipos = 0;
-  usize_t n = min(stream->winsize, input_size);
+  usize_t n = xd3_min (stream->winsize, input_size);
 
   (*output_size) = 0;
 
@@ -3596,7 +3596,7 @@ xd3_process_stream (int            is_encode,
 	{
 	case XD3_OUTPUT: { /* memcpy below */ break; }
 	case XD3_INPUT: {
-	  n = min(stream->winsize, input_size - ipos);
+	  n = xd3_min(stream->winsize, input_size - ipos);
 	  if (n == 0) 
 	    {
 	      goto done;
@@ -3672,7 +3672,7 @@ xd3_process_memory (int            is_encode,
 
   if (is_encode)
     {
-      config.winsize = min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
+      config.winsize = xd3_min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.sprevsz = xd3_pow2_roundup (config.winsize);
     }
 
@@ -3927,8 +3927,8 @@ xd3_srcwin_setup (xd3_stream *stream)
    * issued, but we have to decide the source window base and length
    * now.  */
   src->srcbase = stream->match_minaddr;
-  src->srclen  = max ((usize_t) length,
-		      stream->avail_in + (stream->avail_in >> 2));
+  src->srclen  = xd3_max ((usize_t) length,
+			  stream->avail_in + (stream->avail_in >> 2));
 
   if (src->eof_known)
     {
@@ -3936,7 +3936,7 @@ xd3_srcwin_setup (xd3_stream *stream)
        * code that expects to pass a single block w/ getblk == NULL
        * will not function, as the code will return GETSRCBLK asking
        * for the second block. */
-      src->srclen = min (src->srclen, xd3_source_eof(src) - src->srcbase);
+      src->srclen = xd3_min (src->srclen, xd3_source_eof(src) - src->srcbase);
     }
   
   IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %llu len %llu\n",
@@ -4200,7 +4200,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	      return ret;
 	    }
 
-	  tryrem = min (tryoff, stream->match_maxback - stream->match_back);
+	  tryrem = xd3_min (tryoff, stream->match_maxback - stream->match_back);
 
 	  IF_DEBUG2(DP(RINT "[maxback] maxback %u trysrc %"Q"u/%u tgt %u tryrem %u\n",
 		       stream->match_maxback, tryblk, tryoff, streamoff, tryrem));
@@ -4245,7 +4245,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	  return ret;
 	}
 
-      tryrem = min(stream->match_maxfwd - stream->match_fwd,
+      tryrem = xd3_min(stream->match_maxfwd - stream->match_fwd,
 		   src->onblk - tryoff);
 
       if (tryrem == 0)
@@ -4587,7 +4587,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
   /* Begin by advancing at twice the input rate, up to half the
    * maximum window size. */
-  logical_input_cksum_pos = min((stream->total_in + stream->input_position) * 2,
+  logical_input_cksum_pos = xd3_min((stream->total_in + stream->input_position) * 2,
 				(stream->total_in + stream->input_position) +
 				  (stream->src->max_winsize / 2));
 
@@ -4812,9 +4812,9 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
    * of length 8 at the next position. */
   if (xd3_iopt_last_matched (stream) > stream->input_position)
     {
-      stream->min_match = max(MIN_MATCH,
-			      1 + xd3_iopt_last_matched(stream) -
-			      stream->input_position);
+      stream->min_match = xd3_max (MIN_MATCH,
+				   1 + xd3_iopt_last_matched(stream) -
+				   stream->input_position);
     }
   else
     {

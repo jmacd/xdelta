@@ -1222,7 +1222,7 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  XPR(NT "Blocksize %"Q"u windowsize %"Q"u\n",
+  XPR(NT "Blocksize %"Q"u windowsize %zu\n",
       T::BLOCK_SIZE, T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);

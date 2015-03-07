@@ -156,7 +156,7 @@ xd3_decode_section (xd3_stream *stream,
 	  usize_t sect_need = section->size - section->pos;
 
 	  /* Allocate and copy */
-	  sect_take = min (sect_need, stream->avail_in);
+	  sect_take = xd3_min (sect_need, stream->avail_in);
 
 	  if (section->pos == 0)
 	    {
@@ -582,7 +582,7 @@ xd3_decode_sections (xd3_stream *stream)
   more = (need - stream->dec_winbytes);
 
   /* How much to consume. */
-  take = min (more, stream->avail_in);
+  take = xd3_min (more, stream->avail_in);
 
   /* See if the input is completely available, to avoid copy. */
   copy = (take != more);

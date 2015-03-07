@@ -456,7 +456,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
       djw_heapen *h2 = heap_extract (heap, ents, --heap_last);
 
       ents[ents_size].freq   = h1->freq + h2->freq;
-      ents[ents_size].depth  = 1 + max (h1->depth, h2->depth);
+      ents[ents_size].depth  = 1 + xd3_max (h1->depth, h2->depth);
       ents[ents_size].parent = 0;
 
       h1->parent = h2->parent = ents_size;
@@ -525,7 +525,7 @@ djw_build_codes (usize_t *codes, const uint8_t *clen, usize_t asize, usize_t abs
 	  min_clen = clen[i];
 	}
 
-      max_clen = max (max_clen, (usize_t) clen[i]);
+      max_clen = xd3_max (max_clen, (usize_t) clen[i]);
     }
 
   XD3_ASSERT (max_clen <= abs_max);
@@ -1799,7 +1799,7 @@ xd3_decode_huff (xd3_stream     *stream,
 	    XD3_ASSERT (output_end - output > 0);
 	    
 	    /* Decode next sector. */
-	    n = min (sector_size, (usize_t) (output_end - output));
+	    n = xd3_min (sector_size, (usize_t) (output_end - output));
 
 	    do
 	      {

@@ -109,7 +109,7 @@ mt_exp_rand (uint32_t mean, uint32_t max_value)
 			      (double)UINT32_MAX));
   uint32_t x = (uint32_t) (mean_d * erand + 0.5);
 
-  return min (x, max_value);
+  return xd3_min (x, max_value);
 }
 
 #if SHELL_TESTS
@@ -300,7 +300,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       double add_prob = (left == 0) ? 0 : (add_left / (double) left);
       int do_copy;
 
-      next = min (left, next);
+      next = xd3_min (left, next);
       do_copy = (next > add_left ||
 		 (mt_random (&static_mtrand) / \
 		  (double)USIZE_T_MAX) >= add_prob);
@@ -735,10 +735,10 @@ test_address_cache (xd3_stream *stream, int unused)
       p         = (mt_random (&static_mtrand) / (double)USIZE_T_MAX);
       prev_i    = mt_random (&static_mtrand) % offset;
       nearby    = (mt_random (&static_mtrand) % 256) % offset;
-      nearby    = max (1U, nearby);
+      nearby    = xd3_max (1U, nearby);
 
       if (p < 0.1)      { addr = addrs[offset-nearby]; }
-      else if (p < 0.4) { addr = min (addrs[prev_i] + nearby, offset-1); }
+      else if (p < 0.4) { addr = xd3_min (addrs[prev_i] + nearby, offset-1); }
       else              { addr = prev_i; }
 
       if ((ret = xd3_encode_address (stream, addr, offset, & modes[offset]))) { return ret; }
@@ -884,7 +884,7 @@ test_decompress_text (xd3_stream *stream, uint8_t *enc, usize_t enc_size, usize_
 
  input:
   /* Test decoding test_desize input bytes at a time */
-  take = min (enc_size - pos, test_desize);
+  take = xd3_min (enc_size - pos, test_desize);
   CHECK(take > 0);
 
   xd3_avail_input (stream, enc + pos, take);
@@ -1440,7 +1440,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	   * decoding.  Really looking for faults here. */
 	  {
 	    int i;
-	    int bytes = min (compress_size, 10U);
+	    int bytes = xd3_min (compress_size, 10U);
 	    for (i = 0; i < bytes * 8; i += 1)
 	      {
 		dec_input[i/8] ^= 1 << (i%8);

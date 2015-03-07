@@ -157,11 +157,7 @@ typedef uint64_t xoff_t;
 #define SIZEOF_XOFF_T 8
 #define SIZEOF_USIZE_T 4
 #ifndef WIN32
-#if SIZEOF_SIZE_T == 8
-#define Q "z"
-#else
 #define Q "ll"
-#endif
 #else
 #define Q "I64"
 #endif
@@ -309,12 +305,8 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
 #define XD3_ASSERT(x) (void)0
 #endif  /* XD3_DEBUG */
 
-#ifndef max
-#define max(x,y) ((x) < (y) ? (y) : (x))
-#endif
-#ifndef min
-#define min(x,y) ((x) < (y) ? (x) : (y))
-#endif
+#define xd3_max(x,y) ((x) < (y) ? (y) : (x))
+#define xd3_min(x,y) ((x) < (y) ? (x) : (y))
 
 /****************************************************************
  PUBLIC ENUMS
