@@ -153,16 +153,29 @@ typedef uint32_t usize_t;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-typedef uint64_t xoff_t;
-#define SIZEOF_XOFF_T 8
-#define SIZEOF_USIZE_T 4
-#ifndef WIN32
+#if SIZEOF_UNSIGNED_LONG == 8
+typedef unsigned long xoff_t;
+#define Q "l"
+#elif SIZEOF_SIZE_T == 8
+typedef size_t xoff_t;
+#define Q "z"
+#elif SIZEOF_UNSIGNED_LONG_LONG == 8
+typedef unsigned long long xoff_t;
 #define Q "ll"
 #else
+typedef uint64_t xoff_t;
 #define Q "I64"
 #endif
+
+#define SIZEOF_XOFF_T 8
+#define SIZEOF_USIZE_T 4
+#else
+#if SIZEOF_UNSIGNED_INT == 4
+typedef unsigned int xoff_t;
 #else
 typedef uint32_t xoff_t;
+#endif
+
 #define SIZEOF_XOFF_T 4
 #define SIZEOF_USIZE_T 4
 #define Q
