@@ -38,7 +38,7 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
-	 -Wextra -Wno-unused-parameter
+	 -Wextra -Wno-unused-parameter -Wno-unused-function
 
 C_WFLAGS = $(WFLAGS) -pedantic -std=c99
 CXX_WFLAGS = $(WFLAGS)
@@ -48,7 +48,6 @@ common_CFLAGS = \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
 	      -DXD3_POSIX=1 \
-	      -DXD3_USE_LARGEFILE64=1 \
 	      -DXD3_MAIN=1
 
 if DEBUG_SYMBOLS
@@ -65,7 +64,6 @@ xdelta3decode_CFLAGS = \
 	-DSECONDARY_DJW=0 \
 	-DSECONDARY_FGK=0 \
 	-DSECONDARY_LZMA=0 \
-	-DXD3_USE_LARGEFILE64=1 \
 	-DXD3_MAIN=1 \
 	-DXD3_ENCODER=0 \
 	-DXD3_STDIO=1 \
