@@ -25,6 +25,50 @@
                      VCD_SOURCE : ((((x) & VCD_SRCORTGT) == \
                                     VCD_TARGET) ? VCD_TARGET : 0))
 
+static inline int
+xd3_decode_byte (xd3_stream *stream, usize_t *val)
+{
+  if (stream->avail_in == 0)
+    {
+      stream->msg = "further input required";
+      return XD3_INPUT;
+    }
+
+  (*val) = stream->next_in[0];
+
+  DECODE_INPUT (1);
+  return 0;
+}
+
+static inline int
+xd3_decode_bytes (xd3_stream *stream, uint8_t *buf, usize_t *pos, usize_t size)
+{
+  usize_t want;
+  usize_t take;
+
+  /* Note: The case where (*pos == size) happens when a zero-length
+   * appheader or code table is transmitted, but there is nothing in
+   * the standard against that. */
+  while (*pos < size)
+    {
+      if (stream->avail_in == 0)
+	{
+	  stream->msg = "further input required";
+	  return XD3_INPUT;
+	}
+
+      want = size - *pos;
+      take = xd3_min (want, stream->avail_in);
+
+      memcpy (buf + *pos, stream->next_in, (size_t) take);
+
+      DECODE_INPUT (take);
+      (*pos) += take;
+    }
+
+  return 0;
+}
+
 /* Initialize the decoder for a new window.  The dec_tgtlen value is
  * preserved across successive window decodings, and the update to
  * dec_winstart is delayed until a new window actually starts.  This
@@ -933,6 +977,7 @@ xd3_decode_input (xd3_stream *stream)
 
     case DEC_CPYOFF:
       /* Copy window offset: only if VCD_SOURCE or VCD_TARGET is set */
+      
       OFFSET_CASE(SRCORTGT (stream->dec_win_ind), stream->dec_cpyoff,
 		  DEC_ENCLEN);
 

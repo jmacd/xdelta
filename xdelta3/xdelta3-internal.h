@@ -46,6 +46,17 @@ xoff_t xd3_source_eof(const xd3_source *src);
 uint32_t xd3_large_cksum_update (uint32_t cksum,
 				 const uint8_t *base,
 				 usize_t look);
+int xd3_emit_byte (xd3_stream  *stream,
+		   xd3_output **outputp,
+		   uint8_t      code);
+
+int xd3_emit_bytes (xd3_stream     *stream,
+		    xd3_output    **outputp,
+		    const uint8_t  *base,
+		    usize_t          size);
+xd3_output* xd3_alloc_output (xd3_stream *stream,
+			      xd3_output *old_output);
+
 int xd3_encode_init_full (xd3_stream *stream);
 size_t xd3_pow2_roundup (size_t x);
 int xd3_process_stream (int            is_encode,
@@ -152,5 +163,195 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #ifndef UINT64_MAX
 #define UINT64_MAX 18446744073709551615ULL
 #endif
+
+#define UINT32_OFLOW_MASK 0xfe000000U
+#define UINT64_OFLOW_MASK 0xfe00000000000000ULL
+
+/*********************************************************************
+ Integer encoder/decoder functions
+ **********************************************************************/
+
+/* Consume N bytes of input, only used by the decoder. */
+#define DECODE_INPUT(n)             \
+  do {                              \
+  stream->total_in += (xoff_t) (n); \
+  stream->avail_in -= (n);          \
+  stream->next_in  += (n);          \
+  } while (0)
+
+#define DECODE_INTEGER_TYPE(PART,OFLOW)                                \
+  while (stream->avail_in != 0)                                        \
+    {                                                                  \
+      usize_t next = stream->next_in[0];                               \
+                                                                       \
+      DECODE_INPUT(1);                                                 \
+                                                                       \
+      if (PART & OFLOW)                                                \
+	{                                                              \
+	  stream->msg = "overflow in decode_integer";                  \
+	  return XD3_INVALID_INPUT;                                    \
+	}                                                              \
+                                                                       \
+      PART = (PART << 7) | (next & 127);                               \
+                                                                       \
+      if ((next & 128) == 0)                                           \
+	{                                                              \
+	  (*val) = PART;                                               \
+	  PART = 0;                                                    \
+	  return 0;                                                    \
+	}                                                              \
+    }                                                                  \
+                                                                       \
+  stream->msg = "further input required";                              \
+  return XD3_INPUT
+
+#define READ_INTEGER_TYPE(TYPE, OFLOW)                                 \
+  TYPE val = 0;                                                        \
+  const uint8_t *inp = (*inpp);                                        \
+  usize_t next;                                                        \
+                                                                       \
+  do                                                                   \
+    {                                                                  \
+      if (inp == max)                                                  \
+	{                                                              \
+	  stream->msg = "end-of-input in read_integer";                \
+	  return XD3_INVALID_INPUT;                                    \
+	}                                                              \
+                                                                       \
+      if (val & OFLOW)                                                 \
+	{                                                              \
+	  stream->msg = "overflow in read_intger";                     \
+	  return XD3_INVALID_INPUT;                                    \
+	}                                                              \
+                                                                       \
+      next = (*inp++);                                                 \
+      val  = (val << 7) | (next & 127);                                \
+    }                                                                  \
+  while (next & 128);                                                  \
+                                                                       \
+  (*valp) = val;                                                       \
+  (*inpp) = inp;                                                       \
+                                                                       \
+  return 0
+
+#define EMIT_INTEGER_TYPE()                                            \
+  /* max 64-bit value in base-7 encoding is 9.1 bytes */               \
+  uint8_t buf[10];                                                     \
+  usize_t  bufi = 10;                                                  \
+                                                                       \
+  /* This loop performs division and turns on all MSBs. */             \
+  do                                                                   \
+    {                                                                  \
+      buf[--bufi] = (num & 127) | 128;                                 \
+      num >>= 7U;                                                      \
+    }                                                                  \
+  while (num != 0);                                                    \
+                                                                       \
+  /* Turn off MSB of the last byte. */                                 \
+  buf[9] &= 127;                                                       \
+                                                                       \
+  return xd3_emit_bytes (stream, output, buf + bufi, 10 - bufi)
+
+#define IF_SIZEOF32(x) if (num < (1U   << (7 * (x)))) return (x);
+#define IF_SIZEOF64(x) if (num < (1ULL << (7 * (x)))) return (x);
+
+#if USE_UINT32
+static inline uint32_t
+xd3_sizeof_uint32_t (uint32_t num)
+{
+  IF_SIZEOF32(1);
+  IF_SIZEOF32(2);
+  IF_SIZEOF32(3);
+  IF_SIZEOF32(4);
+  return 5;
+}
+
+static inline int
+xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
+{ DECODE_INTEGER_TYPE (stream->dec_32part, UINT32_OFLOW_MASK); }
+
+static inline int
+xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *max, uint32_t *valp)
+{ READ_INTEGER_TYPE (uint32_t, UINT32_OFLOW_MASK); }
+
+#if XD3_ENCODER
+static inline int
+xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
+{ EMIT_INTEGER_TYPE (); }
+#endif
+#endif
+
+#if USE_UINT64
+static inline int
+xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
+{ DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
+
+#if XD3_ENCODER
+static inline int
+xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
+{ EMIT_INTEGER_TYPE (); }
+#endif
+
+/* These are tested but not used */
+#if REGRESSION_TEST
+static int
+xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *max, uint64_t *valp)
+{ READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
+
+static uint32_t
+xd3_sizeof_uint64_t (uint64_t num)
+{
+  IF_SIZEOF64(1);
+  IF_SIZEOF64(2);
+  IF_SIZEOF64(3);
+  IF_SIZEOF64(4);
+  IF_SIZEOF64(5);
+  IF_SIZEOF64(6);
+  IF_SIZEOF64(7);
+  IF_SIZEOF64(8);
+  IF_SIZEOF64(9);
+
+  return 10;
+}
+#endif
+
+#endif
+
+#if SIZEOF_USIZE_T == 4
+#define USIZE_T_MAX        UINT32_MAX
+#define xd3_decode_size   xd3_decode_uint32_t
+#define xd3_emit_size     xd3_emit_uint32_t
+#define xd3_sizeof_size   xd3_sizeof_uint32_t
+#define xd3_read_size     xd3_read_uint32_t
+#elif SIZEOF_USIZE_T == 8
+#define USIZE_T_MAX        UINT64_MAX
+#define xd3_decode_size   xd3_decode_uint64_t
+#define xd3_emit_size     xd3_emit_uint64_t
+#define xd3_sizeof_size   xd3_sizeof_uint64_t
+#define xd3_read_size     xd3_read_uint64_t
+#endif
+
+#if SIZEOF_XOFF_T == 4
+#define XOFF_T_MAX        UINT32_MAX
+#define xd3_emit_offset   xd3_emit_uint32_t
+static inline int
+xd3_decode_offset (xd3_stream *stream, xoff_t *val)
+{
+  return xd3_decode_uint32_t (stream, (uint32_t*) val);
+}
+#elif SIZEOF_XOFF_T == 8
+#define XOFF_T_MAX        UINT64_MAX
+#define xd3_emit_offset   xd3_emit_uint64_t
+static inline int
+xd3_decode_offset (xd3_stream *stream, xoff_t *val)
+{
+  return xd3_decode_uint64_t (stream, (uint64_t*) val);
+}
+#endif
+
+#define USIZE_T_OVERFLOW(a,b) ((USIZE_T_MAX - (usize_t) (a)) < (usize_t) (b))
+#define XOFF_T_OVERFLOW(a,b) ((XOFF_T_MAX - (xoff_t) (a)) < (xoff_t) (b))
 
 #endif // XDELTA3_INTERNAL_H__

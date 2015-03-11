@@ -35,8 +35,8 @@ function buildit {
     echo CXXFLAGS=$CXXFLAGS
     echo LDFLAGS=$LDFLAGS    
     mkdir -p $D
-    echo For machine=${machine} bits,
-    echo For xoff_t=${offsetbits} bits.    
+    echo For machine=${machine}
+    echo For xoff_t=${offsetbits} bits
     
     echo "Configuring $D ..."
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
