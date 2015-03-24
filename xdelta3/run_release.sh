@@ -23,6 +23,13 @@ SRCDIR=$PWD
 
 rm -rf build
 
+function setup {
+    aclocal -I m4
+    automake
+    automake --add-missing
+    autoconf
+}
+
 function buildit {
     machine=$1
     offsetbits=$2
@@ -40,7 +47,10 @@ function buildit {
     
     echo "Configuring $D ..."
     (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
+    echo "Configuring $D ..."
     (cd $D && make all)
+    echo "Testing $D ..."
+    (cd $D && ./xdelta3 test)
 }
 
 function buildall {
