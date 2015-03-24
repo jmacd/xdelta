@@ -1,5 +1,7 @@
 #!/bin/sh
 
+EXTRA=$*
+
 # Choose
 CC=clang 
 CXX=clang++
@@ -45,9 +47,9 @@ function buildit {
     echo For machine=${machine}
     echo For xoff_t=${offsetbits} bits
     
-    echo "Configuring $D ..."
-    (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols)
-    echo "Configuring $D ..."
+    echo "Configuring $D $EXTRA ..."
+    (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols $EXTRA)
+    echo "Building $D ..."
     (cd $D && make all)
     echo "Testing $D ..."
     (cd $D && ./xdelta3 test)

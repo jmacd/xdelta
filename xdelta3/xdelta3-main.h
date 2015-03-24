@@ -391,6 +391,8 @@ main_config (void)
   XPR(NTR "XD3_HARDMAXWINSIZE=%d\n", XD3_HARDMAXWINSIZE);
   XPR(NTR "sizeof(void*)=%d\n", (int)sizeof(void*));
   XPR(NTR "sizeof(int)=%d\n", (int)sizeof(int));
+  XPR(NTR "sizeof(long)=%d\n", (int)sizeof(long));
+  XPR(NTR "sizeof(long long)=%d\n", (int)sizeof(long long));
   XPR(NTR "sizeof(size_t)=%d\n", (int)sizeof(size_t));
   XPR(NTR "sizeof(uint32_t)=%d\n", (int)sizeof(uint32_t));
   XPR(NTR "sizeof(uint64_t)=%d\n", (int)sizeof(uint64_t));
