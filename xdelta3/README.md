@@ -13,7 +13,11 @@ compression. The latest information and downloads are available here:
   http://xdelta.org/
   http://github.com/jmacd/xdelta/
 
-The command-line syntax:
+Xdelta can be configured to use XZ Utils for secondary compression:
+
+  http://tukaani.org/xz/
+
+The command-line syntax is detailed here:
 
   https://github.com/jmacd/xdelta/blob/wiki/CommandLineSyntax.md
 
@@ -21,8 +25,8 @@ Run 'xdelta3 -h' for brief help.  Run 'xdelta3 test' for built-in tests.
 
 Sample commands (like gzip, -e means encode, -d means decode)
 
-  xdelta3 -9 -S lzma -e -vfs OLD_FILE NEW_FILE DELTA_FILE
-  xdelta3 -d -vfs OLD_FILE DELTA_FILE DECODED_FILE
+  xdelta3 -9 -S lzma -e -f -s OLD_FILE NEW_FILE DELTA_FILE
+  xdelta3 -d -s OLD_FILE DELTA_FILE DECODED_FILE
 
 File bug reports and browse open support issues here:
 
