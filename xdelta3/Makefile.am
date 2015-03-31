@@ -80,9 +80,9 @@ man1_MANS = xdelta3.1
 
 EXTRA_DIST = \
 	draft-korn-vcdiff.txt \
-	README \
+	README.md \
 	examples/Makefile \
-	examples/README \
+	examples/README.md \
 	examples/checksum_test.cc \
 	examples/compare_test.c \
 	examples/encode_decode_test.c \
