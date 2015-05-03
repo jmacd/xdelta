@@ -40,10 +40,6 @@ struct _main_blklru
   main_blklru_list  link;
 };
 
-#define MAX_LRU_SIZE 32U
-#define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
-#define XD3_MAXSRCWINSZ (1ULL << 31)
-
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
 static usize_t           lru_size = 0;

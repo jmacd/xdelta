@@ -354,4 +354,8 @@ xd3_decode_offset (xd3_stream *stream, xoff_t *val)
 #define USIZE_T_OVERFLOW(a,b) ((USIZE_T_MAX - (usize_t) (a)) < (usize_t) (b))
 #define XOFF_T_OVERFLOW(a,b) ((XOFF_T_MAX - (xoff_t) (a)) < (xoff_t) (b))
 
+#define MAX_LRU_SIZE 32U
+#define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
+#define XD3_MAXSRCWINSZ (1ULL << 31)
+
 #endif // XDELTA3_INTERNAL_H__
