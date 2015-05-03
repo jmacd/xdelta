@@ -1931,8 +1931,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 
       if (source->onblk == source->blksize)
 	{
-	  source->frontier_blkno = blkno + 1;
-
 	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: "
 			"source length unknown %"Q"u\n",
 			blkno,
@@ -1948,9 +1946,9 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 			    xd3_source_eof (source)));
 	      source->eof_known = 1;
 	    }
-
-	  source->frontier_blkno = blkno;
 	}
+
+      source->frontier_blkno = blkno + 1;
     }
 
   XD3_ASSERT (source->curblk != NULL);
