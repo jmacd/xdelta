@@ -1931,6 +1931,8 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 
       if (source->onblk == source->blksize)
 	{
+	  source->frontier_blkno = blkno + 1;
+
 	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: "
 			"source length unknown %"Q"u\n",
 			blkno,
@@ -1938,6 +1940,13 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	}
       else
 	{
+	  source->frontier_blkno = blkno;
+
+	  if (xd3_bytes_on_srcblk (source, blkno) != 0)
+	    {
+	      source->frontier_blkno += 1;
+	    }
+
 	  if (!source->eof_known)
 	    {
 	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; "
@@ -1947,8 +1956,6 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 	      source->eof_known = 1;
 	    }
 	}
-
-      source->frontier_blkno = blkno + 1;
     }
 
   XD3_ASSERT (source->curblk != NULL);
@@ -3700,7 +3707,7 @@ xd3_srcwin_setup (xd3_stream *stream)
       src->srclen = xd3_min (src->srclen, xd3_source_eof(src) - src->srcbase);
     }
   
-  IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %llu len %llu\n",
+  IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %"Q"u len %u\n",
 		src->srcbase, src->srclen));
 
   XD3_ASSERT (src->srclen);
