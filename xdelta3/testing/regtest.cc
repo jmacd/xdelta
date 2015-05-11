@@ -953,7 +953,7 @@ void TestHalfBlockCopy() {
       Options options;
       options.encode_srcwin_maxsz = Constants::BLOCK_SIZE * b;
 
-      // Block block0;
+      Block block0;
       Block block1;
       InMemoryEncodeDecode(spec0, spec1, &block0, options);
       InMemoryEncodeDecode(spec1, spec0, &block1, options);

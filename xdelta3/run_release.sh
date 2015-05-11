@@ -52,7 +52,7 @@ function buildit {
     echo "Building $D ..."
     (cd $D && make all)
     echo "Testing $D ..."
-    (cd $D && ./xdelta3 test)
+    (cd $D && ./xdelta3regtest)
 }
 
 function buildall {
