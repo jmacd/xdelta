@@ -1,21 +1,10 @@
 #!/bin/sh
 
-EXTRA=$*
-
-# Choose
-CC=clang 
-CXX=clang++
-# or
-#CC=gcc
-#CXX=g++
-
 # Place C/C++ common flags here
 COMMON="-g"
 
 export CFLAGS
 export CXXFLAGS
-export CC
-export CXX
 export LDFLAGS
 
 LIBBASE=$HOME/lib
@@ -33,35 +22,47 @@ function setup {
 }
 
 function buildit {
-    machine=$1
-    offsetbits=$2
-    args=$3
-    D=build/${machine}/xoff${offsetbits}
-    CFLAGS="$COMMON -${machine} ${args} -I$LIBBASE/${machine}/include"
-    CXXFLAGS="$COMMON -${machine} ${args} -I$LIBBASE/${machine}/include"
-    LDFLAGS="$COMMON -${machine} ${args} -L$LIBBASE/${machine}/lib"
+    host=$1
+    march=$2
+    offsetbits=$3
+    args=$4
+    BM="${host}${march}"
+    D=build/$BM/xoff${offsetbits}
+    CFLAGS="$COMMON ${march} ${args} -I$LIBBASE/$BM/include"
+    CXXFLAGS="$COMMON ${march} ${args} -I$LIBBASE/$BM/include"
+    LDFLAGS="$COMMON ${march} ${args} -L$LIBBASE/$BM/lib"
     echo CFLAGS=$CFLAGS
     echo CXXFLAGS=$CXXFLAGS
-    echo LDFLAGS=$LDFLAGS    
+    echo LDFLAGS=$LDFLAGS
     mkdir -p $D
-    echo For machine=${machine}
+    echo For build=$BM
     echo For xoff_t=${offsetbits} bits
-    
-    echo "Configuring $D $EXTRA ..."
-    (cd $D && $SRCDIR/configure --prefix=$PWD/bin --enable-debug-symbols $EXTRA)
+
+    echo "Configuring $D ..."
+    (cd $D && $SRCDIR/configure \
+		  --host=${host} \
+		  --prefix=$PWD \
+		  --enable-debug-symbols)
     echo "Building $D ..."
     (cd $D && make all)
+    echo "Installing $D ..."    
+    (cd $D && make install)
     echo "Testing $D ..."
-    (cd $D && ./xdelta3regtest)
+
+    # TODO test if host matches mingw, can't run tests
+    # (cd $D && ./bin/xdelta3regtest)
+    (cd $D && ./bin/xdelta3 test)
 }
 
 function buildall {
-    buildit $1 32 "-DXD3_USE_LARGEFILE64=0"
-    buildit $1 64 "-DXD3_USE_LARGEFILE64=1"
+    buildit "$1" "$2" 32 "-DXD3_USE_LARGEFILE64=0 $3"
+    buildit "$1" "$2" 64 "-DXD3_USE_LARGEFILE64=1 $3"
 }
 
-buildall m64
-buildall m32
+#buildall x86_64-pc-linux-gnu -m64
+#buildall x86_64-pc-linux-gnu -m32
 
+MINGW_FLAGS="-DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0 -DXD3_WIN32=1 -DSHELL_TESTS=0"
 
-
+buildall i686-w64-mingw32 -m32 "${MINGW_FLAGS}"
+buildall x86_64-w64-mingw32 -m64 "${MINGW_FLAGS}"

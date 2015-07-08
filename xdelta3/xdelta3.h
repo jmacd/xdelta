@@ -112,6 +112,7 @@
 #include <stdint.h>
 #else
 #define WIN32_LEAN_AND_MEAN
+#ifndef WINVER
 #if XD3_USE_LARGEFILE64
 /* 64 bit file offsets: uses GetFileSizeEx and SetFilePointerEx.
  * requires Win2000 or newer version of WinNT */
@@ -122,6 +123,7 @@
  * SetFilePointer. compatible with win9x-me and WinNT4 */
 #define WINVER		0x0400
 #define _WIN32_WINNT	0x0400
+#endif
 #endif
 #include <windows.h>
 #ifdef _MSC_VER

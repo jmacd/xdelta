@@ -107,19 +107,9 @@ struct _main_file
   int                 seek_failed;   /* after seek fails once, try FIFO */
 };
 
-/* According to the internet, Windows vsnprintf() differs from most
- * Unix implementations regarding the terminating 0 when the boundary
- * condition is met. It doesn't matter here, we don't rely on the
- * trailing 0.  Besides, both Windows and DJGPP vsnprintf return -1
- * upon truncation, which isn't C99 compliant. To overcome this,
- * recent MinGW runtimes provided their own vsnprintf (notice the
- * absence of the '_' prefix) but they were initially buggy.  So,
- * always use the native '_'-prefixed version with Win32. */
 #ifdef _WIN32
-#define vsnprintf_func(str,size,fmt,args) \
-  _vsnprintf_s(str,size,size-1,fmt,args)
-#define snprintf_func(str,size,fmt,...) \
-  _snprintf_s(str,size,size-1,fmt,__VA_ARGS__)
+#define vsnprintf_func _vsnprintf
+#define snprintf_func _snprintf
 #else
 #define vsnprintf_func vsnprintf
 #define snprintf_func snprintf
