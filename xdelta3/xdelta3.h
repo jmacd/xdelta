@@ -110,22 +110,26 @@
  */
 #ifndef _WIN32
 #include <stdint.h>
-#else
+#else /* WIN32 case */
 #define WIN32_LEAN_AND_MEAN
+
 #ifndef WINVER
 #if XD3_USE_LARGEFILE64
 /* 64 bit file offsets: uses GetFileSizeEx and SetFilePointerEx.
  * requires Win2000 or newer version of WinNT */
 #define WINVER		0x0500
 #define _WIN32_WINNT	0x0500
-#else
+#else /* xoff_t is 32bit */
 /* 32 bit (DWORD) file offsets: uses GetFileSize and
  * SetFilePointer. compatible with win9x-me and WinNT4 */
 #define WINVER		0x0400
 #define _WIN32_WINNT	0x0400
-#endif
-#endif
+#endif /* if XD3_USE_LARGEFILE64 */
+#endif /* ifndef WINVER */
+
 #include <windows.h>
+
+/* _MSV_VER is defined by Microsoft tools, not by mingw32 */
 #ifdef _MSC_VER
 #define inline
 typedef signed int     ssize_t;
@@ -134,28 +138,34 @@ typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned long  uint32_t;
 typedef ULONGLONG      uint64_t;
-#else
+#else /* _MSC_VER >= 1600 */
 /* For MSVC10 and above */
 #include <stdint.h>
-#endif
-#else
+#endif /* _MSC_VER < 1600 */
+#else /* _MSC_VER not defined  */
 /* mingw32, lcc and watcom provide a proper header */
 #include <stdint.h>
-#endif
-#endif
+#endif /* _MSC_VER defined */
+#endif /* _WIN32 defined */
 
 typedef uint32_t usize_t;
 
 #if XD3_USE_LARGEFILE64
+/* xoff_t is a 64-bit type */
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
+
 #ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
 #endif
+
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
 
-#if SIZEOF_UNSIGNED_LONG == 8
+#ifdef _WIN32
+typedef uint64_t xoff_t;
+#define Q "I64"
+#elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long xoff_t;
 #define Q "l"
 #elif SIZEOF_SIZE_T == 8
@@ -164,9 +174,6 @@ typedef size_t xoff_t;
 #elif SIZEOF_UNSIGNED_LONG_LONG == 8
 typedef unsigned long long xoff_t;
 #define Q "ll"
-#else
-typedef uint64_t xoff_t;
-#define Q "I64"
 #endif
 
 #define SIZEOF_XOFF_T 8
