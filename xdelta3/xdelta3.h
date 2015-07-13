@@ -176,6 +176,16 @@ typedef unsigned long long xoff_t;
 #define Q "ll"
 #endif
 
+#ifdef _WIN32
+#if SIZEOF_SIZE_T == 4
+#define Z ""
+#elif SIZEOF_SIZE_T == 8
+#define Z "I64"
+#endif
+#else
+#define Z "z"
+#endif
+
 #define SIZEOF_XOFF_T 8
 #define SIZEOF_USIZE_T 4
 #else
@@ -188,6 +198,7 @@ typedef uint32_t xoff_t;
 #define SIZEOF_XOFF_T 4
 #define SIZEOF_USIZE_T 4
 #define Q
+#define Z
 #endif
 
 #define USE_UINT32 (SIZEOF_USIZE_T == 4 || \

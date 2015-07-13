@@ -1073,7 +1073,7 @@ main_file_read (main_file  *ifile,
     }
   else
     {
-      if (option_verbose > 4) { XPR(NT "read %s: %zu bytes\n",
+      if (option_verbose > 4) { XPR(NT "read %s: %"Z"u bytes\n",
 				    ifile->filename, (*nread)); }
       ifile->nread += (*nread);
     }

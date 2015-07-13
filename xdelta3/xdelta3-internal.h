@@ -82,12 +82,12 @@ typedef enum
 
 struct _main_file
 {
-#if XD3_STDIO
+#if XD3_WIN32
+  HANDLE              file;
+#elif XD3_STDIO
   FILE               *file;
 #elif XD3_POSIX
   int                 file;
-#elif XD3_WIN32
-  HANDLE              file;
 #endif
 
   int                 mode;          /* XO_READ and XO_WRITE */

@@ -47,7 +47,6 @@ common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
-	      -DXD3_POSIX=1 \
 	      -DXD3_MAIN=1
 
 if DEBUG_SYMBOLS

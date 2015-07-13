@@ -576,7 +576,7 @@ void TestDeleteMutator() {
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
-    cl1.push_back(Change(Change::DELETE, test_cases[i].size,
+    cl1.push_back(Change(Change::DELRANGE, test_cases[i].size,
 			 test_cases[i].addr));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     CHECK_EQ(spec0.Size() - test_cases[i].size, spec1.Size());
@@ -1129,7 +1129,7 @@ void TestMergeCommand1() {
       }
 
       cl1.push_back(Change(Change::ADD, change1, add1_pos));
-      cl2.push_back(Change(Change::DELETE, change1, del2_pos));
+      cl2.push_back(Change(Change::DELRANGE, change1, del2_pos));
       cl3.push_back(Change(Change::MODIFY, change3, change3_pos));
 
       spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
@@ -1183,9 +1183,9 @@ void TestMergeCommand2() {
 
 	  ChangeList cl1, cl2, cl3;
 
-	  cl1.push_back(Change(Change::DELETE, size0 - size1, 0));
-	  cl2.push_back(Change(Change::DELETE, size0 - size2, 0));
-	  cl3.push_back(Change(Change::DELETE, size0 - size3, 0));
+	  cl1.push_back(Change(Change::DELRANGE, size0 - size1, 0));
+	  cl2.push_back(Change(Change::DELRANGE, size0 - size2, 0));
+	  cl3.push_back(Change(Change::DELRANGE, size0 - size3, 0));
 
 	  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
 	  spec0.ModifyTo(ChangeListMutator(cl2), &spec2);
@@ -1259,7 +1259,7 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  XPR(NT "Blocksize %"Q"u windowsize %zu\n",
+  XPR(NT "Blocksize %"Q"u windowsize %"Z"u\n",
       T::BLOCK_SIZE, T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);

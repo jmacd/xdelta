@@ -9,8 +9,9 @@ export LDFLAGS
 
 LIBBASE=$HOME/lib
 
-MINGW_CCFLAGS="-DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0 -DXD3_WIN32=1 -DSHELL_TESTS=0"
-MINGW_LDFLAGS="-lmingw32"
+MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0 -DXD3_WIN32=1 -DSHELL_TESTS=0"
+
+MINGW_LDFLAGS=""
 
 # Location where mingw-w64-build script runs.
 MINGW_BASE="/volume/home/jmacd/src/mingwb"
@@ -19,7 +20,7 @@ MINGW_BASE="/volume/home/jmacd/src/mingwb"
 # Run from the source dir.
 SRCDIR=$PWD
 
-rm -rf build
+rm -rf build/*/*/*
 
 function setup {
     aclocal -I m4
@@ -50,10 +51,12 @@ function buildit {
     (cd $D && $SRCDIR/configure \
 		  --host=${host} \
 		  --prefix=$PWD \
+		  --enable-static \
+		  --disable-shared \
 		  --enable-debug-symbols)
 
-    # echo "Building $D ..."
-    # (cd $D && make all)
+    echo "Building $D ..."
+    (cd $D && make all)
     # echo "Installing $D ..."    
     # (cd $D && make install)
     # echo "Testing $D ..."
