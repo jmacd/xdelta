@@ -131,7 +131,7 @@
 
 /* _MSV_VER is defined by Microsoft tools, not by mingw32 */
 #ifdef _MSC_VER
-#define inline
+/*#define inline*/
 typedef signed int     ssize_t;
 #if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
@@ -162,8 +162,10 @@ typedef uint32_t usize_t;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32)
 typedef uint64_t xoff_t;
+/* Note: The following generates benign warnings in a mingw
+ * cross-compiler */
 #define Q "I64"
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long xoff_t;
@@ -174,32 +176,36 @@ typedef size_t xoff_t;
 #elif SIZEOF_UNSIGNED_LONG_LONG == 8
 typedef unsigned long long xoff_t;
 #define Q "ll"
-#endif
-
-#ifdef _WIN32
-#if SIZEOF_SIZE_T == 4
-#define Z ""
-#elif SIZEOF_SIZE_T == 8
-#define Z "I64"
-#endif
-#else
-#define Z "z"
-#endif
+#endif /* #define Q */
 
 #define SIZEOF_XOFF_T 8
-#define SIZEOF_USIZE_T 4
-#else
+
+#else /* XD3_USE_LARGEFILE64 == 0 */
+
 #if SIZEOF_UNSIGNED_INT == 4
 typedef unsigned int xoff_t;
+#elif SIZEOF_UNSIGNED_LONG == 4
+typedef unsigned long xoff_t;
 #else
 typedef uint32_t xoff_t;
-#endif
+#endif /* xoff_t is 32 bits */
 
 #define SIZEOF_XOFF_T 4
-#define SIZEOF_USIZE_T 4
 #define Q
+#endif /* 64 vs 32 bit xoff_t */
+
+/* Note: This gets modified in the 64bithash branch. */
+#define SIZEOF_USIZE_T 4
+
+#if SIZEOF_SIZE_T == 4
 #define Z
-#endif
+#elif SIZEOF_SIZE_T == 8
+#ifdef _WIN32
+#define Z "I64"
+#else /* !_WIN32 */
+#define Z "z"
+#endif /* Windows or not */
+#endif /* size_t printf flags */
 
 #define USE_UINT32 (SIZEOF_USIZE_T == 4 || \
 		    SIZEOF_XOFF_T == 4 || REGRESSION_TEST)

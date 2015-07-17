@@ -366,28 +366,35 @@ public:
     CHECK_EQ(0, CmpDifferentBlockBytes(to, recon));
   }
 
- //////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
- void TestRandomNumbers() {
-   MTRandom rand;
-   int rounds = 1<<20;
-   uint64_t usum = 0;
-   uint64_t esum = 0;
+void TestPrintf() {
+  char buf[64];
+  xoff_t x = XOFF_T_MAX;
+  snprintf_func (buf, sizeof(buf), "[%"Q"u]", x);
+  XD3_ASSERT(strcmp (buf, "[18446744073709551615]") == 0);
+}
 
-   for (int i = 0; i < rounds; i++) {
-     usum += rand.Rand32();
-     esum += rand.ExpRand32(1024);
-   }
+void TestRandomNumbers() {
+  MTRandom rand;
+  int rounds = 1<<20;
+  uint64_t usum = 0;
+  uint64_t esum = 0;
 
-   double allowed_error = 0.01;
+  for (int i = 0; i < rounds; i++) {
+    usum += rand.Rand32();
+    esum += rand.ExpRand32(1024);
+  }
 
-   uint32_t umean = usum / rounds;
-   uint32_t emean = esum / rounds;
+  double allowed_error = 0.01;
 
-   uint32_t uexpect = UINT32_MAX / 2;
-   uint32_t eexpect = 1024;
+  uint32_t umean = usum / rounds;
+  uint32_t emean = esum / rounds;
 
-   if (umean < uexpect * (1.0 - allowed_error) ||
+  uint32_t uexpect = UINT32_MAX / 2;
+  uint32_t eexpect = 1024;
+
+  if (umean < uexpect * (1.0 - allowed_error) ||
       umean > uexpect * (1.0 + allowed_error)) {
     XPR(NT "uniform mean error: %u != %u\n", umean, uexpect);
     abort();
@@ -1245,6 +1252,7 @@ void TestLastFrontierBlock() {
 template <class T>
 void UnitTest() {
   Regtest<T> regtest;
+  TEST(TestPrintf);
   TEST(TestRandomNumbers);
   TEST(TestRandomFile);
   TEST(TestFirstByte);

@@ -72,13 +72,13 @@ function buildall {
 }
 
 # Linux / OS X 64bit
-#buildall x86_64-pc-linux-gnu -m64
+buildall x86_64-pc-linux-gnu -m64
 
 # Linux / OS X 32bit
-#buildall x86_64-pc-linux-gnu -m32
+buildall x86_64-pc-linux-gnu -m32
 
 # Windows 32bit
 buildall i686-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "-L${MINGW_BASE}/mingw-w64-i686/lib ${MINGW_LDFLAGS}"
 
 # Windows 64bit
-#buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "-L${MINGW_BASE}/mingw-w64-x86_64/lib ${MINGW_LDFLAGS}"
+buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "-L${MINGW_BASE}/mingw-w64-x86_64/lib ${MINGW_LDFLAGS}"

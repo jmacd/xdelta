@@ -49,19 +49,6 @@
 
 /*********************************************************************/
 
-#ifndef XD3_POSIX
-#define XD3_POSIX 0
-#endif
-#ifndef XD3_STDIO
-#define XD3_STDIO 0
-#endif
-#ifndef XD3_WIN32
-#define XD3_WIN32 0
-#endif
-#ifndef NOT_MAIN
-#define NOT_MAIN 0
-#endif
-
 /* Combines xd3_strerror() and strerror() */
 const char* xd3_mainerror(int err_num);
 
@@ -81,12 +68,6 @@ xsnprintf_func (char *str, int n, const char *fmt, ...)
     }
   return ret;
 }
-
-/* If none are set, default to posix. */
-#if (XD3_POSIX + XD3_STDIO + XD3_WIN32) == 0
-#undef XD3_POSIX
-#define XD3_POSIX 1
-#endif
 
 /* Handle externally-compressed inputs. */
 #ifndef EXTERNAL_COMPRESSION
@@ -1248,8 +1229,9 @@ main_set_secondary_flags (xd3_config *config)
  VCDIFF TOOLS
  *****************************************************************/
 
-#if VCDIFF_TOOLS
 #include "xdelta3-merge.h"
+
+#if VCDIFF_TOOLS
 
 /* The following macros let VCDIFF print using main_file_write(),
  * for example:

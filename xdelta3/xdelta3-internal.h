@@ -80,6 +80,25 @@ typedef enum
   XO_WRITE = 1
 } main_file_modes;
 
+#ifndef XD3_POSIX
+#define XD3_POSIX 0
+#endif
+#ifndef XD3_STDIO
+#define XD3_STDIO 0
+#endif
+#ifndef XD3_WIN32
+#define XD3_WIN32 0
+#endif
+#ifndef NOT_MAIN
+#define NOT_MAIN 0
+#endif
+
+/* If none are set, default to posix. */
+#if (XD3_POSIX + XD3_STDIO + XD3_WIN32) == 0
+#undef XD3_POSIX
+#define XD3_POSIX 1
+#endif
+
 struct _main_file
 {
 #if XD3_WIN32

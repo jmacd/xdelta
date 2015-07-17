@@ -215,6 +215,16 @@ test_random_numbers (xd3_stream *stream, int ignore)
   return XD3_INTERNAL;
 }
 
+static int
+test_printf_xoff (xd3_stream *stream, int ignore)
+{
+  char buf[64];
+  xoff_t x = XOFF_T_MAX;
+  snprintf_func (buf, sizeof(buf), "[%"Q"u]", x);
+  XD3_ASSERT(strcmp (buf, "[18446744073709551615]") == 0);
+  return 0;
+}
+
 static void
 test_unlink (char* file)
 {
@@ -2852,6 +2862,7 @@ xd3_selftest (void)
 
   int ret;
   DO_TEST (random_numbers, 0, 0);
+  DO_TEST (printf_xoff, 0, 0);
 
   DO_TEST (decode_integer_end_of_input, 0, 0);
   DO_TEST (decode_integer_overflow, 0, 0);
