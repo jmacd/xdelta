@@ -220,9 +220,13 @@ test_printf_xoff (xd3_stream *stream, int ignore)
 {
   char buf[64];
   xoff_t x = XOFF_T_MAX;
-  snprintf_func (buf, sizeof(buf), "[%"Q"u]", x);
-  XD3_ASSERT(strcmp (buf, "[18446744073709551615]") == 0);
-  return 0;
+  snprintf_func (buf, sizeof(buf), "%"Q"u", x);
+  const char *expect = XD3_USE_LARGEFILE64 ?
+    "18446744073709551615" : "4294967295";
+  if (strcmp (buf, expect) == 0) {
+    return 0;
+  }
+  return XD3_INTERNAL;
 }
 
 static void
@@ -252,14 +256,22 @@ test_cleanup (void)
 int test_setup (void)
 {
   static int x = 0;
+  pid_t pid = getpid();
   x++;
-  snprintf_func (TEST_TARGET_FILE, TESTFILESIZE, "/tmp/xdtest.target.%d", x);
-  snprintf_func (TEST_SOURCE_FILE, TESTFILESIZE, "/tmp/xdtest.source.%d", x);
-  snprintf_func (TEST_DELTA_FILE, TESTFILESIZE, "/tmp/xdtest.delta.%d", x);
-  snprintf_func (TEST_RECON_FILE, TESTFILESIZE, "/tmp/xdtest.recon.%d", x);
-  snprintf_func (TEST_RECON2_FILE, TESTFILESIZE, "/tmp/xdtest.recon2.%d", x);
-  snprintf_func (TEST_COPY_FILE, TESTFILESIZE, "/tmp/xdtest.copy.%d", x);
-  snprintf_func (TEST_NOPERM_FILE, TESTFILESIZE, "/tmp/xdtest.noperm.%d", x);
+  snprintf_func (TEST_TARGET_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.target.%d", pid, x);
+  snprintf_func (TEST_SOURCE_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.source.%d", pid, x);
+  snprintf_func (TEST_DELTA_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.delta.%d", pid, x);
+  snprintf_func (TEST_RECON_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.recon.%d", pid, x);
+  snprintf_func (TEST_RECON2_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.recon2.%d", pid, x);
+  snprintf_func (TEST_COPY_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.copy.%d", pid, x);
+  snprintf_func (TEST_NOPERM_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.noperm.%d", pid, x);
   test_cleanup();
   return 0;
 }

@@ -198,13 +198,15 @@ typedef uint32_t xoff_t;
 #define SIZEOF_USIZE_T 4
 
 #if SIZEOF_SIZE_T == 4
-#define Z
+#define Z "z"
 #elif SIZEOF_SIZE_T == 8
 #ifdef _WIN32
 #define Z "I64"
 #else /* !_WIN32 */
 #define Z "z"
 #endif /* Windows or not */
+#else
+#error Bad configure script
 #endif /* size_t printf flags */
 
 #define USE_UINT32 (SIZEOF_USIZE_T == 4 || \

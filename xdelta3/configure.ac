@@ -4,10 +4,15 @@ AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
 AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar subdir-objects])
-#AC_DISABLE_STATIC
+
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
 AC_PROG_CXX
+
+AC_CHECK_SIZEOF(size_t)
+AC_CHECK_SIZEOF(unsigned int)
+AC_CHECK_SIZEOF(unsigned long)
+AC_CHECK_SIZEOF(unsigned long long)
 
 AC_ARG_WITH(
     [liblzma],
@@ -28,10 +33,6 @@ if test "x$USE_LIBLZMA" != xno ; then
         fi])
 fi
 
-AC_CHECK_SIZEOF(size_t)
-AC_CHECK_SIZEOF(unsigned int)
-AC_CHECK_SIZEOF(unsigned long)
-AC_CHECK_SIZEOF(unsigned long long)
 #AM_PATH_PYTHON(,, [:])
 #AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])
 #AX_PYTHON_DEVEL()

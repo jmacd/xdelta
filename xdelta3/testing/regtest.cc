@@ -371,8 +371,10 @@ public:
 void TestPrintf() {
   char buf[64];
   xoff_t x = XOFF_T_MAX;
-  snprintf_func (buf, sizeof(buf), "[%"Q"u]", x);
-  XD3_ASSERT(strcmp (buf, "[18446744073709551615]") == 0);
+  snprintf_func (buf, sizeof(buf), "%"Q"u", x);
+  const char *expect = XD3_USE_LARGEFILE64 ?
+    "18446744073709551615" : "4294967295";
+  XD3_ASSERT(strcmp (buf, expect) == 0);
 }
 
 void TestRandomNumbers() {
