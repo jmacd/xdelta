@@ -1083,9 +1083,9 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
     }
 
   /* Check expected non-failures */
-  if (non_failures != expected_non_failures)
+  if (non_failures > expected_non_failures)
     {
-      XPR(NT "non-failures %u; expected %u",
+      XPR(NT "non-failures %u > expected %u",
 	 non_failures, expected_non_failures);
       stream->msg = "incorrect";
       return XD3_INTERNAL;

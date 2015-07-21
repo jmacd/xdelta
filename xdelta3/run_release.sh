@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# TODO build liblzma for each host
+
 # Place C/C++ common flags here
 COMMON="-g"
 
@@ -7,7 +9,14 @@ export CFLAGS
 export CXXFLAGS
 export LDFLAGS
 
+# TODO replace w/ wget
+LZMA="xz-5.2.1"
+LZMA_FILE="/volume/home/jmacd/src/xdelta-devel/xz-5.2.1.tar.xz"
+
 MYOS=`uname`
+
+BUILDDIR=${PWD}/build
+LZMASRC=${BUILDDIR}/${LZMA}
 
 LIBBASE=$HOME/lib
 
@@ -34,16 +43,50 @@ function setup {
 function try {
     local w=$1
     shift
-    echo -n "Running $w in $D ..."
-    (cd $FULLD && "$@" >$w.stdout 2>$w.stderr)
+    local dir=$1
+    shift
+    echo -n "Running ${w} in ${dir}"
+    (cd "${dir}" && "$@" >$w.stdout 2>$w.stderr)
     local s=$?
     if [ $s -eq 0 ]; then
 	echo " success"
     else
 	echo " failed!"
-	echo "Error $1 in $D" >&2
+	echo "Error $1 in ${dir}" >&2
     fi
     return $s
+}
+
+try untar-xz ${BUILDDIR} tar -xvf "${LZMA_FILE}"
+if [ $? -ne 0 ]; then
+    return
+fi
+
+function buildlzma {
+    host=$1
+    march=$2
+    local target="${BUILDDIR}/lib-${host}${march}"
+
+    mkdir -p $target
+
+    try configure ${target} ${LZMASRC}/configure \
+	--host=${host} \
+	--prefix=${target} \
+	"CFLAGS=${march}" \
+	"CXXFLAGS=${march}" \
+	"LDFLAGS=${march}"
+    if [ $? -ne 0 ]; then
+	return
+    fi
+
+    try build-xz ${target} make
+    if [ $? -ne 0 ]; then
+	return
+    fi
+    try install-xz ${target} make install
+    if [ $? -ne 0 ]; then
+	return
+    fi
 }
 
 function buildit {
@@ -55,9 +98,9 @@ function buildit {
     BM="${host}${march}"
     D="build/$BM/xoff${offsetbits}"
     FULLD="$PWD/$D"
-    CFLAGS="${COMMON} ${march} ${cargs} -I$LIBBASE/$BM/include"
-    CXXFLAGS="${COMMON} ${march} ${cargs} -I$LIBBASE/$BM/include"
-    LDFLAGS="${largs} -L$LIBBASE/$BM/lib"
+    CFLAGS="${COMMON} ${march} ${cargs} -I${PWD}/build/lib-${BM}/include"
+    CXXFLAGS="${COMMON} ${march} ${cargs} -I${PWD}/build/lib-${BM}/include"
+    LDFLAGS="${largs} ${march} -L${PWD}/build/lib-${BM}/lib"
     #echo CFLAGS=$CFLAGS
     #echo CXXFLAGS=$CXXFLAGS
     #echo LDFLAGS=$LDFLAGS
@@ -65,9 +108,9 @@ function buildit {
 
     echo "For ${BM}-xoff${offsetbits}"
 
-    try configure $SRCDIR/configure \
+    try configure $FULLD $SRCDIR/configure \
 		  --host=${host} \
-		  --prefix=$FULLD \
+		  --prefix=${FULLD} \
 		  --enable-static \
 		  --disable-shared \
 		  --enable-debug-symbols
@@ -75,13 +118,13 @@ function buildit {
 	return
     fi
 
-    try build make all
+    try build $FULLD make all
     if [ $? -ne 0 ]; then
 	return
     fi
 
     if echo "$host" | grep -i "$MYOS" >/dev/null; then
-	try install make install
+	try install $FULLD make install
 	if [ $? -ne 0 ]; then
 	    return
 	fi
@@ -95,8 +138,19 @@ function buildit {
 }
 
 function buildall {
+    echo "Building for $1 $2 ..."
+    buildlzma "$1" "$2"
+    if [ $? -ne 0 ]; then
+	return
+    fi
     buildit "$1" "$2" 32 "-DXD3_USE_LARGEFILE64=0 $3" "$4"
+    if [ $? -ne 0 ]; then
+	return
+    fi
     buildit "$1" "$2" 64 "-DXD3_USE_LARGEFILE64=1 $3" "$4"
+    if [ $? -ne 0 ]; then
+	return
+    fi
 }
 
 # Linux
