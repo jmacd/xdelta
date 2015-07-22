@@ -13,6 +13,8 @@ export LDFLAGS
 LZMA="xz-5.2.1"
 LZMA_FILE="/volume/home/jmacd/src/xdelta-devel/xz-5.2.1.tar.xz"
 
+MAKEFLAGS="-j 10"
+
 MYOS=`uname`
 
 BUILDDIR=${PWD}/build
@@ -31,7 +33,12 @@ MINGW_BASE="/volume/home/jmacd/src/mingwb"
 # Run from the source dir.
 SRCDIR=$PWD
 
-rm -rf build/*/*/*
+LINUXTEST1=""
+LINUXTEST2=""
+WINTEST1=""
+WINTEST2=""
+
+find build -type f 2> /dev/null | xargs rm
 
 function setup {
     aclocal -I m4
@@ -45,7 +52,7 @@ function try {
     shift
     local dir=$1
     shift
-    echo -n "Running ${w} in ${dir}"
+    echo -n "	${w} ..."
     (cd "${dir}" && "$@" >$w.stdout 2>$w.stderr)
     local s=$?
     if [ $s -eq 0 ]; then
@@ -57,7 +64,7 @@ function try {
     return $s
 }
 
-try untar-xz ${BUILDDIR} tar -xvf "${LZMA_FILE}"
+try untar-lzma ${BUILDDIR} tar -xvf "${LZMA_FILE}"
 if [ $? -ne 0 ]; then
     return
 fi
@@ -67,11 +74,14 @@ function buildlzma {
     march=$2
     local target="${BUILDDIR}/lib-${host}${march}"
 
+    echo "	... liblzma"
+    
     mkdir -p $target
 
-    try configure ${target} ${LZMASRC}/configure \
+    try configure-lzma ${target} ${LZMASRC}/configure \
 	--host=${host} \
 	--prefix=${target} \
+	--disable-shared \
 	"CFLAGS=${march}" \
 	"CXXFLAGS=${march}" \
 	"LDFLAGS=${march}"
@@ -79,11 +89,11 @@ function buildlzma {
 	return
     fi
 
-    try build-xz ${target} make
+    try build-lzma ${target} make ${MAKEFLAGS}
     if [ $? -ne 0 ]; then
 	return
     fi
-    try install-xz ${target} make install
+    try install-lzma ${target} make install
     if [ $? -ne 0 ]; then
 	return
     fi
@@ -96,49 +106,64 @@ function buildit {
     cargs=$4
     largs=$5
     BM="${host}${march}"
-    D="build/$BM/xoff${offsetbits}"
+    D="build/${BM}/xoff${offsetbits}"
+    BMD="${BM}-${offsetbits}"
     FULLD="$PWD/$D"
     CFLAGS="${COMMON} ${march} ${cargs} -I${PWD}/build/lib-${BM}/include"
     CXXFLAGS="${COMMON} ${march} ${cargs} -I${PWD}/build/lib-${BM}/include"
     LDFLAGS="${largs} ${march} -L${PWD}/build/lib-${BM}/lib"
-    #echo CFLAGS=$CFLAGS
-    #echo CXXFLAGS=$CXXFLAGS
-    #echo LDFLAGS=$LDFLAGS
-    mkdir -p $D
+    mkdir -p ${D}
 
-    echo "For ${BM}-xoff${offsetbits}"
+    echo "	... ${BMD}"
+    
+    cat >> Makefile.test <<EOF
 
-    try configure $FULLD $SRCDIR/configure \
-		  --host=${host} \
-		  --prefix=${FULLD} \
-		  --enable-static \
-		  --disable-shared \
-		  --enable-debug-symbols
+# ${BMD}
+.PHONY: regtest-${BMD}
+regtest-${BMD}:
+	(cd ${D} && ./xdelta3regtest 1> /tmp/regtest.stdout 2> /tmp/regtest.stderr)
+
+.PHONY: selftest-${BMD}
+selftest-${BMD}:
+	(cd ${D} && ./bin/xdelta3 test 1> /tmp/selftest.stdout 2> /tmp/selftest.stderr)
+
+
+EOF
+
+    case ${host} in
+	*linux*)
+	    LINUXTEST1="${LINUXTEST1} selftest-${BMD}"
+	    LINUXTEST2="${LINUXTEST2} regtest-${BMD}"
+	    ;;
+	*mingw*)
+	    WINTEST1="${WINTEST1} selftest-${BMD}"
+	    WINTEST2="${WINTEST2} regtest-${BMD}"
+	    ;;
+    esac
+
+    try configure-xdelta $FULLD $SRCDIR/configure \
+    		  --host=${host} \
+    		  --prefix=${FULLD} \
+    		  --enable-static \
+    		  --disable-shared \
+    		  --enable-debug-symbols
     if [ $? -ne 0 ]; then
 	return
     fi
 
-    try build $FULLD make all
+    try build-xdelta $FULLD make ${MAKEFLAGS} all
     if [ $? -ne 0 ]; then
 	return
     fi
 
-    if echo "$host" | grep -i "$MYOS" >/dev/null; then
-	try install $FULLD make install
-	if [ $? -ne 0 ]; then
-	    return
-	fi
-
-	(cd $D && ./xdelta3regtest 1> regtest.stdout 2> regtest.stderr&)
-	(cd $D && ./bin/xdelta3 test 1> selftest.stdout 2> selftest.stderr&)
-    else
-	echo "To test:"
-	echo "cd ${FULLD} && ./xdelta3 test"
-    fi
+    try install-xdelta $FULLD make install
 }
 
 function buildall {
-    echo "Building for $1 $2 ..."
+    echo ""
+    echo "Host $1$2"
+    echo ""
+
     buildlzma "$1" "$2"
     if [ $? -ne 0 ]; then
 	return
@@ -153,14 +178,28 @@ function buildall {
     fi
 }
 
+DATE=`date`
+cat > Makefile.test <<EOF
+# Auto-generated ${DATE} -*- Mode: Makefile -*-
+EOF
+
 # Linux
 buildall x86_64-pc-linux-gnu -m32
 buildall x86_64-pc-linux-gnu -m64
 
 # Windows
-buildall i686-w64-mingw32 -mconsole \
-	 "${MINGW_CFLAGS}" \
-	 "-L${MINGW_BASE}/mingw-w64-i686/lib ${MINGW_LDFLAGS}"
-buildall x86_64-w64-mingw32 -mconsole \
-	 "${MINGW_CFLAGS}" \
-	 "-L${MINGW_BASE}/mingw-w64-x86_64/lib ${MINGW_LDFLAGS}"
+buildall i686-w64-mingw32 -mconsole "${MINGW_CFLAGS}" ""
+buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}" ""
+
+cat >> Makefile.test <<EOF
+
+linux: linux-selftest linux-regtest
+windows: windows-selftest windows-regtest
+
+linux-selftest: ${LINUXTEST1}
+linux-regtest: ${LINUXTEST2}
+
+windows-selftest: ${WINTEST1}
+windows-regtest: ${WINTEST2}
+
+EOF
