@@ -102,8 +102,6 @@ EXTRA_DIST = \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/main.m \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Info.plist \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Prefix.pch \
-	Makefile.mingw \
-	Makefile.orig \
 	testing/xdelta3-regtest.py \
 	testing/xdelta3-test.py \
 	xdelta3.1 \

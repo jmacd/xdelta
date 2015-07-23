@@ -64,11 +64,6 @@ function try {
     return $s
 }
 
-try untar-lzma ${BUILDDIR} tar -xvf "${LZMA_FILE}"
-if [ $? -ne 0 ]; then
-    return
-fi
-
 function buildlzma {
     host=$1
     march=$2
@@ -121,11 +116,11 @@ function buildit {
 # ${BMD}
 .PHONY: regtest-${BMD}
 regtest-${BMD}:
-	(cd ${D} && ./xdelta3regtest 1> /tmp/regtest.stdout 2> /tmp/regtest.stderr)
+	(cd ${D} && ./xdelta3regtest 1> \${TMP}/regtest.${BMD}.stdout 2> \${TMP}/regtest.${BMD}.stderr)
 
 .PHONY: selftest-${BMD}
 selftest-${BMD}:
-	(cd ${D} && ./bin/xdelta3 test 1> /tmp/selftest.stdout 2> /tmp/selftest.stderr)
+	(cd ${D} && ./bin/xdelta3 test 1> \${TMP}/selftest.${BMD}.stdout 2> \${TMP}/selftest.${BMD}.stderr)
 
 
 EOF
@@ -177,6 +172,13 @@ function buildall {
 	return
     fi
 }
+
+setup
+
+try untar-lzma ${BUILDDIR} tar -xvf "${LZMA_FILE}"
+if [ $? -ne 0 ]; then
+    return
+fi
 
 DATE=`date`
 cat > Makefile.test <<EOF

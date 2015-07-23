@@ -337,8 +337,8 @@ xprintf (const char *fmt, ...)
 static int
 main_version (void)
 {
-  /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, Joshua MacDonald\\n\");" $ */
-  XPR(NTR "Xdelta version 3.0.9, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013 Joshua MacDonald\n");
+  /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, Joshua MacDonald\\n\");" $ */
+  XPR(NTR "Xdelta version 3.0.10, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015 Joshua MacDonald\n");
   XPR(NTR "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   XPR(NTR "This is free software, and you are welcome to redistribute it\n");
   XPR(NTR "under certain conditions; see \"COPYING\" for details.\n");
