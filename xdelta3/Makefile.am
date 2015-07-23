@@ -78,8 +78,9 @@ xdelta3regtest_LDADD = -lm
 man1_MANS = xdelta3.1
 
 EXTRA_DIST = \
-	draft-korn-vcdiff.txt \
 	README.md \
+	run_release.sh \
+	draft-korn-vcdiff.txt \
 	examples/Makefile \
 	examples/README.md \
 	examples/checksum_test.cc \
