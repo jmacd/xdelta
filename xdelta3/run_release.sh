@@ -1,6 +1,4 @@
-#!/bin/sh
-
-# TODO build liblzma for each host
+#!/bin/bash
 
 # Place C/C++ common flags here
 COMMON="-g"
@@ -177,7 +175,7 @@ setup
 
 try untar-lzma ${BUILDDIR} tar -xvf "${LZMA_FILE}"
 if [ $? -ne 0 ]; then
-    return
+    exit $?
 fi
 
 DATE=`date`
