@@ -32,9 +32,12 @@ OSXTGTS=""
 OSXTEST1=""
 OSXTEST2=""
 
-TMP="${TMP}"
-if [ "${TMP}" == "" ]; then
-    TMP="${TMPDIR}"
+XTMP="/tmp"
+if [ "${TMP}" != "" ]; then
+    XTMP="${TMP}"
+fi
+if [ "${TMPDIR}" != "" ]; then
+    XTMP="${TMPDIR}"
 fi
 
 find build -type f 2> /dev/null | xargs rm
@@ -192,7 +195,7 @@ fi
 
 cat > Makefile.test <<EOF
 # Auto-generated ${DATE} -*- Mode: Makefile -*-
-TMP = ${TMP}
+TMP = ${XTMP}
 
 EOF
 
@@ -216,8 +219,12 @@ buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}"
 cat >> Makefile.test <<EOF
 
 all: linux windows apple
-
 clean: ${CLEAN}
+
+.PHONY: linux windows apple
+.PHONY: linux-build windows-build apple-build
+.PHONY: linux-selftest windows-selftest apple-selftest
+.PHONY: linux-regtest windows-regtest apple-regtest
 
 linux: linux-build linux-selftest linux-regtest
 windows: windows-build windows-selftest windows-regtest
