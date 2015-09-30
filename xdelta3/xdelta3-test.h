@@ -109,7 +109,7 @@ mt_exp_rand (uint32_t mean, uint32_t max_value)
 			      (double)UINT32_MAX));
   uint32_t x = (uint32_t) (mean_d * erand + 0.5);
 
-  return min (x, max_value);
+  return xd3_min (x, max_value);
 }
 
 #if SHELL_TESTS
@@ -218,6 +218,20 @@ test_random_numbers (xd3_stream *stream, int ignore)
   return XD3_INTERNAL;
 }
 
+static int
+test_printf_xoff (xd3_stream *stream, int ignore)
+{
+  char buf[64];
+  xoff_t x = XOFF_T_MAX;
+  snprintf_func (buf, sizeof(buf), "%"Q"u", x);
+  const char *expect = XD3_USE_LARGEFILE64 ?
+    "18446744073709551615" : "4294967295";
+  if (strcmp (buf, expect) == 0) {
+    return 0;
+  }
+  return XD3_INTERNAL;
+}
+
 static void
 test_unlink (char* file)
 {
@@ -245,14 +259,22 @@ test_cleanup (void)
 int test_setup (void)
 {
   static int x = 0;
+  pid_t pid = getpid();
   x++;
-  snprintf_func (TEST_TARGET_FILE, TESTFILESIZE, "/tmp/xdtest.target.%d", x);
-  snprintf_func (TEST_SOURCE_FILE, TESTFILESIZE, "/tmp/xdtest.source.%d", x);
-  snprintf_func (TEST_DELTA_FILE, TESTFILESIZE, "/tmp/xdtest.delta.%d", x);
-  snprintf_func (TEST_RECON_FILE, TESTFILESIZE, "/tmp/xdtest.recon.%d", x);
-  snprintf_func (TEST_RECON2_FILE, TESTFILESIZE, "/tmp/xdtest.recon2.%d", x);
-  snprintf_func (TEST_COPY_FILE, TESTFILESIZE, "/tmp/xdtest.copy.%d", x);
-  snprintf_func (TEST_NOPERM_FILE, TESTFILESIZE, "/tmp/xdtest.noperm.%d", x);
+  snprintf_func (TEST_TARGET_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.target.%d", pid, x);
+  snprintf_func (TEST_SOURCE_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.source.%d", pid, x);
+  snprintf_func (TEST_DELTA_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.delta.%d", pid, x);
+  snprintf_func (TEST_RECON_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.recon.%d", pid, x);
+  snprintf_func (TEST_RECON2_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.recon2.%d", pid, x);
+  snprintf_func (TEST_COPY_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.copy.%d", pid, x);
+  snprintf_func (TEST_NOPERM_FILE, TESTFILESIZE,
+		 "/tmp/xdtest.%d.noperm.%d", pid, x);
   test_cleanup();
   return 0;
 }
@@ -303,7 +325,7 @@ test_make_inputs (xd3_stream *stream, xoff_t *ss_out, xoff_t *ts_out)
       double add_prob = (left == 0) ? 0 : (add_left / (double) left);
       int do_copy;
 
-      next = min (left, next);
+      next = xd3_min (left, next);
       do_copy = (next > add_left ||
 		 (mt_random (&static_mtrand) / \
 		  (double)USIZE_T_MAX) >= add_prob);
@@ -414,7 +436,7 @@ test_compare_files (const char* tgt, const char *rec)
 	{
 	  if (obuf[i] != rbuf[i])
  	    {
-	      XPR(NT "byte %u (read %u @ %"Q") %d != %d\n",
+	      XPR(NT "byte %u (read %u @ %"Q"u) %d != %d\n",
 		  (int)i, (int)oc, offset, obuf[i], rbuf[i]);
 	      diffs++;
 	      return XD3_INTERNAL;
@@ -738,10 +760,10 @@ test_address_cache (xd3_stream *stream, int unused)
       p         = (mt_random (&static_mtrand) / (double)UINT32_MAX);
       prev_i    = mt_random (&static_mtrand) % offset;
       nearby    = (mt_random (&static_mtrand) % 256) % offset;
-      nearby    = max (1U, nearby);
+      nearby    = xd3_max (1U, nearby);
 
       if (p < 0.1)      { addr = addrs[offset-nearby]; }
-      else if (p < 0.4) { addr = min (addrs[prev_i] + nearby, offset-1); }
+      else if (p < 0.4) { addr = xd3_min (addrs[prev_i] + nearby, offset-1); }
       else              { addr = prev_i; }
 
       if ((ret = xd3_encode_address (stream, addr, offset, & modes[offset]))) { return ret; }
@@ -891,7 +913,7 @@ test_decompress_text (xd3_stream *stream, uint8_t *enc, usize_t enc_size, usize_
 
  input:
   /* Test decoding test_desize input bytes at a time */
-  take = min (enc_size - pos, test_desize);
+  take = xd3_min (enc_size - pos, test_desize);
   CHECK(take > 0);
 
   xd3_avail_input (stream, enc + pos, take);
@@ -1068,9 +1090,9 @@ test_decompress_single_bit_error (xd3_stream *stream, int expected_non_failures)
     }
 
   /* Check expected non-failures */
-  if (non_failures != expected_non_failures)
+  if (non_failures > expected_non_failures)
     {
-      XPR(NT "non-failures %u; expected %u",
+      XPR(NT "non-failures %u > expected %u",
 	 non_failures, expected_non_failures);
       stream->msg = "incorrect";
       return XD3_INTERNAL;
@@ -1398,7 +1420,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	  if ((ret = sec->encode (stream, enc_stream,
 				  in_head, out_head, & cfg)))
 	    {
-	      XPR(NT "test %"Z": encode: %s", test_i, stream->msg);
+	      XPR(NT "test %"Z"u: encode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1437,7 +1459,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 					    compress_size, dec_input,
 					    dec_correct, dec_output)))
 	    {
-	      XPR(NT "test %"Z": decode: %s", test_i, stream->msg);
+	      XPR(NT "test %"Z"u: decode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1447,7 +1469,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	   * decoding.  Really looking for faults here. */
 	  {
 	    int i;
-	    int bytes = min (compress_size, 10U);
+	    int bytes = xd3_min (compress_size, 10U);
 	    for (i = 0; i < bytes * 8; i += 1)
 	      {
 		dec_input[i/8] ^= 1 << (i%8);
@@ -1805,7 +1827,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
 	{
 	  XPR(NT "test encode with size ratio %.4f, "
-	     "expected < %.4f (%"Q", %"Q")\n",
+	     "expected < %.4f (%"Q"u, %"Q"u)\n",
 	    ratio, TEST_ADD_RATIO + TEST_EPSILON, dsize, tsize);
 	  stream->msg = "strange encoding";
 	  return XD3_INTERNAL;
@@ -2691,14 +2713,14 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    default: CHECK(0);
 	    }
 
-	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Z"/%"Z"",
+	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Z"u/%"Z"u",
 			 inst->pos, inst->size);
 	  rptr += strlen (rptr);
 
 	  if (inst->type == XD3_CPY)
 	    {
 	      *rptr++ = '@';
-	      snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Q, inst->addr);
+	      snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Q"u", inst->addr);
 	      rptr += strlen (rptr);
 	    }
 
@@ -2714,7 +2736,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 
       if (strcmp (rbuf, test->result) != 0)
 	{
-	  XPR(NT "test %"Z": expected %s: got %s", i, test->result, rbuf);
+	  XPR(NT "test %"Z"u: expected %s: got %s", i, test->result, rbuf);
 	  stream->msg = "wrong result";
 	  return XD3_INTERNAL;
 	}
@@ -2899,6 +2921,7 @@ int xd3_selftest (void)
 
   int ret;
   DO_TEST (random_numbers, 0, 0);
+  DO_TEST (printf_xoff, 0, 0);
 
   DO_TEST (decode_integer_end_of_input, 0, 0);
   DO_TEST (decode_integer_overflow, 0, 0);

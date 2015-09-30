@@ -43,8 +43,7 @@ xdelta3checksum_SOURCES = $(common_SOURCES) \
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
-	 -Wno-unused-parameter -Wformat # -Wconversion
-
+	 -Wno-unused-parameter -Wformat -Wno-unused-function # -Wconversion
 
 C_WFLAGS = $(WFLAGS) -pedantic -std=c99
 CXX_WFLAGS = $(WFLAGS)
@@ -53,7 +52,6 @@ common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \
 	      -DSECONDARY_FGK=1 \
-	      -DXD3_POSIX=1 \
 	      -DXD3_MAIN=1
 
 if DEBUG_SYMBOLS
@@ -91,10 +89,11 @@ xdelta3checksum_CFLAGS = \
 man1_MANS = xdelta3.1
 
 EXTRA_DIST = \
+	README.md \
+	run_release.sh \
 	draft-korn-vcdiff.txt \
-	README \
 	examples/Makefile \
-	examples/README \
+	examples/README.md \
 	examples/checksum_test.cc \
 	examples/compare_test.c \
 	examples/encode_decode_test.c \
@@ -115,8 +114,6 @@ EXTRA_DIST = \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/main.m \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Info.plist \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Prefix.pch \
-	Makefile.mingw \
-	Makefile.orig \
 	testing/xdelta3-regtest.py \
 	testing/xdelta3-test.py \
 	xdelta3.1 \

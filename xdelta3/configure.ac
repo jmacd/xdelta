@@ -1,19 +1,37 @@
-AC_INIT([Xdelta3], [3.0.8], [josh.macdonald@gmail.com], 
+AC_INIT([Xdelta3], [3.0.10], [josh.macdonald@gmail.com], 
 	[xdelta3], [http://xdelta.org/])
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
-AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar])
-#AC_DISABLE_STATIC
+AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar subdir-objects])
+
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
 AC_PROG_CXX
+
 AC_CHECK_SIZEOF(size_t)
-AC_CHECK_SIZEOF(int)
-AC_CHECK_SIZEOF(long)
-AC_CHECK_SIZEOF(long long)
-AC_CHECK_HEADERS([lzma.h])
-AC_CHECK_LIB(lzma, lzma_easy_buffer_encode)
+AC_CHECK_SIZEOF(unsigned int)
+AC_CHECK_SIZEOF(unsigned long)
+AC_CHECK_SIZEOF(unsigned long long)
+
+AC_ARG_WITH(
+    [liblzma],
+    [AC_HELP_STRING(
+        [--with-liblzma],
+        [build with liblzma support @<:@default=autodetect@:>@])],
+    [USE_LIBLZMA=$withval],
+    [USE_LIBLZMA=auto])
+
+if test "x$USE_LIBLZMA" != xno ; then
+    AC_CHECK_HEADERS([lzma.h],,[
+        if test "x$with_liblzma" = xyes ; then
+            AC_MSG_FAILURE([liblzma includes were not found])
+        fi])
+    AC_CHECK_LIB([lzma], [lzma_easy_buffer_encode],,[
+        if test "x$with_liblzma" = xyes ; then
+            AC_MSG_FAILURE([liblzma library were not found])
+        fi])
+fi
 
 #AM_PATH_PYTHON(,, [:])
 #AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != :])

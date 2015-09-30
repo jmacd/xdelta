@@ -1,6 +1,6 @@
 /* xdelta 3 - delta compression tools and library
  * Copyright (C) 2001, 2003, 2004, 2005, 2006, 2007,
- * 2008, 2009, 2010, 2011, 2012, 2013, 2014.  Joshua P. MacDonald
+ * 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -117,82 +117,140 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #include <stdint.h>
-#else
+#else /* WIN32 case */
 #define WIN32_LEAN_AND_MEAN
+
+#ifndef WINVER
 #if XD3_USE_LARGEFILE64
 /* 64 bit file offsets: uses GetFileSizeEx and SetFilePointerEx.
  * requires Win2000 or newer version of WinNT */
 #define WINVER		0x0500
 #define _WIN32_WINNT	0x0500
-#else
+#else /* xoff_t is 32bit */
 /* 32 bit (DWORD) file offsets: uses GetFileSize and
  * SetFilePointer. compatible with win9x-me and WinNT4 */
 #define WINVER		0x0400
 #define _WIN32_WINNT	0x0400
-#endif
+#endif /* if XD3_USE_LARGEFILE64 */
+#endif /* ifndef WINVER */
+
 #include <windows.h>
+
+/* _MSV_VER is defined by Microsoft tools, not by mingw32 */
 #ifdef _MSC_VER
-#define inline
+/*#define inline*/
 typedef signed int     ssize_t;
 #if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned long  uint32_t;
 typedef ULONGLONG      uint64_t;
-#else
+#else /* _MSC_VER >= 1600 */
 /* For MSVC10 and above */
 #include <stdint.h>
-#endif
-#else
+#endif /* _MSC_VER < 1600 */
+#else /* _MSC_VER not defined  */
 /* mingw32, lcc and watcom provide a proper header */
 #include <stdint.h>
-#endif
-#endif
+#endif /* _MSC_VER defined */
+#endif /* _WIN32 defined */
 
+/* Settings based on the size of xoff_t (32 vs 64 file offsets) */
 #if XD3_USE_LARGEFILE64
+/* xoff_t is a 64-bit type */
 #define __USE_FILE_OFFSET64 1 /* GLIBC: for 64bit fileops, ... ? */
+
 #ifndef _LARGEFILE_SOURCE
 #define _LARGEFILE_SOURCE
 #endif
+
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
 
-#define SIZEOF_XOFF_T 8
+/* Set a xoff_t typedef and the "Q" printf insert. */
+#if defined(_WIN32)
 typedef uint64_t xoff_t;
+/* Note: The following generates benign warnings in a mingw
+ * cross-compiler */
+#define Q "I64"
+#elif SIZEOF_UNSIGNED_LONG == 8
+typedef unsigned long xoff_t;
+#define Q "l"
+#elif SIZEOF_SIZE_T == 8
+typedef size_t xoff_t;
+#define Q "z"
+#elif SIZEOF_UNSIGNED_LONG_LONG == 8
+typedef unsigned long long xoff_t;
+#define Q "ll"
+#endif /* typedef and #define Q */
 
-#ifndef _WIN32
-#define Q PRIu64
-#else /* _WIN32 */
-#define Q "I64u"
-#endif
+#define SIZEOF_XOFF_T 8
 
-#else /* XD3_USE_LARGEFILE64 */
+#else /* XD3_USE_LARGEFILE64 == 0 */
+
+#if SIZEOF_UNSIGNED_INT == 4
+typedef unsigned int xoff_t;
+#elif SIZEOF_UNSIGNED_LONG == 4
+typedef unsigned long xoff_t;
+#else
+typedef uint32_t xoff_t;
+#endif /* xoff_t is 32 bits */
 
 #define SIZEOF_XOFF_T 4
-typedef uint32_t xoff_t;
+#define Q
+#endif /* 64 vs 32 bit xoff_t */
 
-#define Q "u"
+/* Settings based on the size of usize_t (32 and 64 bit window size) */
+#if XD3_USE_LARGESIZET
 
-#endif /* XD3_USE_LARGEFILE64 */
-
-#if XD3_USE_LARGEWINDOW64
-
-#if !XD3_USE_LARGEFILE64
-#error "Invalid configuration"
-#endif
+/* Set a usize_ttypedef and the "W" printf insert. */
+#if defined(_WIN32)
+typedef uint64_t usize_t;
+/* Note: The following generates benign warnings in a mingw
+ * cross-compiler */
+#define W "I64"
+#elif SIZEOF_UNSIGNED_LONG == 8
+typedef unsigned long usize_t;
+#define W "l"
+#elif SIZEOF_SIZE_T == 8
+typedef size_t usize_t;
+#define W "z"
+#elif SIZEOF_UNSIGNED_LONG_LONG == 8
+typedef unsigned long long usize_t;
+#define W "ll"
+#endif /* typedef and #define W */
 
 #define SIZEOF_USIZE_T 8
-typedef uint64_t usize_t;
 
-#define Z Q
-#else /* XD3_USE_LARGEWINDOW64 */
+#else /* XD3_USE_LARGESIZET == 0 */
+
+#if SIZEOF_UNSIGNED_INT == 4
+typedef unsigned int usize_t;
+#elif SIZEOF_UNSIGNED_LONG == 4
+typedef unsigned long usize_t;
+#else
+typedef uint32_t usize_t;
+#endif /* usize_t is 32 bits */
 
 #define SIZEOF_USIZE_T 4
-typedef uint32_t usize_t;
+#define W
 
-#define Z "u"
-#endif
+#endif /* 64 vs 32 bit usize_t */
+
+/* Settings based on the size of size_t (the system-provided,
+ * usually-but-maybe-not an unsigned type) */
+#if SIZEOF_SIZE_T == 4
+#define Z "z"
+#elif SIZEOF_SIZE_T == 8
+#ifdef _WIN32
+#define Z "I64"
+#else /* !_WIN32 */
+#define Z "z"
+#endif /* Windows or not */
+#else
+#error Bad configure script
+#endif /* size_t printf flags */
 
 #define USE_UINT32 (SIZEOF_USIZE_T == 4 || \
 		    SIZEOF_XOFF_T == 4 || REGRESSION_TEST)
@@ -334,12 +392,8 @@ typedef int              (xd3_comp_table_func) (xd3_stream *stream,
 #define XD3_ASSERT(x) (void)0
 #endif  /* XD3_DEBUG */
 
-#ifndef max
-#define max(x,y) ((x) < (y) ? (y) : (x))
-#endif
-#ifndef min
-#define min(x,y) ((x) < (y) ? (x) : (y))
-#endif
+#define xd3_max(x,y) ((x) < (y) ? (y) : (x))
+#define xd3_min(x,y) ((x) < (y) ? (x) : (y))
 
 /****************************************************************
  PUBLIC ENUMS

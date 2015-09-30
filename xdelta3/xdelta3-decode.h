@@ -1,5 +1,6 @@
 /* xdelta 3 - delta compression tools and library
- * Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007.  Joshua P. MacDonald
+ * Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+ * 2011, 2012, 2013, 2014, 2015.  Joshua P. MacDonald
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,6 +25,50 @@
 #define SRCORTGT(x) ((((x) & VCD_SRCORTGT) == VCD_SOURCE) ? \
                      VCD_SOURCE : ((((x) & VCD_SRCORTGT) == \
                                     VCD_TARGET) ? VCD_TARGET : 0))
+
+static inline int
+xd3_decode_byte (xd3_stream *stream, usize_t *val)
+{
+  if (stream->avail_in == 0)
+    {
+      stream->msg = "further input required";
+      return XD3_INPUT;
+    }
+
+  (*val) = stream->next_in[0];
+
+  DECODE_INPUT (1);
+  return 0;
+}
+
+static inline int
+xd3_decode_bytes (xd3_stream *stream, uint8_t *buf, usize_t *pos, usize_t size)
+{
+  usize_t want;
+  usize_t take;
+
+  /* Note: The case where (*pos == size) happens when a zero-length
+   * appheader or code table is transmitted, but there is nothing in
+   * the standard against that. */
+  while (*pos < size)
+    {
+      if (stream->avail_in == 0)
+	{
+	  stream->msg = "further input required";
+	  return XD3_INPUT;
+	}
+
+      want = size - *pos;
+      take = xd3_min (want, stream->avail_in);
+
+      memcpy (buf + *pos, stream->next_in, (size_t) take);
+
+      DECODE_INPUT (take);
+      (*pos) += take;
+    }
+
+  return 0;
+}
 
 /* Initialize the decoder for a new window.  The dec_tgtlen value is
  * preserved across successive window decodings, and the update to
@@ -156,7 +201,7 @@ xd3_decode_section (xd3_stream *stream,
 	  usize_t sect_need = section->size - section->pos;
 
 	  /* Allocate and copy */
-	  sect_take = min (sect_need, stream->avail_in);
+	  sect_take = xd3_min (sect_need, stream->avail_in);
 
 	  if (section->pos == 0)
 	    {
@@ -583,7 +628,7 @@ xd3_decode_sections (xd3_stream *stream)
   more = (need - stream->dec_winbytes);
 
   /* How much to consume. */
-  take = min (more, stream->avail_in);
+  take = xd3_min (more, stream->avail_in);
 
   /* See if the input is completely available, to avoid copy. */
   copy = (take != more);
@@ -934,6 +979,7 @@ xd3_decode_input (xd3_stream *stream)
 
     case DEC_CPYOFF:
       /* Copy window offset: only if VCD_SOURCE or VCD_TARGET is set */
+      
       OFFSET_CASE(SRCORTGT (stream->dec_win_ind), stream->dec_cpyoff,
 		  DEC_ENCLEN);
 

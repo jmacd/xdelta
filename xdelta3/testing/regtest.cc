@@ -12,12 +12,14 @@ public:
     Options()
       : encode_srcwin_maxsz(1<<20),
 	block_size(Constants::BLOCK_SIZE),
+	window_size(Constants::WINDOW_SIZE),
 	size_known(false),
 	iopt_size(XD3_DEFAULT_IOPT_SIZE),
 	smatch_cfg(XD3_SMATCH_DEFAULT) { }
 
     xoff_t encode_srcwin_maxsz;
     size_t block_size;
+    xoff_t window_size;
     bool size_known;
     usize_t iopt_size;
     xd3_smatch_cfg smatch_cfg;
@@ -56,7 +58,7 @@ public:
     xd3_init_config(&encode_config, XD3_ADLER32);
     xd3_init_config(&decode_config, XD3_ADLER32);
 
-    encode_config.winsize = Constants::WINDOW_SIZE;
+    encode_config.winsize = options.window_size;
     encode_config.iopt_size = options.iopt_size;
     encode_config.smatch_cfg = options.smatch_cfg;
 
@@ -151,11 +153,11 @@ public:
 	xd3_source *src = (encoding ? &encode_source : &decode_source);
 	Block *block = (encoding ? &encode_source_block : &decode_source_block);
 	if (encoding) {
-	  IF_DEBUG1(XPR(NTR "[srcblock] %"Q" last srcpos %"Q" "
-		       "encodepos %"Q"\n",
-		       encode_source.getblkno,
-		       encode_stream.match_last_srcpos,
-		       encode_stream.input_position + encode_stream.total_in));
+	  IF_DEBUG1(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
+			"encodepos %"Q"u\n",
+			encode_source.getblkno,
+			encode_stream.match_last_srcpos,
+			encode_stream.input_position + encode_stream.total_in));
 	}
 
 	source_iterator.SetBlock(src->getblkno);
@@ -228,10 +230,10 @@ public:
 			ExtFile *coded_data,
 			const Options &options) {
     vector<const char*> ecmd;
-    char wbuf[16];
-    snprintf(wbuf, sizeof(wbuf), "-B%"Q, options.encode_srcwin_maxsz);
+    char bbuf[16];
+    snprintf(bbuf, sizeof(bbuf), "-B%"Q"u", options.encode_srcwin_maxsz);
     ecmd.push_back("xdelta3");
-    ecmd.push_back(wbuf);
+    ecmd.push_back(bbuf);
     ecmd.push_back("-s");
     ecmd.push_back(source_file.Name());
     ecmd.push_back(target_file.Name());
@@ -244,7 +246,7 @@ public:
     vector<const char*> dcmd;
     ExtFile recon_file;
     dcmd.push_back("xdelta3");
-    ecmd.push_back(wbuf);
+    ecmd.push_back(bbuf);
     dcmd.push_back("-d");
     dcmd.push_back("-s");
     dcmd.push_back(source_file.Name());
@@ -364,28 +366,37 @@ public:
     CHECK_EQ(0, CmpDifferentBlockBytes(to, recon));
   }
 
- //////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
- void TestRandomNumbers() {
-   MTRandom rand;
-   int rounds = 1<<20;
-   uint64_t usum = 0;
-   uint64_t esum = 0;
+void TestPrintf() {
+  char buf[64];
+  xoff_t x = XOFF_T_MAX;
+  snprintf_func (buf, sizeof(buf), "%"Q"u", x);
+  const char *expect = XD3_USE_LARGEFILE64 ?
+    "18446744073709551615" : "4294967295";
+  XD3_ASSERT(strcmp (buf, expect) == 0);
+}
 
-   for (int i = 0; i < rounds; i++) {
-     usum += rand.Rand32();
-     esum += rand.ExpRand32(1024);
-   }
+void TestRandomNumbers() {
+  MTRandom rand;
+  int rounds = 1<<20;
+  uint64_t usum = 0;
+  uint64_t esum = 0;
 
-   double allowed_error = 0.01;
+  for (int i = 0; i < rounds; i++) {
+    usum += rand.Rand32();
+    esum += rand.ExpRand32(1024);
+  }
 
-   uint32_t umean = usum / rounds;
-   uint32_t emean = esum / rounds;
+  double allowed_error = 0.01;
 
-   uint32_t uexpect = UINT32_MAX / 2;
-   uint32_t eexpect = 1024;
+  uint32_t umean = usum / rounds;
+  uint32_t emean = esum / rounds;
 
-   if (umean < uexpect * (1.0 - allowed_error) ||
+  uint32_t uexpect = UINT32_MAX / 2;
+  uint32_t eexpect = 1024;
+
+  if (umean < uexpect * (1.0 - allowed_error) ||
       umean > uexpect * (1.0 + allowed_error)) {
     XPR(NT "uniform mean error: %u != %u\n", umean, uexpect);
     abort();
@@ -574,7 +585,7 @@ void TestDeleteMutator() {
 
   for (size_t i = 0; i < SIZEOF_ARRAY(test_cases); i++) {
     ChangeList cl1;
-    cl1.push_back(Change(Change::DELETE, test_cases[i].size,
+    cl1.push_back(Change(Change::DELRANGE, test_cases[i].size,
 			 test_cases[i].addr));
     spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
     CHECK_EQ(spec0.Size() - test_cases[i].size, spec1.Size());
@@ -837,7 +848,6 @@ void TestCopyWindow() {
     options.encode_srcwin_maxsz = size;
     options.iopt_size = 128;
     options.smatch_cfg = XD3_SMATCH_SLOW;
-    options.size_known = false;
 
     Block block1;
     InMemoryEncodeDecode(spec0, spec1, &block1, options);
@@ -978,7 +988,6 @@ void TestHalfBlockCopy() {
 	  // When there are fewer than 3 source blocks.
       	  CHECK_EQ(nocopy_adds, delta1.AddedBytes());
       	}
-      // XPR(NT "0=%zu 1=%zu\n", delta0.AddedBytes(), delta1.AddedBytes());
     }
 
   Options options;
@@ -997,7 +1006,6 @@ void TestHalfBlockCopy() {
   CHECK_GE(onecopy_adds + 1, delta0.AddedBytes());
 
   CHECK_EQ(onecopy_adds, delta1.AddedBytes());
-  // XPR(NT "0=%zu 1=%zu\n", delta0.AddedBytes(), delta1.AddedBytes());
 }
 
 void FourWayMergeTest(const FileSpec &spec0,
@@ -1130,7 +1138,7 @@ void TestMergeCommand1() {
       }
 
       cl1.push_back(Change(Change::ADD, change1, add1_pos));
-      cl2.push_back(Change(Change::DELETE, change1, del2_pos));
+      cl2.push_back(Change(Change::DELRANGE, change1, del2_pos));
       cl3.push_back(Change(Change::MODIFY, change3, change3_pos));
 
       spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
@@ -1184,9 +1192,9 @@ void TestMergeCommand2() {
 
 	  ChangeList cl1, cl2, cl3;
 
-	  cl1.push_back(Change(Change::DELETE, size0 - size1, 0));
-	  cl2.push_back(Change(Change::DELETE, size0 - size2, 0));
-	  cl3.push_back(Change(Change::DELETE, size0 - size3, 0));
+	  cl1.push_back(Change(Change::DELRANGE, size0 - size1, 0));
+	  cl2.push_back(Change(Change::DELRANGE, size0 - size2, 0));
+	  cl3.push_back(Change(Change::DELRANGE, size0 - size3, 0));
 
 	  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
 	  spec0.ModifyTo(ChangeListMutator(cl2), &spec2);
@@ -1200,6 +1208,44 @@ void TestMergeCommand2() {
   }
 }
 
+void TestLastFrontierBlock() {
+  // This test constructs an input that can expose
+  // https://github.com/jmacd/xdelta/issues/188
+  // when run through the command-line with source via a FIFO.
+  // That is not tested here, but the test stays.
+  if (Constants::WINDOW_SIZE < XD3_ALLOCSIZE)
+    {
+      return;
+    }
+
+  MTRandom rand;
+  FileSpec spec0(&rand);
+  FileSpec spec1(&rand);
+  const xoff_t size = XD3_ALLOCSIZE * 64;  // == XD3_MINSRCWINSZ * 2
+  const xoff_t edit = XD3_ALLOCSIZE;
+
+  Options options;
+  options.encode_srcwin_maxsz = XD3_MINSRCWINSZ;
+  options.block_size = XD3_ALLOCSIZE;
+  options.window_size = XD3_MINSRCWINSZ;
+  options.size_known = false;
+
+  spec0.GenerateFixedSize(size);
+
+  ChangeList cl;
+
+  // Modify the 0th byte in order to induce indexing of subsequent
+  // bytes, but allow copying most of the file to keep the test fast.
+  cl.push_back(Change(Change::MODIFY, 1, edit * 31));
+  cl.push_back(Change(Change::COPYOVER, edit, edit * 31, edit * 63));
+
+  spec0.ModifyTo(ChangeListMutator(cl), &spec1);
+
+  Block noblock;
+  InMemoryEncodeDecode(spec0, spec1, &noblock, options);
+  InMemoryEncodeDecode(spec1, spec0, &noblock, options);
+}
+
 };  // class Regtest<Constants>
 
 #define TEST(x) XPR(NTR #x "...\n"); regtest.x()
@@ -1208,6 +1254,7 @@ void TestMergeCommand2() {
 template <class T>
 void UnitTest() {
   Regtest<T> regtest;
+  TEST(TestPrintf);
   TEST(TestRandomNumbers);
   TEST(TestRandomFile);
   TEST(TestFirstByte);
@@ -1222,7 +1269,7 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  XPR(NT "Blocksize %"Q" windowsize %zu\n",
+  XPR(NT "Blocksize %"Q"u windowsize %"Z"u\n",
       T::BLOCK_SIZE, T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);
@@ -1232,6 +1279,7 @@ void MainTest() {
   TEST(TestCopyFromEnd);
   TEST(TestNonBlocking);
   TEST(TestHalfBlockCopy);
+  TEST(TestLastFrontierBlock);
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
 }

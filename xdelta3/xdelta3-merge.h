@@ -446,7 +446,7 @@ xd3_merge_source_copy (xd3_stream *stream,
       XD3_ASSERT (sinst->size > sinst_offset);
 
       sinst_left = sinst->size - sinst_offset;
-      this_take = min (iinst.size, sinst_left);
+      this_take = xd3_min (iinst.size, sinst_left);
 
       XD3_ASSERT (this_take > 0);
 

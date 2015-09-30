@@ -311,8 +311,9 @@ class ExtFile {
 public:
   ExtFile() {
     static int static_counter = 0;
-    char buf[32];
-    snprintf(buf, 32, "/tmp/regtest.%d", static_counter++);
+    pid_t pid = getpid();
+    char buf[64];
+    snprintf(buf, 64, "/tmp/regtest.%d.%d", pid, static_counter++);
     filename_.append(buf);
     unlink(filename_.c_str());
   }

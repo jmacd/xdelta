@@ -26,6 +26,9 @@
 typedef struct _main_blklru      main_blklru;
 typedef struct _main_blklru_list main_blklru_list;
 
+
+#define XD3_INVALID_OFFSET XOFF_T_MAX
+
 struct _main_blklru_list
 {
   main_blklru_list  *next;
@@ -39,11 +42,6 @@ struct _main_blklru
   usize_t           size;
   main_blklru_list  link;
 };
-
-#define MAX_LRU_SIZE 32U
-#define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
-#define XD3_MAXSRCWINSZ (1ULL << (SIZEOF_USIZE_T * 8 - 1))
-#define XD3_INVALID_OFFSET XOFF_T_MAX
 
 XD3_MAKELIST(main_blklru_list,main_blklru,link);
 
@@ -247,7 +245,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (sfile->size_known)
 	{
-	  short_sprintf (srcszbuf, "source size %s [%"Q"]",
+	  short_sprintf (srcszbuf, "source size %s [%"Q"u]",
 			 main_format_bcnt (source_size, &srccntbuf),
 			 source_size);
 	}
@@ -260,7 +258,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (option_verbose > 1)
 	{
-	  short_sprintf (nbufs, " #bufs %"Z, lru_size);
+	  short_sprintf (nbufs, " #bufs %"Z"u", lru_size);
 	}
 
       XPR(NT "source %s %s blksize %s window %s%s%s\n",
@@ -367,7 +365,7 @@ main_read_seek_source (xd3_stream *stream,
 	  if (!option_quiet)
 	    {
 	      XPR(NT "source can't seek backwards; requested block offset "
-		  "%"Q" source position is %"Q"\n",
+		  "%"Q"u source position is %"Q"u\n",
 		  pos, sfile->source_position);
 	    }
 
@@ -387,7 +385,7 @@ main_read_seek_source (xd3_stream *stream,
 
 	  if (option_verbose > 1)
 	    {
-	      XPR(NT "seek error at offset %"Q": %s\n",
+	      XPR(NT "seek error at offset %"Q"u: %s\n",
 		  pos, xd3_mainerror (ret));
 	    }
 	}
@@ -396,7 +394,7 @@ main_read_seek_source (xd3_stream *stream,
 
       if (option_verbose > 1 && pos != sfile->source_position)
 	{
-	  XPR(NT "non-seekable source skipping %"Q" bytes @ %"Q"\n",
+	  XPR(NT "non-seekable source skipping %"Q"u bytes @ %"Q"u\n",
 	      pos - sfile->source_position,
 	      sfile->source_position);
 	}
@@ -432,7 +430,7 @@ main_read_seek_source (xd3_stream *stream,
 
 	  if (nread != source->blksize)
 	    {
-	      IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %zu\n",
+	      IF_DEBUG1 (DP(RINT "[getblk] short skip block nread = %"Z"u\n",
 			    nread));
 	      stream->msg = "non-seekable input is short";
 	      return XD3_INVALID_INPUT;
@@ -537,20 +535,20 @@ main_getblk_func (xd3_stream *stream,
 	{
 	  if (blru->blkno != blkno)
 	    {
-	      XPR(NT "source block %"Q" read %zu ejects %"Q" (lru_hits=%u, "
+	      XPR(NT "source block %"Q"u read %"Z"u ejects %"Q"u (lru_hits=%u, "
 		  "lru_misses=%u, lru_filled=%u)\n",
 		  blkno, nread, blru->blkno, lru_hits, lru_misses, lru_filled);
 	    }
 	  else
 	    {
-	      XPR(NT "source block %"Q" read %zu (lru_hits=%u, "
+	      XPR(NT "source block %"Q"u read %"Z"u (lru_hits=%u, "
 		  "lru_misses=%u, lru_filled=%u)\n",
 		  blkno, nread, lru_hits, lru_misses, lru_filled);
 	    }
 	}
       else
 	{
-	  XPR(NT "source block %"Q" read %zu (lru_hits=%u, lru_misses=%u, "
+	  XPR(NT "source block %"Q"u read %"Z"u (lru_hits=%u, lru_misses=%u, "
 	      "lru_filled=%u)\n", blkno, nread, 
 	      lru_hits, lru_misses, lru_filled);
 	}
@@ -562,8 +560,8 @@ main_getblk_func (xd3_stream *stream,
   blru->size       = nread;
   blru->blkno      = blkno;
 
-  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q" onblk %zu pos %"Q" "
-		"srcpos %"Q"\n",
+  IF_DEBUG1 (DP(RINT "[main_getblk] blkno %"Q"u onblk %"Z"u pos %"Q"u "
+		"srcpos %"Q"u\n",
 		blkno, nread, pos, sfile->source_position));
 
   return 0;

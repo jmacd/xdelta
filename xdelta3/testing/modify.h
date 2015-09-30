@@ -12,12 +12,12 @@ public:
   enum Kind {
     MODIFY = 1,     // Mutate a certain range w/ random or supplied data
     ADD = 2,        // Insert random or supplied data
-    DELETE = 3,     // Delete a specified range of data
+    DELRANGE = 3,     // Delete a specified range of data
     COPY = 4,       // Copy from one region, inserting elsewhere
     MOVE = 5,       // Copy then delete copied-from range
     COPYOVER = 6    // Copy then delete copied-to range
 
-    // ADD, DELETE, and COPY change the file size
+    // ADD, DELRANGE, and COPY change the file size
     // MODIFY, MOVE, COPYOVER preserve the file size
   };
 
@@ -97,7 +97,7 @@ public:
     case Change::MODIFY:
       ModifyChange(ch, table, source_table, rand);
       break;
-    case Change::DELETE:
+    case Change::DELRANGE:
       DeleteChange(ch, table, source_table, rand);
       break;
     case Change::COPY:
@@ -269,7 +269,7 @@ public:
     SegmentMap tmp;
     CHECK_NE(ch.addr1, ch.addr2);
     CopyChange(ch, &tmp, source_table, rand);
-    Change d(Change::DELETE, ch.size,
+    Change d(Change::DELRANGE, ch.size,
 	     ch.addr1 < ch.addr2 ? ch.addr1 : ch.addr1 + ch.size);
     DeleteChange(d, table, &tmp, rand);
   }
@@ -282,7 +282,7 @@ public:
     SegmentMap tmp;
     CHECK_NE(ch.addr1, ch.addr2);
     CopyChange(ch, &tmp, source_table, rand);
-    Change d(Change::DELETE, ch.size, ch.addr2 + ch.size);
+    Change d(Change::DELRANGE, ch.size, ch.addr2 + ch.size);
     DeleteChange(d, table, &tmp, rand);
   }
 
