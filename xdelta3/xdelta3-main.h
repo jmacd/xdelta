@@ -1102,7 +1102,7 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
     }
   else
     {
-      if (option_verbose > 5) { XPR(NT "write %s: %"Z"u bytes\n",
+      if (option_verbose > 5) { XPR(NT "write %s: %"W"u bytes\n",
 				    ofile->filename, size); }
       ofile->nwrite += size;
     }
@@ -1296,7 +1296,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
       addr_bytes = (usize_t)(stream->addr_sect.buf - addr_before);
       inst_bytes = (usize_t)(stream->inst_sect.buf - inst_before);
 
-      VC(UT "  %06"Q"u %03"Z"u  %s %6"Z"u", 
+      VC(UT "  %06"Q"u %03"W"u  %s %6"W"u", 
 	 stream->dec_winstart + size,
 	 option_print_cpymode ? code : 0,
 	 xd3_rtype_to_string ((xd3_rtype) stream->dec_current1.type,
@@ -1309,7 +1309,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      if (stream->dec_current1.addr >= stream->dec_cpylen)
 		{
-		  VC(UT " T@%-6"Z"u",
+		  VC(UT " T@%-6"W"u",
 		     stream->dec_current1.addr - stream->dec_cpylen)VE;
 		}
 	      else
@@ -1328,7 +1328,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 
       if (stream->dec_current2.type != XD3_NOOP)
 	{
-	  VC(UT "  %s %6"Z"u",
+	  VC(UT "  %s %6"W"u",
 	     xd3_rtype_to_string ((xd3_rtype) stream->dec_current2.type,
 				  option_print_cpymode),
 	     stream->dec_current2.size)VE;
@@ -1337,7 +1337,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	    {
 	      if (stream->dec_current2.addr >= stream->dec_cpylen)
 		{
-		  VC(UT " T@%-6"Z"u",
+		  VC(UT " T@%-6"W"u",
 		     stream->dec_current2.addr - stream->dec_cpylen)VE;
 		}
 	      else
@@ -1357,7 +1357,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
 	  (stream->dec_current1.type >= XD3_CPY ||
 	   stream->dec_current2.type >= XD3_CPY))
 	{
-	  VC(UT "  %06"Q"u (inefficiency) %"Z"u encoded as %"Z"u bytes\n",
+	  VC(UT "  %06"Q"u (inefficiency) %"W"u encoded as %"W"u bytes\n",
 	     stream->dec_winstart + size_before,
 	     size - size_before,
 	     addr_bytes + inst_bytes)VE;
@@ -1425,7 +1425,7 @@ main_print_func (xd3_stream* stream, main_file *xfile)
   if (stream->dec_winstart == 0)
     {
       VC(UT "VCDIFF version:               0\n")VE;
-      VC(UT "VCDIFF header size:           %"Z"u\n",
+      VC(UT "VCDIFF header size:           %"W"u\n",
 	 stream->dec_hdrsize)VE;
       VC(UT "VCDIFF header indicator:      ")VE;
       if ((stream->dec_hdr_ind & VCD_SECONDARY) != 0)
@@ -1511,22 +1511,22 @@ main_print_func (xd3_stream* stream, main_file *xfile)
 
   if (SRCORTGT (stream->dec_win_ind))
     {
-      VC(UT "VCDIFF copy window length:    %"Z"u\n",
+      VC(UT "VCDIFF copy window length:    %"W"u\n",
 	 stream->dec_cpylen)VE;
       VC(UT "VCDIFF copy window offset:    %"Q"u\n",
 	 stream->dec_cpyoff)VE;
     }
 
-  VC(UT "VCDIFF delta encoding length: %"Z"u\n",
+  VC(UT "VCDIFF delta encoding length: %"W"u\n",
      (usize_t)stream->dec_enclen)VE;
-  VC(UT "VCDIFF target window length:  %"Z"u\n",
+  VC(UT "VCDIFF target window length:  %"W"u\n",
      (usize_t)stream->dec_tgtlen)VE;
 
-  VC(UT "VCDIFF data section length:   %"Z"u\n",
+  VC(UT "VCDIFF data section length:   %"W"u\n",
      (usize_t)stream->data_sect.size)VE;
-  VC(UT "VCDIFF inst section length:   %"Z"u\n",
+  VC(UT "VCDIFF inst section length:   %"W"u\n",
      (usize_t)stream->inst_sect.size)VE;
-  VC(UT "VCDIFF addr section length:   %"Z"u\n",
+  VC(UT "VCDIFF addr section length:   %"W"u\n",
      (usize_t)stream->addr_sect.size)VE;
 
   ret = 0;
@@ -1967,7 +1967,7 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 		  addr = inst->addr - window_start;
 		}
 	      IF_DEBUG2 ({
-		  XPR(NTR "[merge copy] winpos %"Z" take %"Z" "
+		  XPR(NTR "[merge copy] winpos %"W" take %"W" "
 		      "addr %"Q" mode %u\n",
 		      window_pos, take, addr, inst->mode);
 		});
@@ -3300,7 +3300,7 @@ main_input (xd3_cmd     cmd,
 			stream.i_slots_used > stream.iopt_size)
 		      {
 			XPR(NT "warning: input position %"Q"u overflowed "
-			    "instruction buffer, needed %"Z"u (vs. %"Z"u), "
+			    "instruction buffer, needed %"W"u (vs. %"W"u), "
 			    "consider changing -I\n",
 			    stream.current_window * winsize,
 			    stream.i_slots_used, stream.iopt_size);
@@ -3424,10 +3424,10 @@ done:
   if (option_verbose > 1 && cmd == CMD_ENCODE)
     {
       XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
-      XPR(NT "target hash table size: %"Z"u\n", stream.small_hash.size);
+      XPR(NT "target hash table size: %"W"u\n", stream.small_hash.size);
       if (sfile != NULL && sfile->filename != NULL)
 	{
-	  XPR(NT "source hash table size: %"Z"u\n", stream.large_hash.size);
+	  XPR(NT "source hash table size: %"W"u\n", stream.large_hash.size);
 	}
     }
 

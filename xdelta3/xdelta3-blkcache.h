@@ -258,7 +258,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (option_verbose > 1)
 	{
-	  short_sprintf (nbufs, " #bufs %"Z"u", lru_size);
+	  short_sprintf (nbufs, " #bufs %"W"u", lru_size);
 	}
 
       XPR(NT "source %s %s blksize %s window %s%s%s\n",

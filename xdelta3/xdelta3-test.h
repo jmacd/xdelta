@@ -1420,7 +1420,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	  if ((ret = sec->encode (stream, enc_stream,
 				  in_head, out_head, & cfg)))
 	    {
-	      XPR(NT "test %"Z"u: encode: %s", test_i, stream->msg);
+	      XPR(NT "test %"W"u: encode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1459,7 +1459,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 					    compress_size, dec_input,
 					    dec_correct, dec_output)))
 	    {
-	      XPR(NT "test %"Z"u: decode: %s", test_i, stream->msg);
+	      XPR(NT "test %"W"u: decode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -2713,7 +2713,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    default: CHECK(0);
 	    }
 
-	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Z"u/%"Z"u",
+	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"W"u/%"W"u",
 			 inst->pos, inst->size);
 	  rptr += strlen (rptr);
 
@@ -2736,7 +2736,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 
       if (strcmp (rbuf, test->result) != 0)
 	{
-	  XPR(NT "test %"Z"u: expected %s: got %s", i, test->result, rbuf);
+	  XPR(NT "test %"W"u: expected %s: got %s", i, test->result, rbuf);
 	  stream->msg = "wrong result";
 	  return XD3_INTERNAL;
 	}
