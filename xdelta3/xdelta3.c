@@ -2965,7 +2965,7 @@ xd3_encode_init (xd3_stream *stream, int full_init)
        * identical or short inputs require no table allocation. */
       if (large_comp)
 	{
-	  /* TODO(jmacd) Need to check for overflow here. */
+	  /* TODO Need to check for overflow here. */
 	  usize_t hash_values = stream->src->max_winsize /
 	                        stream->smatcher.large_step;
 
@@ -3590,7 +3590,7 @@ xd3_string_match_init (xd3_stream *stream)
   return 0;
 }
 
-#if XD3_USE_LARGEFILE64
+#if XD3_USE_LARGEFILE64 && !XD3_USE_LARGESIZET
 /* This function handles the 32/64bit ambiguity -- file positions are 64bit
  * but the hash table for source-offsets is 32bit. */
 static xoff_t
@@ -3670,11 +3670,11 @@ xd3_srcwin_setup (xd3_stream *stream)
 
   /* Otherwise, we have to make a guess.  More copies may still be
    * issued, but we have to decide the source window base and length
-   * now.  */
+   * now.  
+   * TODO: This >> 2 is arbitrary--try other values. */
   src->srcbase = stream->match_minaddr;
-  /* TODO(jmacd) Need to check for overflow here. */
   src->srclen  = xd3_max ((usize_t) length,
-		      stream->avail_in + (stream->avail_in >> 2));
+			  stream->avail_in + (stream->avail_in >> 2));
 
   if (src->eof_known)
     {
@@ -3745,11 +3745,12 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
   /* Going backwards, the 1.5-pass algorithm allows some
    * already-matched input may be covered by a longer source match.
-   * The greedy algorithm does not allow this. */
+   * The greedy algorithm does not allow this.
+   * TODO: Measure this. */
   if (stream->flags & XD3_BEGREEDY)
     {
       /* The greedy algorithm allows backward matching to the last
-	 matched position. */
+       * matched position. */
       greedy_or_not = xd3_iopt_last_matched (stream);
     }
   else
@@ -3778,6 +3779,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
        * 0--src->size.  We compare the usize_t
        * match_maxfwd/match_maxback against the xoff_t
        * src->size/srcpos values and take the min. */
+      /* TODO #if XD3_USE_LARGESIZET ? */
       if (srcpos < stream->match_maxback)
 	{
 	  stream->match_maxback = (usize_t) srcpos;

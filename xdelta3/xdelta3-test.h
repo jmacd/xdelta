@@ -2811,10 +2811,10 @@ test_iopt_flush_instructions (xd3_stream *stream, int ignore)
 /*
  * This tests the 32/64bit ambiguity for source-window matching.
  */
-#if !XD3_USE_LARGEWINDOW64
+#if !XD3_USE_LARGESIZET
 static int
 test_source_cksum_offset (xd3_stream *stream, int ignore)
-{
+ {
   xd3_source source;
 
   // Inputs are:
@@ -2848,7 +2848,7 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
   stream->src = &source;
 
   for (test_ptr = cksum_test; test_ptr->cpos; test_ptr++) {
-	xoff_t r;
+    xoff_t r;
     stream->srcwin_cksum_pos = test_ptr->cpos;
     stream->total_in = test_ptr->ipos;
 
@@ -2857,7 +2857,7 @@ test_source_cksum_offset (xd3_stream *stream, int ignore)
   }
   return 0;
 }
-#endif /* !XD3_USE_LARGEWINDOW64 */
+#endif /* !XD3_USE_LARGESIZET */
 
 static int
 test_in_memory (xd3_stream *stream, int ignore)
@@ -2938,7 +2938,7 @@ int xd3_selftest (void)
   DO_TEST (in_memory, 0, 0);
 
   DO_TEST (iopt_flush_instructions, 0, 0);
-#if !XD3_USE_LARGEWINDOW64
+#if !XD3_USE_LARGESIZET
   DO_TEST (source_cksum_offset, 0, 0);
 #endif
 
