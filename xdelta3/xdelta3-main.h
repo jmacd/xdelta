@@ -289,16 +289,17 @@ static xd3_stream *recode_stream = NULL;
 /* merge_stream is used by merge commands for storing the source encoding */
 static xd3_stream *merge_stream = NULL;
 
+#include "xdelta3-compr.h"
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
-  { "bzip2",    "-c",   "bzip2",      "-dc",   "B", "BZh",          3, 0, NULL },
-  { "gzip",     "-cn",  "gzip",       "-dc",   "G", "\037\213",     2, 0, NULL },
+  { "bzip2",    "-c",   "bzip2",      "-dc",   "B", "BZh",          3, 0, bz2_detect_func },
+  { "gzip",     "-cn",  "gzip",       "-dc",   "G", "\037\213",     2, 0, gz_detect_func },
   { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0, NULL },
 
   /* Xz is lzma with a magic number http://tukaani.org/xz/format.html */
-  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 6, 0, NULL },
+  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 6, 0, xz_detect_func },
 };
 
 static int main_input (xd3_cmd cmd, main_file *ifile,
