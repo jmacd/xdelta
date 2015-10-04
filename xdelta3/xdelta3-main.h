@@ -292,7 +292,7 @@ static xd3_stream *merge_stream = NULL;
 static main_extcomp extcomp_types[] =
 {
   { "bzip2",    "-c",   "bzip2",      "-dc",   "B", "BZh",          3, 0 },
-  { "gzip",     "-c",   "gzip",       "-dc",   "G", "\037\213",     2, 0 },
+  { "gzip",     "-cn",  "gzip",       "-dc",   "G", "\037\213",     2, 0 },
   { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0 },
 
   /* Xz is lzma with a magic number http://tukaani.org/xz/format.html */
