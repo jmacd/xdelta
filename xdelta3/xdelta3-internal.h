@@ -87,6 +87,7 @@ struct _main_file
   const char         *realname;      /* File name or /dev/stdin,
 				      * /dev/stdout, /dev/stderr. */
   const main_extcomp *compressor;    /* External compression struct. */
+  int                 compression_level; /* 0..9 or -1 if not detected */
   int                 flags;         /* RD_FIRST, RD_NONEXTERNAL, ... */
   xoff_t              nread;         /* for input position */
   xoff_t              nwrite;        /* for output position */

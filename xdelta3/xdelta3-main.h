@@ -207,6 +207,8 @@ struct _main_extcomp
   const char    *magic;
   usize_t        magic_size;
   int            flags;
+/* function for detecting compression level of input file */
+  int          (*detect_func)(uint8_t *data, int len);
 };
 
 /* Merge state: */
@@ -291,12 +293,12 @@ static xd3_stream *merge_stream = NULL;
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] =
 {
-  { "bzip2",    "-c",   "bzip2",      "-dc",   "B", "BZh",          3, 0 },
-  { "gzip",     "-cn",  "gzip",       "-dc",   "G", "\037\213",     2, 0 },
-  { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0 },
+  { "bzip2",    "-c",   "bzip2",      "-dc",   "B", "BZh",          3, 0, NULL },
+  { "gzip",     "-cn",  "gzip",       "-dc",   "G", "\037\213",     2, 0, NULL },
+  { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0, NULL },
 
   /* Xz is lzma with a magic number http://tukaani.org/xz/format.html */
-  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 6, 0 },
+  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 6, 0, NULL },
 };
 
 static int main_input (xd3_cmd cmd, main_file *ifile,
@@ -2453,7 +2455,12 @@ main_secondary_decompress_check (main_file  *file,
 
 	      if (memcmp (check_buf, decomp->magic, decomp->magic_size) == 0)
 		{
+		  int compression_level = -1;
 		  decompressor = decomp;
+		  if(decomp->detect_func) {
+		    compression_level = decomp->detect_func(check_buf, try_read);
+		  }
+		  file->compression_level = compression_level;
 		  break;
 		}
 	    }
