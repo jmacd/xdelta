@@ -296,7 +296,7 @@ static main_extcomp extcomp_types[] =
   { "compress", "-c",   "uncompress", "-c",    "Z", "\037\235",     2, 0 },
 
   /* Xz is lzma with a magic number http://tukaani.org/xz/format.html */
-  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0 },
+  { "xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 6, 0 },
 };
 
 static int main_input (xd3_cmd cmd, main_file *ifile,
