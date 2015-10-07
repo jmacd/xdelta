@@ -7,16 +7,17 @@ import (
 )
 
 const (
-	blocksize = 16380  // A factor of 7
+	blocksize = 16380
 )
 
-func WriteRstreams(seed, offset, len int64,
+func WriteRstreams(t *TestGroup, seed, offset, len int64,
 	first, second io.WriteCloser) {
-	go writeOne(seed, 0, len, first)
-	go writeOne(seed, offset, len, second)
+	go writeOne(t, seed, 0, len, first)
+	go writeOne(t, seed, offset, len, second)
 }
 
-func writeOne(seed, offset, len int64, stream io.WriteCloser) error {
+func writeOne(t *TestGroup, seed, offset, len int64, stream io.WriteCloser) error {
+	t.WaitGroup.Add(1)
 	if offset != 0 {
 		// Fill with other random data until the offset
 		if err := writeRand(rand.New(rand.NewSource(^seed)), offset, stream); err != nil {
@@ -27,6 +28,7 @@ func writeOne(seed, offset, len int64, stream io.WriteCloser) error {
 		len - offset, stream); err != nil {
 		return err
 	}
+	t.WaitGroup.Done()
 	return stream.Close()
 }
 

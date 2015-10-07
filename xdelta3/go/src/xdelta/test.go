@@ -1,6 +1,9 @@
 package xdelta
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -8,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"sync/atomic"
+	"sync"
 
 	"golang.org/x/sys/unix"
 )
@@ -25,6 +29,10 @@ type Runner struct {
 	Testdir string
 }
 
+type TestGroup struct {
+	sync.WaitGroup
+}
+
 type Run struct {
 	Cmd exec.Cmd
 	Srcfile string
@@ -32,6 +40,97 @@ type Run struct {
 	Srcin io.WriteCloser
 	Stdout io.ReadCloser
 	Stderr io.ReadCloser
+}
+
+func (t *TestGroup) Panic(err error) {
+	t.WaitGroup.Done()  // For the caller
+	t.WaitGroup.Wait()
+	panic(err)
+}
+
+func NewTestGroup() *TestGroup {
+	return &TestGroup{}
+}
+
+func (t *TestGroup) Drain(f io.ReadCloser) <-chan []byte {
+	c := make(chan []byte)
+	go func() {
+		t.WaitGroup.Add(1)
+		if b, err := ioutil.ReadAll(f); err != nil {
+			t.Panic(err)
+		} else {
+			c <- b
+		}
+		t.WaitGroup.Done()
+	}()
+	return c
+}
+
+func (t *TestGroup) Empty(f io.ReadCloser, desc string) {
+	go func() {
+		t.WaitGroup.Add(1)
+		s := bufio.NewScanner(f)
+		for s.Scan() {
+			os.Stderr.Write([]byte(fmt.Sprint(desc, ": ", s.Text(), "\n")))
+		}
+		if err := s.Err(); err != nil {
+			t.Panic(err)
+		}
+		t.WaitGroup.Done()
+	}()
+}
+
+func (t *TestGroup) Write(what string, f io.WriteCloser, b []byte) {
+	if _, err := f.Write(b); err != nil {
+		t.Panic(errors.New(fmt.Sprint(what, ":", err)))
+	}
+	if err := f.Close(); err != nil {
+		t.Panic(errors.New(fmt.Sprint(what, ":", err)))
+	}
+}
+
+func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) {
+	t.Add(1)
+	_, err := io.Copy(w, r)
+	if err != nil {
+		t.Panic(err)
+	}
+	err = r.Close()
+	if err != nil {
+		t.Panic(err)
+	}
+	err = w.Close()
+	if err != nil {
+		t.Panic(err)
+	}
+	t.Done()
+}
+
+func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length int64) {
+	t.Add(1)
+	b1 := make([]byte, blocksize)
+	b2 := make([]byte, blocksize)
+	var idx int64
+	for length > 0 {
+		c := blocksize
+		if length < blocksize {
+			c = int(length)
+		}
+		if _, err := io.ReadFull(r1, b1[0:c]); err != nil {
+			t.Panic(err)
+		}
+		if _, err := io.ReadFull(r2, b2[0:c]); err != nil {
+			t.Panic(err)
+		}
+		if bytes.Compare(b1[0:c], b2[0:c]) != 0 {
+			fmt.Println("B1 is", string(b1[0:c]))
+			fmt.Println("B2 is", string(b2[0:c]))			
+			t.Panic(errors.New(fmt.Sprint("Bytes do not compare at ", idx)))
+		}
+		length -= int64(c)
+		idx += int64(c)
+	}
+	t.Done()
 }
 
 func NewRunner() (*Runner, error) {
