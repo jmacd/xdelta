@@ -20,48 +20,51 @@ func smokeTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program) {
 	target := "Hello world!"
 	source := "Hello world, nice to meet you!"
 	
-	run, err := r.Exec(p, true, []string{"-e"})
+	run, err := r.Exec(p, true, []string{"-evv"})
 	if err != nil {
 		t.Panic(err)
 	}
-	encodeout := t.Drain(run.Stdout)
+	encodeout := t.Drain(run.Stdout, "encode.stdout")
 	t.Empty(run.Stderr, "encode")
 
 	t.Write("encode.stdin", run.Stdin, []byte(target))
-	t.Write("encode.stdout", run.Srcin, []byte(source))
+	t.Write("encode.srcin", run.Srcin, []byte(source))
 
 	if err := run.Cmd.Wait(); err != nil {
 		t.Panic(err)
 	}
 
-	run, err = r.Exec(p, true, []string{"-d"})
+	run, err = r.Exec(p, true, []string{"-dvv"})
 	if err != nil {
 		t.Panic(err)
 	}
 
-	decodeout := t.Drain(run.Stdout)
+	decodeout := t.Drain(run.Stdout, "decode.stdout")
 	t.Empty(run.Stderr, "decode")
 
 	t.Write("decode.stdin", run.Stdin, <-encodeout)
-	t.Write("decode.stdout", run.Srcin, []byte(source))
-
+	t.Write("decode.srcin", run.Srcin, []byte(source))
+	decoded := string(<-decodeout)
 	if err := run.Cmd.Wait(); err != nil {
 		t.Panic(err)
 	}
-
-	if string(<-decodeout) != target {
+	if decoded != target {
 		t.Panic(errors.New("It's not working!!!"))
 	}
 	t.Done()
+	fmt.Println("Smoketest pass")
 }
 
 func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, offset, bufsize, length int64) {
+	fmt.Println("Hi")
 	t.Add(1)
 	eargs := []string{"-e", "-1", "-n", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	enc, err := r.Exec(p, true, eargs)
+	fmt.Println("Hi2")
 	if err != nil {
 		t.Panic(err)
 	}
+	fmt.Println("Hi3")
 	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	dec, err := r.Exec(p, true, dargs)
 	if err != nil {
@@ -70,11 +73,14 @@ func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, offset
 
 	read, write := io.Pipe()
 
-	t.CopyStreams(enc.Stdout, dec.Stdin)
-	t.CompareStreams(dec.Stdout, read, length)
-
 	t.Empty(enc.Stderr, "encode")
 	t.Empty(dec.Stderr, "decode")
+
+	fmt.Println("Hi4")
+	t.CopyStreams(enc.Stdout, dec.Stdin)
+	fmt.Println("Hi5")
+	t.CompareStreams(dec.Stdout, read, length)
+	fmt.Println("Hi6")
 
 	// TODO: seems possible to use one WriteRstreams call to generate
 	// the source and target for both encoder and decoder.  Why not?
@@ -101,7 +107,5 @@ func main() {
 
 	smokeTest(r, xdelta.NewTestGroup(), prog)
 
-	offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 8, 1 << 9, 1 << 10)
-
-	//offsetTest(r, prog, 1 << 31, 1 << 32, 1 << 33)
+	offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
 }
