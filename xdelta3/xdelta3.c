@@ -1632,8 +1632,11 @@ xd3_free_stream (xd3_stream *stream)
   xd3_free (stream, stream->addr_sect.copied1);
   xd3_free (stream, stream->data_sect.copied1);
 
+  if (stream->dec_lastwin != stream->dec_buffer)
+    {
+      xd3_free (stream, (uint8_t*) stream->dec_lastwin);
+    }
   xd3_free (stream, stream->dec_buffer);
-  xd3_free (stream, (uint8_t*) stream->dec_lastwin);
 
   xd3_free (stream, stream->buf_in);
   xd3_free (stream, stream->dec_appheader);

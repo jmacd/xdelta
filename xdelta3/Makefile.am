@@ -57,7 +57,7 @@ endif
 
 # For additional debugging, add -DXD3_DEBUG=1, 2, 3, ...
 # TODO: DO NOT RELEASE
-xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=1
+xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=0
 xdelta3_LDADD = -lm
 
 xdelta3decode_CFLAGS = \
