@@ -140,6 +140,12 @@ xd3_decode_secondary (xd3_stream      *stream,
       return ret;
     }
 
+  if (dec_size == 0)
+    {
+      stream->msg = "secondary decoder invalid output size";
+      return XD3_INTERNAL;
+    }
+
   out_used = sect->copied2;
 
   if ((ret = stream->sec_type->decode (stream, *sec_streamp,

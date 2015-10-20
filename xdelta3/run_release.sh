@@ -40,13 +40,14 @@ if [ "${TMPDIR}" != "" ]; then
     XTMP="${TMPDIR}"
 fi
 
-find build -type f 2> /dev/null | xargs rm
+find build -type f 2> /dev/null | xargs rm -f
 
 function setup {
     libtoolize
+    automake --add-missing
     aclocal -I m4
     automake
-    automake --add-missing
+    autoheader
     autoconf
 }
 
