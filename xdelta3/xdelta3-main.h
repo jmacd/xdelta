@@ -3336,7 +3336,8 @@ main_input (xd3_cmd     cmd,
 	default:
 	  /* input_func() error */
 	  XPR(NT XD3_LIB_ERRMSG (& stream, ret));
-	  if (! option_quiet && ret == XD3_INVALID_INPUT)
+	  if (! option_quiet && ret == XD3_INVALID_INPUT &&
+	      sfile != NULL && sfile->filename != NULL)
 	    {
 	      XPR(NT "normally this indicates that the source file is incorrect\n");
 	      XPR(NT "please verify the source file with sha1sum or equivalent\n");

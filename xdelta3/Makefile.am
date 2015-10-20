@@ -40,8 +40,10 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
 	 -Wextra -Wno-unused-parameter -Wno-unused-function
 
-C_WFLAGS = $(WFLAGS) -pedantic -std=c99 -fno-omit-frame-pointer -fsanitize=address
-CXX_WFLAGS = $(WFLAGS) -fno-omit-frame-pointer -fsanitize=address
+# TODO: DO NOT RELEASE
+ASAN = -fno-omit-frame-pointer -fsanitize=address
+C_WFLAGS = $(WFLAGS) -pedantic -std=c99 $(ASAN)
+CXX_WFLAGS = $(WFLAGS) $(ASAN)
 
 common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \
@@ -54,6 +56,7 @@ if DEBUG_SYMBOLS
 endif
 
 # For additional debugging, add -DXD3_DEBUG=1, 2, 3, ...
+# TODO: DO NOT RELEASE
 xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=1
 xdelta3_LDADD = -lm
 

@@ -910,7 +910,13 @@ xd3_decode_input (xd3_stream *stream)
       if (stream->dec_hdr_ind & VCD_APPHEADER)
 	{
 	  /* Note: we add an additional byte for padding, to allow
-	     0-termination. */
+	     0-termination. Check for overflow: */
+	  if (USIZE_T_OVERFLOW(stream->dec_appheadsz, 1))
+	    {
+	      stream->msg = "exceptional appheader size";
+	      return XD3_INVALID_INPUT;
+	    }
+
 	  if ((stream->dec_appheader == NULL) &&
 	      (stream->dec_appheader =
 	       (uint8_t*) xd3_alloc (stream,
