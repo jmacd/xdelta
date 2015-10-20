@@ -43,6 +43,7 @@ fi
 find build -type f 2> /dev/null | xargs rm
 
 function setup {
+    libtoolize
     aclocal -I m4
     automake
     automake --add-missing
