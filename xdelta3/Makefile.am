@@ -40,10 +40,8 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
 	 -Wextra -Wno-unused-parameter -Wno-unused-function
 
-# TODO: DO NOT RELEASE
-ASAN = -fno-omit-frame-pointer -fsanitize=address
-C_WFLAGS = $(WFLAGS) -pedantic -std=c99 $(ASAN)
-CXX_WFLAGS = $(WFLAGS) $(ASAN)
+C_WFLAGS = $(WFLAGS) -pedantic -std=c99
+CXX_WFLAGS = $(WFLAGS)
 
 common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \

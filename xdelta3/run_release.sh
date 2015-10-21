@@ -12,7 +12,9 @@ MAKEFLAGS="-j 10"
 BUILDDIR=${SRCDIR}/build
 LZMASRC=${BUILDDIR}/${LZMA}
 
-MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0"
+NONWIN_CFLAGS="-fno-omit-frame-pointer -fsanitize=address"
+
+MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0"
 MINGW_CFLAGS="${MINGW_CFLAGS} -DXD3_WIN32=1 -DSHELL_TESTS=0"
 
 MYOS=`uname`
@@ -204,14 +206,14 @@ EOF
 # Native compiles
 if [ "${MYOS}" == "Linux" ]; then
     # Linux
-    buildall x86_64-pc-linux-gnu -m32
-    buildall x86_64-pc-linux-gnu -m64
+    buildall x86_64-pc-linux-gnu -m32 "${NONWIN_CFLAGS}"
+    buildall x86_64-pc-linux-gnu -m64 "${NONWIN_CFLAGS}"
 fi
 
 if [ "${MYOS}" == "Darwin" ]; then
     # OS X
-    buildall x86_64-apple-darwin -m32
-    buildall x86_64-apple-darwin -m64
+    buildall x86_64-apple-darwin -m32 "${NONWIN_CFLAGS}"
+    buildall x86_64-apple-darwin -m64 "${NONWIN_CFLAGS}"
 fi
 
 # Cross compile

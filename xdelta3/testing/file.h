@@ -50,7 +50,7 @@ public:
       }
       data_ = new uint8_t[data_size_];
       memcpy(data_, tmp, size_);
-      delete tmp;
+      delete [] tmp;
     }
 
     memcpy(data_ + size_, data, size);
