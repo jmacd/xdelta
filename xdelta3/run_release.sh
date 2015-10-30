@@ -12,10 +12,8 @@ MAKEFLAGS="-j 10"
 BUILDDIR=${SRCDIR}/build
 LZMASRC=${BUILDDIR}/${LZMA}
 
-NONWIN_CFLAGS="-fno-omit-frame-pointer -fsanitize=address"
-
-MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0"
-MINGW_CFLAGS="${MINGW_CFLAGS} -DXD3_WIN32=1 -DSHELL_TESTS=0"
+NONWIN_CFLAGS=""
+MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0 -DXD3_WIN32=1 -DSHELL_TESTS=0"
 
 MYOS=`uname`
 DATE=`date`
@@ -58,7 +56,7 @@ function try {
     shift
     local dir=$1
     shift
-    echo -n "	${w} ..."
+    echo -n "	${w} ... "
     (cd "${dir}" && "$@" >${w}.stdout 2>${w}.stderr)
     local s=$?
     if [ ${s} -eq 0 ]; then
@@ -92,11 +90,11 @@ function buildlzma {
 
     try build-lzma ${target} make ${MAKEFLAGS}
     if [ $? -ne 0 ]; then
-	return
+    	return
     fi
     try install-lzma ${target} make install
     if [ $? -ne 0 ]; then
-	return
+    	return
     fi
 }
 
@@ -105,14 +103,32 @@ function buildit {
     local march=$2
     local offsetbits=$3
     local cargs=$4
-    local largs=$5
+    local afl=$5
     local BM="${host}${march}"
+    local USECC="${CC}"
+    local USECXX="${CXX}"
+    local ASAN="0"
+    local LIBBM="${BM}"
+
+    if [ "${afl}" = "1" ]; then
+	USECC="afl-gcc"
+	USECXX="afl-g++"
+	BM="${BM}-afl"
+
+	if [ "${march}" = "-m32" ]; then
+	    ASAN="1"
+	    BM="${BM}-asan"
+	    cargs="${cargs} -fno-omit-frame-pointer -fsanitize=address"
+	fi
+    fi
+
     local D="build/${BM}/xoff${offsetbits}"
     local BMD="${BM}-${offsetbits}"
     local FULLD="${SRCDIR}/${D}"
-    local CFLAGS="${march} ${cargs} -g -I${SRCDIR}/build/lib-${BM}/include"
-    local CXXFLAGS="${march} ${cargs} -g -I${SRCDIR}/build/lib-${BM}/include"
-    local LDFLAGS="${largs} ${march} -L${SRCDIR}/build/lib-${BM}/lib"
+    local CFLAGS="${march} ${cargs} -I${SRCDIR}/build/lib-${LIBBM}/include"
+    local CXXFLAGS="${march} ${cargs} -I${SRCDIR}/build/lib-${LIBBM}/include"
+    local LDFLAGS="${march} -L${SRCDIR}/build/lib-${LIBBM}/lib"
+
     mkdir -p ${D}
 
     echo "	... ${BMD}"
@@ -123,7 +139,7 @@ function buildit {
 # ${CFLAGS}
 .PHONY: build-${BMD}
 build-${BMD}:
-	(cd ${D} && make all)
+	(cd ${D} && make all && make install)
 
 .PHONY: clean-${BMD}
 clean-${BMD}:
@@ -167,22 +183,26 @@ EOF
     		  --enable-debug-symbols \
 		  "CFLAGS=${CFLAGS}" \
 		  "CXXFLAGS=${CXXFLAGS}" \
-		  "LDFLAGS=${LDFLAGS}"
+		  "LDFLAGS=${LDFLAGS}" \
+		  "CC=${USECC}" \
+		  "CXX=${USECXX}" \
+		  "AFL_HARDEN=${afl}" \
+		  "AFL_USE_ASAN=${ASAN}"
     if [ $? -ne 0 ]; then
 	return
     fi
 
-    try build-xdelta ${FULLD} make ${MAKEFLAGS} all
-    if [ $? -ne 0 ]; then
-	return
-    fi
+    # try build-xdelta ${FULLD} make ${MAKEFLAGS} all
+    # if [ $? -ne 0 ]; then
+    # 	return
+    # fi
 
-    try install-xdelta ${FULLD} make install
+    # try install-xdelta ${FULLD} make install
 }
 
 function buildall {
     echo ""
-    echo "Host $1$2"
+    echo "Host $1$2 afl=$4"
     echo ""
 
     buildlzma "$1" "$2"
@@ -201,28 +221,31 @@ cat > Makefile.test <<EOF
 # Auto-generated ${DATE} -*- Mode: Makefile -*-
 TMP = ${XTMP}
 
+all: linux windows apple
+
 EOF
 
 # Native compiles
 if [ "${MYOS}" == "Linux" ]; then
     # Linux
-    buildall x86_64-pc-linux-gnu -m32 "${NONWIN_CFLAGS}"
-    buildall x86_64-pc-linux-gnu -m64 "${NONWIN_CFLAGS}"
+    buildall x86_64-pc-linux-gnu -m32 "${NONWIN_CFLAGS}" "0"
+    buildall x86_64-pc-linux-gnu -m32 "${NONWIN_CFLAGS}" "1"
+    buildall x86_64-pc-linux-gnu -m64 "${NONWIN_CFLAGS}" "0"
+    buildall x86_64-pc-linux-gnu -m64 "${NONWIN_CFLAGS}" "1"
 fi
 
 if [ "${MYOS}" == "Darwin" ]; then
     # OS X
-    buildall x86_64-apple-darwin -m32 "${NONWIN_CFLAGS}"
-    buildall x86_64-apple-darwin -m64 "${NONWIN_CFLAGS}"
+    buildall x86_64-apple-darwin -m32 "${NONWIN_CFLAGS}" "0"
+    buildall x86_64-apple-darwin -m64 "${NONWIN_CFLAGS}" "0"
 fi
 
 # Cross compile
-buildall i686-w64-mingw32 -mconsole "${MINGW_CFLAGS}"
-buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}"
+buildall i686-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "0"
+buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "0"
 
 cat >> Makefile.test <<EOF
 
-all: linux windows apple
 clean: ${CLEAN}
 
 .PHONY: linux windows apple

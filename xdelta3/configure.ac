@@ -1,9 +1,12 @@
-AC_INIT([Xdelta3], [3.0.10], [josh.macdonald@gmail.com], 
+AC_INIT([Xdelta3], [3.0.11], [josh.macdonald@gmail.com], 
 	[xdelta3], [http://xdelta.org/])
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
 AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar subdir-objects])
+
+AC_ARG_VAR(AFL_HARDEN, "Use hardened AFL")
+AC_ARG_VAR(AFL_USE_ASAN, "Use ASAN with AFL")
 
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
