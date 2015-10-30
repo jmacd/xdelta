@@ -233,7 +233,8 @@ static void
 test_unlink (char* file)
 {
   int ret;
-  if ((ret = unlink (file)) != 0 && errno != ENOENT)
+  if (file != NULL && *file != 0 &&
+      (ret = unlink (file)) != 0 && errno != ENOENT)
     {
       XPR(NT "unlink %s failed: %s\n", file, strerror(ret));
     }
@@ -258,6 +259,9 @@ int test_setup (void)
   static int x = 0;
   pid_t pid = getpid();
   x++;
+
+  test_cleanup();
+
   snprintf_func (TEST_TARGET_FILE, TESTFILESIZE,
 		 "/tmp/xdtest.%d.target.%d", pid, x);
   snprintf_func (TEST_SOURCE_FILE, TESTFILESIZE,
@@ -272,6 +276,7 @@ int test_setup (void)
 		 "/tmp/xdtest.%d.copy.%d", pid, x);
   snprintf_func (TEST_NOPERM_FILE, TESTFILESIZE,
 		 "/tmp/xdtest.%d.noperm.%d", pid, x);
+
   test_cleanup();
   return 0;
 }
@@ -1509,7 +1514,8 @@ IF_DJW (static int test_secondary_huff (xd3_stream *stream, usize_t gp)
 	{ return test_secondary (stream, & djw_sec_type, gp); })
 IF_LZMA (static int test_secondary_lzma (xd3_stream *stream, usize_t gp)
 	{ return test_secondary (stream, & lzma_sec_type, gp); })
-#endif
+
+#endif  /* SECONDARY_ANY */
 
 /***********************************************************************
  TEST INSTRUCTION TABLE
@@ -1906,7 +1912,7 @@ test_recode_command2 (xd3_stream *stream, int has_source,
 	    recoded_adler32 ? "" : "-n ",
 	    !change_apphead ? "" :
 	        (recoded_apphead ? "-A=recode_apphead " : "-A= "),
-	    recoded_secondary ? "-S djw " : "-S none ",
+	    recoded_secondary ? "-S djw " : "-S= ",
 	    TEST_DELTA_FILE,
 	    TEST_COPY_FILE);
 
@@ -2002,6 +2008,7 @@ test_recode_command2 (xd3_stream *stream, int has_source,
     {
       return ret;
     }
+  test_cleanup ();
 
   return 0;
 }
@@ -2040,7 +2047,46 @@ test_recode_command (xd3_stream *stream, int ignore)
 
   return 0;
 }
-#endif
+
+#if SECONDARY_LZMA
+int test_secondary_lzma_default (xd3_stream *stream, int ignore)
+{
+  char ecmd[TESTBUFSIZE];
+  int ret;
+
+  test_setup ();
+
+  if ((ret = test_make_inputs (stream, NULL, NULL)))
+    {
+      return ret;
+    }
+
+  /* First encode */
+  snprintf_func (ecmd, TESTBUFSIZE, "%s -e %s %s",
+		 program_name,
+		 TEST_TARGET_FILE,
+		 TEST_DELTA_FILE);
+
+  if ((ret = system (ecmd)) != 0)
+    {
+      return XD3_INTERNAL;
+    }
+
+  if ((ret = check_vcdiff_header (stream,
+				  TEST_DELTA_FILE,
+				  "VCDIFF secondary compressor",
+				  "lzma",
+				  1)))
+    {
+      return ret;
+    }
+
+  test_cleanup ();
+  return 0;
+}
+
+#endif  /* SECONDARY_LZMA */
+#endif  /* SHELL_TESTS */
 
 /***********************************************************************
  EXTERNAL I/O DECOMPRESSION/RECOMPRESSION
@@ -2422,6 +2468,7 @@ test_appheader (xd3_stream *stream, int ignore)
       return XD3_INVALID;  // Must have crashed!
     }
 
+  test_cleanup ();
   return 0;
 }
 
@@ -2915,6 +2962,7 @@ xd3_selftest (void)
   DO_TEST (recode_command, 0, 0);
 #endif
 
+  IF_LZMA (DO_TEST (secondary_lzma_default, 0, 0));
   IF_LZMA (DO_TEST (secondary_lzma, 0, 1));
   IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));
   IF_FGK (DO_TEST (secondary_fgk, 0, 1));

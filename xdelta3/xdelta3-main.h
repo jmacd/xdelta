@@ -219,7 +219,7 @@ static int         option_verbose            = DEFAULT_VERBOSE;
 static int         option_quiet              = 0;
 static int         option_use_appheader      = 1;
 static uint8_t*    option_appheader          = NULL;
-static int         option_use_secondary      = 0;
+static int         option_use_secondary      = 1;
 static const char* option_secondary          = NULL;
 static int         option_use_checksum       = 1;
 static const char* option_smatch_config      = NULL;
@@ -338,7 +338,7 @@ static int
 main_version (void)
 {
   /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, Joshua MacDonald\\n\");" $ */
-  XPR(NTR "Xdelta version 3.0.10, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015 Joshua MacDonald\n");
+  XPR(NTR "Xdelta version 3.0.11, Copyright (C) 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015 Joshua MacDonald\n");
   XPR(NTR "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   XPR(NTR "This is free software, and you are welcome to redistribute it\n");
   XPR(NTR "under certain conditions; see \"COPYING\" for details.\n");
@@ -391,7 +391,7 @@ reset_defaults(void)
   option_verbose = DEFAULT_VERBOSE;
   option_quiet = 0;
   option_appheader = NULL;
-  option_use_secondary = 0;
+  option_use_secondary = 1;
   option_secondary = NULL;
   option_smatch_config = NULL;
   option_no_compress = 0;
@@ -1155,70 +1155,72 @@ static int
 main_set_secondary_flags (xd3_config *config)
 {
   int ret;
-  if (option_use_secondary)
+  if (!option_use_secondary)
     {
-      /* The default secondary compressor is DJW, if it's compiled. */
-      if (option_secondary == NULL)
+      return 0;
+    }
+  if (option_secondary == NULL)
+    {
+      /* Set a default secondary compressor if LZMA is built in, otherwise
+       * default to no secondary compressor. */
+      if (SECONDARY_LZMA)
 	{
-	  if (SECONDARY_DJW)
-	    {
-	      config->flags |= XD3_SEC_DJW;
-	    }
+	  config->flags |= XD3_SEC_LZMA;
 	}
-      else
+    }
+  else
+    {
+      if (strcmp (option_secondary, "lzma") == 0 && SECONDARY_LZMA)
 	{
-	  if (strcmp (option_secondary, "fgk") == 0 && SECONDARY_FGK)
-	    {
-	      config->flags |= XD3_SEC_FGK;
-	    }
-	  else if (strcmp (option_secondary, "lzma") == 0 && SECONDARY_LZMA)
-	    {
-	      config->flags |= XD3_SEC_LZMA;
-	    }
-	  else if (strncmp (option_secondary, "djw", 3) == 0 && SECONDARY_DJW)
-	    {
-	      usize_t level = XD3_DEFAULT_SECONDARY_LEVEL;
+	  config->flags |= XD3_SEC_LZMA;
+	}
+      else if (strcmp (option_secondary, "fgk") == 0 && SECONDARY_FGK)
+	{
+	  config->flags |= XD3_SEC_FGK;
+	}
+      else if (strncmp (option_secondary, "djw", 3) == 0 && SECONDARY_DJW)
+	{
+	  usize_t level = XD3_DEFAULT_SECONDARY_LEVEL;
 
-	      config->flags |= XD3_SEC_DJW;
+	  config->flags |= XD3_SEC_DJW;
 
-	      if (strlen (option_secondary) > 3 &&
-		  (ret = main_atou (option_secondary + 3,
-				    &level,
-				    0, 9, 'S')) != 0 &&
-		  !option_quiet)
-		{
-		  return XD3_INVALID;
-		}
-
-	      /* XD3_SEC_NOXXXX flags disable secondary compression on
-	       * a per-section basis.  For djw, ngroups=1 indicates
-	       * minimum work, ngroups=0 uses default settings, which
-	       * is > 1 groups by default. */
-	      if (level < 1) { config->flags |= XD3_SEC_NODATA; }
-	      if (level < 7) { config->sec_data.ngroups = 1; }
-	      else { config->sec_data.ngroups = 0; }
-
-	      if (level < 3) { config->flags |= XD3_SEC_NOINST; }
-	      if (level < 8) { config->sec_inst.ngroups = 1; }
-	      else { config->sec_inst.ngroups = 0; }
-
-	      if (level < 5) { config->flags |= XD3_SEC_NOADDR; }
-	      if (level < 9) { config->sec_addr.ngroups = 1; }
-	      else { config->sec_addr.ngroups = 0; }
-	    }
-	  else if (strcmp (option_secondary, "none") == 0 && SECONDARY_DJW)
+	  if (strlen (option_secondary) > 3 &&
+	      (ret = main_atou (option_secondary + 3,
+				&level,
+				0, 9, 'S')) != 0 &&
+	      !option_quiet)
 	    {
-	      /* No secondary */
+	      return XD3_INVALID;
 	    }
-	  else
+
+	  /* XD3_SEC_NOXXXX flags disable secondary compression on
+	   * a per-section basis.  For djw, ngroups=1 indicates
+	   * minimum work, ngroups=0 uses default settings, which
+	   * is > 1 groups by default. */
+	  if (level < 1) { config->flags |= XD3_SEC_NODATA; }
+	  if (level < 7) { config->sec_data.ngroups = 1; }
+	  else { config->sec_data.ngroups = 0; }
+
+	  if (level < 3) { config->flags |= XD3_SEC_NOINST; }
+	  if (level < 8) { config->sec_inst.ngroups = 1; }
+	  else { config->sec_inst.ngroups = 0; }
+
+	  if (level < 5) { config->flags |= XD3_SEC_NOADDR; }
+	  if (level < 9) { config->sec_addr.ngroups = 1; }
+	  else { config->sec_addr.ngroups = 0; }
+	}
+      else if (*option_secondary == 0 ||
+	       strcmp (option_secondary, "none") == 0)
+	{
+	}
+      else 
+	{
+	  if (!option_quiet)
 	    {
-	      if (!option_quiet)
-		{
-		  XPR(NT "unrecognized secondary compressor type: %s\n",
-		      option_secondary);
-		  return XD3_INVALID;
-		}
+	      XPR(NT "unrecognized or not compiled secondary compressor: %s\n",
+		  option_secondary);
 	    }
+	  return XD3_INVALID;
 	}
     }
 
@@ -2400,7 +2402,7 @@ main_secondary_decompress_check (main_file  *file,
   usize_t i;
   usize_t try_read = xd3_min (input_size, XD3_ALLOCSIZE);
   size_t  check_nread = 0;
-  uint8_t check_buf[XD3_ALLOCSIZE];  /* TODO: stack limit */
+  uint8_t check_buf[XD3_ALLOCSIZE];  /* TODO: heap allocate */
   const main_extcomp *decompressor = NULL;
 
   if ((ret = main_file_read (file, check_buf,
@@ -3742,8 +3744,8 @@ int main (int argc, char **argv)
 	case 'J': option_no_output = 1; break;
 	case 'S': if (my_optarg == NULL)
 	    {
-	      option_use_secondary = 1;
-	      option_secondary = "none";
+	      option_use_secondary = 0;
+	      option_secondary = NULL;
 	    }
 	  else
 	    {
