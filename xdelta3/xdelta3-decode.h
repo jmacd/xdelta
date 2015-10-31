@@ -397,6 +397,13 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
    * supplies the data */
   usize_t take = inst->size;
 
+  if (USIZE_T_OVERFLOW (stream->avail_out, take) ||
+      stream->avail_out + take > stream->space_out)
+    {
+      stream->msg = "overflow while decoding";
+      return XD3_INVALID_INPUT;
+    }
+
   XD3_ASSERT (inst->type != XD3_NOOP);
 
   switch (inst->type)
