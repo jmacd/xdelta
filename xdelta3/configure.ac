@@ -5,9 +5,6 @@ AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
 AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar subdir-objects])
 
-AC_ARG_VAR(AFL_HARDEN, "Use hardened AFL")
-AC_ARG_VAR(AFL_USE_ASAN, "Use ASAN with AFL")
-
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
 AC_PROG_CXX

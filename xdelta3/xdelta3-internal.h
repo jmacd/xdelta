@@ -221,7 +221,7 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
                                                                        \
   do                                                                   \
     {                                                                  \
-      if (inp == max)                                                  \
+      if (inp == maxp)						       \
 	{                                                              \
 	  stream->msg = "end-of-input in read_integer";                \
 	  return XD3_INVALID_INPUT;                                    \
@@ -281,7 +281,7 @@ xd3_decode_uint32_t (xd3_stream *stream, uint32_t *val)
 
 static inline int
 xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
-		   const uint8_t *max, uint32_t *valp)
+		   const uint8_t *maxp, uint32_t *valp)
 { READ_INTEGER_TYPE (uint32_t, UINT32_OFLOW_MASK); }
 
 #if XD3_ENCODER
@@ -306,7 +306,7 @@ xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 #if REGRESSION_TEST
 static int
 xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
-		   const uint8_t *max, uint64_t *valp)
+		   const uint8_t *maxp, uint64_t *valp)
 { READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
 
 static uint32_t

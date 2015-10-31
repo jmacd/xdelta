@@ -625,10 +625,23 @@ xd3_decode_sections (xd3_stream *stream)
       return xd3_decode_finish_window (stream);
     }
 
-  /* To avoid copying, need this much data available */
-  need = (stream->inst_sect.size +
-	  stream->addr_sect.size +
-	  stream->data_sect.size);
+  /* To avoid extra copying, allocate three sections at once (but
+   * check for overflow). */
+  need = stream->inst_sect.size;
+
+  if (USIZE_T_OVERFLOW (need, stream->addr_sect.size))
+    {
+      stream->msg = "decoder section size overflow";
+      return XD3_INTERNAL;
+    }
+  need += stream->addr_sect.size;
+
+  if (USIZE_T_OVERFLOW (need, stream->data_sect.size))
+    {
+      stream->msg = "decoder section size overflow";
+      return XD3_INTERNAL;
+    }
+  need += stream->data_sect.size;
 
   /* The window may be entirely processed. */
   XD3_ASSERT (stream->dec_winbytes <= need);

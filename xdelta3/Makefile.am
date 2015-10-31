@@ -4,7 +4,6 @@ bin_PROGRAMS = xdelta3
 noinst_PROGRAMS = xdelta3regtest xdelta3decode
 
 export AFL_HARDEN
-export AFL_USE_ASAN
 
 common_SOURCES = \
 	  xdelta3-blkcache.h \

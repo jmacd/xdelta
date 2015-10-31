@@ -107,19 +107,12 @@ function buildit {
     local BM="${host}${march}"
     local USECC="${CC}"
     local USECXX="${CXX}"
-    local ASAN="0"
     local LIBBM="${BM}"
 
     if [ "${afl}" = "1" ]; then
 	USECC="afl-gcc"
 	USECXX="afl-g++"
 	BM="${BM}-afl"
-
-	if [ "${march}" = "-m32" ]; then
-	    ASAN="1"
-	    BM="${BM}-asan"
-	    cargs="${cargs} -fno-omit-frame-pointer -fsanitize=address"
-	fi
     fi
 
     local D="build/${BM}/xoff${offsetbits}"
@@ -185,9 +178,7 @@ EOF
 		  "CXXFLAGS=${CXXFLAGS}" \
 		  "LDFLAGS=${LDFLAGS}" \
 		  "CC=${USECC}" \
-		  "CXX=${USECXX}" \
-		  "AFL_HARDEN=${afl}" \
-		  "AFL_USE_ASAN=${ASAN}"
+		  "CXX=${USECXX}"
     if [ $? -ne 0 ]; then
 	return
     fi
