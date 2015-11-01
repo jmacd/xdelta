@@ -97,6 +97,15 @@ xd3_decode_setup_buffers (xd3_stream *stream)
   /* If VCD_TARGET is set then the previous buffer may be reused. */
   if (stream->dec_win_ind & VCD_TARGET)
     {
+      /* Note: this implementation is untested, since Xdelta3 itself
+       * does not implement an encoder for VCD_TARGET mode. Thus, mark
+       * unimplemented until needed. */
+      if (1)
+	{
+	  stream->msg = "VCD_TARGET not implemented";
+	  return XD3_UNIMPLEMENTED;
+	}
+
       /* But this implementation only supports copying from the last
        * target window.  If the offset is outside that range, it can't
        * be done. */
@@ -116,7 +125,7 @@ xd3_decode_setup_buffers (xd3_stream *stream)
 	  stream->space_out = 0;
 	}
 
-      // TODO: VCD_TARGET mode, this is broken
+      /* TODO: (See note above, this looks incorrect) */
       stream->dec_cpyaddrbase = stream->dec_lastwin +
 	(usize_t) (stream->dec_cpyoff - stream->dec_laststart);
     }
@@ -389,6 +398,13 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
    * supplies the data */
   usize_t take = inst->size;
 
+  if (USIZE_T_OVERFLOW (stream->avail_out, take) ||
+      stream->avail_out + take > stream->space_out)
+    {
+      stream->msg = "overflow while decoding";
+      return XD3_INVALID_INPUT;
+    }
+
   XD3_ASSERT (inst->type != XD3_NOOP);
 
   switch (inst->type)
@@ -460,7 +476,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	      {
 		/* TODO: Users have requested long-distance copies of
 		 * similar material within a target (e.g., for dup
-		 * supression in backups). */
+		 * supression in backups). This code path is probably
+		 * dead due to XD3_UNIMPLEMENTED in xd3_decode_setup_buffers */
 		inst->size = 0;
 		inst->type = XD3_NOOP;
 		stream->msg = "VCD_TARGET not implemented";
@@ -616,10 +633,23 @@ xd3_decode_sections (xd3_stream *stream)
       return xd3_decode_finish_window (stream);
     }
 
-  /* To avoid copying, need this much data available */
-  need = (stream->inst_sect.size +
-	  stream->addr_sect.size +
-	  stream->data_sect.size);
+  /* To avoid extra copying, allocate three sections at once (but
+   * check for overflow). */
+  need = stream->inst_sect.size;
+
+  if (USIZE_T_OVERFLOW (need, stream->addr_sect.size))
+    {
+      stream->msg = "decoder section size overflow";
+      return XD3_INTERNAL;
+    }
+  need += stream->addr_sect.size;
+
+  if (USIZE_T_OVERFLOW (need, stream->data_sect.size))
+    {
+      stream->msg = "decoder section size overflow";
+      return XD3_INTERNAL;
+    }
+  need += stream->data_sect.size;
 
   /* The window may be entirely processed. */
   XD3_ASSERT (stream->dec_winbytes <= need);
@@ -887,6 +917,7 @@ xd3_decode_input (xd3_stream *stream)
 
       if ((stream->dec_hdr_ind & VCD_CODETABLE) != 0)
 	{
+	  stream->msg = "VCD_CODETABLE support was removed";
 	  return XD3_UNIMPLEMENTED;
 	}
       else
@@ -911,7 +942,13 @@ xd3_decode_input (xd3_stream *stream)
       if (stream->dec_hdr_ind & VCD_APPHEADER)
 	{
 	  /* Note: we add an additional byte for padding, to allow
-	     0-termination. */
+	     0-termination. Check for overflow: */
+	  if (USIZE_T_OVERFLOW(stream->dec_appheadsz, 1))
+	    {
+	      stream->msg = "exceptional appheader size";
+	      return XD3_INVALID_INPUT;
+	    }
+
 	  if ((stream->dec_appheader == NULL) &&
 	      (stream->dec_appheader =
 	       (uint8_t*) xd3_alloc (stream,

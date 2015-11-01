@@ -473,7 +473,7 @@ struct test_result : public test_result_base {
     usize_t i;
 
     for (i = 3; i <= bits; i += 1) {
-      if (slots <= (1 << i)) {
+      if (slots <= (1U << i)) {
 	return i - Checksum::compaction;
       }
     }

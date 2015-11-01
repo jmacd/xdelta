@@ -12,8 +12,8 @@ MAKEFLAGS="-j 10"
 BUILDDIR=${SRCDIR}/build
 LZMASRC=${BUILDDIR}/${LZMA}
 
-MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0 -DVCDIFF_TOOLS=0"
-MINGW_CFLAGS="${MINGW_CFLAGS} -DXD3_WIN32=1 -DSHELL_TESTS=0"
+NONWIN_CFLAGS=""
+MINGW_CFLAGS="-DEXTERNAL_COMPRESSION=0 -DXD3_WIN32=1 -DSHELL_TESTS=0"
 
 MYOS=`uname`
 DATE=`date`
@@ -40,15 +40,15 @@ if [ "${TMPDIR}" != "" ]; then
     XTMP="${TMPDIR}"
 fi
 
-find build -type f 2> /dev/null | xargs rm
+find build -type f 2> /dev/null | xargs rm -f
 
 function setup {
-    mkdir -p ${BUILDDIR}
+    libtoolize
+    automake --add-missing
     aclocal -I m4
     autoheader
-    libtoolize
     automake
-    automake --add-missing
+    autoheader
     autoconf
 }
 
@@ -57,7 +57,7 @@ function try {
     shift
     local dir=$1
     shift
-    echo -n "	${w} ..."
+    echo -n "	${w} ... "
     (cd "${dir}" && "$@" >${w}.stdout 2>${w}.stderr)
     local s=$?
     if [ ${s} -eq 0 ]; then
@@ -91,11 +91,11 @@ function buildlzma {
 
     try build-lzma ${target} make ${MAKEFLAGS}
     if [ $? -ne 0 ]; then
-	return
+    	return
     fi
     try install-lzma ${target} make install
     if [ $? -ne 0 ]; then
-	return
+    	return
     fi
 }
 
@@ -105,14 +105,26 @@ function buildit {
     local usizebits=$3
     local offsetbits=$4
     local cargs=$5
-    local largs=$6
+    local afl=$6
     local BM="${host}${march}"
+    local USECC="${CC}"
+    local USECXX="${CXX}"
+    local LIBBM="${BM}"
+
+    if [ "${afl}" = "1" ]; then
+	USECC="afl-gcc"
+	USECXX="afl-g++"
+	BM="${BM}-afl"
+    fi
+
     local D="build/${BM}/usize${usizebits}/xoff${offsetbits}"
     local BMD="${BM}-${usizebits}-${offsetbits}"
+
     local FULLD="${SRCDIR}/${D}"
-    local CFLAGS="${march} ${cargs} -g -I${SRCDIR}/build/lib-${BM}/include"
-    local CXXFLAGS="${march} ${cargs} -g -I${SRCDIR}/build/lib-${BM}/include"
-    local LDFLAGS="${largs} ${march} -L${SRCDIR}/build/lib-${BM}/lib"
+    local CFLAGS="${march} ${cargs} -I${SRCDIR}/build/lib-${LIBBM}/include"
+    local CXXFLAGS="${march} ${cargs} -I${SRCDIR}/build/lib-${LIBBM}/include"
+    local LDFLAGS="${march} -L${SRCDIR}/build/lib-${LIBBM}/lib"
+
     mkdir -p ${D}
 
     echo "	... ${BMD}"
@@ -123,7 +135,7 @@ function buildit {
 # ${CFLAGS}
 .PHONY: build-${BMD}
 build-${BMD}:
-	(cd ${D} && make all)
+	(cd ${D} && make all && make install)
 
 .PHONY: clean-${BMD}
 clean-${BMD}:
@@ -167,22 +179,24 @@ EOF
     		  --enable-debug-symbols \
 		  "CFLAGS=${CFLAGS}" \
 		  "CXXFLAGS=${CXXFLAGS}" \
-		  "LDFLAGS=${LDFLAGS}"
+		  "LDFLAGS=${LDFLAGS}" \
+		  "CC=${USECC}" \
+		  "CXX=${USECXX}"
     if [ $? -ne 0 ]; then
 	return
     fi
 
-    try build-xdelta ${FULLD} make ${MAKEFLAGS} all
-    if [ $? -ne 0 ]; then
-	return
-    fi
+    # try build-xdelta ${FULLD} make ${MAKEFLAGS} all
+    # if [ $? -ne 0 ]; then
+    # 	return
+    # fi
 
-    try install-xdelta ${FULLD} make install
+    # try install-xdelta ${FULLD} make install
 }
 
 function buildall {
     echo ""
-    echo "Host $1$2"
+    echo "Host $1$2 afl=$4"
     echo ""
 
     buildlzma "$1" "$2"
@@ -202,28 +216,31 @@ cat > Makefile.test <<EOF
 # Auto-generated ${DATE} -*- Mode: Makefile -*-
 TMP = ${XTMP}
 
+all: linux windows apple
+
 EOF
 
 # Native compiles
 if [ "${MYOS}" == "Linux" ]; then
     # Linux
-    buildall x86_64-pc-linux-gnu -m32
-    buildall x86_64-pc-linux-gnu -m64
+    buildall x86_64-pc-linux-gnu -m32 "${NONWIN_CFLAGS}" "0"
+    buildall x86_64-pc-linux-gnu -m32 "${NONWIN_CFLAGS}" "1"
+    buildall x86_64-pc-linux-gnu -m64 "${NONWIN_CFLAGS}" "0"
+    buildall x86_64-pc-linux-gnu -m64 "${NONWIN_CFLAGS}" "1"
 fi
 
 if [ "${MYOS}" == "Darwin" ]; then
     # OS X
-    buildall x86_64-apple-darwin -m32
-    buildall x86_64-apple-darwin -m64
+    buildall x86_64-apple-darwin -m32 "${NONWIN_CFLAGS}" "0"
+    buildall x86_64-apple-darwin -m64 "${NONWIN_CFLAGS}" "0"
 fi
 
 # Cross compile
-buildall i686-w64-mingw32 -mconsole "${MINGW_CFLAGS}"
-buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}"
+buildall i686-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "0"
+buildall x86_64-w64-mingw32 -mconsole "${MINGW_CFLAGS}" "0"
 
 cat >> Makefile.test <<EOF
 
-all: linux windows apple
 clean: ${CLEAN}
 
 .PHONY: linux windows apple
