@@ -56,15 +56,12 @@ func smokeTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program) {
 }
 
 func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, offset, bufsize, length int64) {
-	fmt.Println("Hi")
 	t.Add(1)
-	eargs := []string{"-e", "-1", "-n", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
+	eargs := []string{"-e", "-1", "-N", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	enc, err := r.Exec(p, true, eargs)
-	fmt.Println("Hi2")
 	if err != nil {
 		t.Panic(err)
 	}
-	fmt.Println("Hi3")
 	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	dec, err := r.Exec(p, true, dargs)
 	if err != nil {
@@ -76,11 +73,8 @@ func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, offset
 	t.Empty(enc.Stderr, "encode")
 	t.Empty(dec.Stderr, "decode")
 
-	fmt.Println("Hi4")
 	t.CopyStreams(enc.Stdout, dec.Stdin)
-	fmt.Println("Hi5")
 	t.CompareStreams(dec.Stdout, read, length)
-	fmt.Println("Hi6")
 
 	// TODO: seems possible to use one WriteRstreams call to generate
 	// the source and target for both encoder and decoder.  Why not?
