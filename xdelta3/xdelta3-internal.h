@@ -330,12 +330,14 @@ xd3_sizeof_uint64_t (uint64_t num)
 
 #if SIZEOF_USIZE_T == 4
 #define USIZE_T_MAX        UINT32_MAX
+#define USIZE_T_MAXBLKSZ   0x80000000U
 #define xd3_decode_size   xd3_decode_uint32_t
 #define xd3_emit_size     xd3_emit_uint32_t
 #define xd3_sizeof_size   xd3_sizeof_uint32_t
 #define xd3_read_size     xd3_read_uint32_t
 #elif SIZEOF_USIZE_T == 8
 #define USIZE_T_MAX        UINT64_MAX
+#define USIZE_T_MAXBLKSZ   0x8000000000000000ULL
 #define xd3_decode_size   xd3_decode_uint64_t
 #define xd3_emit_size     xd3_emit_uint64_t
 #define xd3_sizeof_size   xd3_sizeof_uint64_t

@@ -1456,7 +1456,7 @@ djw_decode_symbol (xd3_stream     *stream,
       if (*input == input_end)
 	{
 	  stream->msg = "secondary decoder end of input";
-	  return XD3_INTERNAL;
+	  return XD3_INVALID_INPUT;
 	}
 
       bstate->cur_byte = *(*input)++;
@@ -1479,7 +1479,7 @@ djw_decode_symbol (xd3_stream     *stream,
 
  corrupt:
   stream->msg = "secondary decoder invalid code";
-  return XD3_INTERNAL;
+  return XD3_INVALID_INPUT;
 }
 
 static int
@@ -1606,7 +1606,7 @@ djw_decode_1_2 (xd3_stream     *stream,
   if (rep != 0)
     {
       stream->msg = "secondary decoder invalid repeat code";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
   
   return 0;
@@ -1654,7 +1654,7 @@ xd3_decode_huff (xd3_stream     *stream,
   if (output_bytes == 0)
     {
       stream->msg = "secondary decoder invalid input";
-      return XD3_INTERNAL;
+      return XD3_INVALID_INPUT;
     }
 
   /* Decode: number of groups */
@@ -1796,7 +1796,11 @@ xd3_decode_huff (xd3_stream     *stream,
 		gp_maxlen  = maxlen[gp];
 	      }
 
-	    XD3_ASSERT (output_end - output > 0);
+	    if (output_end < output)
+	      {
+		stream->msg = "secondary decoder invalid input";
+		return XD3_INVALID_INPUT;
+	      }
 	    
 	    /* Decode next sector. */
 	    n = xd3_min (sector_size, (usize_t) (output_end - output));

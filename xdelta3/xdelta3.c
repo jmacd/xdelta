@@ -1104,7 +1104,17 @@ xd3_round_blksize (usize_t sz, usize_t blksz)
 
   XD3_ASSERT (xd3_check_pow2 (blksz, NULL) == 0);
 
-  return mod ? (sz + (blksz - mod)) : sz;
+  if (mod == 0)
+    {
+      return sz;
+    }
+
+  if (sz > USIZE_T_MAXBLKSZ)
+    {
+      return USIZE_T_MAXBLKSZ;
+    }
+
+  return sz + (blksz - mod);
 }
 
 /***********************************************************************
@@ -2081,8 +2091,8 @@ xd3_close_stream (xd3_stream *stream)
 	  break;
 	default:
 	  /* If decoding, should be ready for the next window. */
-	  stream->msg = "EOF in decode";
-	  return XD3_INTERNAL;
+	  stream->msg = "eof in decode";
+	  return XD3_INVALID_INPUT;
 	}
     }
 
@@ -3762,7 +3772,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	       frontier_pos, srcpos, stream->src->max_winsize));
   if (srcpos < frontier_pos &&
       frontier_pos - srcpos > stream->src->max_winsize) {
-    IF_DEBUG1(DP(RINT "[match_setup] rejected due to src->max_winsize "
+    IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
 		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%"Q"u\n",
 		 xd3_source_eof (stream->src),
 		 srcpos, stream->src->max_winsize));
@@ -4423,14 +4433,15 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	  IF_DEBUG1 (DP(RINT
 			"[srcwin_move_point] async getblk return for %"Q"u\n",
 			blkno));
+
 	  return ret;
 	}
 
       IF_DEBUG1 (DP(RINT
-		    "[srcwin_move_point] T=%"Q"u{%"Q"u} S=%"Q"u EOF=%"Q"u %s\n",
+		    "[srcwin_move_point] T=%"Q"u S=%"Q"u L=%"Q"u EOF=%"Q"u %s\n",
 		    stream->total_in + stream->input_position,
-		    logical_input_cksum_pos,
 		    stream->srcwin_cksum_pos,
+		    logical_input_cksum_pos,
 		    xd3_source_eof (stream->src),
 		    stream->src->eof_known ? "known" : "unknown"));
 
@@ -4475,11 +4486,11 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     }
 
   IF_DEBUG1 (DP(RINT
-		"[srcwin_move_point] exited loop T=%"Q"u{%"Q"u} "
-		"S=%"Q"u EOF=%"Q"u %s\n",
+		"[srcwin_move_point] exited loop T=%"Q"u "
+		"S=%"Q"u L=%"Q" EOF=%"Q"u %s\n",
 		stream->total_in + stream->input_position,
-		logical_input_cksum_pos,
 		stream->srcwin_cksum_pos,
+		logical_input_cksum_pos,
 		xd3_source_eof (stream->src),
 		stream->src->eof_known ? "known" : "unknown"));
 
