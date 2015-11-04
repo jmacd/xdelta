@@ -1892,7 +1892,7 @@ xd3_config_stream(xd3_stream *stream,
 inline
 xoff_t xd3_source_eof(const xd3_source *src)
 {
-  xoff_t r = (src->blksize * src->max_blkno) + (xoff_t)src->onlastblk;
+  xoff_t r = (src->max_blkno << src->shiftby) + (xoff_t)src->onlastblk;
   return r;
 }
 
@@ -1906,7 +1906,7 @@ usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno)
 }
 
 /* This function interfaces with the client getblk function, checks
- * its results, updates frontier_blkno, max_blkno, onlastblk, eof_known. */
+ * its results, updates frontier_pos, max_blkno, onlastblk, eof_known. */
 static int
 xd3_getblk (xd3_stream *stream, xoff_t blkno)
 {
@@ -1934,40 +1934,24 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 		    "%u blksize %u\n", blkno, source->onblk, source->blksize));
     }
 
-  if (blkno >= source->frontier_blkno)
+  if (blkno > source->max_blkno)
     {
-      if (blkno > source->max_blkno)
-	{
-	  source->max_blkno = blkno;
-	  source->onlastblk = source->onblk;
-	}
+      source->max_blkno = blkno;
 
       if (source->onblk == source->blksize)
 	{
-	  source->frontier_blkno = blkno + 1;
-
-	  IF_DEBUG2 (DP(RINT "[getblk] full source blkno %"Q"u: "
+	  IF_DEBUG1 (DP(RINT "[getblk] full source blkno %"Q"u: "
 			"source length unknown %"Q"u\n",
 			blkno,
 			xd3_source_eof (source)));
 	}
-      else
+      else if (!source->eof_known)
 	{
-	  source->frontier_blkno = blkno;
-
-	  if (xd3_bytes_on_srcblk (source, blkno) != 0)
-	    {
-	      source->frontier_blkno += 1;
-	    }
-
-	  if (!source->eof_known)
-	    {
-	      IF_DEBUG2 (DP(RINT "[getblk] eof block has %d bytes; "
-			    "source length known %"Q"u\n",
-			    xd3_bytes_on_srcblk (source, blkno),
-			    xd3_source_eof (source)));
-	      source->eof_known = 1;
-	    }
+	  IF_DEBUG1 (DP(RINT "[getblk] eof block has %d bytes; "
+			"source length known %"Q"u\n",
+			xd3_bytes_on_srcblk (source, blkno),
+			xd3_source_eof (source)));
+	  source->eof_known = 1;
 	}
     }
 
@@ -1978,11 +1962,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
       /* In case the application sets the source as 1 block w/ a
 	 preset buffer. */
       source->onlastblk = source->onblk;
-
-      if (source->onblk == source->blksize)
-	{
-	  source->frontier_blkno = blkno + 1;
-	}
+      source->frontier_pos = (blkno + 1) << source->shiftby;
     }
   return 0;
 }
@@ -2019,6 +1999,7 @@ xd3_set_source (xd3_stream *stream,
       IF_DEBUG1 (DP(RINT "raising src_maxsize to %u\n", src->blksize));
     }
   src->max_winsize = xd3_max (src->max_winsize, XD3_ALLOCSIZE);
+  src->frontier_pos = src->max_winsize;
 
   return 0;
 }
@@ -3740,9 +3721,8 @@ xd3_srcwin_setup (xd3_stream *stream)
 static int
 xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 {
-  xd3_source *src = stream->src;
+  xd3_source *const src = stream->src;
   usize_t greedy_or_not;
-  xoff_t frontier_pos;
 
   stream->match_maxback = 0;
   stream->match_maxfwd  = 0;
@@ -3766,18 +3746,22 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   /* Implement src->max_winsize, which prevents the encoder from seeking
    * back further than the LRU cache maintaining FIFO discipline, (to
    * avoid seeking). */
-  frontier_pos = stream->src->frontier_blkno * stream->src->blksize;
+  XD3_ASSERT (srcpos <= src->frontier_pos);
+
+  /* Prevent backwards seeks. This prevents an XD3_TOOFARBACK code
+     (checked below). */
+  if (src->frontier_pos - srcpos > src->max_winsize)
+    {
+      IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
+		   "distance eof=%"Q"u srcpos=%"Q"u frontier_pos=%"Q"u max_winsz=%"Q"u\n",
+		   xd3_source_eof (src),
+		   srcpos, src->frontier_pos, src->max_winsize));
+      goto bad;
+    }
+
   IF_DEBUG2(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
 	       "src->max_winsize %"Q"u\n",
-	       frontier_pos, srcpos, stream->src->max_winsize));
-  if (srcpos < frontier_pos &&
-      frontier_pos - srcpos > stream->src->max_winsize) {
-    IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
-		 "distance eof=%"Q"u srcpos=%"Q"u maxsz=%"Q"u\n",
-		 xd3_source_eof (stream->src),
-		 srcpos, stream->src->max_winsize));
-    goto bad;
-  }
+	       src->frontier_pos, srcpos, src->max_winsize));
 
   /* Going backwards, the 1.5-pass algorithm allows some
    * already-matched input may be covered by a longer source match.
@@ -3819,9 +3803,9 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	  stream->match_maxback = (usize_t) srcpos;
 	}
 
-      if (stream->src->eof_known)
+      if (src->eof_known)
 	{
-	  xoff_t srcavail = xd3_source_eof (stream->src) - srcpos;
+	  xoff_t srcavail = xd3_source_eof (src) - srcpos;
 
 	  if (srcavail < (xoff_t) stream->match_maxfwd)
 	    {
@@ -3934,7 +3918,7 @@ static int
 xd3_source_extend_match (xd3_stream *stream)
 {
   int ret;
-  xd3_source *src = stream->src;
+  xd3_source *const src = stream->src;
   xoff_t matchoff;  /* matchoff is the current right/left-boundary of
 		       the source match being tested. */
   usize_t streamoff; /* streamoff is the current right/left-boundary
@@ -3971,9 +3955,19 @@ xd3_source_extend_match (xd3_stream *stream)
 
 	  if ((ret = xd3_getblk (stream, tryblk)))
 	    {
-	      /* if search went too far back, continue forward. */
 	      if (ret == XD3_TOOFARBACK)
 		{
+		  IF_DEBUG1({
+		      DP(RINT "[maxback] frontier block %u TOOFARBACK block %u\n",
+			 stream->src->frontier_pos >> stream->src->shiftby, tryblk);
+		    });
+		  /* the starting position is too far back. */
+		  if (stream->match_back == 0)
+		    {
+		      return 0;
+		    }
+
+		  /* search went too far back, continue forward. */
 		  break;
 		}
 
@@ -4430,6 +4424,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	    {
  	      ret = XD3_INTERNAL;
 	    }
+
 	  IF_DEBUG1 (DP(RINT
 			"[srcwin_move_point] async getblk return for %"Q"u\n",
 			blkno));
@@ -4487,7 +4482,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
   IF_DEBUG1 (DP(RINT
 		"[srcwin_move_point] exited loop T=%"Q"u "
-		"S=%"Q"u L=%"Q" EOF=%"Q"u %s\n",
+		"S=%"Q"u L=%"Q"u EOF=%"Q"u %s\n",
 		stream->total_in + stream->input_position,
 		stream->srcwin_cksum_pos,
 		logical_input_cksum_pos,

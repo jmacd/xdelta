@@ -783,10 +783,9 @@ struct _xd3_source
   xoff_t              max_blkno;  /* Maximum block, if eof is known,
 				   * otherwise, equals frontier_blkno
 				   * (initially 0). */
-  xoff_t              frontier_blkno;  /* If eof is unknown, the next
-					* source position to be read.
-					* Otherwise, equal to
-					* max_blkno. */
+  xoff_t              frontier_pos;  /* The next source position to be
+				      * read, equal to ((max_blkno+1)
+				      * << shiftby) */
   usize_t             onlastblk;  /* Number of bytes on max_blkno */
   int                 eof_known;  /* Set to true when the first
 				   * partial block is read. */

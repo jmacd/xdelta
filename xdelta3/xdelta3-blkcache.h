@@ -180,6 +180,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   if (!sfile->size_known && source->onblk < blksize)
     {
       source_size = source->onblk;
+      source->onlastblk = source_size;
       sfile->size_known = 1;
     }
 
@@ -191,8 +192,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       /* Modify block 0, change blocksize. */
       blksize = option_srcwinsz / MAX_LRU_SIZE;
       source->blksize = blksize;
-      source->onblk = blksize;  /* xd3 sets onblk */
-      /* Note: source->max_winsize is unchanged. */
+      source->onblk = blksize;
+      source->onlastblk = blksize;
+      source->max_blkno = MAX_LRU_SIZE - 1;
+
       lru[0].size = blksize;
       lru_size = MAX_LRU_SIZE;
 
