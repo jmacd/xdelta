@@ -31,6 +31,8 @@ type Runner struct {
 
 type TestGroup struct {
 	sync.WaitGroup
+	sync.Mutex
+	errs []error
 }
 
 type Run struct {
@@ -42,10 +44,17 @@ type Run struct {
 	Stderr io.ReadCloser
 }
 
+
 func (t *TestGroup) Panic(err error) {
+	t.Lock()
+	t.errs = append(t.errs, err)
+	t.Unlock()
 	t.Done()  // For the caller
 	t.Wait()
-	panic(err)
+	for _, e := range t.errs {
+		fmt.Println(e)
+	}
+	panic(fmt.Sprintf("%d errors", len(t.errs)))
 }
 
 func NewTestGroup() *TestGroup {
@@ -185,9 +194,8 @@ func (r *Runner) Exec(p *Program, srcfifo bool, flags []string) (*Run, error) {
 	run.Cmd.Path = p.Path
 	run.Cmd.Args = append(args, flags...)
 	run.Cmd.Dir = r.Testdir
-	run.Cmd.Start()
 
-	return run, nil
+	return run, run.Cmd.Start()
 }
 
 func writeFifo(srcfile string, read io.Reader) error {

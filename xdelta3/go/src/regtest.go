@@ -10,8 +10,8 @@ import (
 
 const (
 	blocksize = 1<<16
-	winsize = 1<<26
-	xdelta3 = "/volume/home/jmacd/src/xdelta-64bithash/xdelta3/build/x86_64-pc-linux-gnu-m64/usize64/xoff64/xdelta3"
+	winsize = 1<<22
+	xdelta3 = "/volume/home/jmacd/src/xdelta-devel/xdelta3/xdelta3"
 	seed = 1422253499919909358
 )
 
@@ -20,32 +20,32 @@ func smokeTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program) {
 	target := "Hello world!"
 	source := "Hello world, nice to meet you!"
 	
-	run, err := r.Exec(p, true, []string{"-evv"})
+	enc, err := r.Exec(p, true, []string{"-evv"})
 	if err != nil {
 		t.Panic(err)
 	}
-	encodeout := t.Drain(run.Stdout, "encode.stdout")
-	t.Empty(run.Stderr, "encode")
+	encodeout := t.Drain(enc.Stdout, "encode.stdout")
+	t.Empty(enc.Stderr, "encode")
 
-	t.Write("encode.stdin", run.Stdin, []byte(target))
-	t.Write("encode.srcin", run.Srcin, []byte(source))
+	t.Write("encode.stdin", enc.Stdin, []byte(target))
+	t.Write("encode.srcin", enc.Srcin, []byte(source))
 
-	if err := run.Cmd.Wait(); err != nil {
+	if err := enc.Cmd.Wait(); err != nil {
 		t.Panic(err)
 	}
 
-	run, err = r.Exec(p, true, []string{"-dvv"})
+	dec, err := r.Exec(p, true, []string{"-dvv"})
 	if err != nil {
 		t.Panic(err)
 	}
 
-	decodeout := t.Drain(run.Stdout, "decode.stdout")
-	t.Empty(run.Stderr, "decode")
+	decodeout := t.Drain(dec.Stdout, "decode.stdout")
+	t.Empty(dec.Stderr, "decode")
 
-	t.Write("decode.stdin", run.Stdin, <-encodeout)
-	t.Write("decode.srcin", run.Srcin, []byte(source))
+	t.Write("decode.stdin", dec.Stdin, <-encodeout)
+	t.Write("decode.srcin", dec.Srcin, []byte(source))
 	decoded := string(<-decodeout)
-	if err := run.Cmd.Wait(); err != nil {
+	if err := dec.Cmd.Wait(); err != nil {
 		t.Panic(err)
 	}
 	if decoded != target {
@@ -55,9 +55,9 @@ func smokeTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program) {
 	fmt.Println("Smoketest pass")
 }
 
-func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, offset, bufsize, length int64) {
+func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, bufsize, offset, length int64) {
 	t.Add(1)
-	eargs := []string{"-e", "-1", "-N", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
+	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	enc, err := r.Exec(p, true, eargs)
 	if err != nil {
 		t.Panic(err)
@@ -78,7 +78,7 @@ func offsetTest(r *xdelta.Runner, t *xdelta.TestGroup, p *xdelta.Program, offset
 
 	// TODO: seems possible to use one WriteRstreams call to generate
 	// the source and target for both encoder and decoder.  Why not?
-	xdelta.WriteRstreams(t, seed, offset, length, enc.Srcin, enc. Stdin)
+	xdelta.WriteRstreams(t, seed, offset, length, enc.Srcin, enc.Stdin)
 	xdelta.WriteRstreams(t, seed, offset, length, dec.Srcin, write)
 
 	if err := enc.Cmd.Wait(); err != nil {
@@ -100,6 +100,7 @@ func main() {
 	prog := &xdelta.Program{xdelta3}
 
 	smokeTest(r, xdelta.NewTestGroup(), prog)
+	offsetTest(r, xdelta.NewTestGroup(), prog, 4 << 20, 3 << 20, 5 << 20)
 
-	offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
+	//offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
 }
