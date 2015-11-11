@@ -55,6 +55,9 @@ if DEBUG_SYMBOLS
   common_CFLAGS += -g
 endif
 
+#common_CFLAGS += -fsanitize=address -fno-omit-frame-pointer
+#common_CFLAGS += -O2
+
 # For additional debugging, add -DXD3_DEBUG=1, 2, 3, ...
 xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=0
 xdelta3_LDADD = -lm

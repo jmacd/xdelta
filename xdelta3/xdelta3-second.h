@@ -300,7 +300,7 @@ xd3_encode_secondary (xd3_stream      *stream,
     {
       if (comp_size < orig_size)
 	{
-	  IF_DEBUG1(DP(RINT "secondary saved %u bytes: %u -> %u (%0.2f%%)\n",
+	  IF_DEBUG1(DP(RINT "[encode_secondary] saved %u bytes: %u -> %u (%0.2f%%)\n",
 		       orig_size - comp_size, orig_size, comp_size,
 		       100.0 * (double) comp_size / (double) orig_size));
 	}

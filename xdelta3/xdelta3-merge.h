@@ -492,10 +492,15 @@ xd3_merge_source_copy (xd3_stream *stream,
 	    }
 	  else
 	    {
-	      // TODO: this is slow because of the recursion, which
-	      // could reach a depth equal to the number of target
-	      // copies, and this is compression-inefficient because
-	      // it can produce duplicate adds.
+	      // Note: A better implementation will construct the
+	      // mapping of output ranges, starting from the input
+	      // range, applying deltas in forward order, using an
+	      // interval tree.  This code uses recursion to construct
+	      // each copied range, recursively (using binary search
+	      // in xd3_merge_find_position).
+	      //
+	      // TODO: This code can cause stack overflow. Fix as
+	      // described above.
 	      xd3_winst tinst;
 	      tinst.type = XD3_CPY;
 	      tinst.mode = iinst.mode;
@@ -555,11 +560,13 @@ int xd3_merge_inputs (xd3_stream *stream,
 	  ret = xd3_merge_add (stream, input, iinst);
 	  break;
 	default:
-	  /* TODO: VCD_TARGET support is completely untested all
-	   * throughout. */
-	  if (iinst->mode == 0 || iinst->mode == VCD_TARGET)
+	  if (iinst->mode == 0)
 	    {
 	      ret = xd3_merge_target_copy (stream, iinst);
+	    }
+	  else if (iinst->mode == VCD_TARGET)
+	    {
+	      ret = XD3_INVALID_INPUT;
 	    }
 	  else
 	    {
