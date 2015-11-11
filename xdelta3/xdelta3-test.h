@@ -2960,9 +2960,9 @@ xd3_selftest (void)
 #endif
 
   DO_TEST (recode_command, 0, 0);
+  IF_LZMA (DO_TEST (secondary_lzma_default, 0, 0));
 #endif
 
-  IF_LZMA (DO_TEST (secondary_lzma_default, 0, 0));
   IF_LZMA (DO_TEST (secondary_lzma, 0, 1));
   IF_DJW (DO_TEST (secondary_huff, 0, DJW_MAX_GROUPS));
   IF_FGK (DO_TEST (secondary_fgk, 0, 1));
