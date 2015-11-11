@@ -2232,8 +2232,6 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
       }
     case XD3_RUN:
       {
-	XD3_ASSERT (inst->size >= MIN_MATCH);
-
 	if ((ret = xd3_emit_byte (stream, & DATA_TAIL (stream), inst->xtra))) { return ret; }
 
 	stream->n_run += 1;
@@ -3739,7 +3737,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
    * TestNonBlockingProgress test! */
   if (srcpos != 0 && srcpos == stream->match_last_srcpos)
     {
-      IF_DEBUG2(DP(RINT "[match_setup] looping failure\n"));
+      IF_DEBUG1(DP(RINT "[match_setup] looping failure\n"));
       goto bad;
     }
 
@@ -3752,15 +3750,16 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
      (checked below). */
   if (src->frontier_pos - srcpos > src->max_winsize)
     {
-      IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
+      IF_DEBUG1(DP(RINT "[match_setup] rejected due to src->max_winsize "
 		   "distance eof=%"Q"u srcpos=%"Q"u frontier_pos=%"Q"u max_winsz=%"Q"u\n",
 		   xd3_source_eof (src),
 		   srcpos, src->frontier_pos, src->max_winsize));
       goto bad;
     }
 
-  IF_DEBUG2(DP(RINT "[match_setup] frontier_pos %"Q"u, srcpos %"Q"u, "
+  IF_DEBUG1(DP(RINT "[match_setup] %"Q"u frontier_pos %"Q"u, srcpos %"Q"u, "
 	       "src->max_winsize %"Q"u\n",
+	       stream->total_in + stream->input_position,
 	       src->frontier_pos, srcpos, src->max_winsize));
 
   /* Going backwards, the 1.5-pass algorithm allows some
@@ -4340,7 +4339,6 @@ xd3_verify_run_state (xd3_stream    *stream,
  * stream->input_position reaches the value returned as
  * *next_move_point.  NB: this is one of the most expensive functions
  * in this code and also the most critical for good compression.
- * TODO: optimize the inner loop
  */
 static int
 xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
@@ -4372,6 +4370,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     {
       *next_move_point = stream->input_position +
 	(usize_t)(stream->srcwin_cksum_pos - logical_input_cksum_pos);
+      IF_DEBUG1 (DP(RINT
+		    "[srcwin_move_point] %"Q"u cksum_pos greater than logical pos %"Q"u\n",
+		    stream->srcwin_cksum_pos, logical_input_cksum_pos));
       return 0;
     }
 
