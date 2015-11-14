@@ -4344,6 +4344,7 @@ static int
 xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 {
   xoff_t logical_input_cksum_pos;
+  xoff_t absolute_input_pos;
   xoff_t source_size;
 
   if (stream->src->eof_known)
@@ -4358,11 +4359,20 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	}
     }
 
+  absolute_input_pos = stream->total_in + stream->input_position;
+
   /* Begin by advancing at twice the input rate, up to half the
    * maximum window size. */
-  logical_input_cksum_pos = xd3_min((stream->total_in + stream->input_position) * 2,
-				(stream->total_in + stream->input_position) +
-				  (stream->src->max_winsize / 2));
+#if 1
+  if (absolute_input_pos < stream->src->max_winsize) {
+    logical_input_cksum_pos = stream->src->max_winsize;
+  } else {
+    logical_input_cksum_pos = absolute_input_pos + stream->src->max_winsize / 2;
+  }
+#else
+  logical_input_cksum_pos = xd3_min(absolute_input_pos * 2,
+				    absolute_input_pos + (stream->src->max_winsize / 2));
+#endif
 
   /* If srcwin_cksum_pos is already greater, wait until the difference
    * is met. */

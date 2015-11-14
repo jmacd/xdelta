@@ -59,7 +59,7 @@ endif
 #common_CFLAGS += -O2
 
 # For additional debugging, add -DXD3_DEBUG=1, 2, 3, ...
-xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=0
+xdelta3_CFLAGS = $(C_WFLAGS) $(common_CFLAGS) -DXD3_DEBUG=1
 xdelta3_LDADD = -lm
 
 xdelta3decode_CFLAGS = \
@@ -75,9 +75,9 @@ xdelta3decode_CFLAGS = \
 	-DVCDIFF_TOOLS=0
 
 xdelta3regtest_CXXFLAGS = \
-	$(CXX_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+	$(CXX_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=2
 xdelta3regtest_CFLAGS = \
-	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
+	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=2
 xdelta3regtest_LDADD = -lm
 
 man1_MANS = xdelta3.1
