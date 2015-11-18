@@ -816,7 +816,7 @@ void TestSmallStride() {
     IF_DEBUG1(DP(RINT "[stride=%d] changes=%u adds=%"Q"u\n",
 		 s, changes, delta.AddedBytes()));
     double allowance = Constants::BLOCK_SIZE < 8192 ? 3.0 : 1.1;
-    CHECK_GE(allowance, (double)delta.AddedBytes());
+    CHECK_GE(allowance * changes, (double)delta.AddedBytes());
   }
 }
 
