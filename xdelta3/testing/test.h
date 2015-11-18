@@ -22,8 +22,8 @@ extern "C" {
     typeof(x) _y(y); \
     if (!(_x OP _y)) { \
       cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x " " #OP " " #y << endl; \
-      cerr << __FILE__ << ":" << __LINE__ << " Expected: " << _x << endl; \
-      cerr << __FILE__ << ":" << __LINE__ << " Actual: " << _y << endl; \
+      cerr << __FILE__ << ":" << __LINE__ << " {0} " << _x << endl; \
+      cerr << __FILE__ << ":" << __LINE__ << " {1} " << _y << endl; \
     abort(); \
     } } while (false)
 #undef CHECK

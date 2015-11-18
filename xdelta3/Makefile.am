@@ -75,9 +75,9 @@ xdelta3decode_CFLAGS = \
 	-DVCDIFF_TOOLS=0
 
 xdelta3regtest_CXXFLAGS = \
-	$(CXX_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=2
+	$(CXX_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
 xdelta3regtest_CFLAGS = \
-	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=2
+	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
 xdelta3regtest_LDADD = -lm
 
 man1_MANS = xdelta3.1

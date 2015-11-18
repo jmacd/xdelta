@@ -207,9 +207,6 @@ xd3_decode_section (xd3_stream *stream,
 	  /* No allocation/copy needed */
 	  section->buf = stream->next_in;
 	  sect_take    = section->size;
-
-	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] copy==0 @ 0 %u\n",
-			sect_take, section->alloc1));
 	}
       else
 	{
@@ -1166,8 +1163,8 @@ xd3_decode_input (xd3_stream *stream)
 			  &src->cpyoff_blocks,
 			  &src->cpyoff_blkoff);
 	  
-	  IF_DEBUG1(DP(RINT
-		       "decode cpyoff %"Q"u "
+	  IF_DEBUG2(DP(RINT
+		       "[decode_cpyoff] %"Q"u "
 		       "cpyblkno %"Q"u "
 		       "cpyblkoff %u "
 		       "blksize %u\n",
