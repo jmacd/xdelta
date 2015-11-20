@@ -3750,7 +3750,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   if (srcpos < stream->srcwin_cksum_pos &&
       stream->srcwin_cksum_pos - srcpos > src->max_winsize)
     {
-      IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
+      IF_DEBUG1(DP(RINT "[match_setup] rejected due to src->max_winsize "
 		   "distance eof=%"Q"u srcpos=%"Q"u max_winsz=%"Q"u\n",
 		   xd3_source_eof (src),
 		   srcpos, src->max_winsize));
@@ -3866,6 +3866,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 
  bad:
   stream->match_state  = MATCH_SEARCHING;
+  stream->match_last_srcpos = srcpos;
   return 1;
 }
 
@@ -3956,16 +3957,18 @@ xd3_source_extend_match (xd3_stream *stream)
 	    {
 	      if (ret == XD3_TOOFARBACK)
 		{
-		  IF_DEBUG1(DP(RINT "[maxback] frontier block %u TOOFARBACK block %u\n",
-			       stream->src->frontier_pos >> stream->src->shiftby, tryblk));
+		  IF_DEBUG1(DP(RINT "[maxback] %"Q"u TOOFARBACK: %u\n",
+			       tryblk, stream->match_back));
+
 		  /* the starting position is too far back. */
 		  if (stream->match_back == 0)
 		    {
-		      return 0;
+		      XD3_ASSERT(stream->match_fwd == 0);
+		      goto donefwd;
 		    }
 
 		  /* search went too far back, continue forward. */
-		  break;
+		  goto doneback;
 		}
 
 	      /* could be a XD3_GETSRCBLK failure. */
@@ -4042,6 +4045,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	}
     }
 
+ donefwd:
   stream->match_state = MATCH_SEARCHING;
 
   /* If the match ends short of the last instruction end, we probably

@@ -231,9 +231,8 @@ xd3_decode_section (xd3_stream *stream,
 	    }
 
 	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %u @ %u[%u] size %u\n",
-			section->pos, sect_take, section->alloc1, section->size));
-			
-	  XD3_ASSERT (section->pos + sect_take < section->alloc1);
+			sect_take, section->pos, section->alloc1, section->size));
+	  XD3_ASSERT (section->pos + sect_take <= section->alloc1);
 
 	  memcpy (section->copied1 + section->pos,
 		  stream->next_in,
@@ -249,6 +248,7 @@ xd3_decode_section (xd3_stream *stream,
 
   if (section->pos < section->size)
     {
+      IF_DEBUG1 (DP(RINT "[xd3_decode_section] further input required %u\n", section->size - section->pos));
       stream->msg = "further input required";
       return XD3_INPUT;
     }
