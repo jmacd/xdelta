@@ -11,25 +11,30 @@ const (
 )
 
 func WriteRstreams(t *TestGroup, seed, offset, len int64,
-	first, second io.WriteCloser) {
-	go writeOne(t, seed, 0, len, first)
-	go writeOne(t, seed, offset, len, second)
+	src, tgt io.WriteCloser) {
+	t.Go("src", func (g Goroutine) {
+		go writeOne(g, seed, 0, len, src)
+	})
+	t.Go("tgt", func (g Goroutine) {
+		go writeOne(g, seed, offset, len, tgt)
+	})
 }
 
-func writeOne(t *TestGroup, seed, offset, len int64, stream io.WriteCloser) error {
-	t.WaitGroup.Add(1)
+func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser) {
 	if offset != 0 {
 		// Fill with other random data until the offset
 		if err := writeRand(rand.New(rand.NewSource(^seed)), offset, stream); err != nil {
-			return err
+			g.Panic(err)
 		}
 	}
 	if err := writeRand(rand.New(rand.NewSource(seed)),
 		len - offset, stream); err != nil {
-		return err
+		g.Panic(err)
 	}
-	t.WaitGroup.Done()
-	return stream.Close()
+	if err := stream.Close(); err != nil {
+		g.Panic(err)
+	}
+	g.OK()
 }
 
 func writeRand(r *rand.Rand, len int64, s io.Writer) error {
