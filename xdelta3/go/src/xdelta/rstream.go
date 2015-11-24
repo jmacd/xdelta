@@ -10,17 +10,20 @@ const (
 	blocksize = 16380
 )
 
-func WriteRstreams(t *TestGroup, seed, offset, len int64,
+func WriteRstreams(t *TestGroup, desc string, seed, offset, len int64,
 	src, tgt io.WriteCloser) {
-	t.Go("src", func (g Goroutine) {
-		go writeOne(g, seed, 0, len, src)
+	t.Go("src-write:"+desc, func (g Goroutine) {
+		writeOne(g, seed, 0, len, src, false)
 	})
-	t.Go("tgt", func (g Goroutine) {
-		go writeOne(g, seed, offset, len, tgt)
+	t.Go("tgt-write:"+desc, func (g Goroutine) {
+		writeOne(g, seed, offset, len, tgt, true)
 	})
 }
 
-func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser) {
+func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser, readall bool) {
+	if !readall {
+		g.OK()
+	}
 	if offset != 0 {
 		// Fill with other random data until the offset
 		if err := writeRand(rand.New(rand.NewSource(^seed)), offset, stream); err != nil {

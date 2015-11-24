@@ -10,6 +10,7 @@ type TestGroup struct {
 	*Runner
 	sync.Mutex
 	running []Goroutine
+	errors []error
 	waitChan <-chan bool
 }
 
@@ -31,13 +32,19 @@ func (g *Goroutine) String() string {
 }
 
 func (g *Goroutine) OK() {
-	g.errChan <- nil
-	_ = <- g.errChan
+	if g.errChan != nil {
+		g.errChan <- nil
+		_ = <- g.errChan
+		g.errChan = nil
+	}
 }
 
 func (g *Goroutine) Panic(err error) {
-	g.errChan <- err
-	_ = <- g.errChan
+	fmt.Print("[", g.name, "] ", err, "\n")
+	if g.errChan != nil {
+		g.errChan <- err
+		_ = <- g.errChan
+	}
 	select {}
 }
 
@@ -52,15 +59,24 @@ func (t *TestGroup) Go(name string, f func(Goroutine)) {
 func (t *TestGroup) Wait(g Goroutine) {
 	g.OK()
 	t.Lock()
-	t.waitChan = nil
 	wc := t.waitChan
+	t.waitChan = nil
 	t.Unlock()
 	_ = <- wc
+	t.Lock()
+	errs := t.errors
+	t.Unlock()
+	if len(errs) != 0 {
+		panic(fmt.Sprintln(len(errs), "errors in test"))
+	}
 }
 
 func waitAll(t *TestGroup, wc chan bool) {
 	for {
 		t.Lock()
+		// for _, x := range t.running {
+		// 	fmt.Println("RUNNING", x.name)
+		// }
 		if len(t.running) == 0 {
 			t.Unlock()
 			break
@@ -69,19 +85,18 @@ func waitAll(t *TestGroup, wc chan bool) {
 		t.running = t.running[1:]
 		t.Unlock()
 
-		timeout := make(chan bool, 1)
-		go func() {
-			time.Sleep(1 * time.Second)
-			timeout <- true
-		}()
-		fmt.Println("Waiting on", runner)
+		timeout := time.After(time.Second)
+		// fmt.Println("Waiting on", runner)
 		select {
 		case err := <- runner.errChan:
 			runner.errChan <- err
 			if err != nil {
-				fmt.Println("[G]", runner, err)
+				// fmt.Println("[G]", runner, err)
+				t.Lock()
+				t.errors = append(t.errors, err)
+				t.Unlock()
 			} else {
-				fmt.Println("[G]", runner, "OK")
+				// fmt.Println("[G]", runner, "OK")
 			}
 		case <- timeout:
 			t.Lock()

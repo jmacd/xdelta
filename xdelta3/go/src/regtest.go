@@ -20,7 +20,7 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 	target := "Hello world!"
 	source := "Hello world, nice to meet you!"
 
-	enc, err := t.Exec(p, true, []string{"-evv"})
+	enc, err := t.Exec("encode", p, true, []string{"-evv"})
 	if err != nil {
 		g.Panic(err)
 	}
@@ -34,7 +34,7 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 		g.Panic(err)
 	}
 
-	dec, err := t.Exec(p, true, []string{"-dvv"})
+	dec, err := t.Exec("decode", p, true, []string{"-dvv"})
 	if err != nil {
 		g.Panic(err)
 	}
@@ -59,13 +59,13 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int64) {
 	t, g := xdelta.NewTestGroup(r)
 	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
-	enc, err := t.Exec(p, true, eargs)
+	enc, err := t.Exec("encode", p, true, eargs)
 	if err != nil {
 		g.Panic(err)
 	}
 	
 	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
-	dec, err := t.Exec(p, true, dargs)
+	dec, err := t.Exec("decode", p, true, dargs)
 	if err != nil {
 		g.Panic(err)
 	}
@@ -78,10 +78,8 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 	t.CopyStreams(enc.Stdout, dec.Stdin)
 	t.CompareStreams(dec.Stdout, read, length)
 
-	// TODO: seems possible to use one WriteRstreams call to generate
-	// the source and target for both encoder and decoder.  Why not?
-	xdelta.WriteRstreams(t, seed, offset, length, enc.Srcin, enc.Stdin)
-	xdelta.WriteRstreams(t, seed, offset, length, dec.Srcin, write)
+	xdelta.WriteRstreams(t, "encode", seed, offset, length, enc.Srcin, enc.Stdin)
+	xdelta.WriteRstreams(t, "decode", seed, offset, length, dec.Srcin, write)
 
 	t.Wait(g)
 }
@@ -96,7 +94,9 @@ func main() {
 	prog := &xdelta.Program{xdelta3}
 
 	smokeTest(r, prog)
-	offsetTest(r, prog, 4 << 20, 3 << 20, 5 << 20)
+	for {
+		offsetTest(r, prog, 4 << 20, 3 << 20, 5 << 20)
+	}
 
 	//offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
 }

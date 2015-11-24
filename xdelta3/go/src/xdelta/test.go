@@ -49,6 +49,7 @@ func (t *TestGroup) Drain(f io.ReadCloser, desc string) <-chan []byte {
 
 func (t *TestGroup) Empty(f io.ReadCloser, desc string) {
 	t.Go(desc, func (g Goroutine) {
+		g.OK()
 		s := bufio.NewScanner(f)
 		for s.Scan() {
 			os.Stderr.Write([]byte(fmt.Sprint(desc, ": ", s.Text(), "\n")))
@@ -59,7 +60,6 @@ func (t *TestGroup) Empty(f io.ReadCloser, desc string) {
 			fmt.Println("Empty", desc, err)
 			g.Panic(err)
 		}
-		g.OK()
 	})
 }
 
@@ -126,7 +126,7 @@ func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length in
 	})
 }
 
-func (t *TestGroup) Exec(p *Program, srcfifo bool, flags []string) (*Run, error) {
+func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) (*Run, error) {
 	var err error
 	run := &Run{}
 	args := []string{p.Path}
@@ -162,7 +162,7 @@ func (t *TestGroup) Exec(p *Program, srcfifo bool, flags []string) (*Run, error)
 	if serr := run.Cmd.Start(); serr != nil {
 		return nil, serr
 	}
-	t.Go("exec-wait", func (g Goroutine) {
+	t.Go("exec-wait:" + desc, func (g Goroutine) {
 		if err := run.Cmd.Wait(); err != nil {
 			g.Panic(err)
 		}
