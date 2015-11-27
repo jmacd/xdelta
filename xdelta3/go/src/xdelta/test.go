@@ -47,9 +47,8 @@ func (t *TestGroup) Drain(f io.ReadCloser, desc string) <-chan []byte {
 	return c
 }
 
-func (t *TestGroup) Empty(f io.ReadCloser, desc string) {
-	t.Go(desc, func (g Goroutine) {
-		g.OK()
+func (t *TestGroup) Empty(f io.ReadCloser, desc string) Goroutine {
+	return t.Go("empty:"+desc, func (g Goroutine) {
 		s := bufio.NewScanner(f)
 		for s.Scan() {
 			os.Stderr.Write([]byte(fmt.Sprint(desc, ": ", s.Text(), "\n")))
@@ -57,9 +56,9 @@ func (t *TestGroup) Empty(f io.ReadCloser, desc string) {
 		err := s.Err()
 		f.Close()
 		if err != nil {
-			fmt.Println("Empty", desc, err)
 			g.Panic(err)
 		}
+		g.OK()
 	})
 }
 
@@ -75,8 +74,8 @@ func TestWrite(what string, f io.WriteCloser, b []byte) error {
 	return nil
 }
 
-func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) {
-	t.Go("copy", func(g Goroutine) {
+func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) Goroutine {
+	return t.Go("copy", func(g Goroutine) {
 		_, err := io.Copy(w, r)
 		if err != nil {
 			fmt.Println("CopyS", err)
@@ -96,8 +95,8 @@ func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) {
 	})
 }
 
-func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length int64) {
-	t.Go("compare", func(g Goroutine) {
+func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length int64) Goroutine {
+	return t.Go("compare", func(g Goroutine) {
 		b1 := make([]byte, blocksize)
 		b2 := make([]byte, blocksize)
 		var idx int64
@@ -162,13 +161,11 @@ func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) 
 	if serr := run.Cmd.Start(); serr != nil {
 		return nil, serr
 	}
-	t.Go("exec-wait:" + desc, func (g Goroutine) {
-		if err := run.Cmd.Wait(); err != nil {
-			g.Panic(err)
-		}
-		g.OK()
-	})
 	return run, nil
+}
+
+func (r *Run) Wait() error {
+	return r.Cmd.Wait()
 }
 
 func writeFifo(srcfile string, read io.Reader) error {

@@ -22,6 +22,9 @@ func WriteRstreams(t *TestGroup, desc string, seed, offset, len int64,
 
 func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser, readall bool) {
 	if !readall {
+		// Allow the source-read to fail or block until the process terminates.
+		// This behavior is reserved for the decoder, which is not required to
+		// read the entire source.
 		g.OK()
 	}
 	if offset != 0 {

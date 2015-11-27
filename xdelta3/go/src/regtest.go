@@ -52,7 +52,7 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 	if decoded != target {
 		g.Panic(errors.New("It's not working!!!"))
 	}
-	t.Wait(g)
+	t.Wait(g, enc, dec)
 	fmt.Println("Smoketest pass")
 }
 
@@ -80,8 +80,7 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 
 	xdelta.WriteRstreams(t, "encode", seed, offset, length, enc.Srcin, enc.Stdin)
 	xdelta.WriteRstreams(t, "decode", seed, offset, length, dec.Srcin, write)
-
-	t.Wait(g)
+	t.Wait(g, enc, dec)
 }
 
 func main() {

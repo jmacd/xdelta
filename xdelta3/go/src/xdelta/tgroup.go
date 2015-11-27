@@ -40,7 +40,7 @@ func (g *Goroutine) OK() {
 }
 
 func (g *Goroutine) Panic(err error) {
-	fmt.Print("[", g.name, "] ", err, "\n")
+	fmt.Println(g, err)
 	if g.errChan != nil {
 		g.errChan <- err
 		_ = <- g.errChan
@@ -48,16 +48,17 @@ func (g *Goroutine) Panic(err error) {
 	select {}
 }
 
-func (t *TestGroup) Go(name string, f func(Goroutine)) {
+func (t *TestGroup) Go(name string, f func(Goroutine)) Goroutine {
 	g := Goroutine{name, make(chan error)}
 	t.Lock()
 	t.running = append(t.running, g)
 	t.Unlock()
 	go f(g)
+	return g
 }
 
-func (t *TestGroup) Wait(g Goroutine) {
-	g.OK()
+func (t *TestGroup) Wait(self Goroutine, procs... *Run) {
+	self.OK()
 	t.Lock()
 	wc := t.waitChan
 	t.waitChan = nil
@@ -66,17 +67,22 @@ func (t *TestGroup) Wait(g Goroutine) {
 	t.Lock()
 	errs := t.errors
 	t.Unlock()
+	for _, p := range procs {
+		if err := p.Wait(); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	if len(errs) != 0 {
-		panic(fmt.Sprintln(len(errs), "errors in test"))
+		for _, err := range errs {
+			fmt.Println(err)
+		}
+		panic(fmt.Sprint(len(errs), " errors"))
 	}
 }
 
 func waitAll(t *TestGroup, wc chan bool) {
 	for {
 		t.Lock()
-		// for _, x := range t.running {
-		// 	fmt.Println("RUNNING", x.name)
-		// }
 		if len(t.running) == 0 {
 			t.Unlock()
 			break
@@ -86,17 +92,14 @@ func waitAll(t *TestGroup, wc chan bool) {
 		t.Unlock()
 
 		timeout := time.After(time.Second)
-		// fmt.Println("Waiting on", runner)
+
 		select {
 		case err := <- runner.errChan:
 			runner.errChan <- err
 			if err != nil {
-				// fmt.Println("[G]", runner, err)
 				t.Lock()
 				t.errors = append(t.errors, err)
 				t.Unlock()
-			} else {
-				// fmt.Println("[G]", runner, "OK")
 			}
 		case <- timeout:
 			t.Lock()
