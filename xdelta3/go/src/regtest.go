@@ -78,8 +78,11 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 	t.CopyStreams(enc.Stdout, dec.Stdin)
 	t.CompareStreams(dec.Stdout, read, length)
 
-	xdelta.WriteRstreams(t, "encode", seed, offset, length, enc.Srcin, enc.Stdin)
-	xdelta.WriteRstreams(t, "decode", seed, offset, length, dec.Srcin, write)
+	// The decoder output ("read", above) is compared with the
+	// test-provided output ("write", below).
+	xdelta.WriteRstreams(t, seed, offset, length,
+		t.NewDualWriter(enc.Srcin, dec.Srcin),
+		t.NewDualWriter(dec.Srcin, write))
 	t.Wait(g, enc, dec)
 }
 
@@ -92,10 +95,8 @@ func main() {
 
 	prog := &xdelta.Program{xdelta3}
 
-	smokeTest(r, prog)
-	for {
-		offsetTest(r, prog, 4 << 20, 3 << 20, 5 << 20)
-	}
+	//smokeTest(r, prog)
+	offsetTest(r, prog, 4 << 20, 3 << 20, 5 << 20)
 
 	//offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
 }

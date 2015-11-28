@@ -7,15 +7,15 @@ import (
 )
 
 const (
-	blocksize = 16380
+	blocksize = 1<<20
 )
 
-func WriteRstreams(t *TestGroup, desc string, seed, offset, len int64,
+func WriteRstreams(t *TestGroup, seed, offset, len int64,
 	src, tgt io.WriteCloser) {
-	t.Go("src-write:"+desc, func (g Goroutine) {
+	t.Go("src-write", func (g Goroutine) {
 		writeOne(g, seed, 0, len, src, false)
 	})
-	t.Go("tgt-write:"+desc, func (g Goroutine) {
+	t.Go("tgt-write", func (g Goroutine) {
 		writeOne(g, seed, offset, len, tgt, true)
 	})
 }
@@ -60,9 +60,9 @@ func writeRand(r *rand.Rand, len int64, s io.Writer) error {
 }
 
 func fillRand(r *rand.Rand, blk []byte) {
-	for p := 0; p < blocksize; {
+	for p := 0; p < len(blk); {
 		v := r.Int63()
-		for i := 7; i != 0; i-- {
+		for i := 7; i != 0 && p < len(blk); i-- {
 			blk[p] = byte(v)
 			p++
 			v >>= 8

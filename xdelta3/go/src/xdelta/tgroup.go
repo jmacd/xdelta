@@ -2,6 +2,7 @@ package xdelta
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"time"
 )
@@ -108,4 +109,54 @@ func waitAll(t *TestGroup, wc chan bool) {
 		}
 	}
 	wc <- true
+}
+
+type dualWriter struct {
+	e, d chan []byte
+}
+
+func (d *dualWriter) Write(p []byte) (int, error) {
+	if len(p) != 0 {
+		d.e <- p
+		d.d <- p
+	}
+	return len(p), nil
+}
+
+func (d *dualWriter) Close() error {
+	d.e <- nil
+	d.d <- nil
+	_ = <- d.e
+	_ = <- d.d
+	return nil
+}
+
+func newWriter(c chan []byte, a io.WriteCloser) func (Goroutine) {
+	return func (g Goroutine) {
+		for {
+			d := <- c
+			if d == nil {
+				if err := a.Close(); err != nil {
+					g.Panic(err)
+				}
+				c <- nil
+				g.OK()
+				return
+			}
+			if num, err := a.Write(d); err != nil {
+				g.Panic(err)
+			} else if num != len(d) {
+				g.Panic(fmt.Errorf("Invalid write: %v != %v", num, len(d)))
+			}
+		}
+	}
+}
+
+func (t *TestGroup) NewDualWriter(a1, a2 io.WriteCloser) io.WriteCloser {
+	c1 := make(chan []byte)
+	c2 := make(chan []byte)
+	r := &dualWriter{c1, c2}
+	t.Go("writer0", newWriter(c1, a1))
+	t.Go("writer1", newWriter(c2, a2))
+	return r
 }
