@@ -57,14 +57,20 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 }
 
 func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int64) {
+	// Note there is a strong potential to deadlock or fail due to
+	// a broken test in this test for several reasons:
+	// (a) decoder is not required to read the entire source file
+	// (b) decoder defers open to source file until first window received
+	// (c) open on a fifo blocks until a reader opens
+	// (d) sub-process Wait can invalidate busy file descriptors
 	t, g := xdelta.NewTestGroup(r)
-	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
+	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vvvvvvv", fmt.Sprint("-W", winsize)}
 	enc, err := t.Exec("encode", p, true, eargs)
 	if err != nil {
 		g.Panic(err)
 	}
 	
-	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
+	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vvvvvvv", fmt.Sprint("-W", winsize)}
 	dec, err := t.Exec("decode", p, true, dargs)
 	if err != nil {
 		g.Panic(err)
@@ -79,10 +85,10 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 	t.CompareStreams(dec.Stdout, read, length)
 
 	// The decoder output ("read", above) is compared with the
-	// test-provided output ("write", below).
-	xdelta.WriteRstreams(t, seed, offset, length,
-		t.NewDualWriter(enc.Srcin, dec.Srcin),
-		t.NewDualWriter(dec.Srcin, write))
+	// test-provided output ("write", below).  The following
+	// generates the input and output twice.
+	t.WriteRstreams("encode", seed, offset, length, enc.Srcin, dec.Srcin)
+	t.WriteRstreams("decode", seed, offset, length, dec.Srcin, write)
 	t.Wait(g, enc, dec)
 }
 

@@ -78,17 +78,14 @@ func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) Goroutine {
 	return t.Go("copy", func(g Goroutine) {
 		_, err := io.Copy(w, r)
 		if err != nil {
-			fmt.Println("CopyS", err)
 			g.Panic(err)
 		}
 		err = r.Close()
 		if err != nil {
-			fmt.Println("CloseS1", err)
 			g.Panic(err)
 		}
 		err = w.Close()
 		if err != nil {
-			fmt.Println("CloseS2", err)
 			g.Panic(err)
 		}
 		g.OK()
@@ -157,7 +154,7 @@ func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) 
 	run.Cmd.Path = p.Path
 	run.Cmd.Args = append(args, flags...)
 	run.Cmd.Dir = t.Runner.Testdir
-
+	fmt.Println("Start command", run.Cmd.Args)
 	if serr := run.Cmd.Start(); serr != nil {
 		return nil, serr
 	}
@@ -169,7 +166,9 @@ func (r *Run) Wait() error {
 }
 
 func writeFifo(srcfile string, read io.Reader) error {
+	fmt.Println("About to open", srcfile)
 	fifo, err := os.OpenFile(srcfile, os.O_WRONLY, 0600)
+	fmt.Println("Opened!!!", srcfile)
 	if err != nil {
 		fifo.Close()
 		return err

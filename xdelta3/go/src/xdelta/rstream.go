@@ -3,19 +3,20 @@ package xdelta
 
 import (
 	"io"
+	"fmt"
 	"math/rand"
 )
 
 const (
-	blocksize = 1<<20
+	blocksize = 1<<17
 )
 
-func WriteRstreams(t *TestGroup, seed, offset, len int64,
+func (t *TestGroup) WriteRstreams(desc string, seed, offset, len int64,
 	src, tgt io.WriteCloser) {
-	t.Go("src-write", func (g Goroutine) {
+	t.Go("src-write:"+desc, func (g Goroutine) {
 		writeOne(g, seed, 0, len, src, false)
 	})
-	t.Go("tgt-write", func (g Goroutine) {
+	t.Go("tgt-write:"+desc, func (g Goroutine) {
 		writeOne(g, seed, offset, len, tgt, true)
 	})
 }
@@ -29,31 +30,37 @@ func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser, reada
 	}
 	if offset != 0 {
 		// Fill with other random data until the offset
-		if err := writeRand(rand.New(rand.NewSource(^seed)), offset, stream); err != nil {
+		fmt.Println(g, "pre-offset case", offset)
+		if err := writeRand(g, rand.New(rand.NewSource(^seed)), offset, stream); err != nil {
 			g.Panic(err)
 		}
 	}
-	if err := writeRand(rand.New(rand.NewSource(seed)),
+	fmt.Println(g, "offset case", len - offset)
+	if err := writeRand(g, rand.New(rand.NewSource(seed)),
 		len - offset, stream); err != nil {
 		g.Panic(err)
 	}
+	fmt.Println(g, "closing", len)
 	if err := stream.Close(); err != nil {
 		g.Panic(err)
 	}
 	g.OK()
 }
 
-func writeRand(r *rand.Rand, len int64, s io.Writer) error {
+func writeRand(g Goroutine, r *rand.Rand, len int64, s io.Writer) error {
 	blk := make([]byte, blocksize)
+	fmt.Println(g, "rstream", len)
 	for len > 0 {
 		fillRand(r, blk)
 		c := blocksize
 		if len < blocksize {
 			c = int(len)
 		}
+		fmt.Println(g, "writing...", c, s)
 		if _, err := s.Write(blk[0:c]); err != nil {
 			return err
 		}
+		fmt.Println(g, "...written", c)
 		len -= int64(c)
 	}
 	return nil
