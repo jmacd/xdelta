@@ -87,7 +87,7 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 	// The decoder output ("read", above) is compared with the
 	// test-provided output ("write", below).  The following
 	// generates the input and output twice.
-	t.WriteRstreams("encode", seed, offset, length, enc.Srcin, dec.Srcin)
+	t.WriteRstreams("encode", seed, offset, length, enc.Srcin, enc.Stdin)
 	t.WriteRstreams("decode", seed, offset, length, dec.Srcin, write)
 	t.Wait(g, enc, dec)
 }
