@@ -53,7 +53,6 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 		g.Panic(errors.New("It's not working!!!"))
 	}
 	t.Wait(g, enc, dec)
-	fmt.Println("Smoketest pass")
 }
 
 func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int64) {
@@ -64,13 +63,13 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 	// (c) open on a fifo blocks until a reader opens
 	// (d) sub-process Wait can invalidate busy file descriptors
 	t, g := xdelta.NewTestGroup(r)
-	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vvvvvvv", fmt.Sprint("-W", winsize)}
+	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	enc, err := t.Exec("encode", p, true, eargs)
 	if err != nil {
 		g.Panic(err)
 	}
 	
-	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vvvvvvv", fmt.Sprint("-W", winsize)}
+	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
 	dec, err := t.Exec("decode", p, true, dargs)
 	if err != nil {
 		g.Panic(err)
@@ -101,8 +100,11 @@ func main() {
 
 	prog := &xdelta.Program{xdelta3}
 
-	//smokeTest(r, prog)
+	smokeTest(r, prog)
+	fmt.Println("Smoke-test pass")
+
 	offsetTest(r, prog, 4 << 20, 3 << 20, 5 << 20)
+	fmt.Println("Offset-test pass")
 
 	//offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
 }

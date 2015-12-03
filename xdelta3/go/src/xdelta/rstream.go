@@ -13,15 +13,15 @@ const (
 
 func (t *TestGroup) WriteRstreams(desc string, seed, offset, len int64,
 	src, tgt io.WriteCloser) {
-	t.Go("src-write:"+desc, func (g Goroutine) {
+	t.Go("src-write:"+desc, func (g *Goroutine) {
 		writeOne(g, seed, 0, len, src, false)
 	})
-	t.Go("tgt-write:"+desc, func (g Goroutine) {
+	t.Go("tgt-write:"+desc, func (g *Goroutine) {
 		writeOne(g, seed, offset, len, tgt, true)
 	})
 }
 
-func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser, readall bool) {
+func writeOne(g *Goroutine, seed, offset, len int64, stream io.WriteCloser, readall bool) {
 	if !readall {
 		// Allow the source-read to fail or block until the process terminates.
 		// This behavior is reserved for the decoder, which is not required to
@@ -40,27 +40,23 @@ func writeOne(g Goroutine, seed, offset, len int64, stream io.WriteCloser, reada
 		len - offset, stream); err != nil {
 		g.Panic(err)
 	}
-	fmt.Println(g, "closing", len)
 	if err := stream.Close(); err != nil {
 		g.Panic(err)
 	}
 	g.OK()
 }
 
-func writeRand(g Goroutine, r *rand.Rand, len int64, s io.Writer) error {
+func writeRand(g *Goroutine, r *rand.Rand, len int64, s io.Writer) error {
 	blk := make([]byte, blocksize)
-	fmt.Println(g, "rstream", len)
 	for len > 0 {
 		fillRand(r, blk)
 		c := blocksize
 		if len < blocksize {
 			c = int(len)
 		}
-		fmt.Println(g, "writing...", c, s)
 		if _, err := s.Write(blk[0:c]); err != nil {
 			return err
 		}
-		fmt.Println(g, "...written", c)
 		len -= int64(c)
 	}
 	return nil

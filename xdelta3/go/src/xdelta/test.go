@@ -35,9 +35,8 @@ type Run struct {
 
 func (t *TestGroup) Drain(f io.ReadCloser, desc string) <-chan []byte {
 	c := make(chan []byte)
-	t.Go(desc, func(g Goroutine) {
+	t.Go(desc, func(g *Goroutine) {
 		if b, err := ioutil.ReadAll(f); err != nil {
-			fmt.Println("Drain", err)
 			g.Panic(err)
 		} else {
 			c <- b
@@ -47,8 +46,8 @@ func (t *TestGroup) Drain(f io.ReadCloser, desc string) <-chan []byte {
 	return c
 }
 
-func (t *TestGroup) Empty(f io.ReadCloser, desc string) Goroutine {
-	return t.Go("empty:"+desc, func (g Goroutine) {
+func (t *TestGroup) Empty(f io.ReadCloser, desc string) *Goroutine {
+	return t.Go("empty:"+desc, func (g *Goroutine) {
 		s := bufio.NewScanner(f)
 		for s.Scan() {
 			os.Stderr.Write([]byte(fmt.Sprint(desc, ": ", s.Text(), "\n")))
@@ -64,18 +63,16 @@ func (t *TestGroup) Empty(f io.ReadCloser, desc string) Goroutine {
 
 func TestWrite(what string, f io.WriteCloser, b []byte) error {
 	if _, err := f.Write(b); err != nil {
-		fmt.Println("Write", err)
 		return errors.New(fmt.Sprint(what, ":", err))
 	}
 	if err := f.Close(); err != nil {
-		fmt.Println("Close", err)
 		return errors.New(fmt.Sprint(what, ":", err))
 	}
 	return nil
 }
 
-func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) Goroutine {
-	return t.Go("copy", func(g Goroutine) {
+func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) *Goroutine {
+	return t.Go("copy", func(g *Goroutine) {
 		_, err := io.Copy(w, r)
 		if err != nil {
 			g.Panic(err)
@@ -92,8 +89,8 @@ func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) Goroutine {
 	})
 }
 
-func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length int64) Goroutine {
-	return t.Go("compare", func(g Goroutine) {
+func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length int64) *Goroutine {
+	return t.Go("compare", func(g *Goroutine) {
 		b1 := make([]byte, blocksize)
 		b2 := make([]byte, blocksize)
 		var idx int64
@@ -103,11 +100,9 @@ func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length in
 				c = int(length)
 			}
 			if _, err := io.ReadFull(r1, b1[0:c]); err != nil {
-				fmt.Println("ReadFull1", err)
 				g.Panic(err)
 			}
 			if _, err := io.ReadFull(r2, b2[0:c]); err != nil {
-				fmt.Println("ReadFull2", err)
 				g.Panic(err)
 			}
 			if bytes.Compare(b1[0:c], b2[0:c]) != 0 {
@@ -166,9 +161,7 @@ func (r *Run) Wait() error {
 }
 
 func writeFifo(srcfile string, read io.Reader) error {
-	fmt.Println("About to open", srcfile)
 	fifo, err := os.OpenFile(srcfile, os.O_WRONLY, 0600)
-	fmt.Println("Opened!!!", srcfile)
 	if err != nil {
 		fifo.Close()
 		return err
