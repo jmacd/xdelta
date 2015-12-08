@@ -15,8 +15,8 @@ const (
 	seed = 1422253499919909358
 )
 
-func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
-	t, g := xdelta.NewTestGroup(r)
+func smokeTest(t *xdelta.TestGroup, p *xdelta.Program) {
+	g := t.Main()
 	target := "Hello world!"
 	source := "Hello world, nice to meet you!"
 
@@ -55,32 +55,29 @@ func smokeTest(r *xdelta.Runner, p *xdelta.Program) {
 	t.Wait(g, enc, dec)
 }
 
-func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int64) {
-	// Note there is a strong potential to deadlock or fail due to
-	// a broken test in this test for several reasons:
-	// (a) decoder is not required to read the entire source file
-	// (b) decoder defers open to source file until first window received
-	// (c) open on a fifo blocks until a reader opens
-	// (d) sub-process Wait can invalidate busy file descriptors
-	t, g := xdelta.NewTestGroup(r)
-	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
+func offsetTest(t *xdelta.TestGroup, p *xdelta.Program, offset, bufsize, length int64) {
+	g := t.Main()
+	eargs := []string{"-e", "-0", fmt.Sprint("-B", bufsize), "-q", fmt.Sprint("-W", winsize)}
 	enc, err := t.Exec("encode", p, true, eargs)
 	if err != nil {
 		g.Panic(err)
 	}
 	
-	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-vv", fmt.Sprint("-W", winsize)}
+	dargs := []string{"-d", fmt.Sprint("-B", bufsize), "-q", fmt.Sprint("-W", winsize)}
 	dec, err := t.Exec("decode", p, true, dargs)
 	if err != nil {
 		g.Panic(err)
 	}
 
+	// The pipe used to read the decoder output and compare
+	// against the target.
 	read, write := io.Pipe()
 
 	t.Empty(enc.Stderr, "encode")
 	t.Empty(dec.Stderr, "decode")
 
-	t.CopyStreams(enc.Stdout, dec.Stdin)
+	var encoded_size int64
+	t.CopyStreams(enc.Stdout, dec.Stdin, &encoded_size)
 	t.CompareStreams(dec.Stdout, read, length)
 
 	// The decoder output ("read", above) is compared with the
@@ -89,6 +86,12 @@ func offsetTest(r *xdelta.Runner, p *xdelta.Program, bufsize, offset, length int
 	t.WriteRstreams("encode", seed, offset, length, enc.Srcin, enc.Stdin)
 	t.WriteRstreams("decode", seed, offset, length, dec.Srcin, write)
 	t.Wait(g, enc, dec)
+
+	expect := bufsize - offset
+	if float64(encoded_size) < (0.95 * float64(expect)) ||
+		float64(encoded_size) > (1.05 * float64(expect)) {
+		t.Fail("encoded size should be ~=", expect, ", actual ", encoded_size)
+	}
 }
 
 func main() {
@@ -100,11 +103,10 @@ func main() {
 
 	prog := &xdelta.Program{xdelta3}
 
-	smokeTest(r, prog)
-	fmt.Println("Smoke-test pass")
+	r.RunTest("smoketest", func(tg *xdelta.TestGroup) { smokeTest(tg, prog) })
 
-	offsetTest(r, prog, 4 << 20, 3 << 20, 5 << 20)
-	fmt.Println("Offset-test pass")
-
-	//offsetTest(r, xdelta.NewTestGroup(), prog, 1 << 31, 1 << 32, 1 << 33)
+	for i := uint(20); i <= 30; i += 1 {
+		r.RunTest(fmt.Sprint("offset", i), func(t *xdelta.TestGroup) {
+			offsetTest(t, prog, 1 << i, 2 << i, 3 << i) })
+	}
 }

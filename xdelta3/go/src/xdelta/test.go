@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"sync/atomic"
 
@@ -19,19 +18,6 @@ var (
 	tmpDir = "/tmp"
 	srcSeq int64
 )
-
-type Program struct {
-	Path string
-}
-
-type Run struct {
-	Cmd exec.Cmd
-	Srcfile string
-	Stdin io.WriteCloser
-	Srcin io.WriteCloser
-	Stdout io.ReadCloser
-	Stderr io.ReadCloser
-}
 
 func (t *TestGroup) Drain(f io.ReadCloser, desc string) <-chan []byte {
 	c := make(chan []byte)
@@ -71,9 +57,9 @@ func TestWrite(what string, f io.WriteCloser, b []byte) error {
 	return nil
 }
 
-func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) *Goroutine {
+func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser, written *int64) *Goroutine {
 	return t.Go("copy", func(g *Goroutine) {
-		_, err := io.Copy(w, r)
+		nwrite, err := io.Copy(w, r)
 		if err != nil {
 			g.Panic(err)
 		}
@@ -86,6 +72,7 @@ func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser) *Goroutine {
 			g.Panic(err)
 		}
 		g.OK()
+		*written = nwrite
 	})
 }
 
@@ -127,12 +114,9 @@ func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) 
 		if err = unix.Mkfifo(run.Srcfile, 0600); err != nil {
 			return nil, err
 		}
-		// Because OpenFile blocks on the Fifo until the reader
-		// arrives, a pipe to defer open
 		read, write := io.Pipe()
+		t.writeFifo(run.Srcfile, read)
 		run.Srcin = write
-
-		go writeFifo(run.Srcfile, read)
 		args = append(args, "-s")
 		args = append(args, run.Srcfile)
 	}
@@ -156,19 +140,24 @@ func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) 
 	return run, nil
 }
 
-func (r *Run) Wait() error {
-	return r.Cmd.Wait()
+func (t *TestGroup) Fail(v ...interface{}) {
+	panic(fmt.Sprintln(v...))
 }
 
-func writeFifo(srcfile string, read io.Reader) error {
-	fifo, err := os.OpenFile(srcfile, os.O_WRONLY, 0600)
-	if err != nil {
-		fifo.Close()
-		return err
-	}
-	if _, err := io.Copy(fifo, read); err != nil {
-		fifo.Close()
-		return err
-	}
-	return fifo.Close()
+func (t *TestGroup) writeFifo(srcfile string, read io.Reader) *Goroutine {
+	return t.Go("compare", func(g *Goroutine) {
+		fifo, err := os.OpenFile(srcfile, os.O_WRONLY, 0600)
+		if err != nil {
+			fifo.Close()
+			g.Panic(err)
+		}
+		if _, err := io.Copy(fifo, read); err != nil {
+			fifo.Close()
+			g.Panic(err)
+		}
+		if err := fifo.Close(); err != nil {
+			g.Panic(err)
+		}
+		g.OK()
+	})
 }

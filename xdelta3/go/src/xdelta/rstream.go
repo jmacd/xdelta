@@ -3,7 +3,6 @@ package xdelta
 
 import (
 	"io"
-	"fmt"
 	"math/rand"
 )
 
@@ -14,10 +13,10 @@ const (
 func (t *TestGroup) WriteRstreams(desc string, seed, offset, len int64,
 	src, tgt io.WriteCloser) {
 	t.Go("src-write:"+desc, func (g *Goroutine) {
-		writeOne(g, seed, 0, len, src, false)
+		writeOne(g, seed, 0, len, tgt, false)
 	})
 	t.Go("tgt-write:"+desc, func (g *Goroutine) {
-		writeOne(g, seed, offset, len, tgt, true)
+		writeOne(g, seed, offset, len, src, true)
 	})
 }
 
@@ -30,12 +29,10 @@ func writeOne(g *Goroutine, seed, offset, len int64, stream io.WriteCloser, read
 	}
 	if offset != 0 {
 		// Fill with other random data until the offset
-		fmt.Println(g, "pre-offset case", offset)
 		if err := writeRand(g, rand.New(rand.NewSource(^seed)), offset, stream); err != nil {
 			g.Panic(err)
 		}
 	}
-	fmt.Println(g, "offset case", len - offset)
 	if err := writeRand(g, rand.New(rand.NewSource(seed)),
 		len - offset, stream); err != nil {
 		g.Panic(err)

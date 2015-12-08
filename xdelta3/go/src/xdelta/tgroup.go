@@ -2,11 +2,13 @@ package xdelta
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
 )
 
 type TestGroup struct {
 	*Runner
+	main *Goroutine
 	sync.Mutex
 	sync.WaitGroup
 	running []*Goroutine
@@ -18,14 +20,6 @@ type Goroutine struct {
 	*TestGroup
 	name string
 	done bool
-}
-
-func NewTestGroup(r *Runner) (*TestGroup, *Goroutine) {
-	tg := &TestGroup{Runner: r}
-	tg.WaitGroup.Add(1)
-	g0 := &Goroutine{tg, "main", false}
-	tg.running = append(tg.running, g0)
-	return tg, g0
 }
 
 func (g *Goroutine) String() string {
@@ -59,8 +53,10 @@ func (g *Goroutine) OK() {
 
 func (g *Goroutine) Panic(err error) {
 	g.finish(err)
-	select {}
+	runtime.Goexit()
 }
+
+func (t *TestGroup) Main() *Goroutine { return t.main }
 
 func (t *TestGroup) Go(name string, f func(*Goroutine)) *Goroutine {
 	g := &Goroutine{t, name, false}
@@ -87,7 +83,6 @@ func (t *TestGroup) Wait(self *Goroutine, procs... *Run) {
 		fmt.Println("(ERROR)", err)
 	}
 	if len(t.errors) != 0 {
-		panic(fmt.Sprintf("Test failed with", len(t.errors), "errors"))
+		t.Fail("Test failed with", len(t.errors), "errors")
 	}
 }
-
