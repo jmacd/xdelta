@@ -207,6 +207,8 @@ xd3_decode_section (xd3_stream *stream,
 	  /* No allocation/copy needed */
 	  section->buf = stream->next_in;
 	  sect_take    = section->size;
+	  IF_DEBUG1 (DP(RINT "[xd3_decode_section] zerocopy %u @ %u avail %u\n",
+			sect_take, section->pos, stream->avail_in));
 	}
       else
 	{
@@ -230,8 +232,8 @@ xd3_decode_section (xd3_stream *stream,
 	      section->buf = section->copied1;
 	    }
 
-	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %u @ %u[%u] size %u\n",
-			sect_take, section->pos, section->alloc1, section->size));
+	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %u @ %u [need %u] avail %u\n",
+			sect_take, section->pos, sect_need, stream->avail_in));
 	  XD3_ASSERT (section->pos + sect_take <= section->alloc1);
 
 	  memcpy (section->copied1 + section->pos,

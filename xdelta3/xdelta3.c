@@ -1927,7 +1927,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
       ret = stream->getblk (stream, source, blkno);
       if (ret != 0)
 	{
-	  IF_DEBUG1 (DP(RINT "[getblk] app error blkno %"Q"u: %s\n",
+	  IF_DEBUG2 (DP(RINT "[getblk] app error blkno %"Q"u: %s\n",
 			blkno, xd3_strerror (ret)));
 	  return ret;
 	}
@@ -3750,13 +3750,17 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
   if (srcpos < stream->srcwin_cksum_pos &&
       stream->srcwin_cksum_pos - srcpos > src->max_winsize)
     {
-      IF_DEBUG1(DP(RINT "[match_setup] rejected due to src->max_winsize "
+      IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
 		   "distance eof=%"Q"u srcpos=%"Q"u max_winsz=%"Q"u\n",
 		   xd3_source_eof (src),
 		   srcpos, src->max_winsize));
       goto bad;
     }
 
+  /* There are cases where the above test does not reject a match that
+   * will experience XD3_TOOFARBACK at the first xd3_getblk call
+   * because the input may have advanced up to one block beyond the
+   * actual EOF. */
   IF_DEBUG2(DP(RINT "[match_setup] %"Q"u srcpos %"Q"u, "
 	       "src->max_winsize %"Q"u\n",
 	       stream->total_in + stream->input_position,
@@ -3929,9 +3933,6 @@ xd3_source_extend_match (xd3_stream *stream)
   usize_t tryrem;    /* tryrem is the number of matchable bytes */
   usize_t matched;
 
-  IF_DEBUG2(DP(RINT "[extend match] srcpos %"Q"u\n",
-	       stream->match_srcpos));
-
   XD3_ASSERT (src != NULL);
 
   /* Does it make sense to compute backward match AFTER forward match? */
@@ -3957,8 +3958,10 @@ xd3_source_extend_match (xd3_stream *stream)
 	    {
 	      if (ret == XD3_TOOFARBACK)
 		{
-		  IF_DEBUG1(DP(RINT "[maxback] %"Q"u TOOFARBACK: %u\n",
-			       tryblk, stream->match_back));
+		  IF_DEBUG2(DP(RINT "[maxback] %"Q"u TOOFARBACK: %u INP %"Q"u CKSUM %"Q"u\n",
+			       tryblk, stream->match_back,
+			       stream->total_in + stream->input_position,
+			       stream->srcwin_cksum_pos));
 
 		  /* the starting position is too far back. */
 		  if (stream->match_back == 0)
@@ -4014,7 +4017,14 @@ xd3_source_extend_match (xd3_stream *stream)
 
       if ((ret = xd3_getblk (stream, tryblk)))
 	{
-	  XD3_ASSERT (ret != XD3_TOOFARBACK);
+	  if (ret == XD3_TOOFARBACK)
+	    {
+	      IF_DEBUG2(DP(RINT "[maxfwd] %"Q"u TOOFARBACK: %u INP %"Q"u CKSUM %"Q"u\n",
+			   tryblk, stream->match_fwd,
+			   stream->total_in + stream->input_position,
+			   stream->srcwin_cksum_pos));
+	      goto donefwd;
+	    }
 
 	  /* could be a XD3_GETSRCBLK failure. */
 	  return ret;
@@ -4047,6 +4057,11 @@ xd3_source_extend_match (xd3_stream *stream)
 
  donefwd:
   stream->match_state = MATCH_SEARCHING;
+
+  IF_DEBUG2(DP(RINT "[extend match] input %"Q"u srcpos %"Q"u len %u\n",
+	       stream->input_position + stream->total_in,
+	       stream->match_srcpos,
+	       stream->match_fwd));
 
   /* If the match ends short of the last instruction end, we probably
    * don't want it.  There is the possibility that a copy ends short
@@ -4099,8 +4114,9 @@ xd3_source_extend_match (xd3_stream *stream)
 
       IF_DEBUG2 ({
 	static int x = 0;
-	DP(RINT "[source match:%d] <inp %"Q"u %"Q"u>  <src %"Q"u %"Q"u> (%s) [ %u bytes ]\n",
+	DP(RINT "[source match:%d] length %u <inp %"Q"u %"Q"u>  <src %"Q"u %"Q"u> (%s) [ %u bytes ]\n",
 	   x++,
+	   match_length,
 	   stream->total_in + target_position,
 	   stream->total_in + target_position + match_length,
 	   match_position,
