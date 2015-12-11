@@ -29,6 +29,11 @@ func (g *Goroutine) String() string {
 func (g *Goroutine) finish(err error) {
 	wait := false
 	tg := g.TestGroup
+	sbuf := make([]byte, 4096)
+	sbuf = sbuf[0:runtime.Stack(sbuf, false)]
+	if err != nil {
+		err = fmt.Errorf("%v:%v:%v", g.name, err, string(sbuf))
+	}
 	tg.Lock()
 	if g.done {
 		if err != nil {
@@ -58,6 +63,8 @@ func (g *Goroutine) Panic(err error) {
 
 func (t *TestGroup) Main() *Goroutine { return t.main }
 
+func (t *TestGroup) Panic(err error) { t.Main().Panic(err) }
+
 func (t *TestGroup) Go(name string, f func(*Goroutine)) *Goroutine {
 	g := &Goroutine{t, name, false}
 	t.Lock()
@@ -68,8 +75,8 @@ func (t *TestGroup) Go(name string, f func(*Goroutine)) *Goroutine {
 	return g
 }
 
-func (t *TestGroup) Wait(self *Goroutine, procs... *Run) {
-	self.OK()
+func (t *TestGroup) Wait(procs... *Run) {
+	t.Main().OK()
 	t.WaitGroup.Wait()
 	for _, p := range procs {
 		if err := p.Wait(); err != nil {

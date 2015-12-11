@@ -47,14 +47,16 @@ func (t *TestGroup) Empty(f io.ReadCloser, desc string) *Goroutine {
 	})
 }
 
-func TestWrite(what string, f io.WriteCloser, b []byte) error {
-	if _, err := f.Write(b); err != nil {
-		return errors.New(fmt.Sprint(what, ":", err))
-	}
-	if err := f.Close(); err != nil {
-		return errors.New(fmt.Sprint(what, ":", err))
-	}
-	return nil
+func (t *TestGroup) TestWrite(what string, f io.WriteCloser, b []byte) *Goroutine {
+	return t.Go("write", func(g *Goroutine) {
+		if _, err := f.Write(b); err != nil {
+			g.Panic(err)
+		}
+		if err := f.Close(); err != nil {
+			g.Panic(err)
+		}
+		g.OK()
+	})
 }
 
 func (t *TestGroup) CopyStreams(r io.ReadCloser, w io.WriteCloser, written *int64) *Goroutine {
@@ -104,7 +106,7 @@ func (t *TestGroup) CompareStreams(r1 io.ReadCloser, r2 io.ReadCloser, length in
 	})
 }
 
-func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) (*Run, error) {
+func (t *TestGroup) Exec(desc string, p Program, srcfifo bool, flags []string) (*Run, error) {
 	var err error
 	run := &Run{}
 	args := []string{p.Path}
@@ -133,7 +135,6 @@ func (t *TestGroup) Exec(desc string, p *Program, srcfifo bool, flags []string) 
 	run.Cmd.Path = p.Path
 	run.Cmd.Args = append(args, flags...)
 	run.Cmd.Dir = t.Runner.Testdir
-	fmt.Println("Start command", run.Cmd.Args)
 	if serr := run.Cmd.Start(); serr != nil {
 		return nil, serr
 	}
