@@ -4388,8 +4388,10 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
    * compression where data is deleted near the beginning of the file.
    * 
    * The new policy is slower and may benefit, or slightly worsen,
-   * compression performance. TODO test these changes in 3.0.10 to
-   * 3.0.11 releases. */
+   * compression performance.  As shown by go/src/regtest.go (see the
+   * 64bithash branch), this policy does worsen compression, somewhat
+   * more significantly than hoped for.  TODO revert.
+   */
   if (absolute_input_pos < stream->src->max_winsize / 2)
     {
       target_cksum_pos = stream->src->max_winsize;
