@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"path"
 	"os"
+	"time"
 
 	"xdelta"
 )
@@ -65,6 +67,7 @@ type PairTest struct {
 
 	// Output
 	encoded int64
+	duration time.Duration
 }
 
 // P is the test program, Q is the reference version.
@@ -94,14 +97,22 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
 			largest := uint(20)
 			for ; largest <= 31 && 1<<largest < meansize; largest++ {}
 
-			// 1/8, 1/4, 1/2, and 1/1 of the power-of-2 rounded-up mean size
-			for b := largest /* - 3*/; b <= largest; b++ {
+			// 1/4, 1/2, and 1/1 of the power-of-2 rounded-up mean size
+			for b := largest - 2; b <= largest; b++ {
 				c1 := cfg
 				c1.srcbuf_size = 1<<b
-				ptest := &PairTest{c1, p, in1, in2, -1}
+				ptest := &PairTest{c1, p, in1, in2, -1, 0}
 				ptest.datasetPairTest(t, 1<<b);
-				qtest := &PairTest{c1, q, in1, in2, -1}
+				qtest := &PairTest{c1, q, in1, in2, -1, 0}
 				qtest.datasetPairTest(t, 1<<b)
+
+ 				fmt.Printf("%s, %s: %+d / %d bytes, %s / %s [B=%d]\n",
+					path.Base(in1), path.Base(in2),
+					ptest.encoded - qtest.encoded,
+					qtest.encoded,
+					(ptest.duration - qtest.duration).String(),
+					qtest.duration,
+					1<<b)
 			}
 		}
 	}
@@ -137,7 +148,7 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 
 	t.Wait(enc, dec)
 
-	fmt.Println("PairTest", pt, "success")
+	pt.duration = enc.Cmd.ProcessState.UserTime()
 }
 
 func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, length int64) {
