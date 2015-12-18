@@ -67,7 +67,8 @@ type PairTest struct {
 
 	// Output
 	encoded int64
-	duration time.Duration
+	encDuration time.Duration
+	decDuration time.Duration
 }
 
 // P is the test program, Q is the reference version.
@@ -101,17 +102,19 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
 			for b := largest - 2; b <= largest; b++ {
 				c1 := cfg
 				c1.srcbuf_size = 1<<b
-				ptest := &PairTest{c1, p, in1, in2, -1, 0}
+				ptest := &PairTest{c1, p, in1, in2, -1, 0, 0}
 				ptest.datasetPairTest(t, 1<<b);
-				qtest := &PairTest{c1, q, in1, in2, -1, 0}
+				qtest := &PairTest{c1, q, in1, in2, -1, 0, 0}
 				qtest.datasetPairTest(t, 1<<b)
 
- 				fmt.Printf("%s, %s: %+d / %d bytes, %s / %s [B=%d]\n",
+ 				fmt.Printf("%s, %s: %+d/%db, E:%s/%s D:%s/%s [B=%d]\n",
 					path.Base(in1), path.Base(in2),
 					ptest.encoded - qtest.encoded,
 					qtest.encoded,
-					(ptest.duration - qtest.duration).String(),
-					qtest.duration,
+					(ptest.encDuration - qtest.encDuration).String(),
+					qtest.encDuration,
+					(ptest.decDuration - qtest.decDuration).String(),
+					qtest.decDuration,
 					1<<b)
 			}
 		}
@@ -120,14 +123,15 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
 
 func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 	cfg := pt.Config
-	eargs := []string{"-e", fmt.Sprint("-B", cfg.srcbuf_size), "-q",
-		fmt.Sprint("-W", cfg.window_size), "-s", pt.source, pt.target}
+	eargs := []string{"-e", fmt.Sprint("-B", cfg.srcbuf_size), // "-q",
+		fmt.Sprint("-W", cfg.window_size), "-s", pt.source,
+		"-I0", pt.target}
 	enc, err := t.Exec("encode", pt.program, false, eargs)
 	if err != nil {
 		t.Panic(err)
 	}
 
-	dargs := []string{"-dc", fmt.Sprint("-B", cfg.srcbuf_size), "-q",
+	dargs := []string{"-dc", fmt.Sprint("-B", cfg.srcbuf_size), //"-q",
 		fmt.Sprint("-W", cfg.window_size), "-s", pt.source}
 	dec, err := t.Exec("decode", pt.program, false, dargs)
 	if err != nil {
@@ -148,7 +152,8 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 
 	t.Wait(enc, dec)
 
-	pt.duration = enc.Cmd.ProcessState.UserTime()
+	pt.decDuration = dec.Cmd.ProcessState.UserTime()
+	pt.encDuration = enc.Cmd.ProcessState.UserTime()
 }
 
 func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, length int64) {
@@ -204,19 +209,18 @@ func main() {
 
 	r.RunTest("smoketest", func(t *xdelta.TestGroup) { cfg.smokeTest(t, prog) })
 
+	// for i := uint(19); i <= 30; i += 1 {
+	// 	// The arguments to offsetTest are offset, source
+	// 	// window size, and file size. The source window size
+	// 	// is (2 << i) and (in the 3.0x release branch) is
+	// 	// limited to 2^31, so the the greatest value of i is
+	// 	// 30.
+	// 	cfg.srcbuf_size = 2 << i
+	// 	r.RunTest(fmt.Sprint("offset", i), func(t *xdelta.TestGroup) {
+	// 		cfg.offsetTest(t, prog, 1 << i, 3 << i) })
+	// }
+	
 	comp := xdelta.Program{xcompare}
 
 	r.RunTest("dataset", func(t *xdelta.TestGroup) { cfg.datasetTest(t, prog, comp) })
-
-	for i := uint(19); i <= 30; i += 1 {
-		// The arguments to offsetTest are offset, source
-		// window size, and file size. The source window size
-		// is (2 << i) and (in the 3.0x release branch) is
-		// limited to 2^31, so the the greatest value of i is
-		// 30.
-		cfg.srcbuf_size = 2 << i
-		r.RunTest(fmt.Sprint("offset", i), func(t *xdelta.TestGroup) {
-			cfg.offsetTest(t, prog, 1 << i, 3 << i) })
-	}
-	
 }
