@@ -3852,7 +3852,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	  stream->match_maxfwd = srcavail;
 	}
 
-      IF_DEBUG1(DP(RINT
+      IF_DEBUG2(DP(RINT
 		   "[match_setup] srcpos %"Q"u (tgtpos %"Q"u) "
 		   "restricted maxback %u maxfwd %u\n",
 		   srcpos,
@@ -4387,11 +4387,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
    * results in better compression for very-similar inputs, but worse
    * compression where data is deleted near the beginning of the file.
    * 
-   * The new policy is slower and may benefit, or slightly worsen,
-   * compression performance.  As shown by go/src/regtest.go (see the
-   * 64bithash branch), this policy does worsen compression, somewhat
-   * more significantly than hoped for.  TODO revert.
-   */
+   * The new policy is simpler, somewhat slower and can benefit, or
+   * slightly worsen, compression performance. */
   if (absolute_input_pos < stream->src->max_winsize / 2)
     {
       target_cksum_pos = stream->src->max_winsize;
@@ -4401,10 +4398,6 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       target_cksum_pos = absolute_input_pos + stream->src->max_winsize / 2;
       target_cksum_pos &= ~stream->src->maskby;
     }
-  
-  /* If srcwin_cksum_pos is already greater, wait until the difference
-   * is met. */
-  XD3_ASSERT (stream->srcwin_cksum_pos <= target_cksum_pos);
 
   /* A long match may have extended past srcwin_cksum_pos.  Don't
    * start checksumming already-matched source data. */
@@ -4513,8 +4506,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
   /* How long until this function should be called again. */
   XD3_ASSERT(stream->srcwin_cksum_pos >= target_cksum_pos);
 
-  *next_move_point = stream->input_position + stream->src->blksize / 2 -
-    (stream->input_position & stream->src->maskby);
+  *next_move_point = stream->input_position +
+    stream->src->blksize -
+    ((stream->srcwin_cksum_pos - target_cksum_pos) & stream->src->maskby);
   
   IF_DEBUG2 (DP(RINT
 		"[srcwin_move_point] finished T=%"Q"u "
