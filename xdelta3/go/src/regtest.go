@@ -5,15 +5,16 @@ import (
 	"io"
 	"path"
 	"os"
+	"sort"
 	"time"
 
 	"xdelta"
 )
 
 const (
-	xdataset = "/Users/jmacd/src/testdata"
-	xcompare = "/Users/jmacd/src/xdelta3-3.0.10/xdelta3"
-	xdelta3 = "/Users/jmacd/src/xdelta-devel/xdelta3/xdelta3"
+	xdataset = "/volume/home/jmacd/src/testdata"
+	xcompare = "/volume/home/jmacd/src/xdelta3-3.0.10/xdelta3"
+	xdelta3 = "/volume/home/jmacd/src/xdelta-devel/xdelta3/xdelta3"
 	seed = 1422253499919909358
 )
 
@@ -34,10 +35,12 @@ func (c Config) smokeTest(t *xdelta.TestGroup, p xdelta.Program) {
 
 	enc, err := t.Exec("encode", p, true, []string{"-e"})
 	if err != nil {
+		fmt.Println(err)
 		t.Panic(err)
 	}
 	dec, err := t.Exec("decode", p, true, []string{"-d"})
 	if err != nil {
+		fmt.Println(err)
 		t.Panic(err)
 	}
 
@@ -91,6 +94,7 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
 		total += d.Size()
 	}
 	meansize := total / int64(len(dents))
+	sort.Strings(paths)
 	for _, in1 := range paths {
 		for _, in2 := range paths {
 			if in1 == in2 { continue }
@@ -125,14 +129,15 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 	cfg := pt.Config
 	eargs := []string{"-e", fmt.Sprint("-B", cfg.srcbuf_size), // "-q",
 		fmt.Sprint("-W", cfg.window_size), "-s", pt.source,
-		"-I0", pt.target}
+		"-I0", "-S", "none", pt.target}
 	enc, err := t.Exec("encode", pt.program, false, eargs)
 	if err != nil {
 		t.Panic(err)
 	}
 
 	dargs := []string{"-dc", fmt.Sprint("-B", cfg.srcbuf_size), //"-q",
-		fmt.Sprint("-W", cfg.window_size), "-s", pt.source}
+		fmt.Sprint("-W", cfg.window_size), "-s", pt.source,
+		"-S", "none"}
 	dec, err := t.Exec("decode", pt.program, false, dargs)
 	if err != nil {
 		t.Panic(err)
