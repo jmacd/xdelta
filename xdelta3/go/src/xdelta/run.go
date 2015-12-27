@@ -52,17 +52,16 @@ func (r *Runner) Cleanup() {
 
 func (r *Runner) RunTest(name string, f func (t *TestGroup)) {
 	t := r.newTestGroup(name)
-	var rec interface{}
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("PANIC in ", name, ": ", r)
-			rec = r
-		} else {
-			// Goexit
-		}
+	c := make(chan interface{})
+	go func() {
+		defer func() {
+			c <- recover()
+		}()
+		fmt.Println("Testing", name, "...")
+		f(t)
+		c <- nil
 	}()
-	fmt.Println("Testing", name, "...")
-	f(t)
+	rec := <- c
 	if t.errors == nil && rec == nil {
 		fmt.Println("Success:", name)
 	} else {
