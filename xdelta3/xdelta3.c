@@ -4395,7 +4395,14 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     }
   else
     {
-      target_cksum_pos = absolute_input_pos + stream->src->max_winsize / 2;
+      /* TODO: The addition of 2 blocks here is arbitrary.  Do a
+       * better job of stream alignment based on observed source copy
+       * addresses, and when both input sizes are known, the
+       * difference in size.
+       */
+      target_cksum_pos = absolute_input_pos +
+	stream->src->max_winsize / 2 +
+	/*stream->src->blksize * 2*/;
       target_cksum_pos &= ~stream->src->maskby;
     }
 
