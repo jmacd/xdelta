@@ -3324,7 +3324,7 @@ main_input (xd3_cmd     cmd,
 			    main_format_bcnt (stream.total_in, &trdb),
 			    main_format_bcnt (stream.total_out, &twdb),
 			    main_format_millis (millis, &tm),
-			    main_format_bcnt (sfile->source_position, &srcpos));
+			    main_format_bcnt (stream.srcwin_cksum_pos, &srcpos));
 		      }
 		    else
 		      {
