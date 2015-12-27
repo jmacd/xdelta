@@ -471,7 +471,6 @@ main_getblk_func (xd3_stream *stream,
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru;
   int is_new;
-  int did_seek = 0;
   size_t nread = 0;
 
   if (allow_fake_source)
@@ -508,10 +507,6 @@ main_getblk_func (xd3_stream *stream,
 	{
 	  return ret;
 	}
-
-      /* Indicates that another call to main_getblk_lru() may be
-       * needed */
-      did_seek = 1;
     }
 
   XD3_ASSERT (sfile->source_position == pos);
