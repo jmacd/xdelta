@@ -69,9 +69,28 @@ type PairTest struct {
 	source, target string
 
 	// Output
+	TestOutput
+}
+
+type TestOutput struct {
 	encoded int64
 	encDuration time.Duration
 	decDuration time.Duration
+	encSysDuration time.Duration
+	decSysDuration time.Duration
+}
+
+func (to *TestOutput) Add(a TestOutput) {
+	to.encoded += a.encoded
+	to.encDuration += a.encDuration
+	to.decDuration += a.decDuration
+	to.encSysDuration += a.encSysDuration
+	to.decSysDuration += a.decSysDuration
+}
+
+func (to *TestOutput) String() string {
+	return fmt.Sprintf("SIZE: %v\tT: %v\tTSYS: %v\tDT: %v\tDTSYS: %v",
+		to.encoded, to.encDuration, to.encSysDuration, to.decDuration, to.encSysDuration)
 }
 
 // P is the test program, Q is the reference version.
@@ -94,34 +113,57 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
 		total += d.Size()
 	}
 	meansize := total / int64(len(dents))
+	largest  := uint(20)
+	for ; largest <= 31 && 1<<largest < meansize; largest++ {}
+
 	sort.Strings(paths)
+
+	testSum := map[uint]*TestOutput{}
+	compSum := map[uint]*TestOutput{}
+
 	for _, in1 := range paths {
 		for _, in2 := range paths {
 			if in1 == in2 { continue }
 
-			largest := uint(20)
-			for ; largest <= 31 && 1<<largest < meansize; largest++ {}
-
-			// 1/4, 1/2, and 1/1 of the power-of-2 rounded-up mean size
+			// 1/4, 1/2, and 1 of the power-of-2 rounded-up mean size
 			for b := largest - 2; b <= largest; b++ {
+				if _, has := testSum[b]; !has {
+					testSum[b] = &TestOutput{}
+					compSum[b] = &TestOutput{}
+				}
 				c1 := cfg
 				c1.srcbuf_size = 1<<b
-				ptest := &PairTest{c1, p, in1, in2, -1, 0, 0}
+				ptest := &PairTest{c1, p, in1, in2, TestOutput{-1, 0, 0, 0, 0}}
 				ptest.datasetPairTest(t, 1<<b);
-				qtest := &PairTest{c1, q, in1, in2, -1, 0, 0}
+				qtest := &PairTest{c1, q, in1, in2, TestOutput{-1, 0, 0, 0, 0}}
 				qtest.datasetPairTest(t, 1<<b)
 
- 				fmt.Printf("%s, %s: %+d/%db, E:%s/%s D:%s/%s [B=%d]\n",
+				testSum[b].Add(ptest.TestOutput)
+				compSum[b].Add(qtest.TestOutput)
+
+ 				fmt.Printf("%s, %s: %.2f%% %+d/%d\n\tE:%.2f%%/%s(%.2f%%/%s) D:%.2f%%/%s(%.2f%%/%s) [B=%d]\n",
 					path.Base(in1), path.Base(in2),
+					float64(ptest.encoded - qtest.encoded) * 100.0 / float64(qtest.encoded),
 					ptest.encoded - qtest.encoded,
 					qtest.encoded,
-					(ptest.encDuration - qtest.encDuration).String(),
+					(ptest.encDuration - qtest.encDuration).Seconds() * 100.0 / qtest.encDuration.Seconds(),
 					qtest.encDuration,
-					(ptest.decDuration - qtest.decDuration).String(),
-					qtest.decDuration,
+					(ptest.decDuration - qtest.decDuration).Seconds() * 100.0 / qtest.decDuration.Seconds(),
+					qtest.encDuration,
+					(ptest.encSysDuration - qtest.encSysDuration).Seconds() * 100.0 / qtest.encSysDuration.Seconds(),
+					qtest.encSysDuration,
+					(ptest.decSysDuration - qtest.decSysDuration).Seconds() * 100.0 / qtest.decSysDuration.Seconds(),
+					qtest.decSysDuration,
 					1<<b)
 			}
 		}
+	}
+	var keys []uint
+	for k, _ := range testSum {
+		keys = append(keys, k)
+	}
+	for _, k := range keys {		
+		fmt.Printf("B=%v\nTEST: %v\nCOMP: %v\n", 1<<k, testSum[k], compSum[k])
 	}
 }
 
@@ -138,6 +180,7 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 	dargs := []string{"-dc", fmt.Sprint("-B", cfg.srcbuf_size), //"-q",
 		fmt.Sprint("-W", cfg.window_size), "-s", pt.source,
 		"-S", "none"}
+
 	dec, err := t.Exec("decode", pt.program, false, dargs)
 	if err != nil {
 		t.Panic(err)
@@ -159,6 +202,8 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 
 	pt.decDuration = dec.Cmd.ProcessState.UserTime()
 	pt.encDuration = enc.Cmd.ProcessState.UserTime()
+	pt.decSysDuration = dec.Cmd.ProcessState.SystemTime()
+	pt.encSysDuration = enc.Cmd.ProcessState.SystemTime()
 }
 
 func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, length int64) {
