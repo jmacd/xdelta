@@ -101,9 +101,9 @@
 #endif
 
 /* The source window size is limited to 2GB unless
- * XD3_USE_LARGEWINDOW64 is defined to 1. */
-#ifndef XD3_USE_LARGEWINDOW64
-#define XD3_USE_LARGEWINDOW64 0
+ * XD3_USE_LARGESIZET is defined to 1. */
+#ifndef XD3_USE_LARGESIZET
+#define XD3_USE_LARGESIZET 1
 #endif
 
 /* Sizes and addresses within VCDIFF windows are represented as usize_t
