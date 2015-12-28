@@ -92,7 +92,7 @@ public:
     bool done = false;
     bool done_after_input = false;
 
-    IF_DEBUG1 (XPR(NTR "source %"Q"[%"Q"] target %"Q" winsize %lu\n",
+    IF_DEBUG1 (XPR(NTR "source %"Q"u[%"Q"u] target %"Q"u winsize %"Z"u\n",
 		  source_file.Size(), options.block_size,
 		  target_file.Size(),
 		  Constants::WINDOW_SIZE));
@@ -153,7 +153,7 @@ public:
 	xd3_source *src = (encoding ? &encode_source : &decode_source);
 	Block *block = (encoding ? &encode_source_block : &decode_source_block);
 	if (encoding) {
-	  IF_DEBUG1(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
+	  IF_DEBUG2(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
 			"encodepos %"Q"u\n",
 			encode_source.getblkno,
 			encode_stream.match_last_srcpos,
@@ -790,32 +790,34 @@ void TestSmallStride() {
   usize_t size = Constants::BLOCK_SIZE * 4;
   spec0.GenerateFixedSize(size);
 
-  /* TODO Need to study the actual causes of missed adds for tests
-   * less than 30 bytes. */
-  const int s = 30;
-  usize_t adds = 0;
-  ChangeList cl;
-  for (usize_t j = s; j < size; j += s, ++adds)
-    {
-      cl.push_back(Change(Change::MODIFY, 1, j));
-    }
+  // Note: Not very good performance due to hash collisions, note 3x
+  // multiplier below.
+  for (int s = 15; s < 101; s++) {
+    usize_t changes = 0;
+    ChangeList cl;
+    for (usize_t j = s; j < size; j += s, ++changes)
+      {
+	cl.push_back(Change(Change::MODIFY, 1, j));
+      }
 
-  FileSpec spec1(&rand);
-  spec0.ModifyTo(ChangeListMutator(cl), &spec1);
+    FileSpec spec1(&rand);
+    spec0.ModifyTo(ChangeListMutator(cl), &spec1);
 
-  Options options;
-  options.encode_srcwin_maxsz = size;
-  options.iopt_size = 128;
-  options.smatch_cfg = XD3_SMATCH_SLOW;
-  options.size_known = false;
+    Options options;
+    options.encode_srcwin_maxsz = size;
+    options.iopt_size = 128;
+    options.smatch_cfg = XD3_SMATCH_SLOW;
+    options.size_known = false;
 
-  Block block;
-  InMemoryEncodeDecode(spec0, spec1, &block, options);
-  Delta delta(block);
+    Block block;
+    InMemoryEncodeDecode(spec0, spec1, &block, options);
+    Delta delta(block);
 
-  // Allow an additional two byte of add per window
-  usize_t allowance = 2 * size / Constants::WINDOW_SIZE;
-  CHECK_GE(adds + allowance, delta.AddedBytes());
+    IF_DEBUG1(DP(RINT "[stride=%d] changes=%u adds=%"Q"u\n",
+		 s, changes, delta.AddedBytes()));
+    double allowance = Constants::BLOCK_SIZE < 8192 || s < 30 ? 3.0 : 1.1;
+    CHECK_GE(allowance * changes, (double)delta.AddedBytes());
+  }
 }
 
 void TestCopyWindow() {
@@ -927,85 +929,73 @@ void TestCopyFromEnd() {
 }
 
 void TestHalfBlockCopy() {
-  MTRandom rand;
-  FileSpec spec0(&rand);
-  FileSpec spec1(&rand);
-
-  spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 4);
-
-  // Create a half-block copy, 2.5 blocks apart, from the second half
-  // of the source version to the first half of the target version.
-  //       0             1             2             3
-  // spec0 [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb][ccccc][bbbbb]
-  // spec1 [aaaaa][ccccc][aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa]
-  ChangeList cl1;
-  cl1.push_back(Change(Change::MODIFY,
-		       Constants::BLOCK_SIZE / 2,  // size
-		       0));
-  cl1.push_back(Change(Change::COPYOVER,
-		       Constants::BLOCK_SIZE / 2,  // size
-		       Constants::BLOCK_SIZE * 3,  // offset
-		       Constants::BLOCK_SIZE / 2));
-  cl1.push_back(Change(Change::MODIFY,
-		       Constants::BLOCK_SIZE * 3,
-		       Constants::BLOCK_SIZE));
-  spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
-
-  const int onecopy_adds =
-    4 * Constants::BLOCK_SIZE - Constants::BLOCK_SIZE / 2;
-  const int nocopy_adds = 4 * Constants::BLOCK_SIZE;
-
-  // Note the case b=4 is contrived: the caller should use a single block
-  // containing the entire source, if possible.
-  for (int b = 1; b <= 4; b++)
+  // Create a half-block copy, 7.5 blocks apart, in a pair of files:
+  //       0             1     ...     6             7
+  // spec0 [bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb][ccccc][bbbb_]
+  // spec1 [aaaaa][ccccc][aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_]
+  // where stage=
+  // 0: the final block is full
+  //   a. (source)spec1->(target)spec0 copies block C: reads 8 source
+  //      blocks during target block 0.
+  //   b. (source)spec0->(target)spec1 does not copy block C b/c attempt
+  //      to read past EOF empties block 0 from (virtual) block cache
+  // 1: the final block is less than full.
+  //   a. (same) copies block C
+  //   b. (same) copies block C, unlike 0a, no attempt to read past EOF
+  //
+  // "virtual" above refers to XD3_TOOFARBACK, since there is no caching
+  // in the API, there is simply a promise not to request blocks that are
+  // beyond source->max_winsize from the last known source file position.
+  for (int stage = 0; stage < 2; stage++)
     {
+      IF_DEBUG1 (DP(RINT "half_block_copy stage %d\n", stage));
+
+      MTRandom rand;
+      FileSpec spec0(&rand);
+      FileSpec spec1(&rand);
+
+      spec0.GenerateFixedSize(Constants::BLOCK_SIZE * 8 - stage);
+
+      ChangeList cl1;
+      cl1.push_back(Change(Change::MODIFY,
+			   Constants::BLOCK_SIZE / 2,  // size
+			   0));
+      cl1.push_back(Change(Change::COPYOVER,
+			   Constants::BLOCK_SIZE / 2,  // size
+			   Constants::BLOCK_SIZE * 7,  // offset
+			   Constants::BLOCK_SIZE / 2));
+      cl1.push_back(Change(Change::MODIFY,
+			   Constants::BLOCK_SIZE * 7,
+			   Constants::BLOCK_SIZE - stage));
+      spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
+
       Options options;
-      options.encode_srcwin_maxsz = Constants::BLOCK_SIZE * b;
+      options.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 8;
 
       Block block0;
       Block block1;
       InMemoryEncodeDecode(spec0, spec1, &block0, options);
       InMemoryEncodeDecode(spec1, spec0, &block1, options);
+
       Delta delta0(block0);
       Delta delta1(block1);
 
-      // The first block never copies from the last source block, by
-      // design, because if the last source block is available when
-      // the first target block is ready, the caller is expected to
-      // use a single block.
-      CHECK_EQ(nocopy_adds, delta0.AddedBytes());
-      if (Constants::BLOCK_SIZE < 8192 || b > 2)
-      	{
-	  // For small-block inputs, the entire file is read into one
-	  // block (the min source window size is 16kB).
-	  //
-	  // For large blocks, at least 3 blocks of source window are
-	  // needed.
-      	  CHECK_EQ(onecopy_adds, delta1.AddedBytes());
-      	}
+      const int yes =
+	Constants::BLOCK_SIZE * 8 - Constants::BLOCK_SIZE / 2;
+      const int no =
+	Constants::BLOCK_SIZE * 8 - Constants::BLOCK_SIZE / 2;
+
+      if (stage == 0)
+	{
+	  CHECK_EQ(yes, delta0.AddedBytes());
+	  CHECK_EQ(no, delta1.AddedBytes());
+	}
       else
-      	{
-	  // When there are fewer than 3 source blocks.
-      	  CHECK_EQ(nocopy_adds, delta1.AddedBytes());
-      	}
+	{
+	  CHECK_EQ(yes, delta0.AddedBytes());
+	  CHECK_EQ(yes, delta1.AddedBytes());
+	}
     }
-
-  Options options;
-  options.encode_srcwin_maxsz = Constants::BLOCK_SIZE * 4;
-  options.block_size = Constants::BLOCK_SIZE * 4;
-
-  // Test the whole-buffer case.
-  Block block0;
-  Block block1;
-  InMemoryEncodeDecode(spec0, spec1, &block0, options);
-  InMemoryEncodeDecode(spec1, spec0, &block1, options);
-  Delta delta0(block0);
-  Delta delta1(block1);
-  // This <= >= are only for blocksize = 512, which has irregular readsize.
-  CHECK_LE(onecopy_adds, delta0.AddedBytes());
-  CHECK_GE(onecopy_adds + 1, delta0.AddedBytes());
-
-  CHECK_EQ(onecopy_adds, delta1.AddedBytes());
 }
 
 void FourWayMergeTest(const FileSpec &spec0,
@@ -1310,3 +1300,4 @@ int main(int argc, char **argv)
 
   return 0;
 }
+

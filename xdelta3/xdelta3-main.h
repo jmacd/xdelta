@@ -870,6 +870,8 @@ main_file_open (main_file *xfile, const char* name, int mode)
       return XD3_INVALID;
     }
 
+  IF_DEBUG1(DP(RINT "[main] open source %s\n", name));
+
 #if XD3_STDIO
   xfile->file = fopen (name, XOPEN_STDIO);
 
@@ -1041,6 +1043,7 @@ main_file_read (main_file  *ifile,
 		const char *msg)
 {
   int ret = 0;
+  IF_DEBUG1(DP(RINT "[main] read %s up to %"Z"u\n", ifile->filename, size));
 
 #if XD3_STDIO
   size_t result;
@@ -1081,6 +1084,8 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
 {
   int ret = 0;
 
+  IF_DEBUG1(DP(RINT "[main] write %u\n bytes", size));
+  
 #if XD3_STDIO
   usize_t result;
 
@@ -1149,6 +1154,8 @@ static int
 main_write_output (xd3_stream* stream, main_file *ofile)
 {
   int ret;
+
+  IF_DEBUG1(DP(RINT "[main] write(%s) %u\n bytes", ofile->filename, stream->avail_out));
 
   if (option_no_output)
     {
@@ -3335,7 +3342,7 @@ main_input (xd3_cmd     cmd,
 			    main_format_bcnt (stream.total_in, &trdb),
 			    main_format_bcnt (stream.total_out, &twdb),
 			    main_format_millis (millis, &tm),
-			    main_format_bcnt (sfile->source_position, &srcpos));
+			    main_format_bcnt (stream.srcwin_cksum_pos, &srcpos));
 		      }
 		    else
 		      {

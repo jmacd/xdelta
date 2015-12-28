@@ -13,8 +13,8 @@ import (
 
 const (
 	xdataset = "/volume/home/jmacd/src/testdata"
-	xcompare = "/volume/home/jmacd/src/xdelta3-devel/xdelta3/xdelta3"
-	xdelta3 = "/volume/home/jmacd/src/xdelta-64bithash/xdelta3/xdelta3"
+	xcompare = "/volume/home/jmacd/src/xdelta-devel/xdelta3/xdelta3"
+	xdelta3  = "/volume/home/jmacd/src/xdelta-64bithash/xdelta3/xdelta3"
 	seed = 1422253499919909358
 )
 
@@ -35,12 +35,10 @@ func (c Config) smokeTest(t *xdelta.TestGroup, p xdelta.Program) {
 
 	enc, err := t.Exec("encode", p, true, []string{"-e"})
 	if err != nil {
-		fmt.Println(err)
 		t.Panic(err)
 	}
 	dec, err := t.Exec("decode", p, true, []string{"-d"})
 	if err != nil {
-		fmt.Println(err)
 		t.Panic(err)
 	}
 
@@ -234,7 +232,7 @@ func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, leng
 
 	// The decoder output ("read", above) is compared with the
 	// test-provided output ("write", below).  The following
-	// generates the input and output twice.
+	// generates two identical inputs.
 	t.WriteRstreams("encode", seed, offset, length, enc.Srcin, enc.Stdin)
 	t.WriteRstreams("decode", seed, offset, length, dec.Srcin, write)
 	t.Wait(enc, dec)

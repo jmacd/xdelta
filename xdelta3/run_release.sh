@@ -123,6 +123,7 @@ function buildit {
     local FULLD="${SRCDIR}/${D}"
     local CFLAGS="${march} ${cargs} -I${SRCDIR}/build/lib-${LIBBM}/include"
     local CXXFLAGS="${march} ${cargs} -I${SRCDIR}/build/lib-${LIBBM}/include"
+    local CPPFLAGS="-I${SRCDIR}/build/lib-${LIBBM}/include"
     local LDFLAGS="${march} -L${SRCDIR}/build/lib-${LIBBM}/lib"
 
     mkdir -p ${D}
@@ -179,6 +180,7 @@ EOF
     		  --enable-debug-symbols \
 		  "CFLAGS=${CFLAGS}" \
 		  "CXXFLAGS=${CXXFLAGS}" \
+		  "CPPFLAGS=${CPPFLAGS}" \
 		  "LDFLAGS=${LDFLAGS}" \
 		  "CC=${USECC}" \
 		  "CXX=${USECXX}"

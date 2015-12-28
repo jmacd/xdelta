@@ -183,6 +183,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   if (!sfile->size_known && source->onblk < blksize)
     {
       source_size = source->onblk;
+      source->onlastblk = source_size;
       sfile->size_known = 1;
     }
 
@@ -194,8 +195,10 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
       /* Modify block 0, change blocksize. */
       blksize = option_srcwinsz / MAX_LRU_SIZE;
       source->blksize = blksize;
-      source->onblk = blksize;  /* xd3 sets onblk */
-      /* Note: source->max_winsize is unchanged. */
+      source->onblk = blksize;
+      source->onlastblk = blksize;
+      source->max_blkno = MAX_LRU_SIZE - 1;
+
       lru[0].size = blksize;
       lru_size = MAX_LRU_SIZE;
 
@@ -309,9 +312,13 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	      main_blklru_list_remove (blru);
 	      main_blklru_list_push_back (& lru_list, blru);
 	      (*blrup) = blru;
+	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %"Z"u lru_size=%d\n",
+		    blkno, lru_size));
 	      return 0;
 	    }
 	}
+      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %"Z"u lru_size=%d\n",
+		    blkno, lru_size));
     }
 
   if (do_src_fifo)
@@ -467,7 +474,6 @@ main_getblk_func (xd3_stream *stream,
   main_file *sfile = (main_file*) source->ioh;
   main_blklru *blru;
   int is_new;
-  int did_seek = 0;
   size_t nread = 0;
 
   if (allow_fake_source)
@@ -504,19 +510,9 @@ main_getblk_func (xd3_stream *stream,
 	{
 	  return ret;
 	}
-
-      /* Indicates that another call to main_getblk_lru() may be
-       * needed */
-      did_seek = 1;
     }
 
   XD3_ASSERT (sfile->source_position == pos);
-
-  if (did_seek &&
-      (ret = main_getblk_lru (source, blkno, & blru, & is_new)))
-    {
-      return ret;
-    }
 
   if ((ret = main_read_primary_input (sfile,
 				      (uint8_t*) blru->blk,

@@ -55,7 +55,8 @@ func (r *Runner) RunTest(name string, f func (t *TestGroup)) {
 	c := make(chan interface{})
 	go func() {
 		defer func() {
-			c <- recover()
+			rec := recover()
+			c <- rec
 		}()
 		fmt.Println("Testing", name, "...")
 		f(t)

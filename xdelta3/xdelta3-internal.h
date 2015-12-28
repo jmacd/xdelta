@@ -335,6 +335,7 @@ xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 
 #if SIZEOF_USIZE_T == 4
 #define USIZE_T_MAX             UINT32_MAX
+#define USIZE_T_MAXBLKSZ        0x80000000U
 #define xd3_decode_size         xd3_decode_uint32_t
 #define xd3_emit_size           xd3_emit_uint32_t
 #define xd3_sizeof_size         xd3_sizeof_uint32_t
@@ -342,9 +343,10 @@ xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 #define xd3_large_cksum         xd3_large32_cksum
 #define xd3_large_cksum_update  xd3_large32_cksum_update
 #define xd3_hash_multiplier     xd3_hash_multiplier32
-#define XD3_MAXSRCWINSZ (1ULL << 31)
+#define XD3_MAXSRCWINSZ         (1ULL << 31)
 #elif SIZEOF_USIZE_T == 8
 #define USIZE_T_MAX             UINT64_MAX
+#define USIZE_T_MAXBLKSZ        0x8000000000000000ULL
 #define xd3_decode_size         xd3_decode_uint64_t
 #define xd3_emit_size           xd3_emit_uint64_t
 #define xd3_sizeof_size         xd3_sizeof_uint64_t
@@ -352,7 +354,7 @@ xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
 #define xd3_large_cksum         xd3_large64_cksum
 #define xd3_large_cksum_update  xd3_large64_cksum_update
 #define xd3_hash_multiplier     xd3_hash_multiplier64
-#define XD3_MAXSRCWINSZ (1ULL << 61)
+#define XD3_MAXSRCWINSZ         (1ULL << 61)
 #endif /* SIZEOF_USIZE_T */
 
 #if SIZEOF_XOFF_T == 4

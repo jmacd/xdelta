@@ -58,7 +58,9 @@ func (g *Goroutine) OK() {
 
 func (g *Goroutine) Panic(err error) {
 	g.finish(err)
-	runtime.Goexit()
+	if g != g.TestGroup.main {
+		runtime.Goexit()
+	}
 }
 
 func (t *TestGroup) Main() *Goroutine { return t.main }
