@@ -1026,7 +1026,6 @@ xd3_decode_input (xd3_stream *stream)
 
     case DEC_CPYOFF:
       /* Copy window offset: only if VCD_SOURCE or VCD_TARGET is set */
-      
       OFFSET_CASE(SRCORTGT (stream->dec_win_ind), stream->dec_cpyoff,
 		  DEC_ENCLEN);
 

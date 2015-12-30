@@ -59,6 +59,11 @@ usize_t bitsof<uint64_t>() {
   return 64;
 }
 
+template<>
+usize_t bitsof<usize_t>() {
+  return sizeof(usize_t) * 8;
+}
+
 template <typename Word>
 struct hhash {  // shift "s" bits leaving the high bits as a hash value for
 		// this checksum, which are the most "distant" in terms of the
@@ -448,12 +453,12 @@ struct test_result : public test_result_base {
 
   void print() {
     if (fstats.count != count()) {
-      fprintf(stderr, "internal error: %d != %d\n", fstats.count, count());
+      fprintf(stderr, "internal error: %" W "d != %" W "d\n", fstats.count, count());
       abort();
     }
     print_header();
-    printf("%-32s%d/%d 2^%" Z "\t%" Z "\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
-	   "%" Z "\t%" Z "\n",
+    printf("%-32s%d/%d 2^%" Z "u\t%" Z "u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
+	   "%" Z "u\t%" Z "u\n",
 	   test_name,
 	   Checksum::cksum_size,
 	   Checksum::cksum_skip,
