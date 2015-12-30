@@ -50,18 +50,18 @@ template <typename Word>
 usize_t bitsof();
 
 template<>
-usize_t bitsof<uint32_t>() {
-  return 32;
+usize_t bitsof<unsigned int>() {
+  return sizeof(unsigned int) * 8;
 }
 
 template<>
-usize_t bitsof<uint64_t>() {
-  return 64;
+usize_t bitsof<unsigned long>() {
+  return sizeof(unsigned long) * 8;
 }
 
 template<>
-usize_t bitsof<usize_t>() {
-  return sizeof(usize_t) * 8;
+usize_t bitsof<unsigned long long>() {
+  return sizeof(unsigned long long) * 8;
 }
 
 template <typename Word>
@@ -457,8 +457,8 @@ struct test_result : public test_result_base {
       abort();
     }
     print_header();
-    printf("%-32s%d/%d 2^%" Z "u\t%" Z "u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
-	   "%" Z "u\t%" Z "u\n",
+    printf("%-32s%d/%d 2^%" W "u\t%" W "u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
+	   "%" W "u\t%" W "u\n",
 	   test_name,
 	   Checksum::cksum_size,
 	   Checksum::cksum_skip,
