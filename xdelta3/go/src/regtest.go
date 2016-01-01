@@ -257,16 +257,16 @@ func main() {
 
 	r.RunTest("smoketest", func(t *xdelta.TestGroup) { cfg.smokeTest(t, prog) })
 
-	// for i := uint(19); i <= 30; i += 1 {
-	// 	// The arguments to offsetTest are offset, source
-	// 	// window size, and file size. The source window size
-	// 	// is (2 << i) and (in the 3.0x release branch) is
-	// 	// limited to 2^31, so the the greatest value of i is
-	// 	// 30.
-	// 	cfg.srcbuf_size = 2 << i
-	// 	r.RunTest(fmt.Sprint("offset", i), func(t *xdelta.TestGroup) {
-	// 		cfg.offsetTest(t, prog, 1 << i, 3 << i) })
-	// }
+	for i := uint(29); i <= 33; i += 1 {
+		// The arguments to offsetTest are offset, source
+		// window size, and file size. The source window size
+		// is (2 << i) and (in the 3.0x release branch) is
+		// limited to 2^31, so the the greatest value of i is
+		// 30.
+		cfg.srcbuf_size = 2 << i
+		r.RunTest(fmt.Sprint("offset", i), func(t *xdelta.TestGroup) {
+			cfg.offsetTest(t, prog, 1 << i, 3 << i) })
+	}
 	
 	comp := xdelta.Program{xcompare}
 
