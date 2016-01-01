@@ -50,13 +50,18 @@ template <typename Word>
 usize_t bitsof();
 
 template<>
-usize_t bitsof<uint32_t>() {
-  return 32;
+usize_t bitsof<unsigned int>() {
+  return sizeof(unsigned int) * 8;
 }
 
 template<>
-usize_t bitsof<uint64_t>() {
-  return 64;
+usize_t bitsof<unsigned long>() {
+  return sizeof(unsigned long) * 8;
+}
+
+template<>
+usize_t bitsof<unsigned long long>() {
+  return sizeof(unsigned long long) * 8;
 }
 
 template <typename Word>
@@ -448,12 +453,12 @@ struct test_result : public test_result_base {
 
   void print() {
     if (fstats.count != count()) {
-      fprintf(stderr, "internal error: %d != %d\n", fstats.count, count());
+      fprintf(stderr, "internal error: %" W "d != %" W "d\n", fstats.count, count());
       abort();
     }
     print_header();
-    printf("%-32s%d/%d 2^%" Z "\t%" Z "\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
-	   "%" Z "\t%" Z "\n",
+    printf("%-32s%d/%d 2^%" W "u\t%" W "u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
+	   "%" W "u\t%" W "u\n",
 	   test_name,
 	   Checksum::cksum_size,
 	   Checksum::cksum_skip,
