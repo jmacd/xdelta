@@ -102,11 +102,11 @@ public:
 
       xoff_t blks = target_iterator.Blocks();
 
-      IF_DEBUG2(XPR(NTR "target in %s: %" Q "u..%" Q "u %" Q "u(%" Q "u) "
+      IF_DEBUG2(XPR(NTR "target in %s: %" Q "u[%" Z "u] %" Q "u(%" Q "u) "
 		    "verified %" Q "u\n",
 		    encoding ? "encoding" : "decoding",
 		    target_iterator.Offset(),
-		    target_iterator.Offset() + target_block.Size(),
+		    target_block.Size(),
 		    target_iterator.Blkno(),
 		    blks,
 		    verified_bytes));
@@ -816,7 +816,7 @@ void TestSmallStride() {
     InMemoryEncodeDecode(spec0, spec1, &block, options);
     Delta delta(block);
 
-    IF_DEBUG1(DP(RINT "[stride=%d] changes=%u adds=%" Q "u\n",
+    IF_DEBUG1(DP(RINT "[stride=%d] changes=%" W "u adds=%" Q "u\n",
 		 s, changes, delta.AddedBytes()));
     double allowance = Constants::BLOCK_SIZE < 8192 || s < 30 ? 3.0 : 1.1;
     CHECK_GE(allowance * changes, (double)delta.AddedBytes());

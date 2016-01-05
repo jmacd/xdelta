@@ -136,41 +136,6 @@ struct _main_file
   int                 seek_failed;   /* after seek fails once, try FIFO */
 };
 
-#ifdef _WIN32
-#define vsnprintf_func _vsnprintf
-#define snprintf_func _snprintf
-#else
-#define vsnprintf_func vsnprintf
-#define snprintf_func snprintf
-#endif
-#define short_sprintf(sb,fmt,...) \
-  snprintf_func((sb).buf,sizeof((sb).buf),fmt,__VA_ARGS__)
-
-/* Type used for short snprintf calls. */
-typedef struct {
-  char buf[48];
-} shortbuf;
-
-/* Prior to SVN 303 this function was only defined in DJGPP and WIN32
- * environments and other platforms would use the builtin snprintf()
- * with an arrangement of macros below.  In OS X 10.6, Apple made
- * snprintf() a macro, which defeated those macros (since snprintf
- * would be evaluated before its argument macros were expanded,
- * therefore always define xsnprintf_func. */
-#ifndef PRINTF_ATTRIBUTE
-#define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
-#endif
-
-/* Underlying xprintf() */
-int xsnprintf_func (char *str, size_t n, const char *fmt, ...)
-  PRINTF_ATTRIBUTE(3,4);
-
-/* XPR(NT "", ...) (used by main) prefixes an "xdelta3: " to the output. */
-void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
-#define XPR xprintf
-#define NT "xdelta3: "
-#define NTR ""
-
 #ifndef UINT32_MAX
 #define UINT32_MAX 4294967295U
 #endif

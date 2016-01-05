@@ -1084,7 +1084,7 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
 {
   int ret = 0;
 
-  IF_DEBUG1(DP(RINT "[main] write %u\n bytes", size));
+  IF_DEBUG1(DP(RINT "[main] write %"W"u\n bytes", size));
   
 #if XD3_STDIO
   usize_t result;
@@ -1155,7 +1155,7 @@ main_write_output (xd3_stream* stream, main_file *ofile)
 {
   int ret;
 
-  IF_DEBUG1(DP(RINT "[main] write(%s) %u\n bytes", ofile->filename, stream->avail_out));
+  IF_DEBUG1(DP(RINT "[main] write(%s) %"W"u\n bytes", ofile->filename, stream->avail_out));
 
   if (option_no_output)
     {

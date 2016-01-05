@@ -312,12 +312,12 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	      main_blklru_list_remove (blru);
 	      main_blklru_list_push_back (& lru_list, blru);
 	      (*blrup) = blru;
-	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %"Z"u lru_size=%d\n",
+	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %"Q"u lru_size=%"W"u\n",
 		    blkno, lru_size));
 	      return 0;
 	    }
 	}
-      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %"Z"u lru_size=%d\n",
+      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %"Q"u lru_size=%"W"u\n",
 		    blkno, lru_size));
     }
 
@@ -446,7 +446,7 @@ main_read_seek_source (xd3_stream *stream,
 	  sfile->source_position += nread;
 	  blru->size = nread;
 
-	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q" size %u\n",
+	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u size %"W"u\n",
 			skip_blkno, blru->size));
 
 	  XD3_ASSERT (sfile->source_position <= pos);

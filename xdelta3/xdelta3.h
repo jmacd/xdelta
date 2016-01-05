@@ -328,12 +328,6 @@ typedef uint32_t usize_t;
 #include <stdio.h>
 #endif
 
-/* XPRINT.  Debug output and VCDIFF_TOOLS functions report to stderr.
- * I have used an irregular style to abbreviate [fprintf(stderr, "] as
- * [DP(RINT "]. */
-#define DP   fprintf
-#define RINT stderr,
-
 typedef struct _xd3_stream             xd3_stream;
 typedef struct _xd3_source             xd3_source;
 typedef struct _xd3_hash_cfg           xd3_hash_cfg;
@@ -372,16 +366,40 @@ typedef int    (xd3_getblk_func)   (xd3_stream *stream,
 				    xd3_source *source,
 				    xoff_t      blkno);
 
-/* These are internal functions to delay construction of encoding
- * tables and support alternate code tables.  See the comments & code
- * enabled by GENERIC_ENCODE_TABLES. */
-
 typedef const xd3_dinst* (xd3_code_table_func) (void);
-typedef int              (xd3_comp_table_func) (xd3_stream *stream,
-						const uint8_t **data,
-						usize_t *size);
 
 
+#ifdef _WIN32
+#define vsnprintf_func _vsnprintf
+#define snprintf_func _snprintf
+#else
+#define vsnprintf_func vsnprintf
+#define snprintf_func snprintf
+#endif
+#define short_sprintf(sb,fmt,...) \
+  snprintf_func((sb).buf,sizeof((sb).buf),fmt,__VA_ARGS__)
+
+/* Type used for short snprintf calls. */
+typedef struct {
+  char buf[48];
+} shortbuf;
+
+#ifndef PRINTF_ATTRIBUTE
+#define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
+#endif
+
+/* Underlying xprintf() */
+int xsnprintf_func (char *str, size_t n, const char *fmt, ...)
+  PRINTF_ATTRIBUTE(3,4);
+
+/* XPR(NT "", ...) (used by main) prefixes an "xdelta3: " to the output. */
+void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
+#define XPR xprintf
+#define NT "xdelta3: "
+#define NTR ""
+/* DP(RINT ...) */
+#define DP   xprintf
+#define RINT ""
 
 #if XD3_DEBUG
 #define XD3_ASSERT(x)				     \
@@ -1048,7 +1066,6 @@ struct _xd3_stream
   xd3_desect        data_sect;
 
   xd3_code_table_func       *code_table_func;
-  xd3_comp_table_func       *comp_table_func;
   const xd3_dinst           *code_table;
   const xd3_code_table_desc *code_table_desc;
   xd3_dinst                 *code_table_alloc;
