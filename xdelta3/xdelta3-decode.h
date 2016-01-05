@@ -288,8 +288,8 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
     {
       IF_DEBUG2 ({
 	static int cnt = 0;
-	XPR(NT "DECODE:%u: COPY at %"Q" (winoffset %"Z") "
-	    "size %"Z" winaddr %"Z"\n",
+	XPR(NT "DECODE:%u: COPY at %"Q"u (winoffset %"W"u) "
+	    "size %"W"u winaddr %"W"u\n",
 	    cnt++,
 	    stream->total_out + (stream->dec_position -
 				 stream->dec_cpylen),
@@ -330,7 +330,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (inst->type == XD3_ADD)
 	  {
 	    static int cnt;
-	    XPR(NT "DECODE:%d: ADD at %"Q" (winoffset %"Z") size %"Z"\n",
+	    XPR(NT "DECODE:%d: ADD at %"Q"u (winoffset %"W"u) size %"W"u\n",
 	       cnt++,
 	       (stream->total_out + stream->dec_position - stream->dec_cpylen),
 	       stream->dec_position - stream->dec_cpylen,
@@ -340,7 +340,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  {
 	    static int cnt;
 	    XD3_ASSERT (inst->type == XD3_RUN);
-	    XPR(NT "DECODE:%d: RUN at %"Q" (winoffset %"Z") size %"Z"\n",
+	    XPR(NT "DECODE:%d: RUN at %"Q"u (winoffset %"W"u) size %"W"u\n",
 	       cnt++,
 	       stream->total_out + stream->dec_position - stream->dec_cpylen,
 	       stream->dec_position - stream->dec_cpylen,
@@ -526,8 +526,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q" onblk "
-				   "%"Z" blksize %"Z" blkoff %"Z" take %"Z"\n",
+		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q"u onblk "
+				   "%"W"u blksize %"W"u blkoff %"W"u take %"W"u\n",
 				   block,
 				   source->onblk,
 				   blksize,

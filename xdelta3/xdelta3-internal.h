@@ -64,7 +64,7 @@ xd3_output* xd3_alloc_output (xd3_stream *stream,
 
 int xd3_encode_init_full (xd3_stream *stream);
 usize_t xd3_pow2_roundup (usize_t x);
-long get_millisecs_now ();
+long get_millisecs_now (void);
 int xd3_process_stream (int            is_encode,
 			xd3_stream    *stream,
 			int          (*func) (xd3_stream *),
@@ -153,15 +153,12 @@ typedef struct {
 
 /* Prior to SVN 303 this function was only defined in DJGPP and WIN32
  * environments and other platforms would use the builtin snprintf()
- * with an arrangement of macros below.  In OS X 10.6, Apply made
+ * with an arrangement of macros below.  In OS X 10.6, Apple made
  * snprintf() a macro, which defeated those macros (since snprintf
  * would be evaluated before its argument macros were expanded,
  * therefore always define xsnprintf_func. */
-#undef PRINTF_ATTRIBUTE
-#ifdef __GNUC__
+#ifndef PRINTF_ATTRIBUTE
 #define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
-#else
-#define PRINTF_ATTRIBUTE(x,y)
 #endif
 
 /* Underlying xprintf() */

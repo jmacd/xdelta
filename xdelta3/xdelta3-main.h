@@ -320,7 +320,7 @@ static int xd3_merge_input_output (xd3_stream *stream,
  * comments there. */
 #include "xdelta3-blkcache.h"
 
-void (*xprintf_message_func)(const char*msg) = NULL;
+static void (*xprintf_message_func)(const char*msg) = NULL;
 
 void
 xprintf (const char *fmt, ...)
@@ -1985,8 +1985,8 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 		  addr = inst->addr - window_start;
 		}
 	      IF_DEBUG2 ({
-		  XPR(NTR "[merge copy] winpos %"W" take %"W" "
-		      "addr %"Q" mode %u\n",
+		  XPR(NTR "[merge copy] winpos %"W"u take %"W"u "
+		      "addr %"Q"u mode %u\n",
 		      window_pos, take, addr, inst->mode);
 		});
 	      if ((ret = xd3_found_match (recode_stream, window_pos, take,

@@ -45,12 +45,26 @@ xdelta3checksum_SOURCES = $(common_SOURCES) \
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
-	 -Wno-unused-parameter -Wformat -Wno-unused-function # -Wconversion
+	 -Wformat=2 -Wno-format-nonliteral \
+	 -Wno-unused-parameter -Wno-unused-function
+
+ # -Weverything \
+ # -Wc++11-compat-reserved-user-defined-literal \
+ # -Wno-padded \
+ # -Wno-format-nonliteral \
+ # -Wno-cast-align \
+ # -Wno-unused-parameter \
+ # -Wno-sign-conversion \
+ # -Wno-conversion \
+ # -Wno-switch-enum \
+ # -Wno-covered-switch-default \
+ # -Wno-disabled-macro-expansion \
+ # -Wno-variadic-macros \
+ # -Wno-c++98-compat-pedantic
 
 C_WFLAGS = $(WFLAGS) -pedantic -std=c99
-CXX_WFLAGS = $(WFLAGS)
+CXX_WFLAGS = $(WFLAGS) -pedantic -std=c++11
 
-# TODO add -O3
 common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \
 	      -DSECONDARY_DJW=1 \

@@ -82,6 +82,8 @@ function buildlzma {
 	--host=${host} \
 	--prefix=${target} \
 	--disable-shared \
+	"CC=${CC}" \
+	"CXX=${CXX}" \
 	"CFLAGS=${march}" \
 	"CXXFLAGS=${march}" \
 	"LDFLAGS=${march}"

@@ -1588,7 +1588,7 @@ static int
 test_checksum_step (xd3_stream *stream, int ignore)
 {
   const int bufsize = 128;
-  uint8_t buf[bufsize];
+  uint8_t buf[128];
   for (int i = 0; i < bufsize; i++)
     {
       buf[i] = mt_random (&static_mtrand) & 0xff;
@@ -2095,7 +2095,7 @@ test_recode_command (xd3_stream *stream, int ignore)
 }
 
 #if SECONDARY_LZMA
-int test_secondary_lzma_default (xd3_stream *stream, int ignore)
+static int test_secondary_lzma_default (xd3_stream *stream, int ignore)
 {
   char ecmd[TESTBUFSIZE];
   int ret;

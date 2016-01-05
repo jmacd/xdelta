@@ -298,6 +298,10 @@ typedef uint32_t usize_t;
 #define SWIG_MODULE 0
 #endif
 
+#ifndef NOT_MAIN
+#define NOT_MAIN 0
+#endif
+
 /* There are three string matching functions supplied: one fast, one
  * slow (default), and one soft-configurable.  To disable any of
  * these, use the following definitions. */

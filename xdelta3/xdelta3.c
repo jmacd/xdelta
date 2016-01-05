@@ -369,10 +369,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define VCD_SELF       0     /* 1st address mode */
 #define VCD_HERE       1     /* 2nd address mode */
 
-#define CODE_TABLE_STRING_SIZE (6 * 256) /* Should fit a code table string. */
-#define CODE_TABLE_VCDIFF_SIZE (6 * 256) /* Should fit a compressed code
-					  * table string */
-
 #define SECONDARY_ANY (SECONDARY_DJW || SECONDARY_FGK || SECONDARY_LZMA)
 
 #define ALPHABET_SIZE      256  /* Used in test code--size of the secondary
@@ -381,9 +377,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define HASH_CKOFFSET      1U   /* Table entries distinguish "no-entry" from
 				 * offset 0 using this offset. */
 
-#define MIN_SMALL_LOOK    2U    /* Match-optimization stuff. */
-#define MIN_LARGE_LOOK    2U
-#define MIN_MATCH_OFFSET  1U
 #define MAX_MATCH_SPLIT   18U   /* VCDIFF code table: 18 is the default limit
 				 * for direct-coded ADD sizes */
 
@@ -395,7 +388,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 			       * between them.  0. */
 
 #define MIN_MATCH         4U  /* VCDIFF code table: MIN_MATCH=4 */
-#define MIN_ADD           1U  /* 1 */
 #define MIN_RUN           8U  /* The shortest run, if it is shorter than this
 			       * an immediate add/copy will be just as good.
 			       * ADD1/COPY6 = 1I+1D+1A bytes, RUN18 =
@@ -415,8 +407,6 @@ XD3_MAKELIST(xd3_rlist, xd3_rinst, link);
 #define DATA_HEAD(s) ((s)->enc_heads[1])
 #define INST_HEAD(s) ((s)->enc_heads[2])
 #define ADDR_HEAD(s) ((s)->enc_heads[3])
-
-#define TOTAL_MODES(x) (2+(x)->acache.s_same+(x)->acache.s_near)
 
 /* Template instances. */
 #if XD3_BUILD_SLOW
@@ -4482,10 +4472,9 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     }
 
   IF_DEBUG1 (DP(RINT
-		"[srcwin_move_point] exited loop T=%"Q"{%"Q"} "
+		"[srcwin_move_point] exited loop T=%"Q"u "
 		"S=%"Q" EOF=%"Q" %s\n",
 		stream->total_in + stream->input_position,
-		logical_input_cksum_pos,
 		stream->srcwin_cksum_pos,
 		xd3_source_eof (stream->src),
 		stream->src->eof_known ? "known" : "unknown"));
@@ -4577,7 +4566,7 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
   int            ret;
   usize_t        match_length;
   usize_t        match_offset = 0;
-  usize_t        next_move_point;
+  usize_t        next_move_point = 0;
 
   IF_DEBUG2(DP(RINT "[string_match] initial entry %u\n", stream->input_position));
 
