@@ -314,7 +314,7 @@ public:
     pid_t pid = getpid();
     char buf[64];
     xoff_t xpid = pid;
-    snprintf(buf, 64, "/tmp/regtest.%"Q"u.%d", xpid, static_counter++);
+    snprintf(buf, 64, "/tmp/regtest.%" Q "u.%d", xpid, static_counter++);
     filename_.append(buf);
     unlink(filename_.c_str());
   }
