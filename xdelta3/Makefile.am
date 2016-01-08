@@ -42,6 +42,17 @@ xdelta3checksum_SOURCES = $(common_SOURCES) \
 	testing/checksum_test.cc \
 	testing/checksum_test_c.c
 
+# These sources constitute a regression test written in Go, that is
+# not automatically built or run.  Install Go-1.5.x or later, add
+# `pwd`/go in $GOPATH, and (cd go/src && go run regtest.go).
+# TODO(jmacd): replace hard-coded path names in regtest.go w/ flags.
+GOLANG_SOURCES = \
+	go/src/xdelta/test.go \
+	go/src/xdelta/rstream.go \
+	go/src/xdelta/tgroup.go \
+	go/src/xdelta/run.go \
+	go/src/regtest.go
+
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
@@ -112,9 +123,9 @@ EXTRA_DIST = \
 	README.md \
 	run_release.sh \
 	draft-korn-vcdiff.txt \
+	$(GOLANG_SOURCES) \
 	examples/Makefile \
 	examples/README.md \
-	examples/checksum_test.cc \
 	examples/compare_test.c \
 	examples/encode_decode_test.c \
 	examples/small_page_test.c \
@@ -134,6 +145,21 @@ EXTRA_DIST = \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/main.m \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Info.plist \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Prefix.pch \
+	cpp-btree/CMakeLists.txt \
+	cpp-btree/COPYING \
+	cpp-btree/README \
+	cpp-btree/btree.h \
+	cpp-btree/btree_bench.cc \
+	cpp-btree/btree_container.h \
+	cpp-btree/btree_map.h \
+	cpp-btree/btree_set.h \
+	cpp-btree/btree_test.cc \
+	cpp-btree/btree_test.h \
+	cpp-btree/btree_test_flags.cc \
+	cpp-btree/safe_btree.h \
+	cpp-btree/safe_btree_map.h \
+	cpp-btree/safe_btree_set.h \
+	cpp-btree/safe_btree_test.cc \
 	testing/xdelta3-regtest.py \
 	testing/xdelta3-test.py \
 	xdelta3.1 \

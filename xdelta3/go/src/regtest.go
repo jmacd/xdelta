@@ -13,8 +13,8 @@ import (
 
 const (
 	xdataset = "/volume/home/jmacd/src/testdata"
-	xcompare = "/volume/home/jmacd/src/xdelta-devel/xdelta3/xdelta3"
-	xdelta3  = "/volume/home/jmacd/src/xdelta-64bithash/xdelta3/xdelta3"
+	xcompare = "/volume/home/jmacd/src/xdelta-devel/xdelta3/build/x86_64-pc-linux-gnu-m64/xoff64/xdelta3"
+	xdelta3  = "/volume/home/jmacd/src/xdelta-64bithash/xdelta3/build/x86_64-pc-linux-gnu-m64/usize64/xoff64/xdelta3"
 	seed = 1422253499919909358
 )
 
