@@ -313,7 +313,8 @@ public:
     static int static_counter = 0;
     pid_t pid = getpid();
     char buf[64];
-    snprintf(buf, 64, "/tmp/regtest.%d.%d", pid, static_counter++);
+    xoff_t xpid = pid;
+    snprintf(buf, 64, "/tmp/regtest.%"Q"u.%d", xpid, static_counter++);
     filename_.append(buf);
     unlink(filename_.c_str());
   }
