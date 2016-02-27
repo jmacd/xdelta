@@ -1,9 +1,0 @@
-The code in this directory produces a test for Xdelta.  To run it you
-have to edit the hard-coded constants at the top of the file, which
-include "cmd_data_source", which should be the name of a big file
-containing source data that the test uses to construct sample inputs.
-This allows you to test on whatever kind of data you want, but the
-synthetic edits are still hardcoded.  Have a look.
-
-Of course, a better test would let you run it without any
-configuration, but this is not that test.
