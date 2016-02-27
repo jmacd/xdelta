@@ -1,3 +1,0 @@
-The author is Joshua MacDonald, <jmacd@cs.berkeley.edu>.  The Rsync
-algorithm, which inspired the core delta algorithm, is due to Andrew
-Tridgell and Paul Mackerras.
