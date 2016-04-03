@@ -1,4 +1,3 @@
-//
 // Permission to distribute this example by
 // Copyright (C) 2007 Ralf Junker
 // Ralf Junker <delphi@yunqa.de>

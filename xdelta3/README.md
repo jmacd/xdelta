@@ -33,7 +33,5 @@ File bug reports and browse open support issues here:
   https://github.com/jmacd/xdelta/issues
 
 The source distribution contains the C/C++/Python APIs, Unix, Microsoft VC++
-and Cygwin builds.  Xdelta3 is covered under the terms of the GPL, see
-COPYING.
-
-Commercial inquiries welcome, please contact <josh.macdonald@gmail.com>
+and Cygwin builds.  Xdelta3 is covered under the terms of the APL, see
+LICENSE.
