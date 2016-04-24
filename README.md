@@ -10,8 +10,8 @@ re-licensed by the original author under the [Apache Public
 License version 2.0](http://www.apache.org/licenses/LICENSE-2.0),
 namely:
 
-__release3_0_apl__ Change to APL based on 3.0.11 sources
-__release3_1_apl__ Merges release3_0_apl with 3.1.0 sources
+- __release3_0_apl__ Change to APL based on 3.0.11 sources
+- __release3_1_apl__ Merges release3_0_apl with 3.1.0 sources
 
 The original GPL licensed Xdelta lives at
 
