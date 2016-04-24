@@ -13,9 +13,7 @@ namely:
 - __release3_0_apl__ Change to APL based on 3.0.11 sources
 - __release3_1_apl__ Merges release3_0_apl with 3.1.0 sources
 
-The original GPL licensed Xdelta lives at
-
-http://github.com/p/xdelta-gpl.
+The original GPL licensed Xdelta lives at http://github.com/p/xdelta-gpl.
 
 # Documentation
 
