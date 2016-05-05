@@ -46,7 +46,7 @@ xdelta3checksum_SOURCES = $(common_SOURCES) \
 # not automatically built or run.  Install Go-1.5.x or later, add
 # `pwd`/go in $GOPATH, and (cd go/src && go run regtest.go).
 # TODO(jmacd): replace hard-coded path names in regtest.go w/ flags.
-GOLANG_SOURCES = \
+GOLANG_SRCS = \
 	go/src/xdelta/test.go \
 	go/src/xdelta/rstream.go \
 	go/src/xdelta/tgroup.go \
@@ -123,7 +123,7 @@ EXTRA_DIST = \
 	README.md \
 	run_release.sh \
 	draft-korn-vcdiff.txt \
-	$(GOLANG_SOURCES) \
+	$(GOLANG_SRCS) \
 	examples/Makefile \
 	examples/README.md \
 	examples/compare_test.c \

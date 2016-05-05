@@ -5,7 +5,7 @@ SRCDIR=${PWD}
 
 # TODO replace w/ wget
 LZMA="xz-5.2.1"
-LZMA_FILE="${SRCDIR}/../${LZMA}.tar.xz"
+LZMA_FILE="${SRCDIR}/../${LZMA}.tar.gz"
 
 MAKEFLAGS="-j 10"
 
@@ -40,15 +40,22 @@ if [ "${TMPDIR}" != "" ]; then
     XTMP="${TMPDIR}"
 fi
 
-find build -type f 2> /dev/null | xargs rm -f
+BUILDFILES=`ls -A ${BUILDDIR} 2> /dev/null`
+if [ -d "${BUILDDIR}" ]; then
+    if [ -n "${BUILDFILES}" ]; then
+	echo "Directory ${BUILDDIR} should be empty"
+	exit 1
+    fi
+else
+    mkdir "${BUILDDIR}"
+fi
 
 function setup {
-    libtoolize
+    libtoolize || glibtoolize
     automake --add-missing
     aclocal -I m4
     autoheader
     automake
-    autoheader
     autoconf
 }
 
