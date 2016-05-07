@@ -73,8 +73,8 @@ WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
  # -Wno-variadic-macros \
  # -Wno-c++98-compat-pedantic
 
-C_WFLAGS = $(WFLAGS) -pedantic -std=c99
-CXX_WFLAGS = $(WFLAGS) -pedantic -std=c++11
+C_WFLAGS = $(WFLAGS) -std=c99
+CXX_WFLAGS = $(WFLAGS) -std=c++11
 
 common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \

@@ -166,8 +166,6 @@ typedef ULONGLONG      uint64_t;
 /* Set a xoff_t typedef and the "Q" printf insert. */
 #if defined(_WIN32)
 typedef uint64_t xoff_t;
-/* Note: The following generates benign warnings in a mingw
- * cross-compiler */
 #define Q "I64"
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long xoff_t;
@@ -202,8 +200,6 @@ typedef uint32_t xoff_t;
 /* Set a usize_ttypedef and the "W" printf insert. */
 #if defined(_WIN32)
 typedef uint64_t usize_t;
-/* Note: The following generates benign warnings in a mingw
- * cross-compiler */
 #define W "I64"
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long usize_t;
