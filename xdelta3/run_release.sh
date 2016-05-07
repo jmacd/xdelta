@@ -135,6 +135,16 @@ function buildit {
     local CPPFLAGS="-I${SRCDIR}/build/lib-${LIBBM}/include"
     local LDFLAGS="${march} -L${SRCDIR}/build/lib-${LIBBM}/lib"
 
+    local EXEC_PREAMBLE=""
+    local EXEC_SUFFIX=""
+
+    case ${host} in
+	*mingw*)
+	    EXEC_PREAMBLE="wine"
+	    EXEC_SUFFIX=".exe"
+	    ;;
+    esac
+    
     mkdir -p ${D}
 
     echo "	... ${BMD}"
@@ -153,11 +163,11 @@ clean-${BMD}:
 
 .PHONY: regtest-${BMD}
 regtest-${BMD}:
-	(cd ${D} && ./xdelta3regtest 1> \${TMP}/regtest.${BMD}.stdout 2> \${TMP}/regtest.${BMD}.stderr)
+	(cd ${D} && ${EXEC_PREAMBLE} ./bin/xdelta3regtest${EXEC_SUFFIX} 1> \${TMP}/regtest.${BMD}.stdout 2> \${TMP}/regtest.${BMD}.stderr)
 
 .PHONY: selftest-${BMD}
 selftest-${BMD}:
-	(cd ${D} && ./bin/xdelta3 test 1> \${TMP}/selftest.${BMD}.stdout 2> \${TMP}/selftest.${BMD}.stderr)
+	(cd ${D} && ${EXEC_PREAMBLE} ./bin/xdelta3${EXEC_SUFFIX} test 1> \${TMP}/selftest.${BMD}.stdout 2> \${TMP}/selftest.${BMD}.stderr)
 
 
 EOF
