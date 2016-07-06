@@ -369,13 +369,13 @@ usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum);
 
 #if USE_UINT32
 uint32_t xd3_large32_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
-uint32_t xd3_large32_cksum_update (xd3_hash_cfg *cfg, uint32_t cksum, 
+uint32_t xd3_large32_cksum_update (xd3_hash_cfg *cfg, const uint32_t cksum,
 				   const uint8_t *base, const usize_t look);
 #endif /* USE_UINT32 */
 
 #if USE_UINT64
 uint64_t xd3_large64_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
-uint64_t xd3_large64_cksum_update (xd3_hash_cfg *cfg, uint64_t cksum, 
+uint64_t xd3_large64_cksum_update (xd3_hash_cfg *cfg, const uint64_t cksum,
 				   const uint8_t *base, const usize_t look);
 #endif /* USE_UINT64 */
 

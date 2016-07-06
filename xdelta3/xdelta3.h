@@ -115,7 +115,9 @@
 #include <inttypes.h>
 #include <stdint.h>
 #else /* WIN32 case */
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 
 #ifndef WINVER
 #if XD3_USE_LARGEFILE64
@@ -378,7 +380,11 @@ typedef struct {
 } shortbuf;
 
 #ifndef PRINTF_ATTRIBUTE
+#ifdef __GNUC__
 #define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
+#else
+#define PRINTF_ATTRIBUTE(x,y)
+#endif
 #endif
 
 /* Underlying xprintf() */
@@ -1099,6 +1105,11 @@ struct _xd3_stream
  PUBLIC FUNCTIONS
  **************************************************************************/
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+
 /* This function configures an xd3_stream using the provided in-memory
  * input buffer, source buffer, output buffer, and flags.  The output
  * array must be large enough or else ENOSPC will be returned.  This
@@ -1428,6 +1439,10 @@ void xd3_blksize_add (xoff_t *blkno,
 
   XD3_ASSERT (*blkoff < source->blksize);
 }
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #define XD3_NOOP 0U
 #define XD3_ADD 1U
