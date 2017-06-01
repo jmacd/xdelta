@@ -382,6 +382,7 @@ main_config (void)
   XPR(NTR "sizeof(int)=%d\n", (int)sizeof(int));
   XPR(NTR "sizeof(long)=%d\n", (int)sizeof(long));
   XPR(NTR "sizeof(long long)=%d\n", (int)sizeof(long long));
+  XPR(NTR "sizeof(unsigned long long)=%d\n", (int)sizeof(unsigned long long));
   XPR(NTR "sizeof(size_t)=%d\n", (int)sizeof(size_t));
   XPR(NTR "sizeof(uint32_t)=%d\n", (int)sizeof(uint32_t));
   XPR(NTR "sizeof(uint64_t)=%d\n", (int)sizeof(uint64_t));
@@ -672,6 +673,7 @@ main_strtoxoff (const char* s, xoff_t *xo, char which)
     unsigned long long bad = ULONG_MAX;
 #else
     /* Something wrong with SIZEOF_XOFF_T, SIZEOF_UNSIGNED_LONG, etc. */
+    #error Bad configure script
 #endif
 
     if (xx == bad)
