@@ -136,6 +136,7 @@
 /* _MSV_VER is defined by Microsoft tools, not by Mingw32 */
 #ifdef _MSC_VER
 typedef signed int     ssize_t;
+typedef int pid_t;
 #if _MSC_VER < 1600
 typedef unsigned char  uint8_t;
 typedef unsigned short uint16_t;
@@ -144,6 +145,7 @@ typedef ULONGLONG      uint64_t;
 #else /* _MSC_VER >= 1600 */
 /* For MSVC10 and above */
 #include <stdint.h>
+#define inline __inline
 #endif /* _MSC_VER < 1600 */
 #else /* _MSC_VER not defined  */
 /* Mingw32 */
@@ -164,6 +166,9 @@ typedef ULONGLONG      uint64_t;
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
+
+static_assert(SIZEOF_SIZE_T == sizeof(size_t), "SIZEOF_SIZE_T not correctly set");
+static_assert(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), "SIZEOF_UNSIGNED_LONG_LONG not correctly set");
 
 /* Set a xoff_t typedef and the "Q" printf insert. */
 #if defined(_WIN32)
