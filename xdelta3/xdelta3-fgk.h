@@ -106,7 +106,7 @@ static fgk_stream*     fgk_alloc           (xd3_stream *stream /*, usize_t alpha
 static int             fgk_init            (xd3_stream *stream,
 					    fgk_stream *h, 
 					    int is_encode);
-static int             fgk_encode_data     (fgk_stream *h,
+static usize_t         fgk_encode_data     (fgk_stream *h,
 					    usize_t    n);
 static inline fgk_bit  fgk_get_encoded_bit (fgk_stream *h);
 
@@ -122,7 +122,7 @@ static int             xd3_encode_fgk      (xd3_stream  *stream,
 
 static inline int      fgk_decode_bit      (fgk_stream *h,
 					    fgk_bit     b);
-static int             fgk_decode_data     (fgk_stream *h);
+static usize_t         fgk_decode_data     (fgk_stream *h);
 static void            fgk_destroy         (xd3_stream *stream,
 					    fgk_stream *h);
 
@@ -231,7 +231,7 @@ static void fgk_swap_ptrs(fgk_node **one, fgk_node **two)
 
 /* Takes huffman transmitter h and n, the nth elt in the alphabet, and
  * returns the number of required to encode n. */
-static int fgk_encode_data (fgk_stream* h, usize_t n)
+static usize_t fgk_encode_data (fgk_stream* h, usize_t n)
 {
   fgk_node *target_ptr = h->alphabet + n;
 
@@ -246,8 +246,8 @@ static int fgk_encode_data (fgk_stream* h, usize_t n)
    * is not neccesary to encode these bits. */
   if (IS_ADAPTIVE && target_ptr->weight == 0)
     {
-      unsigned int where, shift;
-      int bits;
+      usize_t where, shift;
+      usize_t bits;
 
       where = fgk_find_nth_zero(h, n);
       shift = 1;
@@ -731,7 +731,7 @@ static usize_t fgk_nth_zero (fgk_stream* h, usize_t n)
  * alphabet otherwise this returns 0, indicating more bits are
  * required.
  */
-static int fgk_decode_data (fgk_stream* h)
+static usize_t fgk_decode_data (fgk_stream* h)
 {
   usize_t elt = (usize_t)(h->decode_ptr - h->alphabet);
 

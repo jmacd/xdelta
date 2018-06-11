@@ -107,22 +107,24 @@ public:
     bool done = false;
     bool done_after_input = false;
 
-    IF_DEBUG1 (XPR(NTR "source %"Q"u[%"Q"u] target %"Q"u winsize %"Z"u\n",
-		  source_file.Size(), options.block_size,
-		  target_file.Size(),
-		  Constants::WINDOW_SIZE));
+    IF_DEBUG1 (XPR(NTR "source %" Q "u[%" Z "u] target %" Q "u winsize %" Z "u\n",
+		   source_file.Size(), options.block_size,
+		   target_file.Size(),
+		   Constants::WINDOW_SIZE));
 
     while (!done) {
       target_iterator.Get(&target_block);
 
       xoff_t blks = target_iterator.Blocks();
 
-      IF_DEBUG2(XPR(NTR "target in %s: %"Q"u..%"Q"u %"Q"u(%"Q"u) "
-		    "verified %"Q"u\n",
-		   encoding ? "encoding" : "decoding",
-		   target_iterator.Offset(),
-		   target_iterator.Offset() + target_block.Size(),
-		   target_iterator.Blkno(), blks, verified_bytes));
+      IF_DEBUG2(XPR(NTR "target in %s: %" Q "u[%" Z "u] %" Q "u(%" Q "u) "
+		    "verified %" Q "u\n",
+		    encoding ? "encoding" : "decoding",
+		    target_iterator.Offset(),
+		    target_block.Size(),
+		    target_iterator.Blkno(),
+		    blks,
+		    verified_bytes));
 
       if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
 	xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
@@ -168,8 +170,8 @@ public:
 	xd3_source *src = (encoding ? &encode_source : &decode_source);
 	Block *block = (encoding ? &encode_source_block : &decode_source_block);
 	if (encoding) {
-	  IF_DEBUG2(XPR(NTR "[srcblock] %"Q"u last srcpos %"Q"u "
-			"encodepos %"Q"u\n",
+	  IF_DEBUG2(XPR(NTR "[srcblock] %" Q "u last srcpos %" Q "u "
+			"encodepos %" Q "u\n",
 			encode_source.getblkno,
 			encode_stream.match_last_srcpos,
 			encode_stream.input_position + encode_stream.total_in));
@@ -246,7 +248,7 @@ public:
 			const Options &options) {
     vector<const char*> ecmd;
     char bbuf[16];
-    snprintf(bbuf, sizeof(bbuf), "-B%"Q"u", options.encode_srcwin_maxsz);
+    snprintf(bbuf, sizeof(bbuf), "-B%" Q "u", options.encode_srcwin_maxsz);
     ecmd.push_back("xdelta3");
     ecmd.push_back(bbuf);
     ecmd.push_back("-s");
@@ -386,7 +388,7 @@ public:
 void TestPrintf() {
   char buf[64];
   xoff_t x = XOFF_T_MAX;
-  snprintf_func (buf, sizeof(buf), "%"Q"u", x);
+  snprintf_func (buf, sizeof(buf), "%" Q "u", x);
   const char *expect = XD3_USE_LARGEFILE64 ?
     "18446744073709551615" : "4294967295";
   XD3_ASSERT(strcmp (buf, expect) == 0);
@@ -711,8 +713,9 @@ void TestOverwriteMutator() {
   CHECK(memcmp(b0.Data() + 30, b1.Data() + 30,
 	       Constants::BLOCK_SIZE - 30) == 0);
 
+  xoff_t zero = 0;
   cl1.clear();
-  cl1.push_back(Change(Change::COPYOVER, 10, 20, (xoff_t)0));
+  cl1.push_back(Change(Change::COPYOVER, 10, 20, zero));
   spec0.ModifyTo(ChangeListMutator(cl1), &spec1);
   CHECK_EQ(spec0.Size(), spec1.Size());
 
@@ -828,7 +831,7 @@ void TestSmallStride() {
     InMemoryEncodeDecode(spec0, spec1, &block, options);
     Delta delta(block);
 
-    IF_DEBUG1(DP(RINT "[stride=%d] changes=%u adds=%"Q"u\n",
+    IF_DEBUG1(DP(RINT "[stride=%d] changes=%" W "u adds=%" Q "u\n",
 		 s, changes, delta.AddedBytes()));
     double allowance = Constants::BLOCK_SIZE < 8192 || s < 30 ? 3.0 : 1.1;
     CHECK_GE(allowance * changes, (double)delta.AddedBytes());
@@ -1274,7 +1277,7 @@ void UnitTest() {
 // These are Xdelta tests.
 template <class T>
 void MainTest() {
-  XPR(NT "Blocksize %"Q"u windowsize %"Z"u\n",
+  XPR(NT "Blocksize %" Q "u windowsize %" Z "u\n",
       T::BLOCK_SIZE, T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);

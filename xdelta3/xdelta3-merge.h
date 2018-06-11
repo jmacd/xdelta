@@ -255,8 +255,8 @@ xd3_whole_append_window (xd3_stream *stream)
 
 /* xd3_merge_input_output applies *source to *stream, returns the
  * result in stream. */
-int xd3_merge_input_output (xd3_stream *stream,
-			    xd3_whole_state *source)
+static int xd3_merge_input_output (xd3_stream *stream,
+				   xd3_whole_state *source)
 {
   int ret;
   xd3_stream tmp_stream;

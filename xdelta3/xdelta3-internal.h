@@ -29,6 +29,7 @@ void main_file_cleanup (main_file *xfile);
 int main_file_isopen (main_file *xfile);
 int main_file_open (main_file *xfile, const char* name, int mode);
 int main_file_exists (main_file *xfile);
+int main_file_stat (main_file *xfile, xoff_t *size);
 int xd3_whole_append_window (xd3_stream *stream);
 int xd3_main_cmdline (int argc, char **argv);
 int main_file_read (main_file  *ifile,
@@ -38,9 +39,13 @@ int main_file_read (main_file  *ifile,
 		    const char *msg);
 int main_file_write (main_file *ofile, uint8_t *buf, 
 		     usize_t size, const char *msg);
+void* main_malloc (size_t size);
+void main_free (void *ptr);
+
 int test_compare_files (const char* f0, const char* f1);
 usize_t xd3_bytes_on_srcblk (xd3_source *src, xoff_t blkno);
 xoff_t xd3_source_eof(const xd3_source *src);
+
 uint32_t xd3_large_cksum_update (uint32_t cksum,
 				 const uint8_t *base,
 				 usize_t look);
@@ -56,7 +61,8 @@ xd3_output* xd3_alloc_output (xd3_stream *stream,
 			      xd3_output *old_output);
 
 int xd3_encode_init_full (xd3_stream *stream);
-size_t xd3_pow2_roundup (size_t x);
+usize_t xd3_pow2_roundup (usize_t x);
+long get_millisecs_now (void);
 int xd3_process_stream (int            is_encode,
 			xd3_stream    *stream,
 			int          (*func) (xd3_stream *),
@@ -69,6 +75,10 @@ int xd3_process_stream (int            is_encode,
 
 #if PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
 int xd3_main_cmdline (int argc, char **argv);
+#endif
+
+#if REGRESSION_TEST
+int xd3_selftest (void);
 #endif
 
 /* main_file->mode values */
@@ -123,45 +133,6 @@ struct _main_file
   xoff_t              source_position;  /* for avoiding seek in getblk_func */
   int                 seek_failed;   /* after seek fails once, try FIFO */
 };
-
-#ifdef _WIN32
-#define vsnprintf_func _vsnprintf
-#define snprintf_func _snprintf
-#else
-#define vsnprintf_func vsnprintf
-#define snprintf_func snprintf
-#endif
-#define short_sprintf(sb,fmt,...) \
-  snprintf_func((sb).buf,sizeof((sb).buf),fmt,__VA_ARGS__)
-
-/* Type used for short snprintf calls. */
-typedef struct {
-  char buf[48];
-} shortbuf;
-
-/* Prior to SVN 303 this function was only defined in DJGPP and WIN32
- * environments and other platforms would use the builtin snprintf()
- * with an arrangement of macros below.  In OS X 10.6, Apply made
- * snprintf() a macro, which defeated those macros (since snprintf
- * would be evaluated before its argument macros were expanded,
- * therefore always define xsnprintf_func. */
-#undef PRINTF_ATTRIBUTE
-#ifdef __GNUC__
-/* Let's just assume no one uses gcc 2.x! */
-#define PRINTF_ATTRIBUTE(x,y) __attribute__ ((__format__ (__printf__, x, y)))
-#else
-#define PRINTF_ATTRIBUTE(x,y)
-#endif
-
-/* Underlying xprintf() */
-int xsnprintf_func (char *str, int n, const char *fmt, ...)
-  PRINTF_ATTRIBUTE(3,4);
-
-/* XPR(NT "", ...) (used by main) prefixes an "xdelta3: " to the output. */
-void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
-#define XPR xprintf
-#define NT "xdelta3: "
-#define NTR ""
 
 #ifndef UINT32_MAX
 #define UINT32_MAX 4294967295U
@@ -286,28 +257,11 @@ xd3_read_uint32_t (xd3_stream *stream, const uint8_t **inpp,
 static inline int
 xd3_emit_uint32_t (xd3_stream *stream, xd3_output **output, uint32_t num)
 { EMIT_INTEGER_TYPE (); }
-#endif
-#endif
+#endif  /* XD3_ENCODER */
+#endif  /* USE_UINT32 */
 
 #if USE_UINT64
-static inline int
-xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
-{ DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
-
-#if XD3_ENCODER
-static inline int
-xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
-{ EMIT_INTEGER_TYPE (); }
-#endif
-
-/* These are tested but not used */
-#if REGRESSION_TEST
-static int
-xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
-		   const uint8_t *maxp, uint64_t *valp)
-{ READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
-
-static uint32_t
+static inline uint32_t
 xd3_sizeof_uint64_t (uint64_t num)
 {
   IF_SIZEOF64(1);
@@ -322,49 +276,110 @@ xd3_sizeof_uint64_t (uint64_t num)
 
   return 10;
 }
-#endif
 
-#endif
+static inline int
+xd3_decode_uint64_t (xd3_stream *stream, uint64_t *val)
+{ DECODE_INTEGER_TYPE (stream->dec_64part, UINT64_OFLOW_MASK); }
+
+static inline int
+xd3_read_uint64_t (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *maxp, uint64_t *valp)
+{ READ_INTEGER_TYPE (uint64_t, UINT64_OFLOW_MASK); }
+
+#if XD3_ENCODER
+static inline int
+xd3_emit_uint64_t (xd3_stream *stream, xd3_output **output, uint64_t num)
+{ EMIT_INTEGER_TYPE (); }
+#endif  /* XD3_ENCODER */
+#endif  /* USE_UINT64 */
 
 #if SIZEOF_USIZE_T == 4
-#define USIZE_T_MAX        UINT32_MAX
-#define USIZE_T_MAXBLKSZ   0x80000000U
-#define xd3_decode_size   xd3_decode_uint32_t
-#define xd3_emit_size     xd3_emit_uint32_t
-#define xd3_sizeof_size   xd3_sizeof_uint32_t
-#define xd3_read_size     xd3_read_uint32_t
-#elif SIZEOF_USIZE_T == 8
-#define USIZE_T_MAX        UINT64_MAX
-#define USIZE_T_MAXBLKSZ   0x8000000000000000ULL
-#define xd3_decode_size   xd3_decode_uint64_t
-#define xd3_emit_size     xd3_emit_uint64_t
-#define xd3_sizeof_size   xd3_sizeof_uint64_t
-#define xd3_read_size     xd3_read_uint64_t
+#define USIZE_T_MAX             UINT32_MAX
+#define USIZE_T_MAXBLKSZ        0x80000000U
+#define XD3_MAXSRCWINSZ         (1ULL << 31)
+#define xd3_large_cksum         xd3_large32_cksum
+#define xd3_large_cksum_update  xd3_large32_cksum_update
+#define xd3_hash_multiplier     xd3_hash_multiplier32
+
+static inline uint32_t xd3_sizeof_size (usize_t num)
+{ return xd3_sizeof_uint32_t (num); }
+static inline int xd3_decode_size (xd3_stream *stream, usize_t *valp)
+{ return xd3_decode_uint32_t (stream, (uint32_t*) valp); }
+static inline int xd3_read_size (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *maxp, usize_t *valp)
+{ return xd3_read_uint32_t (stream, inpp, maxp, (uint32_t*) valp); }
+#if XD3_ENCODER
+static inline int xd3_emit_size (xd3_stream *stream, xd3_output **output, usize_t num)
+{ return xd3_emit_uint32_t (stream, output, num); }
 #endif
+
+#elif SIZEOF_USIZE_T == 8
+#define USIZE_T_MAX             UINT64_MAX
+#define USIZE_T_MAXBLKSZ        0x8000000000000000ULL
+#define XD3_MAXSRCWINSZ         (1ULL << 61)
+#define xd3_large_cksum         xd3_large64_cksum
+#define xd3_large_cksum_update  xd3_large64_cksum_update
+#define xd3_hash_multiplier     xd3_hash_multiplier64
+
+static inline uint32_t xd3_sizeof_size (usize_t num)
+{ return xd3_sizeof_uint64_t (num); }
+static inline int xd3_decode_size (xd3_stream *stream, usize_t *valp)
+{ return xd3_decode_uint64_t (stream, (uint64_t*) valp); }
+static inline int xd3_read_size (xd3_stream *stream, const uint8_t **inpp,
+		   const uint8_t *maxp, usize_t *valp)
+{ return xd3_read_uint64_t (stream, inpp, maxp, (uint64_t*) valp); }
+#if XD3_ENCODER
+static inline int xd3_emit_size (xd3_stream *stream, xd3_output **output, usize_t num)
+{ return xd3_emit_uint64_t (stream, output, num); }
+#endif
+
+#endif /* SIZEOF_USIZE_T */
 
 #if SIZEOF_XOFF_T == 4
 #define XOFF_T_MAX        UINT32_MAX
-#define xd3_emit_offset   xd3_emit_uint32_t
-static inline int
-xd3_decode_offset (xd3_stream *stream, xoff_t *val)
-{
-  return xd3_decode_uint32_t (stream, (uint32_t*) val);
-}
+
+static inline int xd3_decode_offset (xd3_stream *stream, xoff_t *valp)
+{ return xd3_decode_uint32_t (stream, (uint32_t*) valp); }
+#if XD3_ENCODER
+static inline int xd3_emit_offset (xd3_stream *stream, xd3_output **output, xoff_t num)
+{ return xd3_emit_uint32_t (stream, output, num); }
+#endif
+
 #elif SIZEOF_XOFF_T == 8
 #define XOFF_T_MAX        UINT64_MAX
-#define xd3_emit_offset   xd3_emit_uint64_t
-static inline int
-xd3_decode_offset (xd3_stream *stream, xoff_t *val)
-{
-  return xd3_decode_uint64_t (stream, (uint64_t*) val);
-}
+
+static inline int xd3_decode_offset (xd3_stream *stream, xoff_t *valp)
+{ return xd3_decode_uint64_t (stream, (uint64_t*) valp); }
+#if XD3_ENCODER
+static inline int xd3_emit_offset (xd3_stream *stream, xd3_output **output, xoff_t num)
+{ return xd3_emit_uint64_t (stream, output, num); }
+#endif
+
 #endif
 
 #define USIZE_T_OVERFLOW(a,b) ((USIZE_T_MAX - (usize_t) (a)) < (usize_t) (b))
 #define XOFF_T_OVERFLOW(a,b) ((XOFF_T_MAX - (xoff_t) (a)) < (xoff_t) (b))
 
+int xd3_size_hashtable (xd3_stream   *stream,
+			usize_t       slots,
+			usize_t       look,
+			xd3_hash_cfg *cfg);
+
+usize_t xd3_checksum_hash (const xd3_hash_cfg *cfg, const usize_t cksum);
+
+#if USE_UINT32
+uint32_t xd3_large32_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
+uint32_t xd3_large32_cksum_update (xd3_hash_cfg *cfg, const uint32_t cksum,
+				   const uint8_t *base, const usize_t look);
+#endif /* USE_UINT32 */
+
+#if USE_UINT64
+uint64_t xd3_large64_cksum (xd3_hash_cfg *cfg, const uint8_t *base, const usize_t look);
+uint64_t xd3_large64_cksum_update (xd3_hash_cfg *cfg, const uint64_t cksum,
+				   const uint8_t *base, const usize_t look);
+#endif /* USE_UINT64 */
+
 #define MAX_LRU_SIZE 32U
 #define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
-#define XD3_MAXSRCWINSZ (1ULL << 31)
 
 #endif // XDELTA3_INTERNAL_H__

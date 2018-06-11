@@ -76,20 +76,22 @@ public:
     size_ = 0;
   }
 
-  void Print() const {
-    xoff_t pos = 0;
-    for (size_t i = 0; i < Size(); i++) {
-      if (pos % 16 == 0) {
-	DP(RINT "%5"Q"x: ", pos);
-      }
-      DP(RINT "%02x ", (*this)[i]);
-      if (pos % 16 == 15) {
-	DP(RINT "\n");
-      }
-      pos++;
-    }
-    DP(RINT "\n");
-  }
+  // Note: This does not benefit from -Wformat= checking, due to the
+  // enclosing template. Further, it was not used.
+  // void Print() const {
+  //   xoff_t pos = 0;
+  //   for (size_t i = 0; i < Size(); i++) {
+  //     if (pos % 16 == 0) {
+  // 	DP(RINT "%5" Q "x: ", pos);
+  //     }
+  //     DP(RINT "%02x ", (*this)[i]);
+  //     if (pos % 16 == 15) {
+  // 	DP(RINT "\n");
+  //     }
+  //     pos++;
+  //   }
+  //   DP(RINT "\n");
+  // }
 
   void WriteTmpFile(TmpFile *f) const {
     f->Append(this);

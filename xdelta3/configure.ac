@@ -1,9 +1,10 @@
-AC_INIT([Xdelta3], [3.0.12], [josh.macdonald@gmail.com], 
+AC_INIT([Xdelta3], [3.1.1], [josh.macdonald@gmail.com], 
 	[xdelta3], [http://xdelta.org/])
 AC_PREREQ([2.68])
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
-AM_INIT_AUTOMAKE([1.9 no-define foreign tar-ustar subdir-objects])
+AM_INIT_AUTOMAKE([1.15 no-define foreign tar-ustar subdir-objects])
+AC_CONFIG_MACRO_DIRS([m4])
 
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 AC_PROG_CC
@@ -43,6 +44,7 @@ dnl --enable-debug-symbols : build with debug symbols?
 AC_ARG_ENABLE(debug-symbols,
    AS_HELP_STRING(--enable-debug-symbols,[Build with debug symbols (default is NO)]),,enableval=no)
 AM_CONDITIONAL([DEBUG_SYMBOLS], [test ${enableval} = "yes"])
+
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])

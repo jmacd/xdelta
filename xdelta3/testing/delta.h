@@ -44,7 +44,7 @@ public:
       case XD3_WINFINISH:
 	break;
       default:
-	DP(RINT "error code %s\n", xd3_strerror (ret));
+	cerr << "decode: " << done;
 	abort();
       }
     }
@@ -62,23 +62,25 @@ public:
     return stream_.whole_target.wininfolen;
   }
 
-  void Print() const {
-    for (size_t i = 0; i < stream_.whole_target.instlen; i++) {
-      xd3_winst &winst = stream_.whole_target.inst[i];
-      switch (winst.type) {
-      case XD3_RUN: 
-	DP(RINT "%"Q"u run %u\n", winst.position, winst.size);
-	break;
-      case XD3_ADD: 
-	DP(RINT "%"Q"u add %u\n", winst.position, winst.size);
-	break;
-      default:
-	DP(RINT "%"Q"u copy %u @ %"Q"u (mode %u)\n", 
-	   winst.position, winst.size, winst.addr, winst.mode);
-	break;
-      }
-    }
-  }
+// Note: This does not benefit from -Wformat= checking, due to the
+// enclosing template. Further, it was not used.
+// void Print() const {
+//     for (size_t i = 0; i < stream_.whole_target.instlen; i++) {
+//       xd3_winst &winst = stream_.whole_target.inst[i];
+//       switch (winst.type) {
+//       case XD3_RUN: 
+// 	DP(RINT, "%" Q "u run %" W "u\n", winst.position, winst.size);
+// 	break;
+//       case XD3_ADD: 
+// 	DP(RINT "%" Q "u add %" W "u\n", winst.position, winst.size);
+// 	break;
+//       default:
+// 	DP(RINT "%" Q "u copy %" W "u @ %" Q "u (mode %u)\n", 
+// 	   winst.position, winst.size, winst.addr, winst.mode);
+// 	break;
+//       }
+//     }
+//   }
 
 private:
   xd3_stream stream_;

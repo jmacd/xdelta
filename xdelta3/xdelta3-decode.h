@@ -159,7 +159,7 @@ xd3_decode_allocate (xd3_stream  *stream,
 		     uint8_t    **buf_ptr,
 		     usize_t      *buf_alloc)
 {
-  IF_DEBUG2 (DP(RINT "[xd3_decode_allocate] size %u alloc %u\n",
+  IF_DEBUG2 (DP(RINT "[xd3_decode_allocate] size %"W"u alloc %"W"u\n",
 		size, *buf_alloc));
   
   if (*buf_ptr != NULL && *buf_alloc < size)
@@ -204,7 +204,7 @@ xd3_decode_section (xd3_stream *stream,
 	  /* No allocation/copy needed */
 	  section->buf = stream->next_in;
 	  sect_take    = section->size;
-	  IF_DEBUG1 (DP(RINT "[xd3_decode_section] zerocopy %u @ %u avail %u\n",
+	  IF_DEBUG1 (DP(RINT "[xd3_decode_section] zerocopy %"W"u @ %"W"u avail %"W"u\n",
 			sect_take, section->pos, stream->avail_in));
 	}
       else
@@ -229,7 +229,7 @@ xd3_decode_section (xd3_stream *stream,
 	      section->buf = section->copied1;
 	    }
 
-	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %u @ %u [need %u] avail %u\n",
+	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %"W"u @ %"W"u [need %"W"u] avail %"W"u\n",
 			sect_take, section->pos, sect_need, stream->avail_in));
 	  XD3_ASSERT (section->pos + sect_take <= section->alloc1);
 
@@ -247,7 +247,8 @@ xd3_decode_section (xd3_stream *stream,
 
   if (section->pos < section->size)
     {
-      IF_DEBUG1 (DP(RINT "[xd3_decode_section] further input required %u\n", section->size - section->pos));
+      IF_DEBUG1 (DP(RINT "[xd3_decode_section] further input required %"W"u\n",
+		    section->size - section->pos));
       stream->msg = "further input required";
       return XD3_INPUT;
     }
@@ -285,13 +286,14 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
     {
       IF_DEBUG2 ({
 	static int cnt = 0;
-	XPR(NT "DECODE:%u: COPY at %"Q"u (winoffset %u) size %u winaddr %u\n",
-		 cnt++,
-		 stream->total_out + (stream->dec_position -
-				      stream->dec_cpylen),
-		 (stream->dec_position - stream->dec_cpylen),
-		 inst->size,
-		 inst->addr);
+	XPR(NT "DECODE:%u: COPY at %"Q"u (winoffset %"W"u) "
+	    "size %"W"u winaddr %"W"u\n",
+	    cnt++,
+	    stream->total_out + (stream->dec_position -
+				 stream->dec_cpylen),
+	    (stream->dec_position - stream->dec_cpylen),
+	    inst->size,
+	    inst->addr);
       });
 
       if ((ret = xd3_decode_address (stream,
@@ -326,7 +328,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (inst->type == XD3_ADD)
 	  {
 	    static int cnt;
-	    XPR(NT "DECODE:%d: ADD at %"Q"u (winoffset %u) size %u\n",
+	    XPR(NT "DECODE:%d: ADD at %"Q"u (winoffset %"W"u) size %"W"u\n",
 	       cnt++,
 	       (stream->total_out + stream->dec_position - stream->dec_cpylen),
 	       stream->dec_position - stream->dec_cpylen,
@@ -336,7 +338,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  {
 	    static int cnt;
 	    XD3_ASSERT (inst->type == XD3_RUN);
-	    XPR(NT "DECODE:%d: RUN at %"Q"u (winoffset %u) size %u\n",
+	    XPR(NT "DECODE:%d: RUN at %"Q"u (winoffset %"W"u) size %"W"u\n",
 	       cnt++,
 	       stream->total_out + stream->dec_position - stream->dec_cpylen,
 	       stream->dec_position - stream->dec_cpylen,
@@ -523,7 +525,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		    (blkoff + take > source->onblk))
 		  {
 		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q"u onblk "
-				   "%u blksize %u blkoff %u take %u\n",
+				   "%"W"u blksize %"W"u blkoff %"W"u take %"W"u\n",
 				   block,
 				   source->onblk,
 				   blksize,
@@ -768,7 +770,7 @@ xd3_decode_emit (xd3_stream *stream)
 
   if (stream->avail_out != stream->dec_tgtlen)
     {
-      IF_DEBUG2 (DP(RINT "AVAIL_OUT(%d) != DEC_TGTLEN(%d)\n",
+      IF_DEBUG2 (DP(RINT "AVAIL_OUT(%"W"u) != DEC_TGTLEN(%"W"u)\n",
 		    stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
       return XD3_INVALID_INPUT;
@@ -1022,7 +1024,6 @@ xd3_decode_input (xd3_stream *stream)
 
     case DEC_CPYOFF:
       /* Copy window offset: only if VCD_SOURCE or VCD_TARGET is set */
-      
       OFFSET_CASE(SRCORTGT (stream->dec_win_ind), stream->dec_cpyoff,
 		  DEC_ENCLEN);
 
@@ -1036,7 +1037,7 @@ xd3_decode_input (xd3_stream *stream)
       /* Check copy window bounds: VCD_TARGET window may not exceed
 	 current position. */
       if ((stream->dec_win_ind & VCD_TARGET) &&
-	  (stream->dec_cpyoff + (xoff_t) stream->dec_cpylen >
+	  (stream->dec_cpyoff + stream->dec_cpylen >
 	   stream->dec_winstart))
 	{
 	  stream->msg = "VCD_TARGET window out of bounds";
@@ -1165,8 +1166,8 @@ xd3_decode_input (xd3_stream *stream)
 	  IF_DEBUG2(DP(RINT
 		       "[decode_cpyoff] %"Q"u "
 		       "cpyblkno %"Q"u "
-		       "cpyblkoff %u "
-		       "blksize %u\n",
+		       "cpyblkoff %"W"u "
+		       "blksize %"W"u\n",
 		       stream->dec_cpyoff,
 		       src->cpyoff_blocks,
 		       src->cpyoff_blkoff,
@@ -1176,7 +1177,7 @@ xd3_decode_input (xd3_stream *stream)
       /* xd3_decode_emit returns XD3_OUTPUT on every success. */
       if ((ret = xd3_decode_emit (stream)) == XD3_OUTPUT)
 	{
-	  stream->total_out += (xoff_t) stream->avail_out;
+	  stream->total_out += stream->avail_out;
 	}
 
       return ret;

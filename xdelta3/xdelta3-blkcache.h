@@ -19,6 +19,9 @@
 typedef struct _main_blklru      main_blklru;
 typedef struct _main_blklru_list main_blklru_list;
 
+
+#define XD3_INVALID_OFFSET XOFF_T_MAX
+
 struct _main_blklru_list
 {
   main_blklru_list  *next;
@@ -118,7 +121,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   /* Note: The API requires a power-of-two blocksize and srcwinsz
    * (-B).  The logic here will use a single block if the entire file
    * is known to fit into srcwinsz. */
-  option_srcwinsz = xd3_pow2_roundup (option_srcwinsz);
+  option_srcwinsz = xd3_xoff_roundup (option_srcwinsz);
 
   /* Though called "lru", it is not LRU-specific.  We always allocate
    * a maximum number of source block buffers.  If the entire file
@@ -146,7 +149,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
    * is the point at which external decompression may begin.  Set the
    * system for a single block. */
   lru_size = 1;
-  lru[0].blkno = (xoff_t) -1;
+  lru[0].blkno = XD3_INVALID_OFFSET;
   blksize = option_srcwinsz;
   main_blklru_list_push_back (& lru_list, & lru[0]);
   XD3_ASSERT (blksize != 0);
@@ -155,7 +158,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
   source->blksize  = blksize;
   source->name     = sfile->filename;
   source->ioh      = sfile;
-  source->curblkno = (xoff_t) -1;
+  source->curblkno = XD3_INVALID_OFFSET;
   source->curblk   = NULL;
   source->max_winsize = option_srcwinsz;
 
@@ -251,7 +254,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (option_verbose > 1)
 	{
-	  short_sprintf (nbufs, " #bufs %u", lru_size);
+	  short_sprintf (nbufs, " #bufs %"W"u", lru_size);
 	}
 
       XPR(NT "source %s %s blksize %s window %s%s%s\n",
@@ -286,7 +289,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	  return 0;
 	}
       /* No going backwards in a sequential scan. */
-      if (blru->blkno != (xoff_t) -1 && blru->blkno > blkno)
+      if (blru->blkno != XD3_INVALID_OFFSET && blru->blkno > blkno)
 	{
 	  return XD3_TOOFARBACK;
 	}
@@ -302,12 +305,12 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	      main_blklru_list_remove (blru);
 	      main_blklru_list_push_back (& lru_list, blru);
 	      (*blrup) = blru;
-	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %"Z"u lru_size=%d\n",
+	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %"Q"u lru_size=%"W"u\n",
 		    blkno, lru_size));
 	      return 0;
 	    }
 	}
-      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %"Z"u lru_size=%d\n",
+      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %"Q"u lru_size=%"W"u\n",
 		    blkno, lru_size));
     }
 
@@ -326,7 +329,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
   lru_filled += 1;
   (*is_new) = 1;
   (*blrup) = blru;
-  blru->blkno = -1;
+  blru->blkno = XD3_INVALID_OFFSET;
   return 0;
 }
 
@@ -436,7 +439,7 @@ main_read_seek_source (xd3_stream *stream,
 	  sfile->source_position += nread;
 	  blru->size = nread;
 
-	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u size %u\n",
+	  IF_DEBUG1 (DP(RINT "[getblk] skip blkno %"Q"u size %"W"u\n",
 			skip_blkno, blru->size));
 
 	  XD3_ASSERT (sfile->source_position <= pos);
@@ -517,7 +520,7 @@ main_getblk_func (xd3_stream *stream,
 
   if (option_verbose > 3)
     {
-      if (blru->blkno != (xoff_t)-1)
+      if (blru->blkno != XD3_INVALID_OFFSET)
 	{
 	  if (blru->blkno != blkno)
 	    {

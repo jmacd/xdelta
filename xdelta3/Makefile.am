@@ -1,7 +1,8 @@
 ACLOCAL_AMFLAGS = -I m4
+AUTOMAKE_OPTIONS = subdir-objects
 
 bin_PROGRAMS = xdelta3
-noinst_PROGRAMS = xdelta3regtest xdelta3decode
+noinst_PROGRAMS = xdelta3regtest xdelta3decode xdelta3checksum
 
 export AFL_HARDEN
 
@@ -37,13 +38,43 @@ xdelta3regtest_SOURCES = $(common_SOURCES) \
 	testing/sizes.h \
 	testing/test.h
 
+xdelta3checksum_SOURCES = $(common_SOURCES) \
+	testing/checksum_test.cc \
+	testing/checksum_test_c.c
+
+# These sources constitute a regression test written in Go, that is
+# not automatically built or run.  Install Go-1.5.x or later, add
+# `pwd`/go in $GOPATH, and (cd go/src && go run regtest.go).
+# TODO(jmacd): replace hard-coded path names in regtest.go w/ flags.
+GOLANG_SRCS = \
+	go/src/xdelta/test.go \
+	go/src/xdelta/rstream.go \
+	go/src/xdelta/tgroup.go \
+	go/src/xdelta/run.go \
+	go/src/regtest.go
+
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
 WFLAGS = -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare \
-	 -Wextra -Wno-unused-parameter -Wno-unused-function
+	 -Wformat=2 -Wno-format-nonliteral \
+	 -Wno-unused-parameter -Wno-unused-function
 
-C_WFLAGS = $(WFLAGS) -pedantic -std=c99
-CXX_WFLAGS = $(WFLAGS)
+ # -Weverything \
+ # -Wc++11-compat-reserved-user-defined-literal \
+ # -Wno-padded \
+ # -Wno-format-nonliteral \
+ # -Wno-cast-align \
+ # -Wno-unused-parameter \
+ # -Wno-sign-conversion \
+ # -Wno-conversion \
+ # -Wno-switch-enum \
+ # -Wno-covered-switch-default \
+ # -Wno-disabled-macro-expansion \
+ # -Wno-variadic-macros \
+ # -Wno-c++98-compat-pedantic
+
+C_WFLAGS = $(WFLAGS) -std=c99
+CXX_WFLAGS = $(WFLAGS) -std=c++11
 
 common_CFLAGS = \
 	      -DREGRESSION_TEST=1 \
@@ -80,15 +111,21 @@ xdelta3regtest_CFLAGS = \
 	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_DEBUG=1
 xdelta3regtest_LDADD = -lm
 
+xdelta3checksum_CXXFLAGS = \
+	$(CXX_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_MAIN=1 -std=c++11
+xdelta3checksum_CFLAGS = \
+	$(C_WFLAGS) $(common_CFLAGS) -DNOT_MAIN=1 -DXD3_MAIN=1
+
+
 man1_MANS = xdelta3.1
 
 EXTRA_DIST = \
 	README.md \
 	run_release.sh \
 	draft-korn-vcdiff.txt \
+	$(GOLANG_SRCS) \
 	examples/Makefile \
 	examples/README.md \
-	examples/checksum_test.cc \
 	examples/compare_test.c \
 	examples/encode_decode_test.c \
 	examples/small_page_test.c \
@@ -108,6 +145,21 @@ EXTRA_DIST = \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/main.m \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Info.plist \
 	examples/iOS/xdelta3-ios-test/xdelta3-ios-test/xdelta3-ios-test-Prefix.pch \
+	cpp-btree/CMakeLists.txt \
+	cpp-btree/COPYING \
+	cpp-btree/README \
+	cpp-btree/btree.h \
+	cpp-btree/btree_bench.cc \
+	cpp-btree/btree_container.h \
+	cpp-btree/btree_map.h \
+	cpp-btree/btree_set.h \
+	cpp-btree/btree_test.cc \
+	cpp-btree/btree_test.h \
+	cpp-btree/btree_test_flags.cc \
+	cpp-btree/safe_btree.h \
+	cpp-btree/safe_btree_map.h \
+	cpp-btree/safe_btree_set.h \
+	cpp-btree/safe_btree_test.cc \
 	testing/xdelta3-regtest.py \
 	testing/xdelta3-test.py \
 	xdelta3.1 \
