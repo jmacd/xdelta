@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find dependencies
+if(@XDELTA_ENABLE_LZMA@)
+    find_dependency(LibLZMA)
+endif()
+
+# Include targets file
+include("${CMAKE_CURRENT_LIST_DIR}/xdeltaTargets.cmake")
+
+check_required_components(xdelta)
