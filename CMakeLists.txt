@@ -189,21 +189,71 @@ if(XDELTA_ENABLE_LZMA)
         # Additional fallback for Windows if find_package fails
         if(WIN32 AND NOT LibLZMA_FOUND)
             message(STATUS "Attempting manual liblzma detection for Windows")
-            # Try to find lzma.h in vcpkg installation
-            if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include/lzma.h")
-                set(LibLZMA_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
 
-                # Find the library file
-                if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/liblzma.lib")
-                    set(LibLZMA_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/liblzma.lib")
-                elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/lzma.lib")
-                    set(LibLZMA_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/lzma.lib")
+            # Try multiple possible locations for vcpkg installation
+            set(POSSIBLE_VCPKG_ROOTS
+                "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg"
+                "${CMAKE_CURRENT_BINARY_DIR}/vcpkg"
+                "$ENV{VCPKG_ROOT}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/../vcpkg"
+            )
+
+            foreach(VCPKG_ROOT ${POSSIBLE_VCPKG_ROOTS})
+                if(EXISTS "${VCPKG_ROOT}/installed")
+                    message(STATUS "Found vcpkg installation at ${VCPKG_ROOT}")
+
+                    # Try different triplets if VCPKG_TARGET_TRIPLET is not set
+                    set(TRIPLETS_TO_TRY "${VCPKG_TARGET_TRIPLET}")
+                    if(NOT TRIPLETS_TO_TRY)
+                        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+                            list(APPEND TRIPLETS_TO_TRY "x64-windows" "x64-windows-static")
+                        else()
+                            list(APPEND TRIPLETS_TO_TRY "x86-windows" "x86-windows-static")
+                        endif()
+                    endif()
+
+                    foreach(TRIPLET ${TRIPLETS_TO_TRY})
+                        set(VCPKG_INCLUDE_DIR "${VCPKG_ROOT}/installed/${TRIPLET}/include")
+                        set(VCPKG_LIB_DIR "${VCPKG_ROOT}/installed/${TRIPLET}/lib")
+
+                        message(STATUS "Checking for lzma.h in ${VCPKG_INCLUDE_DIR}")
+                        if(EXISTS "${VCPKG_INCLUDE_DIR}/lzma.h")
+                            set(LibLZMA_INCLUDE_DIRS "${VCPKG_INCLUDE_DIR}")
+                            message(STATUS "Found lzma.h at ${VCPKG_INCLUDE_DIR}/lzma.h")
+
+                            # Find the library file - try multiple possible names
+                            foreach(LIB_NAME "liblzma.lib" "lzma.lib")
+                                if(EXISTS "${VCPKG_LIB_DIR}/${LIB_NAME}")
+                                    set(LibLZMA_LIBRARIES "${VCPKG_LIB_DIR}/${LIB_NAME}")
+                                    set(LibLZMA_FOUND TRUE)
+                                    message(STATUS "Manually found LibLZMA: ${LibLZMA_LIBRARIES}")
+                                    message(STATUS "Manually found LibLZMA include: ${LibLZMA_INCLUDE_DIRS}")
+                                    break()
+                                endif()
+                            endforeach()
+
+                            if(LibLZMA_FOUND)
+                                break()
+                            endif()
+                        endif()
+                    endforeach()
+
+                    if(LibLZMA_FOUND)
+                        break()
+                    endif()
                 endif()
+            endforeach()
 
-                if(LibLZMA_LIBRARIES)
+            # If still not found, try to find in system paths as a last resort
+            if(NOT LibLZMA_FOUND)
+                message(STATUS "Trying to find liblzma in system paths")
+                find_path(LibLZMA_INCLUDE_DIRS lzma.h)
+                find_library(LibLZMA_LIBRARIES NAMES liblzma lzma)
+
+                if(LibLZMA_INCLUDE_DIRS AND LibLZMA_LIBRARIES)
                     set(LibLZMA_FOUND TRUE)
-                    message(STATUS "Manually found LibLZMA: ${LibLZMA_LIBRARIES}")
-                    message(STATUS "Manually found LibLZMA include: ${LibLZMA_INCLUDE_DIRS}")
+                    message(STATUS "Found LibLZMA in system paths: ${LibLZMA_LIBRARIES}")
+                    message(STATUS "Found LibLZMA include in system paths: ${LibLZMA_INCLUDE_DIRS}")
                 endif()
             endif()
         endif()

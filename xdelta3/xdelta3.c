@@ -2628,7 +2628,7 @@ xd3_emit_double (xd3_stream *stream, xd3_rinst *first,
       return ret;
     }
 
-  IF_DEBUG2 (DP(RINT "[emit2]: %"W"u %s (%"W"u) %s (%"W"u) code %u\n",
+  IF_DEBUG2 (DP(RINT "[emit2]: %" W "u %s (%" W "u) %s (%" W "u) code %u\n",
 		first->pos,
 		xd3_rtype_to_string ((xd3_rtype) first->type, 0),
 		first->size,
@@ -2866,7 +2866,7 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
       XD3_ASSERT (stream->buf_avail == 0);
       XD3_ASSERT (stream->buf_leftavail < stream->winsize);
 
-      IF_DEBUG2 (DP(RINT "[leftover] previous %"W"u avail %"W"u\n",
+      IF_DEBUG2 (DP(RINT "[leftover] previous %" W "u avail %" W "u\n",
 		    stream->buf_leftavail, stream->avail_in));
 
       memcpy (stream->buf_in, stream->buf_leftover, stream->buf_leftavail);
@@ -2892,12 +2892,12 @@ xd3_encode_buffer_leftover (xd3_stream *stream)
   else if ((stream->buf_avail < stream->winsize) && !(stream->flags & XD3_FLUSH))
     {
       /* Buffer has space */
-      IF_DEBUG2 (DP(RINT "[leftover] emptied %"W"u\n", take));
+      IF_DEBUG2 (DP(RINT "[leftover] emptied %" W "u\n", take));
       return XD3_INPUT;
     }
 
   /* Use the buffer: */
-  IF_DEBUG2 (DP(RINT "[leftover] take %"W"u remaining %"W"u\n", take, stream->buf_leftavail));
+  IF_DEBUG2 (DP(RINT "[leftover] take %" W "u remaining %" W "u\n", take, stream->buf_leftavail));
   stream->next_in   = stream->buf_in;
   stream->avail_in  = stream->buf_avail;
   stream->buf_avail = 0;
@@ -3122,13 +3122,13 @@ xd3_encode_input (xd3_stream *stream)
 
       stream->enc_state = ENC_SEARCH;
 
-      IF_DEBUG2 (DP(RINT "[WINSTART:%"Q"u] input bytes %"W"u offset %"Q"u\n",
+      IF_DEBUG2 (DP(RINT "[WINSTART:%" Q "u] input bytes %" W "u offset %" Q "u\n",
 		    stream->current_window, stream->avail_in,
 		    stream->total_in));
       return XD3_WINSTART;
 
     case ENC_SEARCH:
-      IF_DEBUG2 (DP(RINT "[SEARCH] match_state %d avail_in %"W"u %s\n",
+      IF_DEBUG2 (DP(RINT "[SEARCH] match_state %d avail_in %" W "u %s\n",
 		    stream->match_state, stream->avail_in,
 		    stream->src ? "source" : "no source"));
 
@@ -3264,7 +3264,7 @@ xd3_encode_input (xd3_stream *stream)
       stream->total_in += stream->avail_in;
       stream->enc_state = ENC_POSTWIN;
 
-      IF_DEBUG2 (DP(RINT "[WINFINISH:%"Q"u] in=%"Q"u\n",
+      IF_DEBUG2 (DP(RINT "[WINFINISH:%" Q "u] in=%" Q "u\n",
 		    stream->current_window,
 		    stream->total_in));
       return XD3_WINFINISH;

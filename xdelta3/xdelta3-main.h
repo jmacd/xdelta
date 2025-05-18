@@ -4086,5 +4086,5 @@ main_help (void)
   XPR(NTR "   XDELTA=\"-s source-x.y.tar.gz\" \\\n");
   XPR(NTR "   tar --use-compress-program=xdelta3 \\\n");
   XPR(NTR "       -cf target-x.z.tar.gz.vcdiff target-x.y\n");
-  return EXIT_FAILURE;
+  return EXIT_SUCCESS;
 }
