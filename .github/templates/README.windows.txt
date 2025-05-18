@@ -1,18 +1,18 @@
-Xdelta3 Binary
+Xdelta3 Windows Binary
 ======================
 
-This package contains the xdelta3 command-line utility.
+This package contains the xdelta3 command-line utility for Windows.
 
 Command Line Syntax
 -------------------
 
 make patch:
 
-  xdelta3 -e -s old_file new_file delta_file
+  xdelta3.exe -e -s old_file new_file delta_file
 
 apply patch:
 
-  xdelta3 -d -s old_file delta_file decoded_new_file
+  xdelta3.exe -d -s old_file delta_file decoded_new_file
 
 standard options:
    -0 .. -9     compression level
@@ -25,4 +25,4 @@ standard options:
    -v           be verbose (max 2)
    -V           show version
 
-For full documentation, run: xdelta3 --help
+For full documentation, run: xdelta3.exe --help

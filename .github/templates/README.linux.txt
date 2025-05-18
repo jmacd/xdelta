@@ -1,7 +1,7 @@
-Xdelta3 Binary
+Xdelta3 Linux Binary
 ======================
 
-This package contains the xdelta3 command-line utility.
+This package contains the xdelta3 command-line utility for Linux.
 
 Command Line Syntax
 -------------------

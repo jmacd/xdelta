@@ -1,7 +1,7 @@
-Xdelta3 Binary
+Xdelta3 macOS Binary
 ======================
 
-This package contains the xdelta3 command-line utility.
+This package contains the xdelta3 command-line utility for macOS.
 
 Command Line Syntax
 -------------------
@@ -26,3 +26,6 @@ standard options:
    -V           show version
 
 For full documentation, run: xdelta3 --help
+
+NOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues.
+Please use Windows or Linux platforms.

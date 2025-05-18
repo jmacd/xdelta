@@ -204,88 +204,27 @@ jobs:
             Write-Host "No DLLs found at: $dllPath (this may be normal for static builds)"
         }
 
-        # Create README from template file
-        Write-Host "Creating README file from template..."
+        # Create README from platform-specific template file
+        Write-Host "Creating README file from platform-specific template..."
 
         # Define template path with forward slashes for GitHub Actions environment
-        $templatePath = "${{ github.workspace }}/.github/templates/README.template.txt"
+        $templatePath = "${{ github.workspace }}/.github/templates/README.windows.txt"
         Write-Host "Looking for template at: $templatePath"
 
-        # List directory contents for debugging
-        Write-Host "Checking if .github directory exists..."
-        if (Test-Path "${{ github.workspace }}/.github") {
-            Write-Host ".github directory exists"
-            Get-ChildItem -Path "${{ github.workspace }}/.github" | ForEach-Object { Write-Host "- $_" }
-
-            Write-Host "Checking if templates directory exists..."
-            if (Test-Path "${{ github.workspace }}/.github/templates") {
-                Write-Host "templates directory exists"
-                Get-ChildItem -Path "${{ github.workspace }}/.github/templates" | ForEach-Object { Write-Host "- $_" }
-            } else {
-                Write-Host "templates directory does not exist"
-            }
-        } else {
-            Write-Host ".github directory does not exist"
-        }
-
-        # Try to read template with detailed error handling
+        # Copy the template file
         try {
             if (Test-Path $templatePath) {
-                Write-Host "Template file found, reading content..."
-                $templateContent = Get-Content -Path $templatePath -Raw -ErrorAction Stop
-                Write-Host "Template content read successfully, length: $($templateContent.Length) characters"
-
-                # Show first few characters of template for debugging
-                if ($templateContent.Length -gt 0) {
-                    Write-Host "Template starts with: $($templateContent.Substring(0, [Math]::Min(20, $templateContent.Length)))..."
-
-                    # Replace placeholders with explicit string replacement
-                    Write-Host "Replacing placeholders in template..."
-                    $readmeContent = $templateContent -replace '{{PLATFORM}}', 'Windows' -replace '{{EXECUTABLE_NAME}}', 'xdelta3.exe'
-                    Write-Host "Placeholders replaced successfully"
-                } else {
-                    throw "Template file is empty"
-                }
+                Write-Host "Platform-specific template file found, copying..."
+                $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+                Copy-Item -Path $templatePath -Destination $readmePath -Force
+                Write-Host "Template copied successfully to: $readmePath"
             } else {
-                throw "Template file not found at: $templatePath"
+                Write-Error "README template file not found at: $templatePath"
+                exit 1
             }
         } catch {
-            Write-Host "Error processing template: $_"
-            Write-Host "Falling back to hardcoded content..."
-
-            # Fallback to hardcoded content
-            $readmeContent = "Xdelta3 Windows Binary`r`n"
-            $readmeContent += "======================`r`n`r`n"
-            $readmeContent += "This package contains the xdelta3 command-line utility for Windows.`r`n`r`n"
-            $readmeContent += "Command Line Syntax`r`n"
-            $readmeContent += "-------------------`r`n`r`n"
-            $readmeContent += "make patch:`r`n`r`n"
-            $readmeContent += "  xdelta3.exe -e -s old_file new_file delta_file`r`n`r`n"
-            $readmeContent += "apply patch:`r`n`r`n"
-            $readmeContent += "  xdelta3.exe -d -s old_file delta_file decoded_new_file`r`n`r`n"
-            $readmeContent += "standard options:`r`n"
-            $readmeContent += "   -0 .. -9     compression level`r`n"
-            $readmeContent += "   -c           use stdout`r`n"
-            $readmeContent += "   -d           decompress`r`n"
-            $readmeContent += "   -e           compress`r`n"
-            $readmeContent += "   -f           force (overwrite, ignore trailing garbage)`r`n"
-            $readmeContent += "   -h           show help`r`n"
-            $readmeContent += "   -q           be quiet`r`n"
-            $readmeContent += "   -v           be verbose (max 2)`r`n"
-            $readmeContent += "   -V           show version`r`n`r`n"
-            $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
-        }
-        Write-Host "README content prepared"
-
-        # Write the content to file using .NET methods to avoid PowerShell formatting issues
-        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-        [System.IO.File]::WriteAllText($readmePath, $readmeContent)
-
-        # Verify README was created successfully
-        if (Test-Path $readmePath) {
-            Write-Host "README.txt created successfully at: $readmePath"
-        } else {
-            Write-Error "Failed to create README.txt at: $readmePath"
+            Write-Host "Error copying template: $_"
+            Write-Error "Failed to copy README template"
             exit 1
         }
 
@@ -485,53 +424,21 @@ jobs:
         # Copy executables
         cp build/xdelta3 artifacts/linux/
 
-        # Create README from template
-        echo "Creating README file from template..."
+        # Create README from platform-specific template
+        echo "Creating README file from platform-specific template..."
 
-        # Define template path
-        TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.template.txt"
-        echo "Looking for template at: $TEMPLATE_PATH"
+        # Define platform-specific template path
+        PLATFORM_TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.linux.txt"
+        echo "Looking for platform-specific template at: $PLATFORM_TEMPLATE_PATH"
 
-        # Try to read template with fallback
-        if [ -f "$TEMPLATE_PATH" ]; then
-          echo "Template found, processing..."
-          # Use sed to replace placeholders and create README
-          sed -e 's/{{PLATFORM}}/Linux/g' -e 's/{{EXECUTABLE_NAME}}/xdelta3/g' \
-              "$TEMPLATE_PATH" > artifacts/linux/README.txt
-          echo "Template processed successfully"
+        # Copy the template file
+        if [ -f "$PLATFORM_TEMPLATE_PATH" ]; then
+          echo "Platform-specific template found, copying..."
+          cp "$PLATFORM_TEMPLATE_PATH" artifacts/linux/README.txt
+          echo "Template copied successfully"
         else
-          echo "Template file not found, using hardcoded content"
-          # Create a basic README with direct echo commands
-          echo "Xdelta3 Linux Binary" > artifacts/linux/README.txt
-          echo "===================" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "This package contains the xdelta3 command-line utility for Linux." >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-
-          # Add command line syntax documentation
-          echo "Command Line Syntax" >> artifacts/linux/README.txt
-          echo "-------------------" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "make patch:" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "  xdelta3 -e -s old_file new_file delta_file" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "apply patch:" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "  xdelta3 -d -s old_file delta_file decoded_new_file" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "standard options:" >> artifacts/linux/README.txt
-          echo "   -0 .. -9     compression level" >> artifacts/linux/README.txt
-          echo "   -c           use stdout" >> artifacts/linux/README.txt
-          echo "   -d           decompress" >> artifacts/linux/README.txt
-          echo "   -e           compress" >> artifacts/linux/README.txt
-          echo "   -f           force (overwrite, ignore trailing garbage)" >> artifacts/linux/README.txt
-          echo "   -h           show help" >> artifacts/linux/README.txt
-          echo "   -q           be quiet" >> artifacts/linux/README.txt
-          echo "   -v           be verbose (max 2)" >> artifacts/linux/README.txt
-          echo "   -V           show version" >> artifacts/linux/README.txt
-          echo "" >> artifacts/linux/README.txt
-          echo "For full documentation, run: xdelta3 --help" >> artifacts/linux/README.txt
+          echo "ERROR: README template file not found at: $PLATFORM_TEMPLATE_PATH"
+          exit 1
         fi
 
         # Verify README was created successfully
@@ -582,19 +489,21 @@ jobs:
         # Create empty artifacts directory for the package job
         mkdir -p artifacts/macos
 
-        # Create README from template with disabled notice
-        if [ -f "${{ github.workspace }}/.github/templates/README.template.txt" ]; then
-          # Use sed to replace placeholders and create README
-          sed -e 's/{{PLATFORM}}/macOS/g' -e 's/{{EXECUTABLE_NAME}}/xdelta3/g' \
-              "${{ github.workspace }}/.github/templates/README.template.txt" > artifacts/macos/README.txt
+        # Create README from platform-specific template
+        echo "Creating README file from platform-specific template..."
 
-          # Add disabled notice
-          echo -e "\n\nNOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues." >> artifacts/macos/README.txt
-          echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
+        # Define platform-specific template path
+        PLATFORM_TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.macos.txt"
+        echo "Looking for platform-specific template at: $PLATFORM_TEMPLATE_PATH"
+
+        # Copy the template file
+        if [ -f "$PLATFORM_TEMPLATE_PATH" ]; then
+          echo "Platform-specific template found, copying..."
+          cp "$PLATFORM_TEMPLATE_PATH" artifacts/macos/README.txt
+          echo "Template copied successfully"
         else
-          # Fallback if template doesn't exist
-          echo "macOS build is temporarily disabled due to C++11 literal suffix issues." > artifacts/macos/README.txt
-          echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
+          echo "ERROR: README template file not found at: $PLATFORM_TEMPLATE_PATH"
+          exit 1
         fi
 
         # Create empty tarball if requested
