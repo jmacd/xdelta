@@ -43,6 +43,18 @@ jobs:
       with:
         fetch-depth: 0
 
+    # Setup cache for build outputs
+    - name: Setup build cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          build
+          ${{ github.workspace }}/vcpkg/installed
+          ${{ github.workspace }}/vcpkg/packages
+        key: ${{ runner.os }}-${{ matrix.arch }}-build-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c', 'CMakeLists.txt', 'vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.arch }}-build-
+
     # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
       uses: johnwason/vcpkg-action@v6
@@ -53,6 +65,7 @@ jobs:
         revision: ${{ inputs.vcpkg_commit }}
         token: ${{ github.token }}
         github-binarycache: true
+        cache-key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
 
     # Check if liblzma is installed correctly
     - name: Verify liblzma installation
@@ -231,8 +244,9 @@ jobs:
     - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2
       with:
-        key: ${{ runner.os }}-ccache-${{ github.sha }}
-        restore-keys: ${{ runner.os }}-ccache-
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
 
     # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
@@ -244,6 +258,7 @@ jobs:
         revision: ${{ inputs.vcpkg_commit }}
         token: ${{ github.token }}
         github-binarycache: true
+        cache-key: vcpkg-${{ runner.os }}-x64-linux-${{ hashFiles('vcpkg.json') }}
 
     - name: Configure CMake
       run: |
