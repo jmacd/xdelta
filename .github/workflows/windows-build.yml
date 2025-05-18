@@ -46,8 +46,11 @@ jobs:
       with:
         vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
         vcpkgDirectory: ${{ github.workspace }}/vcpkg
-        runVcpkgInstall: true
-        vcpkgJsonGlob: '**/vcpkg.json'
+
+    - name: Install dependencies with vcpkg
+      run: |
+        # Explicitly specify the path to vcpkg.json
+        vcpkg install --x-manifest-root="${{ github.workspace }}"
 
     - name: Configure CMake
       run: |
