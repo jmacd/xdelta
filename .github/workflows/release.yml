@@ -20,8 +20,8 @@ jobs:
   build:
     uses: ./.github/workflows/reusable-build.yml
     with:
-      build_type: ${{ env.BUILD_TYPE }}
-      vcpkg_commit: ${{ env.VCPKG_COMMIT }}
+      build_type: Release
+      vcpkg_commit: a34c873a9717a888f58dc05268dea15592c2f0ff
       artifact_retention_days: 90
       create_archives: true
 
