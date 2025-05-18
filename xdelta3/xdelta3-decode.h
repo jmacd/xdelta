@@ -161,7 +161,7 @@ xd3_decode_allocate (xd3_stream  *stream,
 {
   IF_DEBUG2 (DP(RINT "[xd3_decode_allocate] size %"W"u alloc %"W"u\n",
 		size, *buf_alloc));
-  
+
   if (*buf_ptr != NULL && *buf_alloc < size)
     {
       xd3_free (stream, *buf_ptr);
@@ -286,8 +286,8 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
     {
       IF_DEBUG2 ({
 	static int cnt = 0;
-	XPR(NT "DECODE:%u: COPY at %"Q"u (winoffset %"W"u) "
-	    "size %"W"u winaddr %"W"u\n",
+	XPR(NT "DECODE:%u: COPY at %" Q "u (winoffset %" W "u) "
+	    "size %" W "u winaddr %" W "u\n",
 	    cnt++,
 	    stream->total_out + (stream->dec_position -
 				 stream->dec_cpylen),
@@ -328,7 +328,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	if (inst->type == XD3_ADD)
 	  {
 	    static int cnt;
-	    XPR(NT "DECODE:%d: ADD at %"Q"u (winoffset %"W"u) size %"W"u\n",
+	    XPR(NT "DECODE:%d: ADD at %" Q "u (winoffset %" W "u) size %" W "u\n",
 	       cnt++,
 	       (stream->total_out + stream->dec_position - stream->dec_cpylen),
 	       stream->dec_position - stream->dec_cpylen,
@@ -338,7 +338,7 @@ xd3_decode_parse_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	  {
 	    static int cnt;
 	    XD3_ASSERT (inst->type == XD3_RUN);
-	    XPR(NT "DECODE:%d: RUN at %"Q"u (winoffset %"W"u) size %"W"u\n",
+	    XPR(NT "DECODE:%d: RUN at %" Q "u (winoffset %" W "u) size %" W "u\n",
 	       cnt++,
 	       stream->total_out + stream->dec_position - stream->dec_cpylen,
 	       stream->dec_position - stream->dec_cpylen,
@@ -470,7 +470,7 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 	     * current decoder window, the first (VCD_TARGET) is
 	     * unimplemented. */
 	    overlap = 0;
-	    
+
 	    /* This branch sets "src".  As a side-effect, we modify
 	     * "inst" so that if we reenter this method after a
 	     * XD3_GETSRCBLK response the state is correct.  So if the
@@ -524,8 +524,8 @@ xd3_decode_output_halfinst (xd3_stream *stream, xd3_hinst *inst)
 		if ((source->onblk != blksize) &&
 		    (blkoff + take > source->onblk))
 		  {
-		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %"Q"u onblk "
-				   "%"W"u blksize %"W"u blkoff %"W"u take %"W"u\n",
+		    IF_DEBUG1 (XPR(NT "[srcfile] short at blkno %" Q "u onblk "
+				   "%" W "u blksize %" W "u blkoff %" W "u take %" W "u\n",
 				   block,
 				   source->onblk,
 				   blksize,
@@ -1162,7 +1162,7 @@ xd3_decode_input (xd3_stream *stream)
 	  xd3_blksize_div(stream->dec_cpyoff, src,
 			  &src->cpyoff_blocks,
 			  &src->cpyoff_blkoff);
-	  
+
 	  IF_DEBUG2(DP(RINT
 		       "[decode_cpyoff] %"Q"u "
 		       "cpyblkno %"Q"u "
