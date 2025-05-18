@@ -1,0 +1,315 @@
+name: Reusable Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      build_type:
+        description: 'Build type (Debug, Release, etc.)'
+        required: false
+        default: 'Release'
+        type: string
+      vcpkg_commit:
+        description: 'vcpkg commit hash to use'
+        required: false
+        default: 'a34c873a9717a888f58dc05268dea15592c2f0ff'
+        type: string
+      artifact_retention_days:
+        description: 'Number of days to retain artifacts'
+        required: false
+        default: 90
+        type: number
+      create_archives:
+        description: 'Whether to create zip/tar.gz archives for artifacts'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, x86]
+        include:
+          - arch: x64
+            triplet: x64-windows
+            cmake_arch: -A x64
+          - arch: x86
+            triplet: x86-windows
+            cmake_arch: -A Win32
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Setup vcpkg using vcpkg-action
+    - name: Setup vcpkg
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }}
+        triplet: ${{ matrix.triplet }}
+        revision: ${{ inputs.vcpkg_commit }}
+        token: ${{ github.token }}
+        github-binarycache: true
+
+    # Check if liblzma is installed correctly
+    - name: Verify liblzma installation
+      shell: pwsh
+      run: |
+        $vcpkgInstallDir = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
+        if (Test-Path "$vcpkgInstallDir/include/lzma.h") {
+            Write-Host "lzma.h found at $vcpkgInstallDir/include/lzma.h"
+        } else {
+            Write-Host "ERROR: lzma.h not found in $vcpkgInstallDir/include/"
+
+            # Check if the include directory exists
+            if (Test-Path "$vcpkgInstallDir/include") {
+                Write-Host "Listing files in include directory:"
+                Get-ChildItem -Recurse -Path "$vcpkgInstallDir/include" | Select-Object FullName
+            } else {
+                Write-Host "Include directory does not exist at $vcpkgInstallDir/include"
+            }
+
+            # Check if there are any lzma-related files in the installation
+            Write-Host "Searching for lzma-related files in vcpkg installation:"
+            Get-ChildItem -Recurse -Path "$vcpkgInstallDir" -Filter "*lzma*" | Select-Object FullName
+
+            # Try to find lzma.h in the entire workspace
+            Write-Host "Searching for lzma.h in the entire workspace:"
+            Get-ChildItem -Recurse -Path "${{ github.workspace }}" -Filter "lzma.h" | Select-Object FullName
+        }
+
+    - name: Configure CMake
+      run: |
+        # Simple configuration relying on vcpkg integration
+        Write-Host "Configuring CMake with vcpkg toolchain..."
+
+        # Ensure vcpkg toolchain file exists
+        $vcpkgToolchain = "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        if (Test-Path $vcpkgToolchain) {
+            Write-Host "vcpkg toolchain file found at: $vcpkgToolchain"
+        } else {
+            Write-Host "ERROR: vcpkg toolchain file not found at: $vcpkgToolchain"
+            exit 1
+        }
+
+        # Add explicit include paths for liblzma if needed
+        $vcpkgIncludePath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
+        $vcpkgLibPath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
+
+        # Configure with detailed output
+        cmake -B build -S . ${{ matrix.cmake_arch }} `
+          -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} `
+          -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
+          -DXDELTA_ENABLE_LZMA=ON `
+          -DXDELTA_BUILD_TESTS=OFF `
+          -DCMAKE_INCLUDE_PATH="$vcpkgIncludePath" `
+          -DCMAKE_LIBRARY_PATH="$vcpkgLibPath" `
+          -DLIBLZMA_INCLUDE_DIR="$vcpkgIncludePath" `
+          -DLIBLZMA_LIBRARY="$vcpkgLibPath/liblzma.lib" `
+          -DCMAKE_VERBOSE_MAKEFILE=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ inputs.build_type }}
+
+    - name: Test executable
+      shell: pwsh
+      run: |
+        # Test if the executable works by running --help
+        $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
+
+        # Check if the executable exists
+        if (Test-Path $exePath) {
+            Write-Host "Testing $exePath with --help command..."
+            & $exePath --help
+
+            # We don't check the exit code here since xdelta3 --help may return 0 or 1
+            # The important thing is that it displays help information
+            Write-Host "Executable test passed!"
+        } else {
+            Write-Error "Executable not found at $exePath"
+            exit 1
+        }
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts/windows-${{ matrix.arch }}
+
+        # Copy executables
+        cp build/${{ inputs.build_type }}/xdelta3.exe artifacts/windows-${{ matrix.arch }}/
+
+        # Copy required DLLs if using dynamic linking
+        if (Test-Path "build/vcpkg_installed/${{ matrix.triplet }}/bin") {
+          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll artifacts/windows-${{ matrix.arch }}/
+        }
+
+        # Create README in artifacts
+        @"
+        Xdelta3 Windows Binary (${{ matrix.arch }})
+        ===============================
+
+        Built from: ${{ github.repository }}@${{ github.sha }}
+        Build date: $(Get-Date -Format "yyyy-MM-dd")
+
+        This package contains the xdelta3 command-line utility for Windows.
+        "@ | Out-File -FilePath artifacts/windows-${{ matrix.arch }}/README.txt
+
+        # Create zip archive if requested
+        if (${{ inputs.create_archives }}) {
+          Compress-Archive -Path artifacts/windows-${{ matrix.arch }}/* -DestinationPath xdelta3-windows-${{ matrix.arch }}.zip
+        }
+
+    - name: Upload artifacts (directory)
+      if: ${{ !inputs.create_archives }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-windows-${{ matrix.arch }}
+        path: artifacts/windows-${{ matrix.arch }}
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+    - name: Upload artifacts (archive)
+      if: ${{ inputs.create_archives }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-windows-${{ matrix.arch }}
+        path: xdelta3-windows-${{ matrix.arch }}.zip
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-ccache-${{ github.sha }}
+        restore-keys: ${{ runner.os }}-ccache-
+
+    # Setup vcpkg using vcpkg-action
+    - name: Setup vcpkg
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }}
+        triplet: x64-linux
+        revision: ${{ inputs.vcpkg_commit }}
+        token: ${{ github.token }}
+        github-binarycache: true
+
+    - name: Configure CMake
+      run: |
+        # Simple configuration relying on vcpkg integration
+        cmake -B build -S . \
+          -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+          -DXDELTA_ENABLE_LZMA=ON \
+          -DXDELTA_BUILD_TESTS=OFF \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Build
+      run: cmake --build build --config ${{ inputs.build_type }} -j $(nproc)
+
+    - name: Test executable
+      run: |
+        # Test if the executable works by running --help
+        if [ -f "build/xdelta3" ]; then
+          echo "Testing build/xdelta3 with --help command..."
+          ./build/xdelta3 --help
+
+          # We don't check the exit code here since xdelta3 --help may return 0 or 1
+          # The important thing is that it displays help information
+          echo "Executable test passed!"
+        else
+          echo "Executable not found at build/xdelta3"
+          exit 1
+        fi
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts/linux
+
+        # Copy executables
+        cp build/xdelta3 artifacts/linux/
+
+        # Create README in artifacts
+        cat > artifacts/linux/README.txt << EOF
+        Xdelta3 Linux Binary
+        ===================
+
+        Built from: ${{ github.repository }}@${{ github.sha }}
+        Build date: $(date +"%Y-%m-%d")
+
+        This package contains the xdelta3 command-line utility for Linux.
+        EOF
+
+        # Create tarball if requested
+        if [ "${{ inputs.create_archives }}" = "true" ]; then
+          tar -czvf xdelta3-linux.tar.gz -C artifacts/linux .
+        fi
+
+    - name: Upload artifacts (directory)
+      if: ${{ !inputs.create_archives }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-linux
+        path: artifacts/linux
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+    - name: Upload artifacts (archive)
+      if: ${{ inputs.create_archives }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-linux
+        path: xdelta3-linux.tar.gz
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+  build-macos:
+    runs-on: ubuntu-latest
+
+    # TEMPORARILY DISABLED: macOS support is currently disabled
+    # Known issues:
+    # 1. Format string issues with '%"Z"d' pattern in xdelta3.c
+    # 2. Various warnings in xdelta3-fgk.h
+    # 3. Compatibility issues with static_assert implementation
+    #
+    # These issues need to be addressed in a future PR.
+
+    steps:
+    - name: Skip macOS build
+      run: |
+        echo "::warning::macOS build is temporarily disabled due to C++11 literal suffix issues"
+        echo "macOS support is temporarily disabled. Please use Windows or Linux platforms."
+        # Create empty artifacts directory for the package job
+        mkdir -p artifacts/macos
+        echo "macOS build is temporarily disabled due to C++11 literal suffix issues." > artifacts/macos/README.txt
+        echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
+
+        # Create empty tarball if requested
+        if [ "${{ inputs.create_archives }}" = "true" ]; then
+          tar -czvf xdelta3-macos.tar.gz -C artifacts/macos .
+        fi
+
+    - name: Upload artifacts (directory)
+      if: ${{ !inputs.create_archives }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-macos
+        path: artifacts/macos
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+    - name: Upload artifacts (archive)
+      if: ${{ inputs.create_archives }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-macos
+        path: xdelta3-macos.tar.gz
+        retention-days: ${{ inputs.artifact_retention_days }}

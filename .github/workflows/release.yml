@@ -16,151 +16,17 @@ env:
   VCPKG_COMMIT: a34c873a9717a888f58dc05268dea15592c2f0ff  # 2024.03.25 commit hash
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [x64, x86]
-        include:
-          - arch: x64
-            triplet: x64-windows
-            cmake_arch: -A x64
-          - arch: x86
-            triplet: x86-windows
-            cmake_arch: -A Win32
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    # Setup cache for vcpkg
-    - name: Cache vcpkg packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/vcpkg/installed
-          ${{ github.workspace }}/vcpkg/packages
-        key: ${{ runner.os }}-${{ matrix.arch }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ matrix.arch }}-vcpkg-${{ env.VCPKG_COMMIT }}-
-
-    - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v11
-      with:
-        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
-        vcpkgDirectory: ${{ github.workspace }}/vcpkg
-
-    - name: Install dependencies with vcpkg
-      run: |
-        # Explicitly specify the path to vcpkg.json
-        vcpkg install --x-manifest-root="${{ github.workspace }}"
-
-    - name: Configure CMake
-      run: |
-        cmake -B build -S . ${{ matrix.cmake_arch }} `
-          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
-          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
-          -DXDELTA_ENABLE_LZMA=ON
-
-    - name: Build
-      run: cmake --build build --config ${{ env.BUILD_TYPE }}
-
-    - name: Prepare artifacts
-      run: |
-        mkdir -p artifacts
-
-        # Copy executables
-        cp build/${{ env.BUILD_TYPE }}/xdelta3.exe artifacts/
-
-        # Copy required DLLs if using dynamic linking
-        if (Test-Path "build/vcpkg_installed/${{ matrix.triplet }}/bin") {
-          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll artifacts/
-        }
-
-        # Create zip archive
-        Compress-Archive -Path artifacts/* -DestinationPath xdelta3-windows-${{ matrix.arch }}.zip
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: xdelta3-windows-${{ matrix.arch }}
-        path: xdelta3-windows-${{ matrix.arch }}.zip
-        retention-days: 90
-
-  build-linux:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y liblzma-dev
-
-    - name: Configure CMake
-      run: |
-        cmake -B build -S . \
-          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DXDELTA_ENABLE_LZMA=ON
-
-    - name: Build
-      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(nproc)
-
-    - name: Prepare artifacts
-      run: |
-        mkdir -p artifacts
-
-        # Copy executables
-        cp build/xdelta3 artifacts/
-
-        # Create tarball
-        tar -czvf xdelta3-linux.tar.gz -C artifacts .
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: xdelta3-linux
-        path: xdelta3-linux.tar.gz
-        retention-days: 90
-
-  build-macos:
-    runs-on: ubuntu-latest
-
-    # TEMPORARILY DISABLED: macOS support is currently disabled
-    # Known issues:
-    # 1. Format string issues with '%"Z"d' pattern in xdelta3.c
-    # 2. Various warnings in xdelta3-fgk.h
-    # 3. Compatibility issues with static_assert implementation
-    #
-    # These issues need to be addressed in a future PR.
-
-    steps:
-    - name: Skip macOS build
-      run: |
-        echo "::warning::macOS build is temporarily disabled due to C++11 literal suffix issues"
-        echo "macOS support is temporarily disabled. Please use Windows or Linux platforms."
-        # Create empty artifacts directory for the package job
-        mkdir -p artifacts
-        echo "macOS build is temporarily disabled due to C++11 literal suffix issues." > artifacts/README.txt
-        echo "Please use Windows or Linux platforms." >> artifacts/README.txt
-
-        # Create empty tarball for the release job
-        tar -czvf xdelta3-macos.tar.gz -C artifacts .
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: xdelta3-macos
-        path: xdelta3-macos.tar.gz
-        retention-days: 90
+  # Use the reusable workflow for building on all platforms
+  build:
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      build_type: ${{ env.BUILD_TYPE }}
+      vcpkg_commit: ${{ env.VCPKG_COMMIT }}
+      artifact_retention_days: 90
+      create_archives: true
 
   export-vcpkg-binaries:
-    needs: [build-windows]
+    needs: [build]
     runs-on: windows-latest
 
     steps:
@@ -316,7 +182,7 @@ jobs:
         retention-days: 90
 
   create-release:
-    needs: [build-windows, build-linux, export-vcpkg-binaries]
+    needs: [build, export-vcpkg-binaries]
     runs-on: ubuntu-latest
 
     steps:
