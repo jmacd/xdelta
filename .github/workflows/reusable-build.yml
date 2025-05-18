@@ -207,23 +207,50 @@ jobs:
         # Create README from platform-specific template file
         Write-Host "Creating README file from platform-specific template..."
 
-        # Define template path with forward slashes for GitHub Actions environment
-        $templatePath = "${{ github.workspace }}/.github/templates/README.windows.txt"
+        # Define template path with backslashes for Windows environment
+        $templatePath = "${{ github.workspace }}\.github\templates\README.windows.txt"
         Write-Host "Looking for template at: $templatePath"
 
-        # Copy the template file
+        # List the template directory contents for debugging
+        Write-Host "Listing template directory contents:"
+        Get-ChildItem -Path "${{ github.workspace }}\.github\templates" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+
+        # Create README destination path
+        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+
+        # Copy the template file with improved error handling
         try {
+            # Check if template exists
             if (Test-Path $templatePath) {
                 Write-Host "Platform-specific template file found, copying..."
-                $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-                Copy-Item -Path $templatePath -Destination $readmePath -Force
+                # Use -ErrorAction Stop to ensure errors are caught in the catch block
+                Copy-Item -Path $templatePath -Destination $readmePath -Force -ErrorAction Stop
                 Write-Host "Template copied successfully to: $readmePath"
+
+                # Verify the copy was successful
+                if (Test-Path $readmePath) {
+                    Write-Host "README.txt verified at: $readmePath"
+                    Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
+                } else {
+                    throw "Copy appeared to succeed but README.txt not found at: $readmePath"
+                }
             } else {
-                Write-Error "README template file not found at: $templatePath"
-                exit 1
+                # Try alternative path with forward slashes
+                $altTemplatePath = "${{ github.workspace }}/.github/templates/README.windows.txt"
+                Write-Host "Template not found, trying alternative path: $altTemplatePath"
+
+                if (Test-Path $altTemplatePath) {
+                    Write-Host "Template found at alternative path, copying..."
+                    Copy-Item -Path $altTemplatePath -Destination $readmePath -Force -ErrorAction Stop
+                    Write-Host "Template copied successfully from alternative path to: $readmePath"
+                } else {
+                    Write-Error "README template file not found at either path"
+                    exit 1
+                }
             }
         } catch {
             Write-Host "Error copying template: $_"
+            Write-Host "Stack trace: $($_.ScriptStackTrace)"
             Write-Error "Failed to copy README template"
             exit 1
         }
@@ -431,11 +458,24 @@ jobs:
         PLATFORM_TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.linux.txt"
         echo "Looking for platform-specific template at: $PLATFORM_TEMPLATE_PATH"
 
-        # Copy the template file
+        # List the template directory contents for debugging
+        echo "Listing template directory contents:"
+        ls -la "${{ github.workspace }}/.github/templates/" || echo "Failed to list template directory"
+
+        # Copy the template file with improved error handling
         if [ -f "$PLATFORM_TEMPLATE_PATH" ]; then
           echo "Platform-specific template found, copying..."
-          cp "$PLATFORM_TEMPLATE_PATH" artifacts/linux/README.txt
-          echo "Template copied successfully"
+          # Use cp with verbose flag for better debugging
+          cp -v "$PLATFORM_TEMPLATE_PATH" artifacts/linux/README.txt
+
+          # Verify the copy was successful
+          if [ -f "artifacts/linux/README.txt" ]; then
+            echo "Template copied successfully, showing first few lines:"
+            head -n 3 artifacts/linux/README.txt
+          else
+            echo "ERROR: Copy command appeared to succeed but README.txt not found"
+            exit 1
+          fi
         else
           echo "ERROR: README template file not found at: $PLATFORM_TEMPLATE_PATH"
           exit 1
@@ -496,11 +536,24 @@ jobs:
         PLATFORM_TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.macos.txt"
         echo "Looking for platform-specific template at: $PLATFORM_TEMPLATE_PATH"
 
-        # Copy the template file
+        # List the template directory contents for debugging
+        echo "Listing template directory contents:"
+        ls -la "${{ github.workspace }}/.github/templates/" || echo "Failed to list template directory"
+
+        # Copy the template file with improved error handling
         if [ -f "$PLATFORM_TEMPLATE_PATH" ]; then
           echo "Platform-specific template found, copying..."
-          cp "$PLATFORM_TEMPLATE_PATH" artifacts/macos/README.txt
-          echo "Template copied successfully"
+          # Use cp with verbose flag for better debugging
+          cp -v "$PLATFORM_TEMPLATE_PATH" artifacts/macos/README.txt
+
+          # Verify the copy was successful
+          if [ -f "artifacts/macos/README.txt" ]; then
+            echo "Template copied successfully, showing first few lines:"
+            head -n 3 artifacts/macos/README.txt
+          else
+            echo "ERROR: Copy command appeared to succeed but README.txt not found"
+            exit 1
+          fi
         else
           echo "ERROR: README template file not found at: $PLATFORM_TEMPLATE_PATH"
           exit 1
