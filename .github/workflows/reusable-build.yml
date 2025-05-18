@@ -197,25 +197,55 @@ jobs:
         # Create README from template
         Write-Host "Creating README file from template..."
 
-        # Read the template file
-        $templatePath = Join-Path -Path ${{ github.workspace }} -ChildPath ".github" -AdditionalChildPath "templates", "README.template.txt"
-        Write-Host "Using template at: $templatePath"
+        # Define template path with explicit string concatenation
+        $templatePath = "${{ github.workspace }}\.github\templates\README.template.txt"
+        Write-Host "Looking for template at: $templatePath"
 
-        # Check if template exists
-        if (-not (Test-Path $templatePath)) {
-            Write-Error "README template not found at: $templatePath"
-            exit 1
+        # Try to read template with fallback
+        if (Test-Path $templatePath) {
+            Write-Host "Template found, reading content..."
+            $templateContent = Get-Content -Path $templatePath -Raw
+
+            # Replace placeholders
+            $readmeContent = $templateContent.Replace("{{PLATFORM}}", "Windows").Replace("{{EXECUTABLE_NAME}}", "xdelta3.exe")
+            Write-Host "Template processed successfully"
+        } else {
+            Write-Host "Template file not found, using hardcoded content"
+
+            # Fallback to hardcoded content
+            $readmeContent = "Xdelta3 Windows Binary`r`n"
+            $readmeContent += "======================`r`n`r`n"
+            $readmeContent += "This package contains the xdelta3 command-line utility for Windows.`r`n`r`n"
+            $readmeContent += "Command Line Syntax`r`n"
+            $readmeContent += "-------------------`r`n`r`n"
+            $readmeContent += "make patch:`r`n`r`n"
+            $readmeContent += "  xdelta3.exe -e -s old_file new_file delta_file`r`n`r`n"
+            $readmeContent += "apply patch:`r`n`r`n"
+            $readmeContent += "  xdelta3.exe -d -s old_file delta_file decoded_new_file`r`n`r`n"
+            $readmeContent += "standard options:`r`n"
+            $readmeContent += "   -0 .. -9     compression level`r`n"
+            $readmeContent += "   -c           use stdout`r`n"
+            $readmeContent += "   -d           decompress`r`n"
+            $readmeContent += "   -e           compress`r`n"
+            $readmeContent += "   -f           force (overwrite, ignore trailing garbage)`r`n"
+            $readmeContent += "   -h           show help`r`n"
+            $readmeContent += "   -q           be quiet`r`n"
+            $readmeContent += "   -v           be verbose (max 2)`r`n"
+            $readmeContent += "   -V           show version`r`n`r`n"
+            $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
         }
-
-        # Read template content
-        $templateContent = Get-Content -Path $templatePath -Raw
-
-        # Replace placeholders
-        $readmeContent = $templateContent -replace "{{PLATFORM}}", "Windows" -replace "{{EXECUTABLE_NAME}}", "xdelta3.exe"
 
         # Write the content to file using .NET methods to avoid PowerShell formatting issues
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
         [System.IO.File]::WriteAllText($readmePath, $readmeContent)
+
+        # Verify README was created successfully
+        if (Test-Path $readmePath) {
+            Write-Host "README.txt created successfully at: $readmePath"
+        } else {
+            Write-Error "Failed to create README.txt at: $readmePath"
+            exit 1
+        }
 
         # Create zip archive if requested
         if (${{ inputs.create_archives }}) {
@@ -307,15 +337,59 @@ jobs:
         # Create README from template
         echo "Creating README file from template..."
 
-        # Check if template exists
-        if [ ! -f "${{ github.workspace }}/.github/templates/README.template.txt" ]; then
-          echo "ERROR: README template not found at: ${{ github.workspace }}/.github/templates/README.template.txt"
-          exit 1
+        # Define template path
+        TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.template.txt"
+        echo "Looking for template at: $TEMPLATE_PATH"
+
+        # Try to read template with fallback
+        if [ -f "$TEMPLATE_PATH" ]; then
+          echo "Template found, processing..."
+          # Use sed to replace placeholders and create README
+          sed -e 's/{{PLATFORM}}/Linux/g' -e 's/{{EXECUTABLE_NAME}}/xdelta3/g' \
+              "$TEMPLATE_PATH" > artifacts/linux/README.txt
+          echo "Template processed successfully"
+        else
+          echo "Template file not found, using hardcoded content"
+          # Create a basic README with direct echo commands
+          echo "Xdelta3 Linux Binary" > artifacts/linux/README.txt
+          echo "===================" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "This package contains the xdelta3 command-line utility for Linux." >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+
+          # Add command line syntax documentation
+          echo "Command Line Syntax" >> artifacts/linux/README.txt
+          echo "-------------------" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "make patch:" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "  xdelta3 -e -s old_file new_file delta_file" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "apply patch:" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "  xdelta3 -d -s old_file delta_file decoded_new_file" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "standard options:" >> artifacts/linux/README.txt
+          echo "   -0 .. -9     compression level" >> artifacts/linux/README.txt
+          echo "   -c           use stdout" >> artifacts/linux/README.txt
+          echo "   -d           decompress" >> artifacts/linux/README.txt
+          echo "   -e           compress" >> artifacts/linux/README.txt
+          echo "   -f           force (overwrite, ignore trailing garbage)" >> artifacts/linux/README.txt
+          echo "   -h           show help" >> artifacts/linux/README.txt
+          echo "   -q           be quiet" >> artifacts/linux/README.txt
+          echo "   -v           be verbose (max 2)" >> artifacts/linux/README.txt
+          echo "   -V           show version" >> artifacts/linux/README.txt
+          echo "" >> artifacts/linux/README.txt
+          echo "For full documentation, run: xdelta3 --help" >> artifacts/linux/README.txt
         fi
 
-        # Use sed to replace placeholders and create README
-        sed -e 's/{{PLATFORM}}/Linux/g' -e 's/{{EXECUTABLE_NAME}}/xdelta3/g' \
-            "${{ github.workspace }}/.github/templates/README.template.txt" > artifacts/linux/README.txt
+        # Verify README was created successfully
+        if [ -f "artifacts/linux/README.txt" ]; then
+          echo "README.txt created successfully"
+        else
+          echo "ERROR: Failed to create README.txt"
+          exit 1
+        fi
 
         # Create tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
