@@ -4,6 +4,7 @@
   "description": "Xdelta: a binary diff, differential compression tools",
   "homepage": "http://xdelta.org/",
   "license": "Apache-2.0",
+  "supports": "windows",
   "dependencies": [
     {
       "name": "vcpkg-cmake",
@@ -12,21 +13,6 @@
     {
       "name": "vcpkg-cmake-config",
       "host": true
-    },
-    {
-      "name": "liblzma",
-      "$comment": "Optional dependency, controlled by XDELTA_ENABLE_LZMA"
     }
-  ],
-  "features": {
-    "tools": {
-      "description": "Build xdelta3 command-line tools"
-    },
-    "tests": {
-      "description": "Build xdelta3 tests"
-    }
-  },
-  "default-features": [
-    "tools"
   ]
 }

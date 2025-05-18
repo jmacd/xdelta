@@ -1,0 +1,13 @@
+The package xdelta provides CMake targets:
+
+    find_package(xdelta CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE xdelta::xdelta)
+
+Or you can use the library directly:
+
+    target_include_directories(main PRIVATE ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
+    target_link_libraries(main PRIVATE ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib/xdelta.lib)
+
+The xdelta3 command-line tool is also available:
+
+    ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/xdelta/xdelta3.exe

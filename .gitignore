@@ -8,6 +8,7 @@ Makefile.in
 aclocal.m4
 autom4te.cache
 build
+build-x64
 compile
 config.guess
 config.h
@@ -30,3 +31,9 @@ stamp-h1
 xdelta3/xdelta3
 xdelta3decode
 xdelta3regtest
+
+# vcpkg specific
+vcpkg_installed/
+.vs/
+CMakeUserPresets.json
+xdelta-binaries/

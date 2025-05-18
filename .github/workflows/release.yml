@@ -166,8 +166,164 @@ jobs:
         path: xdelta3-macos.tar.gz
         retention-days: 90
 
+  export-vcpkg-binaries:
+    needs: [build-windows]
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download Windows x64 artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta3-windows-x64
+        path: ./windows-x64-artifacts/
+
+    - name: Download Windows x86 artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta3-windows-x86
+        path: ./windows-x86-artifacts/
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
+
+    - name: Get version
+      id: get_version
+      shell: bash
+      run: |
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Prepare vcpkg binaries
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+
+        # Create directory structure
+        $outputDir = ".\xdelta-binaries"
+        $versionDir = Join-Path $outputDir $version
+
+        New-Item -ItemType Directory -Path $versionDir -Force | Out-Null
+
+        # Create architecture directories
+        $archDirs = @("x64-windows", "x86-windows")
+        foreach ($arch in $archDirs) {
+            $archDir = Join-Path $versionDir $arch
+            New-Item -ItemType Directory -Path $archDir -Force | Out-Null
+
+            # Create bin, lib, include directories
+            $binDir = Join-Path $archDir "bin"
+            $libDir = Join-Path $archDir "lib"
+            $includeDir = Join-Path $archDir "include\xdelta3"
+
+            New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+            New-Item -ItemType Directory -Path $libDir -Force | Out-Null
+            New-Item -ItemType Directory -Path $includeDir -Force | Out-Null
+        }
+
+        # Extract x64 artifacts
+        Expand-Archive -Path .\windows-x64-artifacts\xdelta3-windows-x64.zip -DestinationPath .\x64-extracted
+
+        # Extract x86 artifacts
+        Expand-Archive -Path .\windows-x86-artifacts\xdelta3-windows-x86.zip -DestinationPath .\x86-extracted
+
+        # Copy x64 binaries
+        Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+
+        # Copy x86 binaries
+        Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+
+        # Copy header files
+        Copy-Item "xdelta3\xdelta3.h" -Destination (Join-Path $versionDir "x64-windows\include\xdelta3\") -Force
+        Copy-Item "xdelta3\xdelta3.c" -Destination (Join-Path $versionDir "x64-windows\include\xdelta3\") -Force
+        Copy-Item "xdelta3\xdelta3.h" -Destination (Join-Path $versionDir "x86-windows\include\xdelta3\") -Force
+        Copy-Item "xdelta3\xdelta3.c" -Destination (Join-Path $versionDir "x86-windows\include\xdelta3\") -Force
+
+        # Create a README file
+        $readmePath = Join-Path $versionDir "README.md"
+        @"
+        # Xdelta Binary Distribution
+
+        Version: $version
+
+        ## Contents
+
+        - x64-windows/
+          - bin/
+            - xdelta3.exe
+          - include/xdelta3/
+            - xdelta3.h
+            - xdelta3.c
+        - x86-windows/
+          - bin/
+            - xdelta3.exe
+          - include/xdelta3/
+            - xdelta3.h
+            - xdelta3.c
+
+        ## Usage
+
+        ### Command Line
+
+        ```
+        xdelta3.exe -h
+        ```
+
+        ## License
+
+        Licensed under the Apache License, Version 2.0
+        "@ | Out-File -FilePath $readmePath -Encoding utf8
+
+        # Create a ZIP file
+        $zipPath = Join-Path $outputDir "xdelta-$version-windows.zip"
+        Compress-Archive -Path $versionDir -DestinationPath $zipPath -Force
+
+        # Calculate SHA512 hash for vcpkg
+        $sha512 = (Get-FileHash -Path $zipPath -Algorithm SHA512).Hash.ToLower()
+        $sha512 | Out-File -FilePath "$zipPath.sha512" -Encoding utf8 -NoNewline
+
+        # Save the SHA512 hash for later use
+        echo "BINARY_SHA512=$sha512" >> $env:GITHUB_ENV
+
+        # Update SHA512 in portfile.cmake
+        $portfilePath = ".\vcpkg-registry\ports\xdelta\portfile.cmake"
+        $portfileContent = Get-Content $portfilePath -Raw
+        $updatedContent = $portfileContent -replace 'SHA512 "to-be-filled-after-release"', "SHA512 `"$sha512`""
+        Set-Content -Path $portfilePath -Value $updatedContent
+
+        # Update version in versions/x-/xdelta.json
+        $versionFilePath = ".\vcpkg-registry\versions\x-\xdelta.json"
+        $versionFileContent = Get-Content $versionFilePath -Raw
+        $updatedVersionContent = $versionFileContent -replace '"git-tree": "to-be-filled-after-release"', '"git-tree": "placeholder"'
+        Set-Content -Path $versionFilePath -Value $updatedVersionContent
+
+    - name: Upload vcpkg binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta-vcpkg-binaries
+        path: |
+          .\xdelta-binaries\*.zip
+          .\xdelta-binaries\*.sha512
+        retention-days: 90
+
+    - name: Upload updated vcpkg registry
+      uses: actions/upload-artifact@v4
+      with:
+        name: vcpkg-registry
+        path: .\vcpkg-registry\
+        retention-days: 90
+
   create-release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-macos, export-vcpkg-binaries]
     runs-on: ubuntu-latest
 
     steps:
@@ -197,6 +353,12 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
+        path: ./
+
+    - name: Download vcpkg binaries
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta-vcpkg-binaries
         path: ./
 
     - name: Get version
@@ -239,6 +401,8 @@ jobs:
           xdelta3-windows-x86.zip
           xdelta3-linux.tar.gz
           xdelta3-macos.tar.gz
+          xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip
+          xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip.sha512
         body: |
           # Xdelta3 ${{ steps.get_version.outputs.VERSION }}
 
@@ -254,6 +418,7 @@ jobs:
           - [Windows x86](xdelta3-windows-x86.zip)
           - [Linux](xdelta3-linux.tar.gz)
           - [macOS](xdelta3-macos.tar.gz)
+          - [vcpkg binaries](xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip)
 
           ## Usage
 
@@ -265,3 +430,39 @@ jobs:
           ```
 
           For more detailed usage information, see the [Command Line Syntax documentation](https://github.com/jmacd/xdelta/blob/wiki/CommandLineSyntax.md).
+
+          ## vcpkg Integration
+
+          This release includes pre-built binaries for vcpkg. See the `vcpkg-registry` folder in the repository for details.
+
+    - name: Update vcpkg registry
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      id: update_vcpkg
+      shell: pwsh
+      run: |
+        # Get release URL
+        $version = "${{ steps.get_version.outputs.VERSION }}"
+        $releaseTag = "v$version"
+        $binaryZipUrl = "https://github.com/${{ github.repository }}/releases/download/$releaseTag/xdelta-$version-windows.zip"
+
+        # Run the update script
+        $sha512 = ./scripts/update-vcpkg-registry.ps1 -ReleaseTag $releaseTag -BinaryZipUrl $binaryZipUrl
+        echo "SHA512=$sha512" >> $GITHUB_OUTPUT
+
+    - name: Create PR for vcpkg registry update
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "Update vcpkg registry for version ${{ steps.get_version.outputs.VERSION }}"
+        title: "Update vcpkg registry for version ${{ steps.get_version.outputs.VERSION }}"
+        body: |
+          This PR updates the vcpkg registry for version ${{ steps.get_version.outputs.VERSION }}.
+
+          Changes:
+          - Updated SHA512 hash in portfile.cmake: `${{ steps.update_vcpkg.outputs.SHA512 }}`
+          - Updated version references
+
+          This PR was created automatically by the release workflow.
+        branch: update-vcpkg-registry-${{ steps.get_version.outputs.VERSION }}
+        base: main

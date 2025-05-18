@@ -345,7 +345,7 @@ static int
 main_version (void)
 {
   /* $Format: "  XPR(NTR \"Xdelta version $Xdelta3Version$, Copyright (C) Joshua MacDonald\\n\");" $ */
-  XPR(NTR "Xdelta version 3.1.1, Copyright (C) Joshua MacDonald\n");
+  XPR(NTR "Xdelta version 3.1.0, Copyright (C) Joshua MacDonald\n");
   XPR(NTR "Xdelta comes with ABSOLUTELY NO WARRANTY.\n");
   XPR(NTR "Licensed under the Apache License, Version 2.0\n");
   XPR(NTR "See \"LICENSE\" for details.\n");
@@ -641,16 +641,16 @@ static char*
 main_format_millis (long millis, shortbuf *buf)
 {
   if (millis < 1000)
-    { 
-      short_sprintf (*buf, "%lu ms", millis); 
+    {
+      short_sprintf (*buf, "%lu ms", millis);
     }
-  else if (millis < 10000) 
+  else if (millis < 10000)
     {
       short_sprintf (*buf, "%.1f sec", millis / 1000.0);
     }
   else
     {
-      short_sprintf (*buf, "%lu sec", millis / 1000L); 
+      short_sprintf (*buf, "%lu sec", millis / 1000L);
     }
   return buf->buf;
 }
@@ -720,7 +720,7 @@ main_atoux (const char* arg, xoff_t *xo, xoff_t low,
 
 static int
 main_atou (const char* arg, usize_t *uo, usize_t low,
-	   usize_t high, char which) 
+	   usize_t high, char which)
 {
   int ret;
   xoff_t xo;
@@ -1084,7 +1084,7 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
   int ret = 0;
 
   IF_DEBUG1(DP(RINT "[main] write %"W"u\n bytes", size));
-  
+
 #if XD3_STDIO
   usize_t result;
 
@@ -1233,7 +1233,7 @@ main_set_secondary_flags (xd3_config *config)
 	       strcmp (option_secondary, "none") == 0)
 	{
 	}
-      else 
+      else
 	{
 	  if (!option_quiet)
 	    {
@@ -1313,7 +1313,7 @@ main_print_window (xd3_stream* stream, main_file *xfile)
       addr_bytes = (usize_t)(stream->addr_sect.buf - addr_before);
       inst_bytes = (usize_t)(stream->inst_sect.buf - inst_before);
 
-      VC(UT "  %06"Q"u %03"W"u  %s %6"W"u", 
+      VC(UT "  %06"Q"u %03"W"u  %s %6"W"u",
 	 stream->dec_winstart + size,
 	 option_print_cpymode ? code : 0,
 	 xd3_rtype_to_string ((xd3_rtype) stream->dec_current1.type,
@@ -2094,6 +2094,9 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
  */
 
 #include <signal.h>
+#ifdef _WIN32
+#include "xdelta3-win32.h"
+#else
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -2102,9 +2105,11 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 #define PIPE_READ_FD  0
 #define PIPE_WRITE_FD 1
 #define MAX_SUBPROCS  4  /* max(source + copier + output,
-			        source + copier + input + copier). */
+				        source + copier + input + copier). */
 static pid_t ext_subprocs[MAX_SUBPROCS];
+#endif
 
+#ifndef _WIN32
 /* Like write(), applies to a fd instead of a main_file, for the pipe
  * copier subprocess.  Does not print an error, to facilitate ignoring
  * trailing garbage, see main_pipe_copier(). */
@@ -2121,7 +2126,9 @@ main_pipe_write (int outfd, uint8_t *exist_buf, usize_t remain)
 
   return 0;
 }
+#endif
 
+#ifndef _WIN32
 /* A simple error-reporting waitpid interface. */
 static int
 main_waitpid_check(pid_t pid)
@@ -2138,13 +2145,13 @@ main_waitpid_check(pid_t pid)
   else if (! WIFEXITED (status))
     {
       // SIGPIPE will be delivered to the child process whenever it
-      // writes data after this process closes the pipe, 
-      // happens if xdelta does not require access to the entire 
+      // writes data after this process closes the pipe,
+      // happens if xdelta does not require access to the entire
       // source file.  Considered normal.
-      if (! WIFSIGNALED (status) || WTERMSIG (status) != SIGPIPE) 
+      if (! WIFSIGNALED (status) || WTERMSIG (status) != SIGPIPE)
 	{
 	  ret = ECHILD;
-	  XPR(NT "external compression [pid %d] signal %d\n", pid, 
+	  XPR(NT "external compression [pid %d] signal %d\n", pid,
 	      WIFSIGNALED (status) ? WTERMSIG (status) : WSTOPSIG (status));
 	}
       else if (option_verbose)
@@ -2165,7 +2172,9 @@ main_waitpid_check(pid_t pid)
 
   return ret;
 }
+#endif
 
+#ifndef _WIN32
 /* Wait for any existing child processes to check for abnormal exit. */
 static int
 main_external_compression_finish (void)
@@ -2187,7 +2196,9 @@ main_external_compression_finish (void)
 
   return 0;
 }
+#endif
 
+#ifndef _WIN32
 /* Kills any outstanding compression process. */
 static void
 main_external_compression_cleanup (void)
@@ -2203,7 +2214,9 @@ main_external_compression_cleanup (void)
       ext_subprocs[i] = 0;
     }
 }
+#endif
 
+#ifndef _WIN32
 /* This runs as a forked process of main_input_decompress_setup() to
  * copy input to the decompression process.  First, the available
  * input is copied out of the existing buffer, then the buffer is
@@ -2267,7 +2280,9 @@ main_pipe_copier (uint8_t     *pipe_buf,
     }
   return 0;
 }
+#endif
 
+#ifndef _WIN32
 /* This function is called after we have read some amount of data from
  * the input file and detected a compressed input.  Here we start a
  * decompression subprocess by forking twice.  The first process runs
@@ -2409,6 +2424,7 @@ main_input_decompress_setup (const main_extcomp   *decomp,
   close (inpipefd[PIPE_WRITE_FD]);
   return ret;
 }
+#endif
 
 
 /* This routine is called when the first buffer of input data is read
@@ -2535,6 +2551,7 @@ main_secondary_decompress_check (main_file  *file,
   return 0;
 }
 
+#ifndef _WIN32
 /* Initiate re-compression of the output stream.  This is easier than
  * input decompression because we know beforehand that the stream will
  * be compressed, whereas the input has already been read when we
@@ -2588,6 +2605,7 @@ main_recompress_output (main_file *ofile)
       _exit (127);
     }
 
+
   XD3_ASSERT(num_subprocs < MAX_SUBPROCS);
   ext_subprocs[num_subprocs++] = recomp_id;
 
@@ -2625,6 +2643,7 @@ main_recompress_output (main_file *ofile)
   close (pipefd[PIPE_WRITE_FD]);
   return ret;
 }
+#endif /* _WIN32 */
 #endif /* EXTERNAL_COMPRESSION */
 
 /* Identify the compressor that was used based on its ident string,

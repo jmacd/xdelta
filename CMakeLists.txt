@@ -24,7 +24,7 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 # Set project information
 project(xdelta
-    VERSION 3.1.1
+    VERSION 3.1.0
     DESCRIPTION "Xdelta: a binary diff, differential compression tools"
     HOMEPAGE_URL "http://xdelta.org/"
     LANGUAGES C CXX
@@ -141,6 +141,21 @@ check_type_size("size_t" SIZEOF_SIZE_T)
 check_type_size("unsigned int" SIZEOF_UNSIGNED_INT)
 check_type_size("unsigned long" SIZEOF_UNSIGNED_LONG)
 check_type_size("unsigned long long" SIZEOF_UNSIGNED_LONG_LONG)
+
+# Ensure the values are defined as numeric values, not strings
+# This fixes static_assert issues on Linux and macOS
+if(SIZEOF_SIZE_T)
+    math(EXPR SIZEOF_SIZE_T "${SIZEOF_SIZE_T}")
+endif()
+if(SIZEOF_UNSIGNED_INT)
+    math(EXPR SIZEOF_UNSIGNED_INT "${SIZEOF_UNSIGNED_INT}")
+endif()
+if(SIZEOF_UNSIGNED_LONG)
+    math(EXPR SIZEOF_UNSIGNED_LONG "${SIZEOF_UNSIGNED_LONG}")
+endif()
+if(SIZEOF_UNSIGNED_LONG_LONG)
+    math(EXPR SIZEOF_UNSIGNED_LONG_LONG "${SIZEOF_UNSIGNED_LONG_LONG}")
+endif()
 
 # Set compile definitions
 target_compile_definitions(xdelta

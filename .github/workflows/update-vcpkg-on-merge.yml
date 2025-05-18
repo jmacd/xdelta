@@ -1,0 +1,84 @@
+name: Update vcpkg Registry on Merge
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'CMakeLists.txt'
+      - 'vcpkg.json'
+      - 'xdelta3/**'
+
+jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.check_version.outputs.changed }}
+      version: ${{ steps.check_version.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check if version changed
+      id: check_version
+      shell: bash
+      run: |
+        # Get current version from CMakeLists.txt
+        CURRENT_VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Get previous commit
+        PREVIOUS_COMMIT=$(git rev-parse HEAD^1)
+        
+        # Check if CMakeLists.txt changed
+        if git diff --name-only $PREVIOUS_COMMIT HEAD | grep -q "CMakeLists.txt"; then
+          # Get previous version
+          PREVIOUS_VERSION=$(git show $PREVIOUS_COMMIT:CMakeLists.txt | grep -oP 'VERSION\s+\K[0-9.]+')
+          echo "Previous version: $PREVIOUS_VERSION"
+          
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version did not change"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "CMakeLists.txt did not change"
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        fi
+
+  create-release:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Xdelta3 ${{ needs.check-version-change.outputs.version }}
+        tag_name: v${{ needs.check-version-change.outputs.version }}
+        draft: false
+        prerelease: false
+        body: |
+          # Xdelta3 ${{ needs.check-version-change.outputs.version }}
+          
+          Automatic release created after version change in main branch.
+          
+          Please check the [release workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml) for build status.
+    
+    - name: Trigger release workflow
+      run: |
+        echo "Release created with tag v${{ needs.check-version-change.outputs.version }}"
+        echo "The release workflow will be triggered automatically by the tag push event."
