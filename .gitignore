@@ -33,6 +33,7 @@ xdelta3decode
 xdelta3regtest
 
 # vcpkg specific
+vcpkg/
 vcpkg_installed/
 .vs/
 CMakeUserPresets.json

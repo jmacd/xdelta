@@ -30,73 +30,74 @@ jobs:
       with:
         fetch-depth: 0  # Fetch all history for proper versioning
 
-    # Setup cache for vcpkg
-    - name: Cache vcpkg packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/vcpkg/installed
-          ${{ github.workspace }}/vcpkg/packages
-        key: ${{ runner.os }}-${{ matrix.arch }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ matrix.arch }}-vcpkg-${{ env.VCPKG_COMMIT }}-
-
+    # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v11
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
       with:
-        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
-        vcpkgDirectory: ${{ github.workspace }}/vcpkg
+        manifest-dir: ${{ github.workspace }}
+        triplet: ${{ matrix.triplet }}
+        revision: ${{ env.VCPKG_COMMIT }}
+        token: ${{ github.token }}
+        github-binarycache: true
 
-    - name: Install dependencies with vcpkg
+    # Check if liblzma is installed correctly
+    - name: Verify liblzma installation
+      shell: pwsh
       run: |
-        # Explicitly specify the path to vcpkg.json and ensure it exists
-        Get-Content "${{ github.workspace }}/vcpkg.json" | Out-Null
-        Write-Host "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
-
-        # Make sure vcpkg is up to date
-        cd ${{ github.workspace }}/vcpkg
-        git pull
-        .\bootstrap-vcpkg.bat
-        cd ${{ github.workspace }}
-
-        # Install liblzma explicitly first
-        vcpkg install liblzma:${{ matrix.triplet }}
-
-        # Then install all dependencies from manifest
-        vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root="${{ github.workspace }}"
-
-        # List installed packages for debugging
-        Write-Host "Installed vcpkg packages:"
-        vcpkg list
-
-        # Check if liblzma is installed correctly and show detailed information
-        if (Test-Path "vcpkg/installed/${{ matrix.triplet }}/include/lzma.h") {
-            Write-Host "lzma.h found at vcpkg/installed/${{ matrix.triplet }}/include/lzma.h"
+        $vcpkgInstallDir = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
+        if (Test-Path "$vcpkgInstallDir/include/lzma.h") {
+            Write-Host "lzma.h found at $vcpkgInstallDir/include/lzma.h"
         } else {
-            Write-Host "ERROR: lzma.h not found in vcpkg/installed/${{ matrix.triplet }}/include/"
+            Write-Host "ERROR: lzma.h not found in $vcpkgInstallDir/include/"
 
             # Check if the include directory exists
-            if (Test-Path "vcpkg/installed/${{ matrix.triplet }}/include") {
+            if (Test-Path "$vcpkgInstallDir/include") {
                 Write-Host "Listing files in include directory:"
-                Get-ChildItem -Recurse -Path "vcpkg/installed/${{ matrix.triplet }}/include" | Select-Object FullName
+                Get-ChildItem -Recurse -Path "$vcpkgInstallDir/include" | Select-Object FullName
             } else {
-                Write-Host "Include directory does not exist at vcpkg/installed/${{ matrix.triplet }}/include"
+                Write-Host "Include directory does not exist at $vcpkgInstallDir/include"
             }
 
             # Check if there are any lzma-related files in the installation
             Write-Host "Searching for lzma-related files in vcpkg installation:"
-            Get-ChildItem -Recurse -Path "vcpkg/installed/${{ matrix.triplet }}" -Filter "*lzma*" | Select-Object FullName
+            Get-ChildItem -Recurse -Path "$vcpkgInstallDir" -Filter "*lzma*" | Select-Object FullName
+
+            # Try to find lzma.h in the entire workspace
+            Write-Host "Searching for lzma.h in the entire workspace:"
+            Get-ChildItem -Recurse -Path "${{ github.workspace }}" -Filter "lzma.h" | Select-Object FullName
         }
 
     - name: Configure CMake
       run: |
         # Simple configuration relying on vcpkg integration
+        Write-Host "Configuring CMake with vcpkg toolchain..."
+
+        # Ensure vcpkg toolchain file exists
+        $vcpkgToolchain = "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        if (Test-Path $vcpkgToolchain) {
+            Write-Host "vcpkg toolchain file found at: $vcpkgToolchain"
+        } else {
+            Write-Host "ERROR: vcpkg toolchain file not found at: $vcpkgToolchain"
+            exit 1
+        }
+
+        # Add explicit include paths for liblzma if needed
+        $vcpkgIncludePath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
+        $vcpkgLibPath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
+
+        # Configure with detailed output
         cmake -B build -S . ${{ matrix.cmake_arch }} `
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+          -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
           -DXDELTA_ENABLE_LZMA=ON `
-          -DXDELTA_BUILD_TESTS=OFF
+          -DXDELTA_BUILD_TESTS=OFF `
+          -DCMAKE_INCLUDE_PATH="$vcpkgIncludePath" `
+          -DCMAKE_LIBRARY_PATH="$vcpkgLibPath" `
+          -DLIBLZMA_INCLUDE_DIR="$vcpkgIncludePath" `
+          -DLIBLZMA_LIBRARY="$vcpkgLibPath/liblzma.lib" `
+          -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
@@ -114,16 +115,49 @@ jobs:
         $VCPKG_INSTALLED_DIR = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
         if (Test-Path "$VCPKG_INSTALLED_DIR/include/lzma.h") {
             Write-Host "lzma.h found at $VCPKG_INSTALLED_DIR/include/lzma.h"
+            Get-Content "$VCPKG_INSTALLED_DIR/include/lzma.h" -Head 10
         } else {
             Write-Host "WARNING: lzma.h not found in $VCPKG_INSTALLED_DIR/include/"
-            Write-Host "Listing files in include directory:"
-            Get-ChildItem -Path "$VCPKG_INSTALLED_DIR/include" -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName }
+
+            # Check if the include directory exists
+            if (Test-Path "$VCPKG_INSTALLED_DIR/include") {
+                Write-Host "Listing files in include directory:"
+                Get-ChildItem -Path "$VCPKG_INSTALLED_DIR/include" -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName }
+            } else {
+                Write-Host "Include directory does not exist at $VCPKG_INSTALLED_DIR/include"
+            }
+
+            # Try to find lzma.h in the entire workspace
+            Write-Host "Searching for lzma.h in the entire workspace:"
+            Get-ChildItem -Recurse -Path "${{ github.workspace }}" -Filter "lzma.h" | Select-Object FullName
         }
 
         # Check CMake cache
         if (Test-Path "build/CMakeCache.txt") {
             Write-Host "CMake cache entries related to LZMA:"
             Get-Content "build/CMakeCache.txt" | Select-String -Pattern "LZMA"
+
+            Write-Host "CMake cache entries related to vcpkg:"
+            Get-Content "build/CMakeCache.txt" | Select-String -Pattern "vcpkg"
+        }
+
+        # Check CMake logs
+        if (Test-Path "build/CMakeFiles/CMakeError.log") {
+            Write-Host "CMake error log:"
+            Get-Content "build/CMakeFiles/CMakeError.log" -Tail 100
+        }
+
+        # Check build output
+        if (Test-Path "build/CMakeFiles/CMakeOutput.log") {
+            Write-Host "CMake output log (last 50 lines):"
+            Get-Content "build/CMakeFiles/CMakeOutput.log" -Tail 50
+        }
+
+        # Check compiler errors
+        Write-Host "Checking for compiler error files:"
+        Get-ChildItem -Path "build" -Recurse -Filter "*.obj.log" | ForEach-Object {
+            Write-Host "Compiler errors in $($_.FullName):"
+            Get-Content $_.FullName
         }
 
     # Tests are disabled
@@ -176,31 +210,16 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.sha }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    # Setup cache for vcpkg
-    - name: Cache vcpkg packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/vcpkg/installed
-          ${{ github.workspace }}/vcpkg/packages
-        key: ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-
-
+    # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v11
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
       with:
-        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
-        vcpkgDirectory: ${{ github.workspace }}/vcpkg
-
-    - name: Install dependencies with vcpkg
-      run: |
-        # Verify vcpkg.json exists
-        cat "${{ github.workspace }}/vcpkg.json"
-        echo "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
-
-        # Install dependencies
-        vcpkg install --x-manifest-root="${{ github.workspace }}"
+        manifest-dir: ${{ github.workspace }}
+        triplet: x64-linux
+        revision: ${{ env.VCPKG_COMMIT }}
+        token: ${{ github.token }}
+        github-binarycache: true
 
     - name: Configure CMake
       run: |
@@ -261,35 +280,16 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.sha }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    # Setup cache for vcpkg
-    - name: Cache vcpkg packages
-      uses: actions/cache@v4
-      with:
-        path: |
-          ${{ github.workspace }}/vcpkg/installed
-          ${{ github.workspace }}/vcpkg/packages
-        key: ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-
-
+    # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
-      uses: lukka/run-vcpkg@v11
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
       with:
-        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
-        vcpkgDirectory: ${{ github.workspace }}/vcpkg
-
-    - name: Install dependencies with vcpkg
-      run: |
-        # Verify vcpkg.json exists
-        cat "${{ github.workspace }}/vcpkg.json"
-        echo "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
-
-        # Install dependencies
-        vcpkg install --x-manifest-root="${{ github.workspace }}"
-
-        # Print installed packages for debugging
-        echo "Installed vcpkg packages:"
-        vcpkg list
+        manifest-dir: ${{ github.workspace }}
+        triplet: x64-osx
+        revision: ${{ env.VCPKG_COMMIT }}
+        token: ${{ github.token }}
+        github-binarycache: true
 
     - name: Configure CMake
       run: |
