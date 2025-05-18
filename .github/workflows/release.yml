@@ -13,7 +13,7 @@ on:
 
 env:
   BUILD_TYPE: Release
-  VCPKG_COMMIT: 2024.03.25  # Updated to a more recent vcpkg version
+  VCPKG_COMMIT: a34c873a9717a888f58dc05268dea15592c2f0ff  # 2024.03.25 commit hash
 
 jobs:
   build-windows:
@@ -49,6 +49,7 @@ jobs:
       uses: lukka/run-vcpkg@v11
       with:
         vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
 
     - name: Install dependencies with vcpkg
       run: |
