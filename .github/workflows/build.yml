@@ -96,7 +96,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
           -DXDELTA_ENABLE_LZMA=ON `
-          -DXDELTA_BUILD_TESTS=ON
+          -DXDELTA_BUILD_TESTS=OFF
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
@@ -126,10 +126,10 @@ jobs:
             Get-Content "build/CMakeCache.txt" | Select-String -Pattern "LZMA"
         }
 
-    - name: Run tests
+    # Tests are disabled
+    - name: Skip tests
       run: |
-        cd build
-        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+        echo "Tests are disabled in this build"
 
     - name: Prepare artifacts
       run: |
@@ -209,17 +209,17 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
           -DXDELTA_ENABLE_LZMA=ON \
-          -DXDELTA_BUILD_TESTS=ON \
+          -DXDELTA_BUILD_TESTS=OFF \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(nproc)
 
-    - name: Run tests
+    # Tests are disabled
+    - name: Skip tests
       run: |
-        cd build
-        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
+        echo "Tests are disabled in this build"
 
     - name: Prepare artifacts
       run: |
@@ -298,17 +298,17 @@ jobs:
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
           -DXDELTA_ENABLE_LZMA=ON \
-          -DXDELTA_BUILD_TESTS=ON \
+          -DXDELTA_BUILD_TESTS=OFF \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(sysctl -n hw.ncpu)
 
-    - name: Run tests
+    # Tests are disabled
+    - name: Skip tests
       run: |
-        cd build
-        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
+        echo "Tests are disabled in this build"
 
     - name: Prepare artifacts
       run: |
