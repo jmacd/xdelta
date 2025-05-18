@@ -53,17 +53,45 @@ jobs:
         Get-Content "${{ github.workspace }}/vcpkg.json" | Out-Null
         Write-Host "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
 
-        # Install dependencies
-        vcpkg install --x-manifest-root="${{ github.workspace }}"
+        # Install dependencies with explicit triplet
+        vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root="${{ github.workspace }}"
+
+        # List installed packages for debugging
+        Write-Host "Installed vcpkg packages:"
+        vcpkg list
+
+        # Check if liblzma is installed correctly
+        if (Test-Path "vcpkg/installed/${{ matrix.triplet }}/include/lzma.h") {
+            Write-Host "lzma.h found at vcpkg/installed/${{ matrix.triplet }}/include/lzma.h"
+        } else {
+            Write-Host "ERROR: lzma.h not found in vcpkg/installed/${{ matrix.triplet }}/include/"
+            Get-ChildItem -Recurse -Path "vcpkg/installed/${{ matrix.triplet }}/include" | Select-Object FullName
+        }
 
     - name: Configure CMake
       run: |
+        # Get vcpkg installation path for debugging
+        $VCPKG_INSTALLED_DIR = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
+        Write-Host "VCPKG installed directory: $VCPKG_INSTALLED_DIR"
+
+        # Check for lzma.h in vcpkg installation
+        if (Test-Path "$VCPKG_INSTALLED_DIR/include/lzma.h") {
+            Write-Host "lzma.h found at $VCPKG_INSTALLED_DIR/include/lzma.h"
+        } else {
+            Write-Host "WARNING: lzma.h not found in $VCPKG_INSTALLED_DIR/include/"
+        }
+
         cmake -B build -S . ${{ matrix.cmake_arch }} `
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
           -DXDELTA_ENABLE_LZMA=ON `
-          -DXDELTA_BUILD_TESTS=ON
+          -DXDELTA_BUILD_TESTS=ON `
+          -DCMAKE_PREFIX_PATH="$VCPKG_INSTALLED_DIR" `
+          -DCMAKE_INCLUDE_PATH="$VCPKG_INSTALLED_DIR/include" `
+          -DCMAKE_LIBRARY_PATH="$VCPKG_INSTALLED_DIR/lib" `
+          -DLIBLZMA_INCLUDE_DIR="$VCPKG_INSTALLED_DIR/include" `
+          -DLIBLZMA_LIBRARY="$VCPKG_INSTALLED_DIR/lib/liblzma.lib"
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}

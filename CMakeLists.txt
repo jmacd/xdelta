@@ -153,10 +153,51 @@ if(XDELTA_ENABLE_LZMA)
 
         message(STATUS "Using vcpkg for liblzma dependency")
 
-        # Find LibLZMA through vcpkg
-        find_package(LibLZMA REQUIRED)
-        message(STATUS "Found LibLZMA via vcpkg: ${LibLZMA_LIBRARIES}")
-        message(STATUS "LibLZMA include dirs: ${LibLZMA_INCLUDE_DIRS}")
+        # Try to find vcpkg installation directory
+        if(DEFINED VCPKG_TARGET_TRIPLET)
+            set(VCPKG_INSTALLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}")
+            if(EXISTS "${VCPKG_INSTALLED_DIR}")
+                message(STATUS "Found vcpkg installed directory: ${VCPKG_INSTALLED_DIR}")
+
+                # Check for lzma.h in vcpkg installation
+                if(EXISTS "${VCPKG_INSTALLED_DIR}/include/lzma.h")
+                    message(STATUS "Found lzma.h in vcpkg installation")
+                    set(LIBLZMA_INCLUDE_DIR "${VCPKG_INSTALLED_DIR}/include" CACHE PATH "liblzma include directory")
+
+                    # Find the library file
+                    if(WIN32)
+                        if(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.lib")
+                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.lib" CACHE FILEPATH "liblzma library")
+                        elseif(EXISTS "${VCPKG_INSTALLED_DIR}/lib/lzma.lib")
+                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/lzma.lib" CACHE FILEPATH "liblzma library")
+                        endif()
+                    else()
+                        if(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.a")
+                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.a" CACHE FILEPATH "liblzma library")
+                        elseif(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.dylib")
+                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
+                        elseif(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.so")
+                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.so" CACHE FILEPATH "liblzma library")
+                        endif()
+                    endif()
+
+                    if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
+                        set(LibLZMA_FOUND TRUE)
+                        set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
+                        set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
+                        message(STATUS "Manually set LibLZMA from vcpkg: ${LibLZMA_LIBRARIES}")
+                    endif()
+                endif()
+            endif()
+        endif()
+
+        # If we couldn't find it manually, try the standard find_package
+        if(NOT LibLZMA_FOUND)
+            # Find LibLZMA through vcpkg
+            find_package(LibLZMA REQUIRED)
+            message(STATUS "Found LibLZMA via find_package: ${LibLZMA_LIBRARIES}")
+            message(STATUS "LibLZMA include dirs: ${LibLZMA_INCLUDE_DIRS}")
+        endif()
     else()
         # Find pkg-config for all platforms when not using vcpkg
         find_package(PkgConfig QUIET)
