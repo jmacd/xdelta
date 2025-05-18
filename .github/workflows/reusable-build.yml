@@ -135,18 +135,57 @@ jobs:
         }
 
     - name: Prepare artifacts
+      shell: pwsh
       run: |
-        mkdir -p artifacts/windows-${{ matrix.arch }}
+        # Create artifacts directory with PowerShell
+        $artifactsDir = Join-Path -Path "artifacts" -ChildPath "windows-${{ matrix.arch }}"
+        Write-Host "Creating artifacts directory: $artifactsDir"
+        New-Item -ItemType Directory -Force -Path $artifactsDir | Out-Null
 
-        # Copy executables
-        cp build/${{ inputs.build_type }}/xdelta3.exe artifacts/windows-${{ matrix.arch }}/
+        # Check if directory was created successfully
+        if (-not (Test-Path $artifactsDir)) {
+            Write-Error "Failed to create artifacts directory: $artifactsDir"
+            exit 1
+        }
+
+        # Locate the executable
+        $exePath = Join-Path -Path "build" -ChildPath "${{ inputs.build_type }}" -AdditionalChildPath "xdelta3.exe"
+        Write-Host "Looking for executable at: $exePath"
+
+        # Check if executable exists
+        if (Test-Path $exePath) {
+            # Copy executable
+            $destPath = Join-Path -Path $artifactsDir -ChildPath "xdelta3.exe"
+            Write-Host "Copying executable to: $destPath"
+            Copy-Item -Path $exePath -Destination $destPath -Force
+
+            # Verify copy was successful
+            if (Test-Path $destPath) {
+                Write-Host "Successfully copied executable"
+            } else {
+                Write-Error "Failed to copy executable"
+                exit 1
+            }
+        } else {
+            Write-Error "Executable not found at: $exePath"
+            # List build directory contents for debugging
+            Write-Host "Contents of build directory:"
+            Get-ChildItem -Path "build" -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName }
+            exit 1
+        }
 
         # Copy required DLLs if using dynamic linking
-        if (Test-Path "build/vcpkg_installed/${{ matrix.triplet }}/bin") {
-          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll artifacts/windows-${{ matrix.arch }}/
+        $dllPath = Join-Path -Path "build" -ChildPath "vcpkg_installed" -AdditionalChildPath "${{ matrix.triplet }}", "bin"
+        if (Test-Path $dllPath) {
+            Write-Host "Copying DLLs from: $dllPath"
+            Copy-Item -Path "$dllPath\*.dll" -Destination $artifactsDir -Force
+        } else {
+            Write-Host "No DLLs found at: $dllPath (this may be normal for static builds)"
         }
 
         # Create README in artifacts
+        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+        Write-Host "Creating README at: $readmePath"
         @"
         Xdelta3 Windows Binary (${{ matrix.arch }})
         ===============================
@@ -155,11 +194,13 @@ jobs:
         Build date: $(Get-Date -Format "yyyy-MM-dd")
 
         This package contains the xdelta3 command-line utility for Windows.
-        "@ | Out-File -FilePath artifacts/windows-${{ matrix.arch }}/README.txt
+        "@ | Out-File -FilePath $readmePath -Encoding utf8
 
         # Create zip archive if requested
         if (${{ inputs.create_archives }}) {
-          Compress-Archive -Path artifacts/windows-${{ matrix.arch }}/* -DestinationPath xdelta3-windows-${{ matrix.arch }}.zip
+            $zipPath = "xdelta3-windows-${{ matrix.arch }}.zip"
+            Write-Host "Creating zip archive: $zipPath"
+            Compress-Archive -Path "$artifactsDir\*" -DestinationPath $zipPath -Force
         }
 
     - name: Upload artifacts (directory)
