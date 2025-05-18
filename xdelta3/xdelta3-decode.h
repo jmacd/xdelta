@@ -159,7 +159,7 @@ xd3_decode_allocate (xd3_stream  *stream,
 		     uint8_t    **buf_ptr,
 		     usize_t      *buf_alloc)
 {
-  IF_DEBUG2 (DP(RINT "[xd3_decode_allocate] size %"W"u alloc %"W"u\n",
+  IF_DEBUG2 (DP(RINT "[xd3_decode_allocate] size %" W "u alloc %" W "u\n",
 		size, *buf_alloc));
 
   if (*buf_ptr != NULL && *buf_alloc < size)
@@ -1007,7 +1007,7 @@ xd3_decode_input (xd3_stream *stream)
 
 	stream->dec_state = DEC_CPYLEN;
 
-	IF_DEBUG2 (DP(RINT "--------- TARGET WINDOW %"Q"u -----------\n",
+	IF_DEBUG2 (DP(RINT "--------- TARGET WINDOW %" Q "u -----------\n",
 		      stream->current_window));
       }
 
@@ -1164,10 +1164,10 @@ xd3_decode_input (xd3_stream *stream)
 			  &src->cpyoff_blkoff);
 
 	  IF_DEBUG2(DP(RINT
-		       "[decode_cpyoff] %"Q"u "
-		       "cpyblkno %"Q"u "
-		       "cpyblkoff %"W"u "
-		       "blksize %"W"u\n",
+		       "[decode_cpyoff] %" Q "u "
+		       "cpyblkno %" Q "u "
+		       "cpyblkoff %" W "u "
+		       "blksize %" W "u\n",
 		       stream->dec_cpyoff,
 		       src->cpyoff_blocks,
 		       src->cpyoff_blkoff,

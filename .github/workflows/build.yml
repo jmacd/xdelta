@@ -102,6 +102,28 @@ jobs:
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
 
+    - name: Test executable
+      shell: pwsh
+      run: |
+        # Test if the executable works by running --help
+        $exePath = "build\${{ env.BUILD_TYPE }}\xdelta3.exe"
+
+        # Check if the executable exists
+        if (Test-Path $exePath) {
+            Write-Host "Testing $exePath with --help command..."
+            & $exePath --help
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "Executable test passed!"
+            } else {
+                Write-Error "Executable test failed with exit code $LASTEXITCODE"
+                exit 1
+            }
+        } else {
+            Write-Error "Executable not found at $exePath"
+            exit 1
+        }
+
     - name: Diagnostic Info (on failure)
       if: ${{ failure() }}
       run: |
@@ -235,10 +257,23 @@ jobs:
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(nproc)
 
-    # Tests are disabled
-    - name: Skip tests
+    - name: Test executable
       run: |
-        echo "Tests are disabled in this build"
+        # Test if the executable works by running --help
+        if [ -f "build/xdelta3" ]; then
+          echo "Testing build/xdelta3 with --help command..."
+          ./build/xdelta3 --help
+
+          if [ $? -eq 0 ]; then
+            echo "Executable test passed!"
+          else
+            echo "Executable test failed with exit code $?"
+            exit 1
+          fi
+        else
+          echo "Executable not found at build/xdelta3"
+          exit 1
+        fi
 
     - name: Prepare artifacts
       run: |
@@ -305,10 +340,23 @@ jobs:
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(sysctl -n hw.ncpu)
 
-    # Tests are disabled
-    - name: Skip tests
+    - name: Test executable
       run: |
-        echo "Tests are disabled in this build"
+        # Test if the executable works by running --help
+        if [ -f "build/xdelta3" ]; then
+          echo "Testing build/xdelta3 with --help command..."
+          ./build/xdelta3 --help
+
+          if [ $? -eq 0 ]; then
+            echo "Executable test passed!"
+          else
+            echo "Executable test failed with exit code $?"
+            exit 1
+          fi
+        else
+          echo "Executable not found at build/xdelta3"
+          exit 1
+        fi
 
     - name: Prepare artifacts
       run: |

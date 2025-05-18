@@ -1421,7 +1421,7 @@ xd3_alloc (xd3_stream *stream,
   if (a != NULL)
     {
       IF_DEBUG (stream->alloc_cnt += 1);
-      IF_DEBUG2 (DP(RINT "[stream %p malloc] size %"W"u ptr %p\n",
+      IF_DEBUG2 (DP(RINT "[stream %p malloc] size %" W "u ptr %p\n",
 		    (void*)stream, elts * size, a));
     }
   else
@@ -1872,7 +1872,7 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 
       if (stream->getblk == NULL)
 	{
-	  IF_DEBUG2 (DP(RINT "[getblk] XD3_GETSRCBLK %"Q"u\n", blkno));
+	  IF_DEBUG2 (DP(RINT "[getblk] XD3_GETSRCBLK %" Q "u\n", blkno));
 	  stream->msg = "getblk source input";
 	  return XD3_GETSRCBLK;
 	}
