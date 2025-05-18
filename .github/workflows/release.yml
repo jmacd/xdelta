@@ -124,6 +124,7 @@ jobs:
         # Handle x64 artifacts
         Write-Host "Checking for x64 artifacts..."
         $x64ExeFound = $false
+        $x64LibFound = $false
 
         # Try zip file first
         if (Test-Path $x64ZipPath) {
@@ -132,10 +133,22 @@ jobs:
                 # Extract x64 artifacts
                 Expand-Archive -Path $x64ZipPath -DestinationPath .\x64-extracted -Force
 
+                # Check for executable
                 if (Test-Path ".\x64-extracted\xdelta3.exe") {
                     Write-Host "x64 executable found in zip"
                     Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
                     $x64ExeFound = $true
+                }
+
+                # Check for library files
+                if (Test-Path ".\x64-extracted\xdelta.lib") {
+                    Write-Host "x64 library found in zip"
+                    Copy-Item ".\x64-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
+                    $x64LibFound = $true
+                }
+                if (Test-Path ".\x64-extracted\xdeltad.lib") {
+                    Write-Host "x64 debug library found in zip"
+                    Copy-Item ".\x64-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
                 }
             } catch {
                 Write-Host "Error extracting x64 zip: $_"
@@ -154,19 +167,41 @@ jobs:
                 Copy-Item $x64ExePath -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
                 $x64ExeFound = $true
             }
+
+            # Check for library files
+            $x64LibPath = Get-ChildItem -Path $x64DirPath -Filter "xdelta.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            if ($x64LibPath) {
+                Write-Host "x64 library found at $x64LibPath"
+                Copy-Item $x64LibPath -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
+                $x64LibFound = $true
+            }
+
+            $x64DebugLibPath = Get-ChildItem -Path $x64DirPath -Filter "xdeltad.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            if ($x64DebugLibPath) {
+                Write-Host "x64 debug library found at $x64DebugLibPath"
+                Copy-Item $x64DebugLibPath -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
+            }
         }
 
-        # Create dummy file if nothing found
+        # Create dummy files if nothing found
         if (-not $x64ExeFound) {
             Write-Host "WARNING: x64 executable not found, creating dummy file"
             New-Item -ItemType Directory -Path .\x64-extracted -Force | Out-Null
             New-Item -ItemType File -Path .\x64-extracted\xdelta3.exe -Force | Out-Null
             Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
         }
+        if (-not $x64LibFound) {
+            Write-Host "WARNING: x64 library not found, creating dummy files"
+            New-Item -ItemType File -Path .\x64-extracted\xdelta.lib -Force | Out-Null
+            New-Item -ItemType File -Path .\x64-extracted\xdeltad.lib -Force | Out-Null
+            Copy-Item ".\x64-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
+            Copy-Item ".\x64-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
+        }
 
         # Handle x86 artifacts with similar approach
         Write-Host "Checking for x86 artifacts..."
         $x86ExeFound = $false
+        $x86LibFound = $false
 
         # Try zip file first
         if (Test-Path $x86ZipPath) {
@@ -175,10 +210,22 @@ jobs:
                 # Extract x86 artifacts
                 Expand-Archive -Path $x86ZipPath -DestinationPath .\x86-extracted -Force
 
+                # Check for executable
                 if (Test-Path ".\x86-extracted\xdelta3.exe") {
                     Write-Host "x86 executable found in zip"
                     Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
                     $x86ExeFound = $true
+                }
+
+                # Check for library files
+                if (Test-Path ".\x86-extracted\xdelta.lib") {
+                    Write-Host "x86 library found in zip"
+                    Copy-Item ".\x86-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
+                    $x86LibFound = $true
+                }
+                if (Test-Path ".\x86-extracted\xdeltad.lib") {
+                    Write-Host "x86 debug library found in zip"
+                    Copy-Item ".\x86-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
                 }
             } catch {
                 Write-Host "Error extracting x86 zip: $_"
@@ -197,14 +244,35 @@ jobs:
                 Copy-Item $x86ExePath -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
                 $x86ExeFound = $true
             }
+
+            # Check for library files
+            $x86LibPath = Get-ChildItem -Path $x86DirPath -Filter "xdelta.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            if ($x86LibPath) {
+                Write-Host "x86 library found at $x86LibPath"
+                Copy-Item $x86LibPath -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
+                $x86LibFound = $true
+            }
+
+            $x86DebugLibPath = Get-ChildItem -Path $x86DirPath -Filter "xdeltad.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            if ($x86DebugLibPath) {
+                Write-Host "x86 debug library found at $x86DebugLibPath"
+                Copy-Item $x86DebugLibPath -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
+            }
         }
 
-        # Create dummy file if nothing found
+        # Create dummy files if nothing found
         if (-not $x86ExeFound) {
             Write-Host "WARNING: x86 executable not found, creating dummy file"
             New-Item -ItemType Directory -Path .\x86-extracted -Force | Out-Null
             New-Item -ItemType File -Path .\x86-extracted\xdelta3.exe -Force | Out-Null
             Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+        }
+        if (-not $x86LibFound) {
+            Write-Host "WARNING: x86 library not found, creating dummy files"
+            New-Item -ItemType File -Path .\x86-extracted\xdelta.lib -Force | Out-Null
+            New-Item -ItemType File -Path .\x86-extracted\xdeltad.lib -Force | Out-Null
+            Copy-Item ".\x86-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
+            Copy-Item ".\x86-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
         }
 
         # Copy header files
@@ -224,13 +292,21 @@ jobs:
 
         - x64-windows/
           - bin/
-            - xdelta3.exe
+            - xdelta3.exe - Release build
+            - xdelta3d.exe - Debug build (if available)
+          - lib/
+            - xdelta.lib - Release build
+            - xdeltad.lib - Debug build (if available)
           - include/xdelta3/
             - xdelta3.h
             - xdelta3.c
         - x86-windows/
           - bin/
-            - xdelta3.exe
+            - xdelta3.exe - Release build
+            - xdelta3d.exe - Debug build (if available)
+          - lib/
+            - xdelta.lib - Release build
+            - xdeltad.lib - Debug build (if available)
           - include/xdelta3/
             - xdelta3.h
             - xdelta3.c
@@ -242,6 +318,10 @@ jobs:
         ```
         xdelta3.exe -h
         ```
+
+        ### Library
+
+        Include xdelta3.h in your project and link against xdelta.lib.
 
         ## License
 
@@ -618,4 +698,4 @@ jobs:
 
           This PR was created automatically by the release workflow.
         branch: update-vcpkg-registry-${{ steps.get_version.outputs.VERSION }}
-        base: main
+        base: release3_1_apl

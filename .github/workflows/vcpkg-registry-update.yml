@@ -93,7 +93,7 @@ jobs:
         body: |
           # Xdelta3 ${{ needs.check-version-change.outputs.version }}
 
-          Automatic release created after version change in main branch.
+          Automatic release created after version change in release3_1_apl branch.
 
           Please check the [release workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml) for build status.
 
@@ -224,4 +224,4 @@ jobs:
 
           This PR was created automatically by the vcpkg-registry-update workflow.
         branch: update-vcpkg-registry-${{ steps.get_info.outputs.VERSION }}
-        base: main
+        base: release3_1_apl
