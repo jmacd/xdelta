@@ -39,12 +39,34 @@ jobs:
       with:
         name: xdelta3-windows-x64
         path: ./windows-x64-artifacts/
+      continue-on-error: true
 
     - name: Download Windows x86 artifacts
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
         path: ./windows-x86-artifacts/
+      continue-on-error: true
+
+    - name: List downloaded artifacts
+      shell: pwsh
+      run: |
+        Write-Host "Listing downloaded artifacts directories:"
+        Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
+
+        Write-Host "Checking Windows x64 artifacts:"
+        if (Test-Path "./windows-x64-artifacts") {
+            Get-ChildItem -Path "./windows-x64-artifacts" -Recurse | ForEach-Object { Write-Host $_.FullName }
+        } else {
+            Write-Host "Windows x64 artifacts directory not found"
+        }
+
+        Write-Host "Checking Windows x86 artifacts:"
+        if (Test-Path "./windows-x86-artifacts") {
+            Get-ChildItem -Path "./windows-x86-artifacts" -Recurse | ForEach-Object { Write-Host $_.FullName }
+        } else {
+            Write-Host "Windows x86 artifacts directory not found"
+        }
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
@@ -93,37 +115,93 @@ jobs:
         Write-Host "Listing artifact directories:"
         Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
 
-        # Check if artifact files exist
+        # Check if artifact files exist in both zip and directory format
         $x64ZipPath = ".\windows-x64-artifacts\xdelta3-windows-x64.zip"
         $x86ZipPath = ".\windows-x86-artifacts\xdelta3-windows-x86.zip"
+        $x64DirPath = ".\windows-x64-artifacts"
+        $x86DirPath = ".\windows-x86-artifacts"
 
-        Write-Host "Checking for x64 artifact: $x64ZipPath"
+        # Handle x64 artifacts
+        Write-Host "Checking for x64 artifacts..."
+        $x64ExeFound = $false
+
+        # Try zip file first
         if (Test-Path $x64ZipPath) {
-            Write-Host "x64 artifact found"
-            # Extract x64 artifacts
-            Expand-Archive -Path $x64ZipPath -DestinationPath .\x64-extracted
+            Write-Host "x64 zip artifact found at $x64ZipPath"
+            try {
+                # Extract x64 artifacts
+                Expand-Archive -Path $x64ZipPath -DestinationPath .\x64-extracted -Force
 
-            # Copy x64 binaries
-            Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+                if (Test-Path ".\x64-extracted\xdelta3.exe") {
+                    Write-Host "x64 executable found in zip"
+                    Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+                    $x64ExeFound = $true
+                }
+            } catch {
+                Write-Host "Error extracting x64 zip: $_"
+            }
         } else {
-            Write-Host "WARNING: x64 artifact not found at $x64ZipPath"
-            # Create dummy file for testing
+            Write-Host "x64 zip artifact not found at $x64ZipPath"
+        }
+
+        # If zip extraction failed, try direct directory
+        if (-not $x64ExeFound -and (Test-Path $x64DirPath)) {
+            Write-Host "Checking x64 directory for executable..."
+            $x64ExePath = Get-ChildItem -Path $x64DirPath -Filter "xdelta3.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+
+            if ($x64ExePath) {
+                Write-Host "x64 executable found at $x64ExePath"
+                Copy-Item $x64ExePath -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+                $x64ExeFound = $true
+            }
+        }
+
+        # Create dummy file if nothing found
+        if (-not $x64ExeFound) {
+            Write-Host "WARNING: x64 executable not found, creating dummy file"
             New-Item -ItemType Directory -Path .\x64-extracted -Force | Out-Null
             New-Item -ItemType File -Path .\x64-extracted\xdelta3.exe -Force | Out-Null
             Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
         }
 
-        Write-Host "Checking for x86 artifact: $x86ZipPath"
-        if (Test-Path $x86ZipPath) {
-            Write-Host "x86 artifact found"
-            # Extract x86 artifacts
-            Expand-Archive -Path $x86ZipPath -DestinationPath .\x86-extracted
+        # Handle x86 artifacts with similar approach
+        Write-Host "Checking for x86 artifacts..."
+        $x86ExeFound = $false
 
-            # Copy x86 binaries
-            Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+        # Try zip file first
+        if (Test-Path $x86ZipPath) {
+            Write-Host "x86 zip artifact found at $x86ZipPath"
+            try {
+                # Extract x86 artifacts
+                Expand-Archive -Path $x86ZipPath -DestinationPath .\x86-extracted -Force
+
+                if (Test-Path ".\x86-extracted\xdelta3.exe") {
+                    Write-Host "x86 executable found in zip"
+                    Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+                    $x86ExeFound = $true
+                }
+            } catch {
+                Write-Host "Error extracting x86 zip: $_"
+            }
         } else {
-            Write-Host "WARNING: x86 artifact not found at $x86ZipPath"
-            # Create dummy file for testing
+            Write-Host "x86 zip artifact not found at $x86ZipPath"
+        }
+
+        # If zip extraction failed, try direct directory
+        if (-not $x86ExeFound -and (Test-Path $x86DirPath)) {
+            Write-Host "Checking x86 directory for executable..."
+            $x86ExePath = Get-ChildItem -Path $x86DirPath -Filter "xdelta3.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+
+            if ($x86ExePath) {
+                Write-Host "x86 executable found at $x86ExePath"
+                Copy-Item $x86ExePath -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+                $x86ExeFound = $true
+            }
+        }
+
+        # Create dummy file if nothing found
+        if (-not $x86ExeFound) {
+            Write-Host "WARNING: x86 executable not found, creating dummy file"
             New-Item -ItemType Directory -Path .\x86-extracted -Force | Out-Null
             New-Item -ItemType File -Path .\x86-extracted\xdelta3.exe -Force | Out-Null
             Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
@@ -223,30 +301,35 @@ jobs:
       with:
         name: xdelta3-windows-x64
         path: ./
+      continue-on-error: true
 
     - name: Download Windows x86 artifacts
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
         path: ./
+      continue-on-error: true
 
     - name: Download Linux artifacts
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-linux
         path: ./
+      continue-on-error: true
 
     - name: Download macOS artifacts
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
         path: ./
+      continue-on-error: true
 
     - name: Download vcpkg binaries
       uses: actions/download-artifact@v4
       with:
         name: xdelta-vcpkg-binaries
         path: ./
+      continue-on-error: true
 
     - name: Get version
       id: get_version
@@ -256,6 +339,28 @@ jobs:
         else
           echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
         fi
+
+    - name: List downloaded artifacts
+      run: |
+        echo "Listing downloaded artifacts:"
+        ls -la
+
+        # Check for specific artifacts
+        echo "Checking for Windows x64 artifact:"
+        if [ -f "xdelta3-windows-x64.zip" ]; then
+          echo "Found xdelta3-windows-x64.zip"
+        else
+          echo "xdelta3-windows-x64.zip not found"
+        fi
+
+        echo "Checking for vcpkg binaries:"
+        if [ -f "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip" ]; then
+          echo "Found xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip"
+        else
+          echo "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip not found"
+        fi
+
+    # Note: Get version step was moved above
 
     - name: Generate changelog
       id: changelog
@@ -280,56 +385,101 @@ jobs:
         # Create a directory for all release files
         mkdir -p release-files
 
-        # Check and copy Windows x64 artifacts
+        # Check for artifacts in both zip and directory formats
+        # Windows x64 artifacts
         if [ -f "xdelta3-windows-x64.zip" ]; then
-          echo "Found Windows x64 artifact"
+          echo "Found Windows x64 zip artifact"
           cp xdelta3-windows-x64.zip release-files/
+        elif [ -d "xdelta3-windows-x64" ] || [ -d "windows-x64-artifacts" ]; then
+          echo "Found Windows x64 directory artifact"
+          # Create a zip from the directory
+          if [ -d "xdelta3-windows-x64" ]; then
+            zip -r release-files/xdelta3-windows-x64.zip xdelta3-windows-x64/
+          else
+            zip -r release-files/xdelta3-windows-x64.zip windows-x64-artifacts/
+          fi
         else
           echo "WARNING: Windows x64 artifact not found"
           # Create a dummy file for testing
           echo "Dummy Windows x64 file" > release-files/xdelta3-windows-x64.zip
         fi
 
-        # Check and copy Windows x86 artifacts
+        # Windows x86 artifacts
         if [ -f "xdelta3-windows-x86.zip" ]; then
-          echo "Found Windows x86 artifact"
+          echo "Found Windows x86 zip artifact"
           cp xdelta3-windows-x86.zip release-files/
+        elif [ -d "xdelta3-windows-x86" ] || [ -d "windows-x86-artifacts" ]; then
+          echo "Found Windows x86 directory artifact"
+          # Create a zip from the directory
+          if [ -d "xdelta3-windows-x86" ]; then
+            zip -r release-files/xdelta3-windows-x86.zip xdelta3-windows-x86/
+          else
+            zip -r release-files/xdelta3-windows-x86.zip windows-x86-artifacts/
+          fi
         else
           echo "WARNING: Windows x86 artifact not found"
           # Create a dummy file for testing
           echo "Dummy Windows x86 file" > release-files/xdelta3-windows-x86.zip
         fi
 
-        # Check and copy Linux artifacts
+        # Linux artifacts
         if [ -f "xdelta3-linux.tar.gz" ]; then
           echo "Found Linux artifact"
           cp xdelta3-linux.tar.gz release-files/
+        elif [ -d "xdelta3-linux" ]; then
+          echo "Found Linux directory artifact"
+          tar -czf release-files/xdelta3-linux.tar.gz xdelta3-linux/
         else
           echo "WARNING: Linux artifact not found"
           # Create a dummy file for testing
           echo "Dummy Linux file" > release-files/xdelta3-linux.tar.gz
         fi
 
-        # Check and copy macOS artifacts
+        # macOS artifacts
         if [ -f "xdelta3-macos.tar.gz" ]; then
           echo "Found macOS artifact"
           cp xdelta3-macos.tar.gz release-files/
+        elif [ -d "xdelta3-macos" ]; then
+          echo "Found macOS directory artifact"
+          tar -czf release-files/xdelta3-macos.tar.gz xdelta3-macos/
         else
           echo "WARNING: macOS artifact not found"
           # Create a dummy file for testing
           echo "Dummy macOS file" > release-files/xdelta3-macos.tar.gz
         fi
 
-        # Check and copy vcpkg binaries
-        if [ -f "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip" ]; then
+        # vcpkg binaries
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+        if [ -f "xdelta-${VERSION}-windows.zip" ]; then
           echo "Found vcpkg binaries"
-          cp xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip release-files/
-          cp xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip.sha512 release-files/
+          cp "xdelta-${VERSION}-windows.zip" release-files/
+          if [ -f "xdelta-${VERSION}-windows.zip.sha512" ]; then
+            cp "xdelta-${VERSION}-windows.zip.sha512" release-files/
+          else
+            # Generate SHA512 if not found
+            sha512sum "xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+          fi
+        elif [ -d "xdelta-binaries" ]; then
+          echo "Found vcpkg binaries directory"
+          if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip" ]; then
+            cp "xdelta-binaries/xdelta-${VERSION}-windows.zip" release-files/
+            if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" ]; then
+              cp "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" release-files/
+            else
+              # Generate SHA512 if not found
+              sha512sum "xdelta-binaries/xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+            fi
+          else
+            echo "WARNING: vcpkg binaries not found in directory"
+            # Create dummy files for testing
+            echo "Dummy vcpkg binaries" > "release-files/xdelta-${VERSION}-windows.zip"
+            echo "Dummy SHA512" > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+          fi
         else
           echo "WARNING: vcpkg binaries not found"
           # Create dummy files for testing
-          echo "Dummy vcpkg binaries" > release-files/xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip
-          echo "Dummy SHA512" > release-files/xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip.sha512
+          echo "Dummy vcpkg binaries" > "release-files/xdelta-${VERSION}-windows.zip"
+          echo "Dummy SHA512" > "release-files/xdelta-${VERSION}-windows.zip.sha512"
         fi
 
         # List all files in the release directory

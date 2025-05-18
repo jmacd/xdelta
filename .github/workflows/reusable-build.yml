@@ -333,6 +333,13 @@ jobs:
                 if (Test-Path $zipPath) {
                     Write-Host "Zip archive created successfully: $zipPath"
                     Write-Host "Zip file size: $((Get-Item $zipPath).Length) bytes"
+
+                    # List the contents of the zip file for verification
+                    Write-Host "Listing contents of the zip file:"
+                    Add-Type -AssemblyName System.IO.Compression.FileSystem
+                    $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+                    $zip.Entries | ForEach-Object { Write-Host "  $($_.FullName)" }
+                    $zip.Dispose()
                 } else {
                     throw "Failed to create zip archive: $zipPath"
                 }
