@@ -244,15 +244,61 @@ jobs:
                     Copy-Item -Path $altTemplatePath -Destination $readmePath -Force -ErrorAction Stop
                     Write-Host "Template copied successfully from alternative path to: $readmePath"
                 } else {
-                    Write-Error "README template file not found at either path"
-                    exit 1
+                    Write-Host "WARNING: README template file not found at either path, creating a fallback README..."
+                    # Create a simple README as fallback
+                    $readmeContent = "Xdelta3 Windows Binary`r`n"
+                    $readmeContent += "======================`r`n`r`n"
+                    $readmeContent += "This package contains the xdelta3 command-line utility for Windows.`r`n`r`n"
+                    $readmeContent += "Command Line Syntax`r`n"
+                    $readmeContent += "-------------------`r`n`r`n"
+                    $readmeContent += "make patch:`r`n`r`n"
+                    $readmeContent += "  xdelta3.exe -e -s old_file new_file delta_file`r`n`r`n"
+                    $readmeContent += "apply patch:`r`n`r`n"
+                    $readmeContent += "  xdelta3.exe -d -s old_file delta_file decoded_new_file`r`n`r`n"
+                    $readmeContent += "standard options:`r`n"
+                    $readmeContent += "   -0 .. -9     compression level`r`n"
+                    $readmeContent += "   -c           use stdout`r`n"
+                    $readmeContent += "   -d           decompress`r`n"
+                    $readmeContent += "   -e           compress`r`n"
+                    $readmeContent += "   -f           force (overwrite, ignore trailing garbage)`r`n"
+                    $readmeContent += "   -h           show help`r`n"
+                    $readmeContent += "   -q           be quiet`r`n"
+                    $readmeContent += "   -v           be verbose (max 2)`r`n"
+                    $readmeContent += "   -V           show version`r`n`r`n"
+                    $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
+                    # Write the fallback README
+                    Set-Content -Path $readmePath -Value $readmeContent
+                    Write-Host "Fallback README created successfully"
                 }
             }
         } catch {
             Write-Host "Error copying template: $_"
             Write-Host "Stack trace: $($_.ScriptStackTrace)"
-            Write-Error "Failed to copy README template"
-            exit 1
+            Write-Host "WARNING: Failed to copy README template, creating a fallback README..."
+            # Create a simple README as fallback
+            $readmeContent = "Xdelta3 Windows Binary`r`n"
+            $readmeContent += "======================`r`n`r`n"
+            $readmeContent += "This package contains the xdelta3 command-line utility for Windows.`r`n`r`n"
+            $readmeContent += "Command Line Syntax`r`n"
+            $readmeContent += "-------------------`r`n`r`n"
+            $readmeContent += "make patch:`r`n`r`n"
+            $readmeContent += "  xdelta3.exe -e -s old_file new_file delta_file`r`n`r`n"
+            $readmeContent += "apply patch:`r`n`r`n"
+            $readmeContent += "  xdelta3.exe -d -s old_file delta_file decoded_new_file`r`n`r`n"
+            $readmeContent += "standard options:`r`n"
+            $readmeContent += "   -0 .. -9     compression level`r`n"
+            $readmeContent += "   -c           use stdout`r`n"
+            $readmeContent += "   -d           decompress`r`n"
+            $readmeContent += "   -e           compress`r`n"
+            $readmeContent += "   -f           force (overwrite, ignore trailing garbage)`r`n"
+            $readmeContent += "   -h           show help`r`n"
+            $readmeContent += "   -q           be quiet`r`n"
+            $readmeContent += "   -v           be verbose (max 2)`r`n"
+            $readmeContent += "   -V           show version`r`n`r`n"
+            $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
+            # Write the fallback README
+            Set-Content -Path $readmePath -Value $readmeContent
+            Write-Host "Fallback README created successfully"
         }
 
         # Create zip archive if requested with detailed error handling
