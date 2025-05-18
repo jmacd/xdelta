@@ -7,19 +7,27 @@ cmake_minimum_required(VERSION 3.14)
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       CACHE STRING "Vcpkg toolchain file")
-  message(STATUS "Using vcpkg toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
+  message(STATUS "Using vcpkg toolchain file from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
 endif()
 
 # Check if we're using vcpkg
 if(DEFINED CMAKE_TOOLCHAIN_FILE)
   if(CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg.cmake")
     set(USING_VCPKG TRUE)
-    message(STATUS "Using vcpkg integration")
+    message(STATUS "Using vcpkg integration with toolchain: ${CMAKE_TOOLCHAIN_FILE}")
 
     # Support for vcpkg manifest mode (vcpkg.json)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json")
       message(STATUS "Detected vcpkg.json - using manifest mode")
     endif()
+  endif()
+else()
+  # If toolchain file is not defined, try to find it in common locations
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        CACHE STRING "Vcpkg toolchain file" FORCE)
+    set(USING_VCPKG TRUE)
+    message(STATUS "Found vcpkg toolchain in project directory: ${CMAKE_TOOLCHAIN_FILE}")
   endif()
 endif()
 # Set project information
@@ -142,103 +150,95 @@ if(XDELTA_ENABLE_LZMA)
         else()
             set(LIBLZMA_USE_STATIC_LIBS ON)
         endif()
-    endif()
 
-    # Find pkg-config for all platforms
-    find_package(PkgConfig QUIET)
+        message(STATUS "Using vcpkg for liblzma dependency")
 
-    # On macOS, try to find liblzma from Homebrew or MacPorts first
-    if(APPLE)
-        # Check for Homebrew xz package (which provides liblzma)
-        execute_process(
-            COMMAND brew --prefix xz
-            RESULT_VARIABLE BREW_XZ_RESULT
-            OUTPUT_VARIABLE BREW_XZ_PREFIX
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-        )
-        if(BREW_XZ_RESULT EQUAL 0 AND EXISTS "${BREW_XZ_PREFIX}")
-            message(STATUS "Found Homebrew xz (liblzma) at ${BREW_XZ_PREFIX}")
-            list(APPEND CMAKE_PREFIX_PATH "${BREW_XZ_PREFIX}")
-
-            # Explicitly set include and library paths for Homebrew
-            set(LIBLZMA_INCLUDE_DIR "${BREW_XZ_PREFIX}/include" CACHE PATH "liblzma include directory")
-
-            if(EXISTS "${BREW_XZ_PREFIX}/lib/liblzma.dylib")
-                set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
-            elseif(EXISTS "${BREW_XZ_PREFIX}/lib/liblzma.a")
-                set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib/liblzma.a" CACHE FILEPATH "liblzma library")
-            endif()
-
-            if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
-                set(LibLZMA_FOUND TRUE)
-                set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
-                set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
-                message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
-            endif()
-        endif()
-
-        # Check for MacPorts if Homebrew not found
-        if(NOT LibLZMA_FOUND AND EXISTS "/opt/local/include/lzma.h")
-            message(STATUS "Found MacPorts liblzma")
-            list(APPEND CMAKE_PREFIX_PATH "/opt/local")
-
-            # Explicitly set include and library paths for MacPorts
-            set(LIBLZMA_INCLUDE_DIR "/opt/local/include" CACHE PATH "liblzma include directory")
-
-            if(EXISTS "/opt/local/lib/liblzma.dylib")
-                set(LIBLZMA_LIBRARY "/opt/local/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
-            elseif(EXISTS "/opt/local/lib/liblzma.a")
-                set(LIBLZMA_LIBRARY "/opt/local/lib/liblzma.a" CACHE FILEPATH "liblzma library")
-            endif()
-
-            if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
-                set(LibLZMA_FOUND TRUE)
-                set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
-                set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
-                message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
-            endif()
-        endif()
-
-        # Check system locations if still not found
-        if(NOT LibLZMA_FOUND AND EXISTS "/usr/local/include/lzma.h")
-            message(STATUS "Found liblzma in /usr/local")
-            list(APPEND CMAKE_PREFIX_PATH "/usr/local")
-
-            # Explicitly set include and library paths for system location
-            set(LIBLZMA_INCLUDE_DIR "/usr/local/include" CACHE PATH "liblzma include directory")
-
-            if(EXISTS "/usr/local/lib/liblzma.dylib")
-                set(LIBLZMA_LIBRARY "/usr/local/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
-            elseif(EXISTS "/usr/local/lib/liblzma.a")
-                set(LIBLZMA_LIBRARY "/usr/local/lib/liblzma.a" CACHE FILEPATH "liblzma library")
-            endif()
-
-            if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
-                set(LibLZMA_FOUND TRUE)
-                set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
-                set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
-                message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
-            endif()
-        endif()
-
-        # Use pkg-config as fallback
-        if(NOT LibLZMA_FOUND AND PKG_CONFIG_FOUND)
-            pkg_check_modules(PC_LIBLZMA QUIET liblzma)
-            if(PC_LIBLZMA_FOUND)
-                message(STATUS "Found liblzma via pkg-config")
-                set(LibLZMA_INCLUDE_DIRS ${PC_LIBLZMA_INCLUDE_DIRS})
-                set(LibLZMA_LIBRARIES ${PC_LIBLZMA_LIBRARIES})
-                set(LibLZMA_FOUND TRUE)
-            endif()
-        endif()
-    endif()
-
-    # Only try to find LibLZMA if we haven't already found it manually
-    if(NOT LibLZMA_FOUND)
+        # Find LibLZMA through vcpkg
         find_package(LibLZMA REQUIRED)
-        message(STATUS "Found LibLZMA via find_package: ${LibLZMA_LIBRARIES}")
+        message(STATUS "Found LibLZMA via vcpkg: ${LibLZMA_LIBRARIES}")
+        message(STATUS "LibLZMA include dirs: ${LibLZMA_INCLUDE_DIRS}")
     else()
-        message(STATUS "Using manually configured LibLZMA: ${LibLZMA_LIBRARIES}")
+        # Find pkg-config for all platforms when not using vcpkg
+        find_package(PkgConfig QUIET)
+
+        # On macOS, try to find liblzma from Homebrew or MacPorts first
+        if(APPLE)
+            # Check for Homebrew xz package (which provides liblzma)
+            execute_process(
+                COMMAND brew --prefix xz
+                RESULT_VARIABLE BREW_XZ_RESULT
+                OUTPUT_VARIABLE BREW_XZ_PREFIX
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+            )
+            if(BREW_XZ_RESULT EQUAL 0 AND EXISTS "${BREW_XZ_PREFIX}")
+                message(STATUS "Found Homebrew xz (liblzma) at ${BREW_XZ_PREFIX}")
+                list(APPEND CMAKE_PREFIX_PATH "${BREW_XZ_PREFIX}")
+
+                # Explicitly set include and library paths for Homebrew
+                set(LIBLZMA_INCLUDE_DIR "${BREW_XZ_PREFIX}/include" CACHE PATH "liblzma include directory")
+
+                # Check for the library in various locations
+                if(EXISTS "${BREW_XZ_PREFIX}/lib/liblzma.dylib")
+                    set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
+                elseif(EXISTS "${BREW_XZ_PREFIX}/lib/liblzma.a")
+                    set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib/liblzma.a" CACHE FILEPATH "liblzma library")
+                # Also check for lib64 directory which might exist on some systems
+                elseif(EXISTS "${BREW_XZ_PREFIX}/lib64/liblzma.dylib")
+                    set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib64/liblzma.dylib" CACHE FILEPATH "liblzma library")
+                elseif(EXISTS "${BREW_XZ_PREFIX}/lib64/liblzma.a")
+                    set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib64/liblzma.a" CACHE FILEPATH "liblzma library")
+                endif()
+
+                # If we found both include and library, mark as found
+                if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
+                    set(LibLZMA_FOUND TRUE)
+                    set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
+                    set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
+                    message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
+                endif()
+            endif()
+
+            # Check for MacPorts if Homebrew not found
+            if(NOT LibLZMA_FOUND AND EXISTS "/opt/local/include/lzma.h")
+                message(STATUS "Found MacPorts liblzma")
+                list(APPEND CMAKE_PREFIX_PATH "/opt/local")
+
+                # Explicitly set include and library paths for MacPorts
+                set(LIBLZMA_INCLUDE_DIR "/opt/local/include" CACHE PATH "liblzma include directory")
+
+                if(EXISTS "/opt/local/lib/liblzma.dylib")
+                    set(LIBLZMA_LIBRARY "/opt/local/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
+                elseif(EXISTS "/opt/local/lib/liblzma.a")
+                    set(LIBLZMA_LIBRARY "/opt/local/lib/liblzma.a" CACHE FILEPATH "liblzma library")
+                endif()
+
+                if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
+                    set(LibLZMA_FOUND TRUE)
+                    set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
+                    set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
+                    message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
+                endif()
+            endif()
+
+            # Use pkg-config as fallback
+            if(NOT LibLZMA_FOUND AND PKG_CONFIG_FOUND)
+                pkg_check_modules(PC_LIBLZMA QUIET liblzma)
+                if(PC_LIBLZMA_FOUND)
+                    message(STATUS "Found liblzma via pkg-config")
+                    set(LibLZMA_INCLUDE_DIRS ${PC_LIBLZMA_INCLUDE_DIRS})
+                    set(LibLZMA_LIBRARIES ${PC_LIBLZMA_LIBRARIES})
+                    set(LibLZMA_FOUND TRUE)
+                endif()
+            endif()
+        endif()
+
+        # Only try to find LibLZMA if we haven't already found it manually
+        if(NOT LibLZMA_FOUND)
+            find_package(LibLZMA REQUIRED)
+            message(STATUS "Found LibLZMA via find_package: ${LibLZMA_LIBRARIES}")
+        else()
+            message(STATUS "Using manually configured LibLZMA: ${LibLZMA_LIBRARIES}")
+        endif()
     endif()
 endif()
 
@@ -299,16 +299,46 @@ check_type_size("unsigned long long" SIZEOF_UNSIGNED_LONG_LONG)
 # This fixes static_assert issues on Linux and macOS
 if(SIZEOF_SIZE_T)
     math(EXPR SIZEOF_SIZE_T "${SIZEOF_SIZE_T}")
+else()
+    # Fallback for platforms where check_type_size fails
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(SIZEOF_SIZE_T 8)
+    else()
+        set(SIZEOF_SIZE_T 4)
+    endif()
 endif()
+
 if(SIZEOF_UNSIGNED_INT)
     math(EXPR SIZEOF_UNSIGNED_INT "${SIZEOF_UNSIGNED_INT}")
+else()
+    # Most platforms have 4-byte unsigned int
+    set(SIZEOF_UNSIGNED_INT 4)
 endif()
+
 if(SIZEOF_UNSIGNED_LONG)
     math(EXPR SIZEOF_UNSIGNED_LONG "${SIZEOF_UNSIGNED_LONG}")
+else()
+    # On most 64-bit Unix/Linux/macOS, long is 8 bytes
+    # On Windows and 32-bit systems, it's typically 4 bytes
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT WIN32)
+        set(SIZEOF_UNSIGNED_LONG 8)
+    else()
+        set(SIZEOF_UNSIGNED_LONG 4)
+    endif()
 endif()
+
 if(SIZEOF_UNSIGNED_LONG_LONG)
     math(EXPR SIZEOF_UNSIGNED_LONG_LONG "${SIZEOF_UNSIGNED_LONG_LONG}")
+else()
+    # unsigned long long is almost always 8 bytes
+    set(SIZEOF_UNSIGNED_LONG_LONG 8)
 endif()
+
+# Print the detected sizes for debugging
+message(STATUS "SIZEOF_SIZE_T: ${SIZEOF_SIZE_T}")
+message(STATUS "SIZEOF_UNSIGNED_INT: ${SIZEOF_UNSIGNED_INT}")
+message(STATUS "SIZEOF_UNSIGNED_LONG: ${SIZEOF_UNSIGNED_LONG}")
+message(STATUS "SIZEOF_UNSIGNED_LONG_LONG: ${SIZEOF_UNSIGNED_LONG_LONG}")
 
 # Set compile definitions
 target_compile_definitions(xdelta
@@ -337,76 +367,6 @@ if(XDELTA_ENABLE_LZMA)
         target_include_directories(xdelta PRIVATE ${LibLZMA_INCLUDE_DIRS})
         target_link_libraries(xdelta PRIVATE ${LibLZMA_LIBRARIES})
         message(STATUS "Linking xdelta with LibLZMA: ${LibLZMA_LIBRARIES}")
-    elseif(USING_VCPKG)
-        # vcpkg-specific handling
-        message(STATUS "Using vcpkg-provided LibLZMA")
-
-        # Determine the correct library name based on platform, build type and linking mode
-        set(LZMA_LIB_NAME "liblzma")
-        if(MSVC)
-            if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
-                # Static library
-                if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-                    set(LZMA_LIB_NAME "liblzmad")
-                endif()
-            else()
-                # Dynamic library
-                if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-                    set(LZMA_LIB_NAME "liblzma")
-                endif()
-            endif()
-        elseif(APPLE)
-            # On macOS, the library is typically named liblzma.dylib or liblzma.a
-            set(LZMA_LIB_NAME "lzma")
-        else()
-            # On Linux and other platforms
-            set(LZMA_LIB_NAME "lzma")
-        endif()
-
-        # Find the library in vcpkg installed directory
-        find_library(VCPKG_LZMA_LIB
-            NAMES ${LZMA_LIB_NAME} liblzma lzma
-            PATHS
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib"
-                "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib"
-                "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib"
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/lib"
-                "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/debug/lib"
-                "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/debug/lib"
-            NO_DEFAULT_PATH
-        )
-
-        if(VCPKG_LZMA_LIB)
-            # Find the include directory
-            if(EXISTS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
-                set(VCPKG_LZMA_INCLUDE "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
-            elseif(EXISTS "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
-                set(VCPKG_LZMA_INCLUDE "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
-            elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
-                set(VCPKG_LZMA_INCLUDE "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
-            endif()
-
-            # On macOS, also check system locations if vcpkg include not found
-            if(APPLE AND NOT VCPKG_LZMA_INCLUDE)
-                # Check Homebrew
-                if(EXISTS "/usr/local/include/lzma.h")
-                    set(VCPKG_LZMA_INCLUDE "/usr/local/include")
-                # Check MacPorts
-                elseif(EXISTS "/opt/local/include/lzma.h")
-                    set(VCPKG_LZMA_INCLUDE "/opt/local/include")
-                # Check system location
-                elseif(EXISTS "/usr/include/lzma.h")
-                    set(VCPKG_LZMA_INCLUDE "/usr/include")
-                endif()
-            endif()
-
-            target_include_directories(xdelta PRIVATE ${VCPKG_LZMA_INCLUDE})
-            target_link_libraries(xdelta PRIVATE ${VCPKG_LZMA_LIB})
-            message(STATUS "Linking xdelta with vcpkg LibLZMA: ${VCPKG_LZMA_LIB}")
-            message(STATUS "Using vcpkg LibLZMA include: ${VCPKG_LZMA_INCLUDE}")
-        else()
-            message(WARNING "LibLZMA library not found in vcpkg. LZMA support may not work correctly.")
-        endif()
     else()
         message(WARNING "LibLZMA not found. LZMA support may not work correctly.")
     endif()
@@ -490,10 +450,6 @@ if(XDELTA_ENABLE_LZMA)
         # Standard CMake find_package result
         target_include_directories(xdelta3 PRIVATE ${LibLZMA_INCLUDE_DIRS})
         target_link_libraries(xdelta3 PRIVATE ${LibLZMA_LIBRARIES})
-    elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
-        # Use the same vcpkg library we found for the main library
-        target_include_directories(xdelta3 PRIVATE ${VCPKG_LZMA_INCLUDE})
-        target_link_libraries(xdelta3 PRIVATE ${VCPKG_LZMA_LIB})
     endif()
 endif()
 
@@ -581,10 +537,6 @@ if(XDELTA_BUILD_TESTS)
             # Standard CMake find_package result
             target_include_directories(xdelta3regtest PRIVATE ${LibLZMA_INCLUDE_DIRS})
             target_link_libraries(xdelta3regtest PRIVATE ${LibLZMA_LIBRARIES})
-        elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
-            # Use the same vcpkg library we found for the main library
-            target_include_directories(xdelta3regtest PRIVATE ${VCPKG_LZMA_INCLUDE})
-            target_link_libraries(xdelta3regtest PRIVATE ${VCPKG_LZMA_LIB})
         endif()
     endif()
 
@@ -663,10 +615,6 @@ if(XDELTA_BUILD_TESTS)
             # Standard CMake find_package result
             target_include_directories(xdelta3decode PRIVATE ${LibLZMA_INCLUDE_DIRS})
             target_link_libraries(xdelta3decode PRIVATE ${LibLZMA_LIBRARIES})
-        elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
-            # Use the same vcpkg library we found for the main library
-            target_include_directories(xdelta3decode PRIVATE ${VCPKG_LZMA_INCLUDE})
-            target_link_libraries(xdelta3decode PRIVATE ${VCPKG_LZMA_LIB})
         endif()
     endif()
 

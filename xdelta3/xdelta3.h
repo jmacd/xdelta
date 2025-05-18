@@ -195,6 +195,45 @@ typedef ULONGLONG      uint64_t;
 #endif
 #endif
 
+/* Ensure SIZEOF_* macros are defined before using them in static_assert */
+#ifndef SIZEOF_SIZE_T
+#if defined(__SIZEOF_SIZE_T__)
+#define SIZEOF_SIZE_T __SIZEOF_SIZE_T__
+#elif defined(_WIN64) || defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
+#define SIZEOF_SIZE_T 8
+#else
+#define SIZEOF_SIZE_T 4
+#endif
+#endif
+
+#ifndef SIZEOF_UNSIGNED_INT
+#if defined(__SIZEOF_INT__)
+#define SIZEOF_UNSIGNED_INT __SIZEOF_INT__
+#else
+#define SIZEOF_UNSIGNED_INT 4
+#endif
+#endif
+
+#ifndef SIZEOF_UNSIGNED_LONG
+#if defined(__SIZEOF_LONG__)
+#define SIZEOF_UNSIGNED_LONG __SIZEOF_LONG__
+#elif defined(_WIN32) || defined(_WIN64)
+#define SIZEOF_UNSIGNED_LONG 4
+#elif defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
+#define SIZEOF_UNSIGNED_LONG 8
+#else
+#define SIZEOF_UNSIGNED_LONG 4
+#endif
+#endif
+
+#ifndef SIZEOF_UNSIGNED_LONG_LONG
+#if defined(__SIZEOF_LONG_LONG__)
+#define SIZEOF_UNSIGNED_LONG_LONG __SIZEOF_LONG_LONG__
+#else
+#define SIZEOF_UNSIGNED_LONG_LONG 8
+#endif
+#endif
+
 XD3_STATIC_ASSERT(SIZEOF_SIZE_T == sizeof(size_t), SIZEOF_SIZE_T_mismatch);
 XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_INT == sizeof(unsigned int), SIZEOF_UNSIGNED_INT_mismatch);
 XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_LONG == sizeof(unsigned long), SIZEOF_UNSIGNED_LONG_mismatch);

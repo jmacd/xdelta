@@ -118,15 +118,37 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.sha }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Install dependencies
+    # Setup cache for vcpkg
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/vcpkg/installed
+          ${{ github.workspace }}/vcpkg/packages
+        key: ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
+
+    - name: Install dependencies with vcpkg
       run: |
-        sudo apt-get update
-        sudo apt-get install -y liblzma-dev
+        # Verify vcpkg.json exists
+        cat "${{ github.workspace }}/vcpkg.json"
+        echo "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
+
+        # Install dependencies
+        vcpkg install --x-manifest-root="${{ github.workspace }}"
 
     - name: Configure CMake
       run: |
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
           -DXDELTA_ENABLE_LZMA=ON \
           -DXDELTA_BUILD_TESTS=ON \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
@@ -180,33 +202,41 @@ jobs:
         key: ${{ runner.os }}-ccache-${{ github.sha }}
         restore-keys: ${{ runner.os }}-ccache-
 
-    - name: Install dependencies
+    # Setup cache for vcpkg
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/vcpkg/installed
+          ${{ github.workspace }}/vcpkg/packages
+        key: ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-${{ env.VCPKG_COMMIT }}-
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
+
+    - name: Install dependencies with vcpkg
       run: |
-        # xz package provides liblzma
-        brew install xz
+        # Verify vcpkg.json exists
+        cat "${{ github.workspace }}/vcpkg.json"
+        echo "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
 
-        # Verify liblzma is available and print information
-        echo "Checking for liblzma with pkg-config..."
-        pkg-config --libs --cflags liblzma || true
+        # Install dependencies
+        vcpkg install --x-manifest-root="${{ github.workspace }}"
 
-        # Check if lzma.h exists in common locations
-        echo "Checking for lzma.h in common locations..."
-        ls -la /usr/local/include/lzma.h || true
-        ls -la /usr/include/lzma.h || true
-        ls -la /opt/homebrew/include/lzma.h || true
-        ls -la $(brew --prefix xz)/include/lzma.h || true
-
-        # Create symlink if needed
-        if [ -f "$(brew --prefix xz)/include/lzma.h" ] && [ ! -f "/usr/local/include/lzma.h" ]; then
-          echo "Creating symlink for lzma.h..."
-          sudo mkdir -p /usr/local/include
-          sudo ln -sf "$(brew --prefix xz)/include/lzma.h" /usr/local/include/lzma.h
-        fi
+        # Print installed packages for debugging
+        echo "Installed vcpkg packages:"
+        vcpkg list
 
     - name: Configure CMake
       run: |
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
           -DXDELTA_ENABLE_LZMA=ON \
           -DXDELTA_BUILD_TESTS=ON \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
