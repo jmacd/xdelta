@@ -15,10 +15,74 @@ namely:
 
 The original GPL licensed Xdelta lives at http://github.com/jmacd/xdelta-gpl.
 
+# Build Requirements
+
+## Compiler Requirements
+
+Xdelta3 requires a C11-compatible compiler. The following minimum compiler versions are supported:
+
+- **GCC**: 4.9 or later
+- **Clang**: 3.4 or later
+- **MSVC**: Visual Studio 2015 (14.0) or later
+
+## C/C++ Standard Requirements
+
+- **C Standard**: C11 (ISO/IEC 9899:2011)
+- **C++ Standard**: C++11 (when building with C++ compiler)
+
+## Dependencies
+
+- **LZMA**: Required for LZMA compression support
+- **CMake**: 3.15 or later for build system
+
+## Platform-Specific Notes
+
+### Windows
+
+- Use Visual Studio 2015 or later
+- vcpkg is recommended for managing dependencies
+- Set the following CMake options:
+  ```
+  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake
+  ```
+
+### macOS
+
+- Use Clang from Xcode 6.0 or later
+- Ensure C11 standard is enabled with `-std=c11` flag
+- Install dependencies via Homebrew:
+  ```
+  brew install cmake liblzma
+  ```
+
+### Linux
+
+- GCC 4.9+ or Clang 3.4+ is required
+- Ensure C11 standard is enabled with `-std=c11` flag
+- Install dependencies:
+  ```
+  # Debian/Ubuntu
+  apt-get install cmake liblzma-dev
+
+  # Fedora/RHEL
+  dnf install cmake xz-devel
+  ```
+
+## Compilation Flags
+
+For all platforms, ensure the following compilation flags are set:
+
+- `-std=c11` (GCC/Clang) or `/std:c11` (MSVC)
+- `-D_FILE_OFFSET_BITS=64` for large file support
+
+## Known Issues
+
+- Static assertions in the code require C11 support
+- Some compiler warnings about unused parameters may appear but can be safely ignored
+- MSVC may show warnings about implicit conversions between size_t and other integer types
+
 # Documentation
 
 See the [command-line usage](https://github.com/jmacd/xdelta/blob/wiki/CommandLineSyntax.md).  See [wiki directory](https://github.com/jmacd/xdelta/tree/wiki).
-
-
 
 
