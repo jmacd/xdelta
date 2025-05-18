@@ -1,0 +1,189 @@
+name: Update vcpkg Registry
+
+on:
+  # Manual trigger with version and SHA512 hash
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update (without v prefix)'
+        required: true
+        default: '3.1.0'
+      sha512:
+        description: 'SHA512 hash of the binary package'
+        required: true
+  
+  # Automatic trigger when a new release is created
+  release:
+    types: [published]
+  
+  # Automatic trigger when version changes in main branch
+  push:
+    branches:
+      - main
+      - release3_1_apl
+    paths:
+      - 'CMakeLists.txt'
+      - 'vcpkg.json'
+
+jobs:
+  # Check if version changed (for push events)
+  check-version-change:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.check_version.outputs.changed }}
+      version: ${{ steps.check_version.outputs.version }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check if version changed
+      id: check_version
+      shell: bash
+      run: |
+        # Get current version from CMakeLists.txt
+        CURRENT_VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Get previous commit
+        PREVIOUS_COMMIT=$(git rev-parse HEAD^1)
+        
+        # Check if CMakeLists.txt changed
+        if git diff --name-only $PREVIOUS_COMMIT HEAD | grep -q "CMakeLists.txt"; then
+          # Get previous version
+          PREVIOUS_VERSION=$(git show $PREVIOUS_COMMIT:CMakeLists.txt | grep -oP 'VERSION\s+\K[0-9.]+')
+          echo "Previous version: $PREVIOUS_VERSION"
+          
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "Version changed from $PREVIOUS_VERSION to $CURRENT_VERSION"
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "Version did not change"
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "CMakeLists.txt did not change"
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        fi
+
+  # Create a release when version changes (for push events)
+  create-release:
+    needs: check-version-change
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Xdelta3 ${{ needs.check-version-change.outputs.version }}
+        tag_name: v${{ needs.check-version-change.outputs.version }}
+        draft: false
+        prerelease: false
+        body: |
+          # Xdelta3 ${{ needs.check-version-change.outputs.version }}
+          
+          Automatic release created after version change in main branch.
+          
+          Please check the [release workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/release.yml) for build status.
+    
+    - name: Trigger release workflow
+      run: |
+        echo "Release created with tag v${{ needs.check-version-change.outputs.version }}"
+        echo "The release workflow will be triggered automatically by the tag push event."
+
+  # Update vcpkg registry
+  update-registry:
+    runs-on: ubuntu-latest
+    # Run this job for workflow_dispatch, release events, or after create-release job
+    needs: [check-version-change, create-release]
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'release' || 
+      (github.event_name == 'push' && needs.check-version-change.outputs.version_changed == 'true')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Get version and SHA512
+      id: get_info
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          # For manual trigger, use the provided inputs
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          echo "SHA512=${{ github.event.inputs.sha512 }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event_name }}" == "release" ]]; then
+          # For release event, extract version from tag
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Download the binary package to calculate SHA512
+          BINARY_URL="https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/xdelta-${VERSION}-windows.zip"
+          echo "Downloading from $BINARY_URL"
+          curl -L -o xdelta-binaries.zip "$BINARY_URL"
+          SHA512=$(sha512sum xdelta-binaries.zip | awk '{print $1}')
+          echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event_name }}" == "push" ]]; then
+          # For push event, use the version from check-version-change job
+          echo "VERSION=${{ needs.check-version-change.outputs.version }}" >> $GITHUB_OUTPUT
+          
+          # Download the binary package to calculate SHA512
+          BINARY_URL="https://github.com/${{ github.repository }}/releases/download/v${{ needs.check-version-change.outputs.version }}/xdelta-${{ needs.check-version-change.outputs.version }}-windows.zip"
+          echo "Downloading from $BINARY_URL"
+          curl -L -o xdelta-binaries.zip "$BINARY_URL"
+          SHA512=$(sha512sum xdelta-binaries.zip | awk '{print $1}')
+          echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
+        fi
+      
+    - name: Update portfile.cmake
+      run: |
+        # Update SHA512 in portfile.cmake
+        PORTFILE_PATH="vcpkg-registry/ports/xdelta/portfile.cmake"
+        sed -i 's|SHA512 "to-be-filled-after-release"|SHA512 "${{ steps.get_info.outputs.SHA512 }}"|g' $PORTFILE_PATH
+        sed -i 's|SHA512 "将在发布后填写实际的哈希值"|SHA512 "${{ steps.get_info.outputs.SHA512 }}"|g' $PORTFILE_PATH
+        
+        # Update version in vcpkg.json if needed
+        VCPKG_JSON_PATH="vcpkg-registry/ports/xdelta/vcpkg.json"
+        sed -i 's|"version": "[0-9.]*"|"version": "${{ steps.get_info.outputs.VERSION }}"|g' $VCPKG_JSON_PATH
+        
+        # Update version in versions/x-/xdelta.json
+        VERSION_JSON_PATH="vcpkg-registry/versions/x-/xdelta.json"
+        sed -i 's|"version": "[0-9.]*"|"version": "${{ steps.get_info.outputs.VERSION }}"|g' $VERSION_JSON_PATH
+        
+        # Get current commit hash for git-tree
+        GIT_TREE=$(git rev-parse HEAD)
+        sed -i 's|"git-tree": "to-be-filled-after-release"|"git-tree": "'"$GIT_TREE"'"|g' $VERSION_JSON_PATH
+        
+        # Update baseline.json
+        BASELINE_JSON_PATH="vcpkg-registry/versions/baseline.json"
+        sed -i 's|"baseline": "[0-9.]*"|"baseline": "${{ steps.get_info.outputs.VERSION }}"|g' $BASELINE_JSON_PATH
+        
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: "Update vcpkg registry for version ${{ steps.get_info.outputs.VERSION }}"
+        title: "Update vcpkg registry for version ${{ steps.get_info.outputs.VERSION }}"
+        body: |
+          This PR updates the vcpkg registry for version ${{ steps.get_info.outputs.VERSION }}.
+          
+          Changes:
+          - Updated SHA512 hash in portfile.cmake: `${{ steps.get_info.outputs.SHA512 }}`
+          - Updated version references
+          - Updated git-tree reference
+          
+          This PR was created automatically by the vcpkg-registry-update workflow.
+        branch: update-vcpkg-registry-${{ steps.get_info.outputs.VERSION }}
+        base: main
