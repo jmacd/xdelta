@@ -9,7 +9,7 @@ on:
 
 env:
   BUILD_TYPE: Release
-  VCPKG_COMMIT: 2023.12.12  # Pin vcpkg to a specific commit/version
+  VCPKG_COMMIT: 2024.03.25  # Updated to a more recent vcpkg version
 
 jobs:
   build-windows:
@@ -26,9 +26,20 @@ jobs:
             cmake_arch: -A Win32
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0  # Fetch all history for proper versioning
+
+    # Setup cache for vcpkg
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/vcpkg/installed
+          ${{ github.workspace }}/vcpkg/packages
+        key: ${{ runner.os }}-${{ matrix.arch }}-vcpkg-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.arch }}-vcpkg-${{ env.VCPKG_COMMIT }}-
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
@@ -60,23 +71,23 @@ jobs:
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts/windows-${{ matrix.arch }}
-        
+
         # Copy executables
         cp build/${{ env.BUILD_TYPE }}/xdelta3.exe artifacts/windows-${{ matrix.arch }}/
-        
+
         # Copy required DLLs if using dynamic linking
         if (Test-Path "build/vcpkg_installed/${{ matrix.triplet }}/bin") {
           cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll artifacts/windows-${{ matrix.arch }}/
         }
-        
+
         # Create README in artifacts
         @"
         Xdelta3 Windows Binary (${{ matrix.arch }})
         ===============================
-        
+
         Built from: ${{ github.repository }}@${{ github.sha }}
         Build date: $(Get-Date -Format "yyyy-MM-dd")
-        
+
         This package contains the xdelta3 command-line utility for Windows.
         "@ | Out-File -FilePath artifacts/windows-${{ matrix.arch }}/README.txt
 
@@ -89,11 +100,18 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-ccache-${{ github.sha }}
+        restore-keys: ${{ runner.os }}-ccache-
 
     - name: Install dependencies
       run: |
@@ -105,7 +123,9 @@ jobs:
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
           -DXDELTA_ENABLE_LZMA=ON \
-          -DXDELTA_BUILD_TESTS=ON
+          -DXDELTA_BUILD_TESTS=ON \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(nproc)
@@ -113,23 +133,23 @@ jobs:
     - name: Run tests
       run: |
         cd build
-        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
 
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts/linux
-        
+
         # Copy executables
         cp build/xdelta3 artifacts/linux/
-        
+
         # Create README in artifacts
         cat > artifacts/linux/README.txt << EOF
         Xdelta3 Linux Binary
         ===================
-        
+
         Built from: ${{ github.repository }}@${{ github.sha }}
         Build date: $(date +"%Y-%m-%d")
-        
+
         This package contains the xdelta3 command-line utility for Linux.
         EOF
 
@@ -142,11 +162,18 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
+
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-ccache-${{ github.sha }}
+        restore-keys: ${{ runner.os }}-ccache-
 
     - name: Install dependencies
       run: |
@@ -157,7 +184,9 @@ jobs:
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
           -DXDELTA_ENABLE_LZMA=ON \
-          -DXDELTA_BUILD_TESTS=ON
+          -DXDELTA_BUILD_TESTS=ON \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(sysctl -n hw.ncpu)
@@ -165,23 +194,23 @@ jobs:
     - name: Run tests
       run: |
         cd build
-        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure --timeout 300
 
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts/macos
-        
+
         # Copy executables
         cp build/xdelta3 artifacts/macos/
-        
+
         # Create README in artifacts
         cat > artifacts/macos/README.txt << EOF
         Xdelta3 macOS Binary
         ===================
-        
+
         Built from: ${{ github.repository }}@${{ github.sha }}
         Build date: $(date +"%Y-%m-%d")
-        
+
         This package contains the xdelta3 command-line utility for macOS.
         EOF
 
@@ -197,28 +226,28 @@ jobs:
     needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/release3_1_apl'
-    
+
     steps:
     - name: Download Windows x64 artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
         path: artifacts/windows-x64
 
     - name: Download Windows x86 artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
         path: artifacts/windows-x86
 
     - name: Download Linux artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-linux
         path: artifacts/linux
 
     - name: Download macOS artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
         path: artifacts/macos
@@ -227,22 +256,22 @@ jobs:
       run: |
         mkdir -p combined
         cp -r artifacts/* combined/
-        
+
         # Create a top-level README
         cat > combined/README.txt << EOF
         Xdelta3 Binaries
         ===============
-        
+
         Built from: ${{ github.repository }}@${{ github.sha }}
         Build date: $(date +"%Y-%m-%d")
-        
+
         This package contains the xdelta3 command-line utility for multiple platforms:
-        
+
         - windows-x64/xdelta3.exe - Windows 64-bit version
         - windows-x86/xdelta3.exe - Windows 32-bit version
         - linux/xdelta3 - Linux version
         - macos/xdelta3 - macOS version
-        
+
         Usage:
         ------
         xdelta3 -h                   # Show help
@@ -252,8 +281,20 @@ jobs:
         EOF
 
     - name: Upload combined package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-all-platforms
         path: combined
         retention-days: 90
+
+    # Add a summary of the build
+    - name: Build Summary
+      run: |
+        echo "## Xdelta3 Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Successfully built xdelta3 for all platforms" >> $GITHUB_STEP_SUMMARY
+        echo "📦 Artifacts available:" >> $GITHUB_STEP_SUMMARY
+        echo "- Windows x64: xdelta3-windows-x64" >> $GITHUB_STEP_SUMMARY
+        echo "- Windows x86: xdelta3-windows-x86" >> $GITHUB_STEP_SUMMARY
+        echo "- Linux: xdelta3-linux" >> $GITHUB_STEP_SUMMARY
+        echo "- macOS: xdelta3-macos" >> $GITHUB_STEP_SUMMARY
+        echo "- All platforms: xdelta3-all-platforms" >> $GITHUB_STEP_SUMMARY
