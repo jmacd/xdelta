@@ -43,15 +43,13 @@ jobs:
       with:
         fetch-depth: 0
 
-    # Cache disabled due to persistent 422 errors
-    # - name: Setup build cache
-    #   uses: actions/cache@v4
-    #   with:
-    #     path: |
-    #       build
-    #     key: build-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt') }}
-    #     restore-keys: |
-    #       build-${{ runner.os }}-${{ matrix.arch }}-
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-${{ matrix.arch }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.arch }}-ccache-
 
     # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
@@ -110,7 +108,7 @@ jobs:
         $vcpkgIncludePath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
         $vcpkgLibPath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
 
-        # Configure with detailed output
+        # Configure with detailed output and ccache
         cmake -B build -S . ${{ matrix.cmake_arch }} `
           -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} `
           -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
@@ -121,6 +119,8 @@ jobs:
           -DCMAKE_LIBRARY_PATH="$vcpkgLibPath" `
           -DLIBLZMA_INCLUDE_DIR="$vcpkgIncludePath" `
           -DLIBLZMA_LIBRARY="$vcpkgLibPath/liblzma.lib" `
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
           -DCMAKE_VERBOSE_MAKEFILE=ON
 
     - name: Build
@@ -248,13 +248,13 @@ jobs:
       with:
         fetch-depth: 0
 
-    # Cache disabled due to persistent 422 errors
-    # - name: Setup ccache
-    #   uses: hendrikmuhs/ccache-action@v1.2
-    #   with:
-    #     key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-ccache-
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
 
     # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
@@ -270,12 +270,14 @@ jobs:
 
     - name: Configure CMake
       run: |
-        # Simple configuration relying on vcpkg integration
+        # Simple configuration relying on vcpkg integration with ccache
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
           -DXDELTA_ENABLE_LZMA=ON \
-          -DXDELTA_BUILD_TESTS=OFF
+          -DXDELTA_BUILD_TESTS=OFF \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build build --config ${{ inputs.build_type }} -j $(nproc)
