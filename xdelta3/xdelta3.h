@@ -488,6 +488,9 @@ void xprintf(const char *fmt, ...) PRINTF_ATTRIBUTE(1,2);
 #define xd3_max(x,y) ((x) < (y) ? (y) : (x))
 #define xd3_min(x,y) ((x) < (y) ? (x) : (y))
 
+/* Macro for unused parameters to avoid compiler warnings */
+#define XD3_UNUSED __attribute__((unused))
+
 /****************************************************************
  PUBLIC ENUMS
  ******************************************************************/

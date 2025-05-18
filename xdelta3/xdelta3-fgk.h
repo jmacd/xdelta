@@ -104,7 +104,7 @@ struct _fgk_stream
 
 static fgk_stream*     fgk_alloc           (xd3_stream *stream /*, usize_t alphabet_size */);
 static int             fgk_init            (xd3_stream *stream,
-					    fgk_stream *h, 
+					    fgk_stream *h,
 					    int is_encode);
 static usize_t         fgk_encode_data     (fgk_stream *h,
 					    usize_t    n);
@@ -185,7 +185,7 @@ static fgk_stream* fgk_alloc (xd3_stream *stream /*, int alphabet_size0 */)
   return h;
 }
 
-static int fgk_init (xd3_stream *stream, fgk_stream *h, int is_encode)
+static int fgk_init (xd3_stream *stream XD3_UNUSED, fgk_stream *h, int is_encode XD3_UNUSED)
 {
   usize_t ui;
   ssize_t si;
@@ -263,7 +263,7 @@ static usize_t fgk_encode_data (fgk_stream* h, usize_t n)
 
       while (bits > 0)
 	{
-	  h->coded_bits[h->coded_depth++] = (shift & where) && 1;
+	  h->coded_bits[h->coded_depth++] = (shift & where) & 1;
 
 	  bits   -= 1;
 	  shift <<= 1;
@@ -325,7 +325,7 @@ static void fgk_update_tree (fgk_stream *h, usize_t n)
   h->root_node->weight += 1;
 }
 
-static void fgk_move_right (fgk_stream *h, fgk_node *move_fwd)
+static void fgk_move_right (fgk_stream *h XD3_UNUSED, fgk_node *move_fwd)
 {
   fgk_node **fwd_par_ptr, **back_par_ptr;
   fgk_node *move_back, *tmp;
@@ -419,7 +419,7 @@ static void fgk_promote (fgk_stream *h, fgk_node *node)
     {
       XD3_ASSERT (node->left_child == h->remaining_zeros);
       XD3_ASSERT (node->right_child->weight == (node->weight+1)); /* child weight was already incremented */
-      
+
       if (node->weight == (my_right->weight - 1) && my_right != h->root_node)
 	{
 	  fgk_free_block (h, cur_block);
@@ -739,7 +739,7 @@ static usize_t fgk_decode_data (fgk_stream* h)
     usize_t i = 0;
     usize_t n = 0;
 
-    if (h->coded_depth > 0) 
+    if (h->coded_depth > 0)
       {
 	for (; i < h->coded_depth - 1; i += 1)
 	  {

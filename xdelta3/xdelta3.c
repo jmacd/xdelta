@@ -4169,7 +4169,7 @@ xd3_check_smatch (const uint8_t *ref0, const uint8_t *inp0,
 static usize_t
 xd3_smatch (xd3_stream *stream,
 	    usize_t base,
-	    usize_t scksum,
+	    usize_t scksum XD3_UNUSED,
 	    usize_t *match_offset)
 {
   usize_t cmp_len;
@@ -4429,7 +4429,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       if (blkpos < (ssize_t) stream->smatcher.large_look)
 	{
 	  stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
-	  IF_DEBUG2 (DP(RINT "[srcwin_move_point] continue (end-of-block): %"Z"d\n", blkpos));
+	  IF_DEBUG2 (DP(RINT "[srcwin_move_point] continue (end-of-block): %" Z "d\n", blkpos));
 	  continue;
 	}
 
