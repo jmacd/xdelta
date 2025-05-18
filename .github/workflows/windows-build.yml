@@ -147,7 +147,7 @@ jobs:
         "@ | Out-File -FilePath combined/README.txt
 
     - name: Upload combined package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-windows-all
         path: combined
