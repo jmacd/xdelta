@@ -68,8 +68,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Add compiler-specific flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    # Use C++14 for all files
-    add_compile_options(-std=c++14)
+    # Use C++14 for all files and C11 for C files
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=c++14>)
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-std=c11>)
 
     # Add additional warning suppressions for C++ compilation of C code
     add_compile_options(-Wno-deprecated -Wno-write-strings)
@@ -153,49 +154,22 @@ if(XDELTA_ENABLE_LZMA)
 
         message(STATUS "Using vcpkg for liblzma dependency")
 
-        # Try to find vcpkg installation directory
-        if(DEFINED VCPKG_TARGET_TRIPLET)
-            set(VCPKG_INSTALLED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}")
-            if(EXISTS "${VCPKG_INSTALLED_DIR}")
-                message(STATUS "Found vcpkg installed directory: ${VCPKG_INSTALLED_DIR}")
-
-                # Check for lzma.h in vcpkg installation
-                if(EXISTS "${VCPKG_INSTALLED_DIR}/include/lzma.h")
-                    message(STATUS "Found lzma.h in vcpkg installation")
-                    set(LIBLZMA_INCLUDE_DIR "${VCPKG_INSTALLED_DIR}/include" CACHE PATH "liblzma include directory")
-
-                    # Find the library file
-                    if(WIN32)
-                        if(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.lib")
-                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.lib" CACHE FILEPATH "liblzma library")
-                        elseif(EXISTS "${VCPKG_INSTALLED_DIR}/lib/lzma.lib")
-                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/lzma.lib" CACHE FILEPATH "liblzma library")
-                        endif()
-                    else()
-                        if(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.a")
-                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.a" CACHE FILEPATH "liblzma library")
-                        elseif(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.dylib")
-                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
-                        elseif(EXISTS "${VCPKG_INSTALLED_DIR}/lib/liblzma.so")
-                            set(LIBLZMA_LIBRARY "${VCPKG_INSTALLED_DIR}/lib/liblzma.so" CACHE FILEPATH "liblzma library")
-                        endif()
-                    endif()
-
-                    if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
-                        set(LibLZMA_FOUND TRUE)
-                        set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
-                        set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
-                        message(STATUS "Manually set LibLZMA from vcpkg: ${LibLZMA_LIBRARIES}")
-                    endif()
-                endif()
-            endif()
-        endif()
-
-        # If we couldn't find it manually, try the standard find_package
-        if(NOT LibLZMA_FOUND)
-            # Find LibLZMA through vcpkg
+        # When using vcpkg, rely on its standard integration
+        # Try both CONFIG and MODULE modes for maximum compatibility
+        # First try CONFIG mode which is preferred for vcpkg
+        find_package(liblzma CONFIG QUIET)
+        if(liblzma_FOUND)
+            message(STATUS "Found liblzma via CONFIG mode")
+            # Use the namespaced target
+            set(LibLZMA_FOUND TRUE)
+            set(LibLZMA_LIBRARIES liblzma::liblzma)
+            # Get include directories from the target
+            get_target_property(LibLZMA_INCLUDE_DIRS liblzma::liblzma INTERFACE_INCLUDE_DIRECTORIES)
+            message(STATUS "liblzma include dirs: ${LibLZMA_INCLUDE_DIRS}")
+        else()
+            # Fall back to MODULE mode
             find_package(LibLZMA REQUIRED)
-            message(STATUS "Found LibLZMA via find_package: ${LibLZMA_LIBRARIES}")
+            message(STATUS "Found LibLZMA via MODULE mode: ${LibLZMA_LIBRARIES}")
             message(STATUS "LibLZMA include dirs: ${LibLZMA_INCLUDE_DIRS}")
         endif()
     else()

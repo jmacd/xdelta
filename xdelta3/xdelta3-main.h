@@ -3887,8 +3887,17 @@ int main (int argc, char **argv)
 
   option_source_filename = sfilename;
 
-  /* In case there were no arguments, set the default command. */
-  if (cmd == CMD_NONE) { cmd = CMD_DEFAULT; }
+  /* In case there were no arguments, show help instead of using default command */
+  if (cmd == CMD_NONE) {
+    if (env_argc <= 1) {
+      /* No arguments provided, show help and exit */
+      ret = main_help();
+      goto exit;
+    } else {
+      /* Arguments provided but no command specified, use default */
+      cmd = CMD_DEFAULT;
+    }
+  }
 
   argc -= my_optind;
   argv += my_optind;

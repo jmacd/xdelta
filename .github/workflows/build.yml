@@ -70,31 +70,41 @@ jobs:
 
     - name: Configure CMake
       run: |
-        # Get vcpkg installation path for debugging
-        $VCPKG_INSTALLED_DIR = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
-        Write-Host "VCPKG installed directory: $VCPKG_INSTALLED_DIR"
-
-        # Check for lzma.h in vcpkg installation
-        if (Test-Path "$VCPKG_INSTALLED_DIR/include/lzma.h") {
-            Write-Host "lzma.h found at $VCPKG_INSTALLED_DIR/include/lzma.h"
-        } else {
-            Write-Host "WARNING: lzma.h not found in $VCPKG_INSTALLED_DIR/include/"
-        }
-
+        # Simple configuration relying on vcpkg integration
         cmake -B build -S . ${{ matrix.cmake_arch }} `
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
           -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
           -DXDELTA_ENABLE_LZMA=ON `
-          -DXDELTA_BUILD_TESTS=ON `
-          -DCMAKE_PREFIX_PATH="$VCPKG_INSTALLED_DIR" `
-          -DCMAKE_INCLUDE_PATH="$VCPKG_INSTALLED_DIR/include" `
-          -DCMAKE_LIBRARY_PATH="$VCPKG_INSTALLED_DIR/lib" `
-          -DLIBLZMA_INCLUDE_DIR="$VCPKG_INSTALLED_DIR/include" `
-          -DLIBLZMA_LIBRARY="$VCPKG_INSTALLED_DIR/lib/liblzma.lib"
+          -DXDELTA_BUILD_TESTS=ON
 
     - name: Build
       run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+    - name: Diagnostic Info (on failure)
+      if: ${{ failure() }}
+      run: |
+        Write-Host "Diagnostic information for debugging build failures:"
+
+        # Check vcpkg installation
+        Write-Host "Installed vcpkg packages:"
+        vcpkg list
+
+        # Check for lzma.h
+        $VCPKG_INSTALLED_DIR = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
+        if (Test-Path "$VCPKG_INSTALLED_DIR/include/lzma.h") {
+            Write-Host "lzma.h found at $VCPKG_INSTALLED_DIR/include/lzma.h"
+        } else {
+            Write-Host "WARNING: lzma.h not found in $VCPKG_INSTALLED_DIR/include/"
+            Write-Host "Listing files in include directory:"
+            Get-ChildItem -Path "$VCPKG_INSTALLED_DIR/include" -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName }
+        }
+
+        # Check CMake cache
+        if (Test-Path "build/CMakeCache.txt") {
+            Write-Host "CMake cache entries related to LZMA:"
+            Get-Content "build/CMakeCache.txt" | Select-String -Pattern "LZMA"
+        }
 
     - name: Run tests
       run: |
@@ -174,6 +184,7 @@ jobs:
 
     - name: Configure CMake
       run: |
+        # Simple configuration relying on vcpkg integration
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
@@ -262,6 +273,7 @@ jobs:
 
     - name: Configure CMake
       run: |
+        # Simple configuration relying on vcpkg integration
         cmake -B build -S . \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
           -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \

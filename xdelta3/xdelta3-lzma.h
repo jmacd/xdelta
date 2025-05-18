@@ -20,12 +20,12 @@
 #ifndef _XDELTA3_LZMA_H_
 #define _XDELTA3_LZMA_H_
 
-/* Try different include paths for lzma.h based on platform */
-#if defined(_WIN32) && defined(VCPKG_TARGET_TRIPLET)
-  /* When using vcpkg on Windows, try to include from vcpkg installation */
+/* Include lzma.h - try different include paths for maximum compatibility */
+#if defined(_WIN32) && defined(_MSC_VER)
+  /* On Windows with MSVC, try quotes first which works better with vcpkg */
   #include "lzma.h"
 #else
-  /* Standard include path */
+  /* On other platforms, use standard include path */
   #include <lzma.h>
 #endif
 
