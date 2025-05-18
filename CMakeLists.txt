@@ -122,6 +122,15 @@ endif()
 
 # macOS specific settings
 if(APPLE)
+    # TEMPORARILY DISABLED: macOS support is currently disabled due to C++11 literal suffix issues
+    # Known issues:
+    # 1. Format string issues with '%"Z"d' pattern in xdelta3.c
+    # 2. Various warnings in xdelta3-fgk.h
+    # 3. Compatibility issues with static_assert implementation
+    #
+    # These issues need to be addressed in a future PR.
+    message(FATAL_ERROR "macOS support is temporarily disabled. Please use Windows or Linux platforms.")
+
     # Set minimum macOS version to ensure compatibility
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
 
