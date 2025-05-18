@@ -41,25 +41,50 @@ Xdelta3 requires a C11-compatible compiler. The following minimum compiler versi
 
 - Use Visual Studio 2015 or later
 - vcpkg is recommended for managing dependencies
+- Clone and bootstrap vcpkg:
+  ```
+  git clone https://github.com/microsoft/vcpkg.git
+  cd vcpkg
+  .\bootstrap-vcpkg.bat
+  cd ..
+  ```
 - Set the following CMake options:
   ```
-  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=[path to vcpkg]/scripts/buildsystems/vcpkg.cmake
+  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DXDELTA_ENABLE_LZMA=ON
   ```
+- Build:
+  ```
+  cmake --build build --config Release
+  ```
+- The executable will be located at `build\Release\xdelta3.exe`
 
 ### macOS
 
 - Use Clang from Xcode 6.0 or later
 - Ensure C11 standard is enabled with `-std=c11` flag
-- Install dependencies via Homebrew:
+- Option 1: Install dependencies via Homebrew:
   ```
   brew install cmake liblzma
   ```
+- Option 2: Use vcpkg for dependency management:
+  ```
+  git clone https://github.com/microsoft/vcpkg.git
+  cd vcpkg
+  ./bootstrap-vcpkg.sh
+  cd ..
+  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake -DXDELTA_ENABLE_LZMA=ON
+  ```
+- Build:
+  ```
+  cmake --build build --config Release
+  ```
+- The executable will be located at `build/xdelta3`
 
 ### Linux
 
 - GCC 4.9+ or Clang 3.4+ is required
 - Ensure C11 standard is enabled with `-std=c11` flag
-- Install dependencies:
+- Option 1: Install dependencies from system packages:
   ```
   # Debian/Ubuntu
   apt-get install cmake liblzma-dev
@@ -67,6 +92,19 @@ Xdelta3 requires a C11-compatible compiler. The following minimum compiler versi
   # Fedora/RHEL
   dnf install cmake xz-devel
   ```
+- Option 2: Use vcpkg for dependency management:
+  ```
+  git clone https://github.com/microsoft/vcpkg.git
+  cd vcpkg
+  ./bootstrap-vcpkg.sh
+  cd ..
+  cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake -DXDELTA_ENABLE_LZMA=ON
+  ```
+- Build:
+  ```
+  cmake --build build --config Release
+  ```
+- The executable will be located at `build/xdelta3`
 
 ## Compilation Flags
 
