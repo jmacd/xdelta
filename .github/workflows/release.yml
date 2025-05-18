@@ -53,7 +53,8 @@ jobs:
 
     - name: Install dependencies with vcpkg
       run: |
-        vcpkg install liblzma:${{ matrix.triplet }}
+        # In manifest mode, just run vcpkg install without arguments
+        vcpkg install
 
     - name: Configure CMake
       run: |
