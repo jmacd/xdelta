@@ -242,16 +242,16 @@ XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), SIZEO
 /* Set a xoff_t typedef and the "Q" printf insert. */
 #if defined(_WIN32)
 typedef uint64_t xoff_t;
-#define Q "I64"
+#define Q " I64 "
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long xoff_t;
-#define Q "l"
+#define Q " l "
 #elif SIZEOF_SIZE_T == 8
 typedef size_t xoff_t;
-#define Q "z"
+#define Q " z "
 #elif SIZEOF_UNSIGNED_LONG_LONG == 8
 typedef unsigned long long xoff_t;
-#define Q "ll"
+#define Q " ll "
 #endif /* typedef and #define Q */
 
 #define SIZEOF_XOFF_T 8
@@ -276,16 +276,16 @@ typedef uint32_t xoff_t;
 /* Set a usize_ttypedef and the "W" printf insert. */
 #if defined(_WIN32)
 typedef uint64_t usize_t;
-#define W "I64"
+#define W " I64 "
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long usize_t;
-#define W "l"
+#define W " l "
 #elif SIZEOF_SIZE_T == 8
 typedef size_t usize_t;
-#define W "z"
+#define W " z "
 #elif SIZEOF_UNSIGNED_LONG_LONG == 8
 typedef unsigned long long usize_t;
-#define W "ll"
+#define W " ll "
 #endif /* typedef and #define W */
 
 #define SIZEOF_USIZE_T 8
@@ -308,12 +308,12 @@ typedef uint32_t usize_t;
 /* Settings based on the size of size_t (the system-provided,
  * usually-but-maybe-not an unsigned type) */
 #if SIZEOF_SIZE_T == 4
-#define Z "z"
+#define Z " z "
 #elif SIZEOF_SIZE_T == 8
 #ifdef _WIN32
-#define Z "I64"
+#define Z " I64 "
 #else /* !_WIN32 */
-#define Z "z"
+#define Z " z "
 #endif /* Windows or not */
 #else
 #error Bad configure script

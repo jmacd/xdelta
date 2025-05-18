@@ -154,6 +154,19 @@ if(XDELTA_ENABLE_LZMA)
 
         message(STATUS "Using vcpkg for liblzma dependency")
 
+        # Print vcpkg-related variables for debugging
+        message(STATUS "VCPKG_TARGET_TRIPLET: ${VCPKG_TARGET_TRIPLET}")
+        message(STATUS "CMAKE_TOOLCHAIN_FILE: ${CMAKE_TOOLCHAIN_FILE}")
+
+        # Check if lzma.h exists in expected locations
+        if(WIN32)
+            foreach(triplet "x64-windows" "x86-windows")
+                if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${triplet}/include/lzma.h")
+                    message(STATUS "Found lzma.h at ${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${triplet}/include/lzma.h")
+                endif()
+            endforeach()
+        endif()
+
         # When using vcpkg, rely on its standard integration
         # Try both CONFIG and MODULE modes for maximum compatibility
         # First try CONFIG mode which is preferred for vcpkg
@@ -171,6 +184,28 @@ if(XDELTA_ENABLE_LZMA)
             find_package(LibLZMA REQUIRED)
             message(STATUS "Found LibLZMA via MODULE mode: ${LibLZMA_LIBRARIES}")
             message(STATUS "LibLZMA include dirs: ${LibLZMA_INCLUDE_DIRS}")
+        endif()
+
+        # Additional fallback for Windows if find_package fails
+        if(WIN32 AND NOT LibLZMA_FOUND)
+            message(STATUS "Attempting manual liblzma detection for Windows")
+            # Try to find lzma.h in vcpkg installation
+            if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include/lzma.h")
+                set(LibLZMA_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
+
+                # Find the library file
+                if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/liblzma.lib")
+                    set(LibLZMA_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/liblzma.lib")
+                elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/lzma.lib")
+                    set(LibLZMA_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib/lzma.lib")
+                endif()
+
+                if(LibLZMA_LIBRARIES)
+                    set(LibLZMA_FOUND TRUE)
+                    message(STATUS "Manually found LibLZMA: ${LibLZMA_LIBRARIES}")
+                    message(STATUS "Manually found LibLZMA include: ${LibLZMA_INCLUDE_DIRS}")
+                endif()
+            endif()
         endif()
     else()
         # Find pkg-config for all platforms when not using vcpkg

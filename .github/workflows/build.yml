@@ -53,19 +53,39 @@ jobs:
         Get-Content "${{ github.workspace }}/vcpkg.json" | Out-Null
         Write-Host "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
 
-        # Install dependencies with explicit triplet
+        # Make sure vcpkg is up to date
+        cd ${{ github.workspace }}/vcpkg
+        git pull
+        .\bootstrap-vcpkg.bat
+        cd ${{ github.workspace }}
+
+        # Install liblzma explicitly first
+        vcpkg install liblzma:${{ matrix.triplet }}
+
+        # Then install all dependencies from manifest
         vcpkg install --triplet=${{ matrix.triplet }} --x-manifest-root="${{ github.workspace }}"
 
         # List installed packages for debugging
         Write-Host "Installed vcpkg packages:"
         vcpkg list
 
-        # Check if liblzma is installed correctly
+        # Check if liblzma is installed correctly and show detailed information
         if (Test-Path "vcpkg/installed/${{ matrix.triplet }}/include/lzma.h") {
             Write-Host "lzma.h found at vcpkg/installed/${{ matrix.triplet }}/include/lzma.h"
         } else {
             Write-Host "ERROR: lzma.h not found in vcpkg/installed/${{ matrix.triplet }}/include/"
-            Get-ChildItem -Recurse -Path "vcpkg/installed/${{ matrix.triplet }}/include" | Select-Object FullName
+
+            # Check if the include directory exists
+            if (Test-Path "vcpkg/installed/${{ matrix.triplet }}/include") {
+                Write-Host "Listing files in include directory:"
+                Get-ChildItem -Recurse -Path "vcpkg/installed/${{ matrix.triplet }}/include" | Select-Object FullName
+            } else {
+                Write-Host "Include directory does not exist at vcpkg/installed/${{ matrix.triplet }}/include"
+            }
+
+            # Check if there are any lzma-related files in the installation
+            Write-Host "Searching for lzma-related files in vcpkg installation:"
+            Get-ChildItem -Recurse -Path "vcpkg/installed/${{ matrix.triplet }}" -Filter "*lzma*" | Select-Object FullName
         }
 
     - name: Configure CMake
