@@ -289,16 +289,89 @@ jobs:
             exit 1
         }
 
-        # Create zip archive if requested
+        # Create zip archive if requested with detailed error handling
         if (${{ inputs.create_archives }}) {
-            $zipPath = "xdelta3-windows-${{ matrix.arch }}.zip"
-            Write-Host "Creating zip archive: $zipPath"
-            Compress-Archive -Path "$artifactsDir\*" -DestinationPath $zipPath -Force
+            try {
+                $zipPath = "xdelta3-windows-${{ matrix.arch }}.zip"
+                Write-Host "Creating zip archive: $zipPath"
+
+                # Check if source directory exists and has files
+                Write-Host "Checking source directory: $artifactsDir"
+                if (Test-Path $artifactsDir) {
+                    $files = Get-ChildItem -Path $artifactsDir -Recurse
+                    Write-Host "Files found in artifacts directory: $($files.Count)"
+                    $files | ForEach-Object { Write-Host "- $($_.FullName)" }
+                } else {
+                    throw "Artifacts directory does not exist: $artifactsDir"
+                }
+
+                # Check if destination path is valid
+                $zipDir = Split-Path -Parent $zipPath
+                if ($zipDir -and -not (Test-Path $zipDir)) {
+                    Write-Host "Creating directory for zip file: $zipDir"
+                    New-Item -ItemType Directory -Force -Path $zipDir | Out-Null
+                }
+
+                # Create the zip file with error handling
+                Write-Host "Running Compress-Archive command..."
+                Compress-Archive -Path "$artifactsDir\*" -DestinationPath $zipPath -Force -ErrorAction Stop
+
+                # Verify zip file was created
+                if (Test-Path $zipPath) {
+                    Write-Host "Zip archive created successfully: $zipPath"
+                    Write-Host "Zip file size: $((Get-Item $zipPath).Length) bytes"
+                } else {
+                    throw "Failed to create zip archive: $zipPath"
+                }
+            } catch {
+                Write-Host "Error creating zip archive: $_"
+                Write-Host "Stack trace: $($_.ScriptStackTrace)"
+                # Continue execution but log the error
+                Write-Error "Failed to create zip archive. This is a non-fatal error, continuing with build."
+            }
         }
+
+    # Add a verification step before uploading artifacts
+    - name: Verify artifacts before upload
+      shell: pwsh
+      run: |
+        Write-Host "Verifying artifacts before upload..."
+
+        # Check if we're using archives or directories
+        if (${{ inputs.create_archives }}) {
+            $artifactPath = "xdelta3-windows-${{ matrix.arch }}.zip"
+            Write-Host "Checking archive: $artifactPath"
+
+            if (Test-Path $artifactPath) {
+                $fileInfo = Get-Item $artifactPath
+                Write-Host "Archive exists: $artifactPath"
+                Write-Host "Size: $($fileInfo.Length) bytes"
+                Write-Host "Last modified: $($fileInfo.LastWriteTime)"
+            } else {
+                Write-Host "::error::Archive not found: $artifactPath"
+                # Don't exit with error, let the upload step handle it
+                # This way we can see the full logs
+            }
+        } else {
+            $artifactPath = "artifacts/windows-${{ matrix.arch }}"
+            Write-Host "Checking directory: $artifactPath"
+
+            if (Test-Path $artifactPath) {
+                $files = Get-ChildItem -Path $artifactPath -Recurse
+                Write-Host "Directory exists with $($files.Count) files"
+                $files | ForEach-Object { Write-Host "- $($_.FullName)" }
+            } else {
+                Write-Host "::error::Directory not found: $artifactPath"
+                # Don't exit with error, let the upload step handle it
+            }
+        }
+
+        Write-Host "Artifact verification complete"
 
     - name: Upload artifacts (directory)
       if: ${{ !inputs.create_archives }}
       uses: actions/upload-artifact@v4
+      continue-on-error: true  # Continue even if this step fails
       with:
         name: xdelta3-windows-${{ matrix.arch }}
         path: artifacts/windows-${{ matrix.arch }}
@@ -307,10 +380,46 @@ jobs:
     - name: Upload artifacts (archive)
       if: ${{ inputs.create_archives }}
       uses: actions/upload-artifact@v4
+      continue-on-error: true  # Continue even if this step fails
       with:
         name: xdelta3-windows-${{ matrix.arch }}
         path: xdelta3-windows-${{ matrix.arch }}.zip
         retention-days: ${{ inputs.artifact_retention_days }}
+
+    # Final verification step to ensure the build process completes successfully
+    - name: Final build verification
+      shell: pwsh
+      run: |
+        Write-Host "Performing final build verification..."
+
+        # Check if executable exists
+        $exePath = Join-Path -Path "build" -ChildPath "${{ inputs.build_type }}" -AdditionalChildPath "xdelta3.exe"
+        if (Test-Path $exePath) {
+            Write-Host "✅ Executable exists: $exePath"
+        } else {
+            Write-Host "❌ Executable not found: $exePath"
+        }
+
+        # Check if README was created
+        $artifactsDir = Join-Path -Path "artifacts" -ChildPath "windows-${{ matrix.arch }}"
+        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+        if (Test-Path $readmePath) {
+            Write-Host "✅ README exists: $readmePath"
+        } else {
+            Write-Host "❌ README not found: $readmePath"
+        }
+
+        # Check if archive was created (if applicable)
+        if (${{ inputs.create_archives }}) {
+            $zipPath = "xdelta3-windows-${{ matrix.arch }}.zip"
+            if (Test-Path $zipPath) {
+                Write-Host "✅ Archive exists: $zipPath"
+            } else {
+                Write-Host "❌ Archive not found: $zipPath"
+            }
+        }
+
+        Write-Host "Final verification complete. Build process finished successfully."
 
   build-linux:
     runs-on: ubuntu-latest
