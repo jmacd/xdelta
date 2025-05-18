@@ -167,10 +167,26 @@ typedef ULONGLONG      uint64_t;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-static_assert(SIZEOF_SIZE_T == sizeof(size_t), "SIZEOF_SIZE_T not correctly set");
-static_assert(SIZEOF_UNSIGNED_INT == sizeof(unsigned int), "SIZEOF_UNSIGNED_INT not correctly set");
-static_assert(SIZEOF_UNSIGNED_LONG == sizeof(unsigned long), "SIZEOF_UNSIGNED_LONG not correctly set");
-static_assert(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), "SIZEOF_UNSIGNED_LONG_LONG not correctly set");
+/* Define a cross-platform static_assert macro that works in C99 and C11 */
+#ifndef XD3_STATIC_ASSERT
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L /* C11 */
+#define XD3_STATIC_ASSERT(cond, msg) _Static_assert(cond, #msg)
+#elif defined(__cplusplus) && __cplusplus >= 201103L /* C++11 */
+#define XD3_STATIC_ASSERT(cond, msg) static_assert(cond, #msg)
+#elif defined(__GNUC__) || defined(__clang__) /* GCC or Clang */
+/* Use a more compatible version for GCC/Clang in C99 mode */
+#define XD3_STATIC_ASSERT(cond, msg) \
+    extern int (*xd3_static_assertion(void))[!!sizeof(struct { int static_assertion_failed_##msg : (cond) ? 1 : -1; })]
+#else /* Other compilers - use a trick that works in most C99 compilers */
+#define XD3_STATIC_ASSERT(cond, msg) \
+    typedef char static_assertion_##msg[(cond) ? 1 : -1]
+#endif
+#endif
+
+XD3_STATIC_ASSERT(SIZEOF_SIZE_T == sizeof(size_t), SIZEOF_SIZE_T_mismatch);
+XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_INT == sizeof(unsigned int), SIZEOF_UNSIGNED_INT_mismatch);
+XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_LONG == sizeof(unsigned long), SIZEOF_UNSIGNED_LONG_mismatch);
+XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), SIZEOF_UNSIGNED_LONG_LONG_mismatch);
 
 /* Set a xoff_t typedef and the "Q" printf insert. */
 #if defined(_WIN32)

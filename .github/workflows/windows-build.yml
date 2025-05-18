@@ -46,11 +46,8 @@ jobs:
       with:
         vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
         vcpkgDirectory: ${{ github.workspace }}/vcpkg
-
-    - name: Install dependencies with vcpkg
-      run: |
-        # In manifest mode, just run vcpkg install without arguments
-        vcpkg install
+        runVcpkgInstall: true
+        vcpkgJsonGlob: '**/vcpkg.json'
 
     - name: Configure CMake
       run: |

@@ -313,6 +313,18 @@ elseif(APPLE)
     target_compile_options(xdelta PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-function
+        -Wno-error=implicit-function-declaration
+    )
+elseif(UNIX)
+    # Linux and other Unix-like systems
+    target_compile_definitions(xdelta PRIVATE
+        _GNU_SOURCE
+        _XOPEN_SOURCE=600
+    )
+    target_compile_options(xdelta PRIVATE
+        -Wno-deprecated-declarations
+        -Wno-unused-function
+        -Wno-error=implicit-function-declaration
     )
 endif()
 
@@ -369,6 +381,18 @@ elseif(APPLE)
     target_compile_options(xdelta3 PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-function
+        -Wno-error=implicit-function-declaration
+    )
+elseif(UNIX)
+    # Linux and other Unix-like systems
+    target_compile_definitions(xdelta3 PRIVATE
+        _GNU_SOURCE
+        _XOPEN_SOURCE=600
+    )
+    target_compile_options(xdelta3 PRIVATE
+        -Wno-deprecated-declarations
+        -Wno-unused-function
+        -Wno-error=implicit-function-declaration
     )
 endif()
 
@@ -429,6 +453,18 @@ if(XDELTA_BUILD_TESTS)
         target_compile_options(xdelta3regtest PRIVATE
             -Wno-deprecated-declarations
             -Wno-unused-function
+            -Wno-error=implicit-function-declaration
+        )
+    elseif(UNIX)
+        # Linux and other Unix-like systems
+        target_compile_definitions(xdelta3regtest PRIVATE
+            _GNU_SOURCE
+            _XOPEN_SOURCE=600
+        )
+        target_compile_options(xdelta3regtest PRIVATE
+            -Wno-deprecated-declarations
+            -Wno-unused-function
+            -Wno-error=implicit-function-declaration
         )
     endif()
 
@@ -483,6 +519,18 @@ if(XDELTA_BUILD_TESTS)
         target_compile_options(xdelta3decode PRIVATE
             -Wno-deprecated-declarations
             -Wno-unused-function
+            -Wno-error=implicit-function-declaration
+        )
+    elseif(UNIX)
+        # Linux and other Unix-like systems
+        target_compile_definitions(xdelta3decode PRIVATE
+            _GNU_SOURCE
+            _XOPEN_SOURCE=600
+        )
+        target_compile_options(xdelta3decode PRIVATE
+            -Wno-deprecated-declarations
+            -Wno-unused-function
+            -Wno-error=implicit-function-declaration
         )
     endif()
 endif()
