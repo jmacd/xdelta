@@ -92,7 +92,7 @@ jobs:
         "@ | Out-File -FilePath artifacts/windows-${{ matrix.arch }}/README.txt
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-windows-${{ matrix.arch }}
         path: artifacts/windows-${{ matrix.arch }}
@@ -154,7 +154,7 @@ jobs:
         EOF
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-linux
         path: artifacts/linux
@@ -215,7 +215,7 @@ jobs:
         EOF
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-macos
         path: artifacts/macos

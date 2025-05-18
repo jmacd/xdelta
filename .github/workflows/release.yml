@@ -81,7 +81,7 @@ jobs:
         Compress-Archive -Path artifacts/* -DestinationPath xdelta3-windows-${{ matrix.arch }}.zip
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-windows-${{ matrix.arch }}
         path: xdelta3-windows-${{ matrix.arch }}.zip
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -120,7 +120,7 @@ jobs:
         tar -czvf xdelta3-linux.tar.gz -C artifacts .
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-linux
         path: xdelta3-linux.tar.gz
@@ -130,7 +130,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
@@ -158,7 +158,7 @@ jobs:
         tar -czvf xdelta3-macos.tar.gz -C artifacts .
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: xdelta3-macos
         path: xdelta3-macos.tar.gz
@@ -169,30 +169,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     - name: Download Windows x64 artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
         path: ./
 
     - name: Download Windows x86 artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
         path: ./
 
     - name: Download Linux artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-linux
         path: ./
 
     - name: Download macOS artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
         path: ./
