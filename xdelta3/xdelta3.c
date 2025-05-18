@@ -3716,7 +3716,7 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
       stream->srcwin_cksum_pos - srcpos > src->max_winsize)
     {
       IF_DEBUG2(DP(RINT "[match_setup] rejected due to src->max_winsize "
-		   "distance eof=%"Q"u srcpos=%"Q"u max_winsz=%"Q"u\n",
+		   "distance eof=%" Q "u srcpos=%" Q "u max_winsz=%" Q "u\n",
 		   xd3_source_eof (src),
 		   srcpos, src->max_winsize));
       goto bad;
@@ -3726,8 +3726,8 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
    * will experience XD3_TOOFARBACK at the first xd3_getblk call
    * because the input may have advanced up to one block beyond the
    * actual EOF. */
-  IF_DEBUG2(DP(RINT "[match_setup] %"Q"u srcpos %"Q"u, "
-	       "src->max_winsize %"Q"u\n",
+  IF_DEBUG2(DP(RINT "[match_setup] %" Q "u srcpos %" Q "u, "
+	       "src->max_winsize %" Q "u\n",
 	       stream->total_in + stream->input_position,
 	       srcpos, src->max_winsize));
 
@@ -3784,8 +3784,8 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	}
 
       IF_DEBUG2(DP(RINT
-		   "[match_setup] srcpos %"Q"u (tgtpos %"Q"u) "
-		   "unrestricted maxback %"W"u maxfwd %"W"u\n",
+		   "[match_setup] srcpos %" Q "u (tgtpos %" Q "u) "
+		   "unrestricted maxback %" W "u maxfwd %" W "u\n",
 		   srcpos,
 		   stream->total_in + stream->input_position,
 		   stream->match_maxback,
@@ -3820,8 +3820,8 @@ xd3_source_match_setup (xd3_stream *stream, xoff_t srcpos)
 	}
 
       IF_DEBUG2(DP(RINT
-		   "[match_setup] srcpos %"Q"u (tgtpos %"Q"u) "
-		   "restricted maxback %"W"u maxfwd %"W"u\n",
+		   "[match_setup] srcpos %" Q "u (tgtpos %" Q "u) "
+		   "restricted maxback %" W "u maxfwd %" W "u\n",
 		   srcpos,
 		   stream->total_in + stream->input_position,
 		   stream->match_maxback,
@@ -3900,7 +3900,7 @@ xd3_source_extend_match (xd3_stream *stream)
   usize_t tryrem;    /* tryrem is the number of matchable bytes */
   usize_t matched;
 
-  IF_DEBUG2(DP(RINT "[extend match] srcpos %"Q"u\n",
+  IF_DEBUG2(DP(RINT "[extend match] srcpos %" Q "u\n",
 	       stream->match_srcpos));
 
   XD3_ASSERT (src != NULL);
@@ -3928,7 +3928,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	    {
 	      if (ret == XD3_TOOFARBACK)
 		{
-		  IF_DEBUG2(DP(RINT "[maxback] %"Q"u TOOFARBACK: %"W"u INP %"Q"u CKSUM %"Q"u\n",
+		  IF_DEBUG2(DP(RINT "[maxback] %" Q "u TOOFARBACK: %" W "u INP %" Q "u CKSUM %" Q "u\n",
 			       tryblk, stream->match_back,
 			       stream->total_in + stream->input_position,
 			       stream->srcwin_cksum_pos));
@@ -3950,7 +3950,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
 	  tryrem = xd3_min (tryoff, stream->match_maxback - stream->match_back);
 
-	  IF_DEBUG2(DP(RINT "[maxback] maxback %"W"u trysrc %"Q"u/%"W"u tgt %"W"u tryrem %"W"u\n",
+	  IF_DEBUG2(DP(RINT "[maxback] maxback %" W "u trysrc %" Q "u/%" W "u tgt %" W "u tryrem %" W "u\n",
 		       stream->match_maxback, tryblk, tryoff, streamoff, tryrem));
 
 	  /* TODO: This code can be optimized similar to xd3_match_forward() */
@@ -3989,7 +3989,7 @@ xd3_source_extend_match (xd3_stream *stream)
 	{
 	  if (ret == XD3_TOOFARBACK)
 	    {
-	      IF_DEBUG2(DP(RINT "[maxfwd] %"Q"u TOOFARBACK: %"W"u INP %"Q"u CKSUM %"Q"u\n",
+	      IF_DEBUG2(DP(RINT "[maxfwd] %" Q "u TOOFARBACK: %" W "u INP %" Q "u CKSUM %" Q "u\n",
 			   tryblk, stream->match_fwd,
 			   stream->total_in + stream->input_position,
 			   stream->srcwin_cksum_pos));
@@ -4028,7 +4028,7 @@ xd3_source_extend_match (xd3_stream *stream)
  donefwd:
   stream->match_state = MATCH_SEARCHING;
 
-  IF_DEBUG2(DP(RINT "[extend match] input %"Q"u srcpos %"Q"u len %"W"u\n",
+  IF_DEBUG2(DP(RINT "[extend match] input %" Q "u srcpos %" Q "u len %" W "u\n",
 	       stream->input_position + stream->total_in,
 	       stream->match_srcpos,
 	       stream->match_fwd));
@@ -4084,7 +4084,7 @@ xd3_source_extend_match (xd3_stream *stream)
 
       IF_DEBUG2 ({
 	static int x = 0;
-	DP(RINT "[source match:%d] length %"W"u <inp %"Q"u %"Q"u>  <src %"Q"u %"Q"u> (%s)\n",
+	DP(RINT "[source match:%d] length %" W "u <inp %" Q "u %" Q "u>  <src %" Q "u %" Q "u> (%s)\n",
 	   x++,
 	   match_length,
 	   stream->total_in + target_position,
@@ -4189,7 +4189,7 @@ xd3_smatch (xd3_stream *stream,
 
  again:
 
-  IF_DEBUG2 (DP(RINT "smatch at base=%"W"u inp=%"W"u cksum=%"W"u\n", base,
+  IF_DEBUG2 (DP(RINT "smatch at base=%" W "u inp=%" W "u cksum=%" W "u\n", base,
                 stream->input_position, scksum));
 
   /* For small matches, we can always go to the end-of-input because
