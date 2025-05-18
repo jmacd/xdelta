@@ -55,7 +55,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Force C++ compilation for better cross-platform compatibility
-set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
+# Note: We need to set this after the sources are defined, so we'll do it later
+# set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
 
 # Add compiler-specific flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
@@ -71,7 +72,23 @@ elseif(MSVC)
     endif()
 
     # Disable specific MSVC warnings for C++ compilation of C code
-    add_compile_options(/wd4996 /wd4244 /wd4267)
+    add_compile_options(
+        /wd4996  # Disable deprecated function warnings
+        /wd4244  # Disable conversion warnings
+        /wd4267  # Disable size_t to smaller type conversion warnings
+        /wd4334  # Disable 32-bit shift warnings
+        /wd4311  # Disable pointer truncation warnings
+        /wd4090  # Disable const qualifier warnings
+        /wd4101  # Disable unreferenced local variable warnings
+        /wd4018  # Disable signed/unsigned mismatch warnings
+        /wd4068  # Disable unknown pragma warnings
+    )
+
+    # Enable multi-processor compilation
+    add_compile_options(/MP)
+
+    # Treat warnings as errors for cleaner code
+    # add_compile_options(/WX) # Uncomment if you want to enforce warnings as errors
 endif()
 
 # Configure platform-specific settings
@@ -127,6 +144,9 @@ if(XDELTA_ENABLE_LZMA)
         endif()
     endif()
 
+    # Find pkg-config for all platforms
+    find_package(PkgConfig QUIET)
+
     # On macOS, try to find liblzma from Homebrew or MacPorts first
     if(APPLE)
         # Check for Homebrew xz package (which provides liblzma)
@@ -139,23 +159,70 @@ if(XDELTA_ENABLE_LZMA)
         if(BREW_XZ_RESULT EQUAL 0 AND EXISTS "${BREW_XZ_PREFIX}")
             message(STATUS "Found Homebrew xz (liblzma) at ${BREW_XZ_PREFIX}")
             list(APPEND CMAKE_PREFIX_PATH "${BREW_XZ_PREFIX}")
+
+            # Explicitly set include and library paths for Homebrew
+            set(LIBLZMA_INCLUDE_DIR "${BREW_XZ_PREFIX}/include" CACHE PATH "liblzma include directory")
+
+            if(EXISTS "${BREW_XZ_PREFIX}/lib/liblzma.dylib")
+                set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
+            elseif(EXISTS "${BREW_XZ_PREFIX}/lib/liblzma.a")
+                set(LIBLZMA_LIBRARY "${BREW_XZ_PREFIX}/lib/liblzma.a" CACHE FILEPATH "liblzma library")
+            endif()
+
+            if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
+                set(LibLZMA_FOUND TRUE)
+                set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
+                set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
+                message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
+            endif()
         endif()
 
-        # Check for MacPorts
-        if(EXISTS "/opt/local/include/lzma.h")
+        # Check for MacPorts if Homebrew not found
+        if(NOT LibLZMA_FOUND AND EXISTS "/opt/local/include/lzma.h")
             message(STATUS "Found MacPorts liblzma")
             list(APPEND CMAKE_PREFIX_PATH "/opt/local")
+
+            # Explicitly set include and library paths for MacPorts
+            set(LIBLZMA_INCLUDE_DIR "/opt/local/include" CACHE PATH "liblzma include directory")
+
+            if(EXISTS "/opt/local/lib/liblzma.dylib")
+                set(LIBLZMA_LIBRARY "/opt/local/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
+            elseif(EXISTS "/opt/local/lib/liblzma.a")
+                set(LIBLZMA_LIBRARY "/opt/local/lib/liblzma.a" CACHE FILEPATH "liblzma library")
+            endif()
+
+            if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
+                set(LibLZMA_FOUND TRUE)
+                set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
+                set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
+                message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
+            endif()
         endif()
 
-        # Check system locations
-        if(EXISTS "/usr/local/include/lzma.h")
+        # Check system locations if still not found
+        if(NOT LibLZMA_FOUND AND EXISTS "/usr/local/include/lzma.h")
             message(STATUS "Found liblzma in /usr/local")
             list(APPEND CMAKE_PREFIX_PATH "/usr/local")
+
+            # Explicitly set include and library paths for system location
+            set(LIBLZMA_INCLUDE_DIR "/usr/local/include" CACHE PATH "liblzma include directory")
+
+            if(EXISTS "/usr/local/lib/liblzma.dylib")
+                set(LIBLZMA_LIBRARY "/usr/local/lib/liblzma.dylib" CACHE FILEPATH "liblzma library")
+            elseif(EXISTS "/usr/local/lib/liblzma.a")
+                set(LIBLZMA_LIBRARY "/usr/local/lib/liblzma.a" CACHE FILEPATH "liblzma library")
+            endif()
+
+            if(LIBLZMA_INCLUDE_DIR AND LIBLZMA_LIBRARY)
+                set(LibLZMA_FOUND TRUE)
+                set(LibLZMA_INCLUDE_DIRS ${LIBLZMA_INCLUDE_DIR})
+                set(LibLZMA_LIBRARIES ${LIBLZMA_LIBRARY})
+                message(STATUS "Manually set LibLZMA: ${LibLZMA_LIBRARIES}")
+            endif()
         endif()
 
         # Use pkg-config as fallback
-        find_package(PkgConfig QUIET)
-        if(PKG_CONFIG_FOUND)
+        if(NOT LibLZMA_FOUND AND PKG_CONFIG_FOUND)
             pkg_check_modules(PC_LIBLZMA QUIET liblzma)
             if(PC_LIBLZMA_FOUND)
                 message(STATUS "Found liblzma via pkg-config")
@@ -166,8 +233,13 @@ if(XDELTA_ENABLE_LZMA)
         endif()
     endif()
 
-    find_package(LibLZMA REQUIRED)
-    message(STATUS "Found LibLZMA: ${LibLZMA_LIBRARIES}")
+    # Only try to find LibLZMA if we haven't already found it manually
+    if(NOT LibLZMA_FOUND)
+        find_package(LibLZMA REQUIRED)
+        message(STATUS "Found LibLZMA via find_package: ${LibLZMA_LIBRARIES}")
+    else()
+        message(STATUS "Using manually configured LibLZMA: ${LibLZMA_LIBRARIES}")
+    endif()
 endif()
 
 #-------------------------------------------------------------------------------------------
@@ -190,6 +262,9 @@ set(XDELTA_HEADERS
     "xdelta3/xdelta3-second.h"
     "xdelta3/xdelta3-test.h"
 )
+
+# Force C++ compilation for better cross-platform compatibility
+set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
 
 add_library(xdelta ${XDELTA_SOURCES} ${XDELTA_HEADERS})
 add_library(xdelta::xdelta ALIAS xdelta)
@@ -342,27 +417,42 @@ if(WIN32)
         _WIN32=1
         XD3_WIN32=1
         _CRT_SECURE_NO_WARNINGS
+        NOMINMAX  # Prevent Windows.h from defining min/max macros
+        WIN32_LEAN_AND_MEAN  # Exclude rarely-used Windows headers
     )
 elseif(APPLE)
     target_compile_definitions(xdelta PRIVATE
         _DARWIN_C_SOURCE
         _XOPEN_SOURCE=600
+        _DARWIN_BETTER_REALPATH  # Use better realpath implementation
     )
     target_compile_options(xdelta PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-function
         -Wno-error=implicit-function-declaration
+        -Wno-c++11-narrowing     # Suppress narrowing conversion warnings
+        -Wno-format-security     # Suppress format security warnings
+        -Wno-unused-variable     # Suppress unused variable warnings
+        -Wno-unused-value        # Suppress unused value warnings
+        -Wno-incompatible-pointer-types  # Suppress pointer type warnings
     )
 elseif(UNIX)
     # Linux and other Unix-like systems
     target_compile_definitions(xdelta PRIVATE
         _GNU_SOURCE
         _XOPEN_SOURCE=600
+        _LARGEFILE64_SOURCE  # Support for large files
     )
     target_compile_options(xdelta PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-function
         -Wno-error=implicit-function-declaration
+        -Wno-write-strings   # Suppress string literal conversion warnings
+        -Wno-format-security # Suppress format security warnings
+        -Wno-unused-result   # Suppress unused result warnings
+        -Wno-unused-variable # Suppress unused variable warnings
+        -Wno-unused-but-set-variable # Suppress unused but set variable warnings
+        -Wno-narrowing       # Suppress narrowing conversion warnings
     )
 endif()
 
@@ -370,6 +460,8 @@ endif()
 # Executables
 #-------------------------------------------------------------------------------------------
 # Main xdelta3 executable
+# Use the same source file but set it to C++ for this target as well
+set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
 add_executable(xdelta3 ${XDELTA_SOURCES})
 target_include_directories(xdelta3 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/xdelta3)
 target_compile_definitions(xdelta3
@@ -410,32 +502,51 @@ if(WIN32)
         _WIN32=1
         XD3_WIN32=1
         _CRT_SECURE_NO_WARNINGS
+        NOMINMAX  # Prevent Windows.h from defining min/max macros
+        WIN32_LEAN_AND_MEAN  # Exclude rarely-used Windows headers
     )
 elseif(APPLE)
     target_compile_definitions(xdelta3 PRIVATE
         _DARWIN_C_SOURCE
         _XOPEN_SOURCE=600
+        _DARWIN_BETTER_REALPATH  # Use better realpath implementation
     )
     target_compile_options(xdelta3 PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-function
         -Wno-error=implicit-function-declaration
+        -Wno-c++11-narrowing     # Suppress narrowing conversion warnings
+        -Wno-format-security     # Suppress format security warnings
+        -Wno-unused-variable     # Suppress unused variable warnings
+        -Wno-unused-value        # Suppress unused value warnings
+        -Wno-incompatible-pointer-types  # Suppress pointer type warnings
     )
 elseif(UNIX)
     # Linux and other Unix-like systems
     target_compile_definitions(xdelta3 PRIVATE
         _GNU_SOURCE
         _XOPEN_SOURCE=600
+        _LARGEFILE64_SOURCE  # Support for large files
     )
     target_compile_options(xdelta3 PRIVATE
         -Wno-deprecated-declarations
         -Wno-unused-function
         -Wno-error=implicit-function-declaration
+        -Wno-write-strings   # Suppress string literal conversion warnings
+        -Wno-format-security # Suppress format security warnings
+        -Wno-unused-result   # Suppress unused result warnings
+        -Wno-unused-variable # Suppress unused variable warnings
+        -Wno-unused-but-set-variable # Suppress unused but set variable warnings
+        -Wno-narrowing       # Suppress narrowing conversion warnings
     )
 endif()
 
 # Optional test executables
 if(XDELTA_BUILD_TESTS)
+    # Set C++ language for test source files
+    set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
+    set_source_files_properties(xdelta3/testing/regtest_c.c PROPERTIES LANGUAGE CXX)
+
     # xdelta3regtest
     add_executable(xdelta3regtest
         ${XDELTA_SOURCES}
@@ -482,31 +593,47 @@ if(XDELTA_BUILD_TESTS)
             _WIN32=1
             XD3_WIN32=1
             _CRT_SECURE_NO_WARNINGS
+            NOMINMAX  # Prevent Windows.h from defining min/max macros
+            WIN32_LEAN_AND_MEAN  # Exclude rarely-used Windows headers
         )
     elseif(APPLE)
         target_compile_definitions(xdelta3regtest PRIVATE
             _DARWIN_C_SOURCE
             _XOPEN_SOURCE=600
+            _DARWIN_BETTER_REALPATH  # Use better realpath implementation
         )
         target_compile_options(xdelta3regtest PRIVATE
             -Wno-deprecated-declarations
             -Wno-unused-function
             -Wno-error=implicit-function-declaration
+            -Wno-c++11-narrowing     # Suppress narrowing conversion warnings
+            -Wno-format-security     # Suppress format security warnings
+            -Wno-unused-variable     # Suppress unused variable warnings
+            -Wno-unused-value        # Suppress unused value warnings
+            -Wno-incompatible-pointer-types  # Suppress pointer type warnings
         )
     elseif(UNIX)
         # Linux and other Unix-like systems
         target_compile_definitions(xdelta3regtest PRIVATE
             _GNU_SOURCE
             _XOPEN_SOURCE=600
+            _LARGEFILE64_SOURCE  # Support for large files
         )
         target_compile_options(xdelta3regtest PRIVATE
             -Wno-deprecated-declarations
             -Wno-unused-function
             -Wno-error=implicit-function-declaration
+            -Wno-write-strings   # Suppress string literal conversion warnings
+            -Wno-format-security # Suppress format security warnings
+            -Wno-unused-result   # Suppress unused result warnings
+            -Wno-unused-variable # Suppress unused variable warnings
+            -Wno-unused-but-set-variable # Suppress unused but set variable warnings
+            -Wno-narrowing       # Suppress narrowing conversion warnings
         )
     endif()
 
     # xdelta3decode
+    set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
     add_executable(xdelta3decode ${XDELTA_SOURCES})
     target_include_directories(xdelta3decode PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/xdelta3)
     target_compile_definitions(xdelta3decode
@@ -548,27 +675,42 @@ if(XDELTA_BUILD_TESTS)
             _WIN32=1
             XD3_WIN32=1
             _CRT_SECURE_NO_WARNINGS
+            NOMINMAX  # Prevent Windows.h from defining min/max macros
+            WIN32_LEAN_AND_MEAN  # Exclude rarely-used Windows headers
         )
     elseif(APPLE)
         target_compile_definitions(xdelta3decode PRIVATE
             _DARWIN_C_SOURCE
             _XOPEN_SOURCE=600
+            _DARWIN_BETTER_REALPATH  # Use better realpath implementation
         )
         target_compile_options(xdelta3decode PRIVATE
             -Wno-deprecated-declarations
             -Wno-unused-function
             -Wno-error=implicit-function-declaration
+            -Wno-c++11-narrowing     # Suppress narrowing conversion warnings
+            -Wno-format-security     # Suppress format security warnings
+            -Wno-unused-variable     # Suppress unused variable warnings
+            -Wno-unused-value        # Suppress unused value warnings
+            -Wno-incompatible-pointer-types  # Suppress pointer type warnings
         )
     elseif(UNIX)
         # Linux and other Unix-like systems
         target_compile_definitions(xdelta3decode PRIVATE
             _GNU_SOURCE
             _XOPEN_SOURCE=600
+            _LARGEFILE64_SOURCE  # Support for large files
         )
         target_compile_options(xdelta3decode PRIVATE
             -Wno-deprecated-declarations
             -Wno-unused-function
             -Wno-error=implicit-function-declaration
+            -Wno-write-strings   # Suppress string literal conversion warnings
+            -Wno-format-security # Suppress format security warnings
+            -Wno-unused-result   # Suppress unused result warnings
+            -Wno-unused-variable # Suppress unused variable warnings
+            -Wno-unused-but-set-variable # Suppress unused but set variable warnings
+            -Wno-narrowing       # Suppress narrowing conversion warnings
         )
     endif()
 endif()
