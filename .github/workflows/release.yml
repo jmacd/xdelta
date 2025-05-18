@@ -562,7 +562,14 @@ jobs:
             Write-Host "Using inline implementation instead"
 
             # Inline implementation
-            $tempDir = Join-Path $env:TEMP "xdelta-vcpkg-update"
+            # Use a fallback if TEMP environment variable is not set
+            if ($env:TEMP) {
+                $tempDir = Join-Path $env:TEMP "xdelta-vcpkg-update"
+            } else {
+                # Fallback to current directory if TEMP is not set
+                $tempDir = Join-Path (Get-Location) "temp-xdelta-vcpkg-update"
+                Write-Host "TEMP environment variable not set, using current directory: $tempDir"
+            }
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
             # Download the binary package to calculate SHA512

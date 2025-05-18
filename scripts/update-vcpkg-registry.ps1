@@ -5,7 +5,7 @@
 param(
     [Parameter(Mandatory=$true)]
     [string]$ReleaseTag,
-    
+
     [Parameter(Mandatory=$true)]
     [string]$BinaryZipUrl
 )
@@ -15,7 +15,14 @@ $version = $ReleaseTag -replace '^v', ''
 Write-Host "Updating vcpkg registry for version $version"
 
 # Temporary directory for downloads
-$tempDir = Join-Path $env:TEMP "xdelta-vcpkg-update"
+# Use a fallback if TEMP environment variable is not set
+if ($env:TEMP) {
+    $tempDir = Join-Path $env:TEMP "xdelta-vcpkg-update"
+} else {
+    # Fallback to current directory if TEMP is not set
+    $tempDir = Join-Path (Get-Location) "temp-xdelta-vcpkg-update"
+    Write-Host "TEMP environment variable not set, using current directory: $tempDir"
+}
 New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
 # Download the binary package to calculate SHA512
