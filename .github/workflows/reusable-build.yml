@@ -194,23 +194,54 @@ jobs:
             Write-Host "No DLLs found at: $dllPath (this may be normal for static builds)"
         }
 
-        # Create README from template
+        # Create README from template file
         Write-Host "Creating README file from template..."
 
-        # Define template path with explicit string concatenation
-        $templatePath = "${{ github.workspace }}\.github\templates\README.template.txt"
+        # Define template path with forward slashes for GitHub Actions environment
+        $templatePath = "${{ github.workspace }}/.github/templates/README.template.txt"
         Write-Host "Looking for template at: $templatePath"
 
-        # Try to read template with fallback
-        if (Test-Path $templatePath) {
-            Write-Host "Template found, reading content..."
-            $templateContent = Get-Content -Path $templatePath -Raw
+        # List directory contents for debugging
+        Write-Host "Checking if .github directory exists..."
+        if (Test-Path "${{ github.workspace }}/.github") {
+            Write-Host ".github directory exists"
+            Get-ChildItem -Path "${{ github.workspace }}/.github" | ForEach-Object { Write-Host "- $_" }
 
-            # Replace placeholders
-            $readmeContent = $templateContent.Replace("{{PLATFORM}}", "Windows").Replace("{{EXECUTABLE_NAME}}", "xdelta3.exe")
-            Write-Host "Template processed successfully"
+            Write-Host "Checking if templates directory exists..."
+            if (Test-Path "${{ github.workspace }}/.github/templates") {
+                Write-Host "templates directory exists"
+                Get-ChildItem -Path "${{ github.workspace }}/.github/templates" | ForEach-Object { Write-Host "- $_" }
+            } else {
+                Write-Host "templates directory does not exist"
+            }
         } else {
-            Write-Host "Template file not found, using hardcoded content"
+            Write-Host ".github directory does not exist"
+        }
+
+        # Try to read template with detailed error handling
+        try {
+            if (Test-Path $templatePath) {
+                Write-Host "Template file found, reading content..."
+                $templateContent = Get-Content -Path $templatePath -Raw -ErrorAction Stop
+                Write-Host "Template content read successfully, length: $($templateContent.Length) characters"
+
+                # Show first few characters of template for debugging
+                if ($templateContent.Length -gt 0) {
+                    Write-Host "Template starts with: $($templateContent.Substring(0, [Math]::Min(20, $templateContent.Length)))..."
+
+                    # Replace placeholders with explicit string replacement
+                    Write-Host "Replacing placeholders in template..."
+                    $readmeContent = $templateContent -replace '{{PLATFORM}}', 'Windows' -replace '{{EXECUTABLE_NAME}}', 'xdelta3.exe'
+                    Write-Host "Placeholders replaced successfully"
+                } else {
+                    throw "Template file is empty"
+                }
+            } else {
+                throw "Template file not found at: $templatePath"
+            }
+        } catch {
+            Write-Host "Error processing template: $_"
+            Write-Host "Falling back to hardcoded content..."
 
             # Fallback to hardcoded content
             $readmeContent = "Xdelta3 Windows Binary`r`n"
@@ -234,6 +265,7 @@ jobs:
             $readmeContent += "   -V           show version`r`n`r`n"
             $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
         }
+        Write-Host "README content prepared"
 
         # Write the content to file using .NET methods to avoid PowerShell formatting issues
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
