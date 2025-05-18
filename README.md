@@ -27,8 +27,8 @@ Xdelta3 requires a C11-compatible compiler. The following minimum compiler versi
 
 ## C/C++ Standard Requirements
 
-- **C Standard**: C11 (ISO/IEC 9899:2011)
-- **C++ Standard**: C++11 (when building with C++ compiler)
+- **C++ Standard**: C++14 (ISO/IEC 14882:2014)
+- **C Standard**: C11 (ISO/IEC 9899:2011) when compiled as C
 
 ## Dependencies
 
@@ -72,14 +72,14 @@ Xdelta3 requires a C11-compatible compiler. The following minimum compiler versi
 
 For all platforms, ensure the following compilation flags are set:
 
-- `-std=c11` (GCC/Clang) or `/std:c11` (MSVC)
+- `-std=c++14` (GCC/Clang) or `/std:c++14` (MSVC)
 - `-D_FILE_OFFSET_BITS=64` for large file support
 
 ## Known Issues
 
-- Static assertions in the code require C11 support
-- Some compiler warnings about unused parameters may appear but can be safely ignored
-- MSVC may show warnings about implicit conversions between size_t and other integer types
+- The code is now compiled as C++ using C++14 standard for better cross-platform compatibility
+- Some compiler warnings about unused parameters or type conversions may appear but can be safely ignored
+- The original C code is maintained but compiled with a C++ compiler to avoid platform-specific C11 compatibility issues
 
 # Documentation
 

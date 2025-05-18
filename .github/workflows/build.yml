@@ -49,7 +49,11 @@ jobs:
 
     - name: Install dependencies with vcpkg
       run: |
-        # Explicitly specify the path to vcpkg.json
+        # Explicitly specify the path to vcpkg.json and ensure it exists
+        Get-Content "${{ github.workspace }}/vcpkg.json" | Out-Null
+        Write-Host "vcpkg.json found at ${{ github.workspace }}/vcpkg.json"
+
+        # Install dependencies
         vcpkg install --x-manifest-root="${{ github.workspace }}"
 
     - name: Configure CMake
@@ -178,7 +182,10 @@ jobs:
 
     - name: Install dependencies
       run: |
+        # xz package provides liblzma
         brew install xz
+        # Verify liblzma is available
+        pkg-config --libs --cflags liblzma || true
 
     - name: Configure CMake
       run: |

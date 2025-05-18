@@ -167,19 +167,30 @@ typedef ULONGLONG      uint64_t;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-/* Define a cross-platform static_assert macro that works in C99 and C11 */
+/* Define a cross-platform static_assert macro that works with C++14 */
 #ifndef XD3_STATIC_ASSERT
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L /* C11 */
-#define XD3_STATIC_ASSERT(cond, msg) _Static_assert(cond, #msg)
+#if defined(__cplusplus) && __cplusplus >= 201402L /* C++14 or later */
+  /* C++14 allows static_assert with a single parameter */
+  #define XD3_STATIC_ASSERT(cond, msg) static_assert((cond))
 #elif defined(__cplusplus) && __cplusplus >= 201103L /* C++11 */
-#define XD3_STATIC_ASSERT(cond, msg) static_assert(cond, #msg)
-#elif defined(__GNUC__) || defined(__clang__) /* GCC or Clang */
-/* Use a more compatible version for GCC/Clang in C99 mode */
-#define XD3_STATIC_ASSERT(cond, msg) \
-    extern int (*xd3_static_assertion(void))[!!sizeof(struct { int static_assertion_failed_##msg : (cond) ? 1 : -1; })]
-#else /* Other compilers - use a trick that works in most C99 compilers */
-#define XD3_STATIC_ASSERT(cond, msg) \
+  /* Use standard C++11 static_assert */
+  #define XD3_STATIC_ASSERT(cond, msg) static_assert((cond), #msg)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L /* C11 */
+  /* Use standard C11 _Static_assert */
+  #define XD3_STATIC_ASSERT(cond, msg) _Static_assert((cond), #msg)
+#elif defined(_MSC_VER) && _MSC_VER >= 1900 /* MSVC 2015 and later */
+  /* MSVC 2015+ supports static_assert */
+  #define XD3_STATIC_ASSERT(cond, msg) static_assert((cond), #msg)
+#elif defined(_MSC_VER) /* Older MSVC */
+  /* Use array size trick for older MSVC */
+  #define XD3_STATIC_ASSERT(cond, msg) \
     typedef char static_assertion_##msg[(cond) ? 1 : -1]
+#else /* GCC, Clang, and other compilers */
+  /* Use a more compatible version that works in C99 mode */
+  #define XD3_STATIC_ASSERT(cond, msg) \
+    struct static_assertion_struct_##msg { \
+      unsigned int static_assertion_failed_##msg : (cond) ? 1 : -1; \
+    }
 #endif
 #endif
 

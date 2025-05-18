@@ -44,15 +44,35 @@ include(CMakePackageConfigHelpers)
 #-------------------------------------------------------------------------------------------
 # Compiler settings
 #-------------------------------------------------------------------------------------------
-# Set C standard
+# Set C standard (use C11 when compiling as C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-# Set CXX standard for tests
-set(CMAKE_CXX_STANDARD 11)
+# Set C++ standard to C++14 for better cross-platform compatibility
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Force C++ compilation for better cross-platform compatibility
+set_source_files_properties(${XDELTA_SOURCES} PROPERTIES LANGUAGE CXX)
+
+# Add compiler-specific flags
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    # Use C++14 for all files
+    add_compile_options(-std=c++14)
+
+    # Add additional warning suppressions for C++ compilation of C code
+    add_compile_options(-Wno-deprecated -Wno-write-strings)
+elseif(MSVC)
+    # MSVC 2015 and later support C++14
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.0)
+        message(WARNING "MSVC version may not fully support C++14 features. Consider upgrading to Visual Studio 2015 or later.")
+    endif()
+
+    # Disable specific MSVC warnings for C++ compilation of C code
+    add_compile_options(/wd4996 /wd4244 /wd4267)
+endif()
 
 # Configure platform-specific settings
 if(MSVC AND XDELTA_USE_STATIC_RUNTIME)
@@ -109,22 +129,40 @@ if(XDELTA_ENABLE_LZMA)
 
     # On macOS, try to find liblzma from Homebrew or MacPorts first
     if(APPLE)
-        # Check for Homebrew
+        # Check for Homebrew xz package (which provides liblzma)
         execute_process(
-            COMMAND brew --prefix liblzma
-            RESULT_VARIABLE BREW_LZMA_RESULT
-            OUTPUT_VARIABLE BREW_LZMA_PREFIX
+            COMMAND brew --prefix xz
+            RESULT_VARIABLE BREW_XZ_RESULT
+            OUTPUT_VARIABLE BREW_XZ_PREFIX
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        if(BREW_LZMA_RESULT EQUAL 0 AND EXISTS "${BREW_LZMA_PREFIX}")
-            message(STATUS "Found Homebrew liblzma at ${BREW_LZMA_PREFIX}")
-            list(APPEND CMAKE_PREFIX_PATH "${BREW_LZMA_PREFIX}")
+        if(BREW_XZ_RESULT EQUAL 0 AND EXISTS "${BREW_XZ_PREFIX}")
+            message(STATUS "Found Homebrew xz (liblzma) at ${BREW_XZ_PREFIX}")
+            list(APPEND CMAKE_PREFIX_PATH "${BREW_XZ_PREFIX}")
         endif()
 
         # Check for MacPorts
         if(EXISTS "/opt/local/include/lzma.h")
             message(STATUS "Found MacPorts liblzma")
             list(APPEND CMAKE_PREFIX_PATH "/opt/local")
+        endif()
+
+        # Check system locations
+        if(EXISTS "/usr/local/include/lzma.h")
+            message(STATUS "Found liblzma in /usr/local")
+            list(APPEND CMAKE_PREFIX_PATH "/usr/local")
+        endif()
+
+        # Use pkg-config as fallback
+        find_package(PkgConfig QUIET)
+        if(PKG_CONFIG_FOUND)
+            pkg_check_modules(PC_LIBLZMA QUIET liblzma)
+            if(PC_LIBLZMA_FOUND)
+                message(STATUS "Found liblzma via pkg-config")
+                set(LibLZMA_INCLUDE_DIRS ${PC_LIBLZMA_INCLUDE_DIRS})
+                set(LibLZMA_LIBRARIES ${PC_LIBLZMA_LIBRARIES})
+                set(LibLZMA_FOUND TRUE)
+            endif()
         endif()
     endif()
 
