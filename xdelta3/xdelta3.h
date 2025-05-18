@@ -172,7 +172,7 @@ typedef ULONGLONG      uint64_t;
 #ifndef XD3_STATIC_ASSERT
 #if defined(__cplusplus) && __cplusplus >= 201402L /* C++14 or later */
   /* C++14 allows static_assert with a single parameter */
-  #define XD3_STATIC_ASSERT(cond, msg) static_assert((cond))
+  #define XD3_STATIC_ASSERT(cond, msg) static_assert((cond), #msg)
 #elif defined(__cplusplus) && __cplusplus >= 201103L /* C++11 */
   /* Use standard C++11 static_assert */
   #define XD3_STATIC_ASSERT(cond, msg) static_assert((cond), #msg)

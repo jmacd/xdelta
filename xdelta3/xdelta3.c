@@ -1880,13 +1880,13 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
       ret = stream->getblk (stream, source, blkno);
       if (ret != 0)
 	{
-	  IF_DEBUG2 (DP(RINT "[getblk] app error blkno %"Q"u: %s\n",
+	  IF_DEBUG2 (DP(RINT "[getblk] app error blkno %" Q "u: %s\n",
 			blkno, xd3_strerror (ret)));
 	  return ret;
 	}
 
-      IF_DEBUG2 (DP(RINT "[getblk] read source block %"Q"u onblk "
-		    "%"W"u blksize %"W"u max_blkno %"Q"u\n", blkno, source->onblk,
+      IF_DEBUG2 (DP(RINT "[getblk] read source block %" Q "u onblk "
+		    "%" W "u blksize %" W "u max_blkno %" Q "u\n", blkno, source->onblk,
 		    source->blksize, source->max_blkno));
     }
 
@@ -1896,15 +1896,15 @@ xd3_getblk (xd3_stream *stream, xoff_t blkno)
 
       if (source->onblk == source->blksize)
 	{
-	  IF_DEBUG1 (DP(RINT "[getblk] full source blkno %"Q"u: "
-			"source length unknown %"Q"u\n",
+	  IF_DEBUG1 (DP(RINT "[getblk] full source blkno %" Q "u: "
+			"source length unknown %" Q "u\n",
 			blkno,
 			xd3_source_eof (source)));
 	}
       else if (!source->eof_known)
 	{
-	  IF_DEBUG1 (DP(RINT "[getblk] eof block has %"W"u bytes; "
-			"source length known %"Q"u\n",
+	  IF_DEBUG1 (DP(RINT "[getblk] eof block has %" W "u bytes; "
+			"source length known %" Q "u\n",
 			xd3_bytes_on_srcblk (source, blkno),
 			xd3_source_eof (source)));
 	  source->eof_known = 1;
@@ -1942,7 +1942,7 @@ xd3_set_source (xd3_stream *stream,
     {
       src->blksize = xd3_pow2_roundup(src->blksize);
       xd3_check_pow2 (src->blksize, &shiftby);
-      IF_DEBUG1 (DP(RINT "raising src_blksz to %"W"u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_blksz to %" W "u\n", src->blksize));
     }
 
   src->shiftby = shiftby;
@@ -1951,7 +1951,7 @@ xd3_set_source (xd3_stream *stream,
   if (xd3_check_pow2 (src->max_winsize, NULL) != 0)
     {
       src->max_winsize = xd3_xoff_roundup(src->max_winsize);
-      IF_DEBUG1 (DP(RINT "raising src_maxsize to %"W"u\n", src->blksize));
+      IF_DEBUG1 (DP(RINT "raising src_maxsize to %" W "u\n", src->blksize));
     }
   src->max_winsize = xd3_max (src->max_winsize, XD3_ALLOCSIZE);
   return 0;
@@ -1965,14 +1965,14 @@ xd3_set_source_and_size (xd3_stream *stream,
   if (ret == 0)
     {
       stream->src->eof_known = 1;
-      IF_DEBUG2 (DP(RINT "[set source] size known %"Q"u\n",
+      IF_DEBUG2 (DP(RINT "[set source] size known %" Q "u\n",
 		    source_size));
       xd3_blksize_div(source_size,
 		      stream->src,
 		      &stream->src->max_blkno,
 		      &stream->src->onlastblk);
 
-      IF_DEBUG1 (DP(RINT "[set source] size known %"Q"u max_blkno %"Q"u\n",
+      IF_DEBUG1 (DP(RINT "[set source] size known %" Q "u max_blkno %" Q "u\n",
 		    source_size, stream->src->max_blkno));
     }
   return ret;
@@ -2177,7 +2177,7 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 
 	IF_DEBUG2 ({
 	  static int cnt;
-	  DP(RINT "[iopt copy:%d] pos %"Q"u-%"Q"u addr %"Q"u-%"Q"u size %"W"u\n",
+	  DP(RINT "[iopt copy:%d] pos %" Q "u-%" Q "u addr %" Q "u-%" Q "u size %" W "u\n",
 		   cnt++,
 		   stream->total_in + inst->pos,
 		   stream->total_in + inst->pos + inst->size,
@@ -2194,7 +2194,7 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 
 	IF_DEBUG2 ({
 	  static int cnt;
-	  DP(RINT "[iopt run:%d] pos %"Q"u size %"W"u\n", cnt++, stream->total_in + inst->pos, inst->size);
+	  DP(RINT "[iopt run:%d] pos %" Q "u size %" W "u\n", cnt++, stream->total_in + inst->pos, inst->size);
 	});
 	break;
       }
@@ -2208,7 +2208,7 @@ xd3_iopt_finish_encoding (xd3_stream *stream, xd3_rinst *inst)
 
 	IF_DEBUG2 ({
 	  static int cnt;
-	  DP(RINT "[iopt add:%d] pos %"Q"u size %"W"u\n", cnt++, stream->total_in + inst->pos, inst->size);
+	  DP(RINT "[iopt add:%d] pos %" Q "u size %" W "u\n", cnt++, stream->total_in + inst->pos, inst->size);
 	});
 
 	break;
