@@ -54,9 +54,9 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Configure static/dynamic runtime linking on Windows
+# Configure platform-specific settings
 if(MSVC AND XDELTA_USE_STATIC_RUNTIME)
-    # Use static runtime
+    # Use static runtime on Windows
     foreach(flag_var
         CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
         CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
@@ -74,6 +74,25 @@ if(MSVC AND XDELTA_USE_STATIC_RUNTIME)
     endif()
 endif()
 
+# macOS specific settings
+if(APPLE)
+    # Set minimum macOS version to ensure compatibility
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS deployment version")
+
+    # Add macOS-specific compiler flags
+    add_compile_options(-Wall -Wextra)
+
+    # If using vcpkg on macOS, set the appropriate triplet
+    if(USING_VCPKG AND NOT DEFINED VCPKG_TARGET_TRIPLET)
+        if(BUILD_SHARED_LIBS)
+            set(VCPKG_TARGET_TRIPLET "x64-osx" CACHE STRING "")
+        else()
+            set(VCPKG_TARGET_TRIPLET "x64-osx-static" CACHE STRING "")
+        endif()
+        message(STATUS "Using vcpkg libraries with triplet: ${VCPKG_TARGET_TRIPLET}")
+    endif()
+endif()
+
 #-------------------------------------------------------------------------------------------
 # Dependencies
 #-------------------------------------------------------------------------------------------
@@ -85,6 +104,27 @@ if(XDELTA_ENABLE_LZMA)
             set(LIBLZMA_USE_STATIC_LIBS OFF)
         else()
             set(LIBLZMA_USE_STATIC_LIBS ON)
+        endif()
+    endif()
+
+    # On macOS, try to find liblzma from Homebrew or MacPorts first
+    if(APPLE)
+        # Check for Homebrew
+        execute_process(
+            COMMAND brew --prefix liblzma
+            RESULT_VARIABLE BREW_LZMA_RESULT
+            OUTPUT_VARIABLE BREW_LZMA_PREFIX
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        if(BREW_LZMA_RESULT EQUAL 0 AND EXISTS "${BREW_LZMA_PREFIX}")
+            message(STATUS "Found Homebrew liblzma at ${BREW_LZMA_PREFIX}")
+            list(APPEND CMAKE_PREFIX_PATH "${BREW_LZMA_PREFIX}")
+        endif()
+
+        # Check for MacPorts
+        if(EXISTS "/opt/local/include/lzma.h")
+            message(STATUS "Found MacPorts liblzma")
+            list(APPEND CMAKE_PREFIX_PATH "/opt/local")
         endif()
     endif()
 
@@ -188,7 +228,7 @@ if(XDELTA_ENABLE_LZMA)
         # vcpkg-specific handling
         message(STATUS "Using vcpkg-provided LibLZMA")
 
-        # Determine the correct library name based on build type and linking mode
+        # Determine the correct library name based on platform, build type and linking mode
         set(LZMA_LIB_NAME "liblzma")
         if(MSVC)
             if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
@@ -202,15 +242,24 @@ if(XDELTA_ENABLE_LZMA)
                     set(LZMA_LIB_NAME "liblzma")
                 endif()
             endif()
+        elseif(APPLE)
+            # On macOS, the library is typically named liblzma.dylib or liblzma.a
+            set(LZMA_LIB_NAME "lzma")
+        else()
+            # On Linux and other platforms
+            set(LZMA_LIB_NAME "lzma")
         endif()
 
         # Find the library in vcpkg installed directory
         find_library(VCPKG_LZMA_LIB
-            NAMES ${LZMA_LIB_NAME} lzma
+            NAMES ${LZMA_LIB_NAME} liblzma lzma
             PATHS
                 "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib"
                 "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib"
                 "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib"
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/debug/lib"
+                "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/debug/lib"
+                "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/debug/lib"
             NO_DEFAULT_PATH
         )
 
@@ -222,6 +271,20 @@ if(XDELTA_ENABLE_LZMA)
                 set(VCPKG_LZMA_INCLUDE "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
             elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
                 set(VCPKG_LZMA_INCLUDE "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
+            endif()
+
+            # On macOS, also check system locations if vcpkg include not found
+            if(APPLE AND NOT VCPKG_LZMA_INCLUDE)
+                # Check Homebrew
+                if(EXISTS "/usr/local/include/lzma.h")
+                    set(VCPKG_LZMA_INCLUDE "/usr/local/include")
+                # Check MacPorts
+                elseif(EXISTS "/opt/local/include/lzma.h")
+                    set(VCPKG_LZMA_INCLUDE "/opt/local/include")
+                # Check system location
+                elseif(EXISTS "/usr/include/lzma.h")
+                    set(VCPKG_LZMA_INCLUDE "/usr/include")
+                endif()
             endif()
 
             target_include_directories(xdelta PRIVATE ${VCPKG_LZMA_INCLUDE})
@@ -241,6 +304,15 @@ if(WIN32)
         _WIN32=1
         XD3_WIN32=1
         _CRT_SECURE_NO_WARNINGS
+    )
+elseif(APPLE)
+    target_compile_definitions(xdelta PRIVATE
+        _DARWIN_C_SOURCE
+        _XOPEN_SOURCE=600
+    )
+    target_compile_options(xdelta PRIVATE
+        -Wno-deprecated-declarations
+        -Wno-unused-function
     )
 endif()
 
@@ -288,6 +360,15 @@ if(WIN32)
         _WIN32=1
         XD3_WIN32=1
         _CRT_SECURE_NO_WARNINGS
+    )
+elseif(APPLE)
+    target_compile_definitions(xdelta3 PRIVATE
+        _DARWIN_C_SOURCE
+        _XOPEN_SOURCE=600
+    )
+    target_compile_options(xdelta3 PRIVATE
+        -Wno-deprecated-declarations
+        -Wno-unused-function
     )
 endif()
 
@@ -340,6 +421,15 @@ if(XDELTA_BUILD_TESTS)
             XD3_WIN32=1
             _CRT_SECURE_NO_WARNINGS
         )
+    elseif(APPLE)
+        target_compile_definitions(xdelta3regtest PRIVATE
+            _DARWIN_C_SOURCE
+            _XOPEN_SOURCE=600
+        )
+        target_compile_options(xdelta3regtest PRIVATE
+            -Wno-deprecated-declarations
+            -Wno-unused-function
+        )
     endif()
 
     # xdelta3decode
@@ -384,6 +474,15 @@ if(XDELTA_BUILD_TESTS)
             _WIN32=1
             XD3_WIN32=1
             _CRT_SECURE_NO_WARNINGS
+        )
+    elseif(APPLE)
+        target_compile_definitions(xdelta3decode PRIVATE
+            _DARWIN_C_SOURCE
+            _XOPEN_SOURCE=600
+        )
+        target_compile_options(xdelta3decode PRIVATE
+            -Wno-deprecated-declarations
+            -Wno-unused-function
         )
     endif()
 endif()

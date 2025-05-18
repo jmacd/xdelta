@@ -168,6 +168,8 @@ typedef ULONGLONG      uint64_t;
 #endif
 
 static_assert(SIZEOF_SIZE_T == sizeof(size_t), "SIZEOF_SIZE_T not correctly set");
+static_assert(SIZEOF_UNSIGNED_INT == sizeof(unsigned int), "SIZEOF_UNSIGNED_INT not correctly set");
+static_assert(SIZEOF_UNSIGNED_LONG == sizeof(unsigned long), "SIZEOF_UNSIGNED_LONG not correctly set");
 static_assert(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), "SIZEOF_UNSIGNED_LONG_LONG not correctly set");
 
 /* Set a xoff_t typedef and the "Q" printf insert. */
