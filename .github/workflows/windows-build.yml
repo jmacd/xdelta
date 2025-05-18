@@ -1,0 +1,142 @@
+name: Windows Build
+
+on:
+  push:
+    branches: [ release3_1_apl ]
+  pull_request:
+    branches: [ release3_1_apl ]
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  BUILD_TYPE: Release
+  VCPKG_COMMIT: 2023.12.12  # Pin vcpkg to a specific commit/version
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, x86]
+        include:
+          - arch: x64
+            triplet: x64-windows
+            cmake_arch: -A x64
+          - arch: x86
+            triplet: x86-windows
+            cmake_arch: -A Win32
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Fetch all history for proper versioning
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+
+    - name: Install dependencies with vcpkg
+      run: |
+        # Install liblzma
+        vcpkg install liblzma:${{ matrix.triplet }}
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . ${{ matrix.cmake_arch }} `
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
+          -DXDELTA_ENABLE_LZMA=ON `
+          -DXDELTA_BUILD_TESTS=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest -C ${{ env.BUILD_TYPE }} --output-on-failure
+
+    - name: Prepare artifacts
+      run: |
+        mkdir artifacts
+        mkdir artifacts/${{ matrix.arch }}
+        
+        # Copy executables
+        cp build/${{ env.BUILD_TYPE }}/xdelta3.exe artifacts/${{ matrix.arch }}/
+        
+        # Copy required DLLs if using dynamic linking
+        if (Test-Path "build/vcpkg_installed/${{ matrix.triplet }}/bin") {
+          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll artifacts/${{ matrix.arch }}/
+        }
+        
+        # Create README in artifacts
+        @"
+        Xdelta3 Windows Binary (${{ matrix.arch }})
+        ===============================
+        
+        Built from: ${{ github.repository }}@${{ github.sha }}
+        Build date: $(Get-Date -Format "yyyy-MM-dd")
+        
+        This package contains the xdelta3 command-line utility for Windows.
+        "@ | Out-File -FilePath artifacts/${{ matrix.arch }}/README.txt
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta3-windows-${{ matrix.arch }}
+        path: artifacts/${{ matrix.arch }}
+        retention-days: 90
+
+  # Create a combined release artifact with both architectures
+  package:
+    needs: build-windows
+    runs-on: windows-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release3_1_apl'
+    
+    steps:
+    - name: Download x64 artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: xdelta3-windows-x64
+        path: artifacts/x64
+
+    - name: Download x86 artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: xdelta3-windows-x86
+        path: artifacts/x86
+
+    - name: Create combined package
+      run: |
+        mkdir combined
+        cp -r artifacts/x64 combined/
+        cp -r artifacts/x86 combined/
+        
+        # Create a top-level README
+        @"
+        Xdelta3 Windows Binaries
+        =======================
+        
+        Built from: ${{ github.repository }}@${{ github.sha }}
+        Build date: $(Get-Date -Format "yyyy-MM-dd")
+        
+        This package contains the xdelta3 command-line utility for Windows:
+        
+        - x64/xdelta3.exe - 64-bit version
+        - x86/xdelta3.exe - 32-bit version
+        
+        Usage:
+        ------
+        xdelta3 -h                   # Show help
+        xdelta3 -V                   # Show version
+        xdelta3 -e -s SOURCE TARGET DELTA  # Encode: create delta from source to target
+        xdelta3 -d -s SOURCE DELTA OUTPUT  # Decode: apply delta to source
+        "@ | Out-File -FilePath combined/README.txt
+
+    - name: Upload combined package
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta3-windows-all
+        path: combined
+        retention-days: 90

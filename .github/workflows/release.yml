@@ -1,0 +1,218 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Push events to matching v*, i.e. v1.0, v20.15.10
+
+env:
+  BUILD_TYPE: Release
+  VCPKG_COMMIT: 2023.12.12  # Pin vcpkg to a specific commit/version
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, x86]
+        include:
+          - arch: x64
+            triplet: x64-windows
+            cmake_arch: -A x64
+          - arch: x86
+            triplet: x86-windows
+            cmake_arch: -A Win32
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT }}
+
+    - name: Install dependencies with vcpkg
+      run: |
+        vcpkg install liblzma:${{ matrix.triplet }}
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . ${{ matrix.cmake_arch }} `
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
+          -DXDELTA_ENABLE_LZMA=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+        
+        # Copy executables
+        cp build/${{ env.BUILD_TYPE }}/xdelta3.exe artifacts/
+        
+        # Copy required DLLs if using dynamic linking
+        if (Test-Path "build/vcpkg_installed/${{ matrix.triplet }}/bin") {
+          cp build/vcpkg_installed/${{ matrix.triplet }}/bin/*.dll artifacts/
+        }
+        
+        # Create zip archive
+        Compress-Archive -Path artifacts/* -DestinationPath xdelta3-windows-${{ matrix.arch }}.zip
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta3-windows-${{ matrix.arch }}
+        path: xdelta3-windows-${{ matrix.arch }}.zip
+        retention-days: 90
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y liblzma-dev
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DXDELTA_ENABLE_LZMA=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(nproc)
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+        
+        # Copy executables
+        cp build/xdelta3 artifacts/
+        
+        # Create tarball
+        tar -czvf xdelta3-linux.tar.gz -C artifacts .
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta3-linux
+        path: xdelta3-linux.tar.gz
+        retention-days: 90
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Install dependencies
+      run: |
+        brew install xz
+
+    - name: Configure CMake
+      run: |
+        cmake -B build -S . \
+          -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+          -DXDELTA_ENABLE_LZMA=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }} -j $(sysctl -n hw.ncpu)
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts
+        
+        # Copy executables
+        cp build/xdelta3 artifacts/
+        
+        # Create tarball
+        tar -czvf xdelta3-macos.tar.gz -C artifacts .
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: xdelta3-macos
+        path: xdelta3-macos.tar.gz
+        retention-days: 90
+
+  create-release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Download Windows x64 artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: xdelta3-windows-x64
+        path: ./
+
+    - name: Download Windows x86 artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: xdelta3-windows-x86
+        path: ./
+
+    - name: Download Linux artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: xdelta3-linux
+        path: ./
+
+    - name: Download macOS artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: xdelta3-macos
+        path: ./
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Xdelta3 ${{ steps.get_version.outputs.VERSION }}
+        draft: false
+        prerelease: false
+        files: |
+          xdelta3-windows-x64.zip
+          xdelta3-windows-x86.zip
+          xdelta3-linux.tar.gz
+          xdelta3-macos.tar.gz
+        body: |
+          # Xdelta3 ${{ steps.get_version.outputs.VERSION }}
+          
+          Binary releases for Windows, Linux, and macOS.
+          
+          ## Downloads
+          
+          - [Windows x64](xdelta3-windows-x64.zip)
+          - [Windows x86](xdelta3-windows-x86.zip)
+          - [Linux](xdelta3-linux.tar.gz)
+          - [macOS](xdelta3-macos.tar.gz)
+          
+          ## Usage
+          
+          ```
+          xdelta3 -h                   # Show help
+          xdelta3 -V                   # Show version
+          xdelta3 -e -s SOURCE TARGET DELTA  # Encode: create delta from source to target
+          xdelta3 -d -s SOURCE DELTA OUTPUT  # Decode: apply delta to source
+          ```
