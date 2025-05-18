@@ -192,15 +192,27 @@ if(XDELTA_ENABLE_LZMA)
         # Find the library in vcpkg installed directory
         find_library(VCPKG_LZMA_LIB
             NAMES ${LZMA_LIB_NAME} lzma
-            PATHS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib"
+            PATHS
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib"
+                "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib"
+                "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/lib"
             NO_DEFAULT_PATH
         )
 
         if(VCPKG_LZMA_LIB)
-            target_include_directories(xdelta PRIVATE
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            # Find the include directory
+            if(EXISTS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+                set(VCPKG_LZMA_INCLUDE "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            elseif(EXISTS "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
+                set(VCPKG_LZMA_INCLUDE "${CMAKE_BINARY_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
+            elseif(EXISTS "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
+                set(VCPKG_LZMA_INCLUDE "${CMAKE_SOURCE_DIR}/vcpkg/installed/${VCPKG_TARGET_TRIPLET}/include")
+            endif()
+
+            target_include_directories(xdelta PRIVATE ${VCPKG_LZMA_INCLUDE})
             target_link_libraries(xdelta PRIVATE ${VCPKG_LZMA_LIB})
             message(STATUS "Linking xdelta with vcpkg LibLZMA: ${VCPKG_LZMA_LIB}")
+            message(STATUS "Using vcpkg LibLZMA include: ${VCPKG_LZMA_INCLUDE}")
         else()
             message(WARNING "LibLZMA library not found in vcpkg. LZMA support may not work correctly.")
         endif()
@@ -251,8 +263,7 @@ if(XDELTA_ENABLE_LZMA)
         target_link_libraries(xdelta3 PRIVATE ${LibLZMA_LIBRARIES})
     elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
         # Use the same vcpkg library we found for the main library
-        target_include_directories(xdelta3 PRIVATE
-            "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+        target_include_directories(xdelta3 PRIVATE ${VCPKG_LZMA_INCLUDE})
         target_link_libraries(xdelta3 PRIVATE ${VCPKG_LZMA_LIB})
     endif()
 endif()
@@ -303,8 +314,7 @@ if(XDELTA_BUILD_TESTS)
             target_link_libraries(xdelta3regtest PRIVATE ${LibLZMA_LIBRARIES})
         elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
             # Use the same vcpkg library we found for the main library
-            target_include_directories(xdelta3regtest PRIVATE
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            target_include_directories(xdelta3regtest PRIVATE ${VCPKG_LZMA_INCLUDE})
             target_link_libraries(xdelta3regtest PRIVATE ${VCPKG_LZMA_LIB})
         endif()
     endif()
@@ -349,8 +359,7 @@ if(XDELTA_BUILD_TESTS)
             target_link_libraries(xdelta3decode PRIVATE ${LibLZMA_LIBRARIES})
         elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
             # Use the same vcpkg library we found for the main library
-            target_include_directories(xdelta3decode PRIVATE
-                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            target_include_directories(xdelta3decode PRIVATE ${VCPKG_LZMA_INCLUDE})
             target_link_libraries(xdelta3decode PRIVATE ${VCPKG_LZMA_LIB})
         endif()
     endif()
