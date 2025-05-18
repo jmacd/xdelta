@@ -107,6 +107,57 @@ Copy-Item "build-x64\Release\xdelta.lib" -Destination (Join-Path $x64LibDir "xde
 Copy-Item "xdelta3\xdelta3.h" -Destination $x64IncludeDir -Force
 Copy-Item "xdelta3\xdelta3.c" -Destination $x64IncludeDir -Force
 
+# Configure and build for x86
+Write-Host "Configuring and building for x86..." -ForegroundColor Cyan
+if (-not (Test-Path "build-x86")) {
+    New-Item -ItemType Directory -Path "build-x86" | Out-Null
+}
+
+# Configure for x86
+cmake -B build-x86 -S . -A Win32 -DXDELTA_ENABLE_LZMA=OFF
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to configure for x86" -ForegroundColor Red
+    exit 1
+}
+
+# Build Debug configuration for x86
+Write-Host "Building Debug configuration for x86..."
+cmake --build build-x86 --config Debug
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to build Debug configuration for x86" -ForegroundColor Red
+    exit 1
+}
+
+# Build Release configuration for x86
+Write-Host "Building Release configuration for x86..."
+cmake --build build-x86 --config Release
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Failed to build Release configuration for x86" -ForegroundColor Red
+    exit 1
+}
+
+# Copy x86 binaries
+$x86BinDir = Join-Path $versionDir "x86-windows\bin"
+$x86LibDir = Join-Path $versionDir "x86-windows\lib"
+$x86IncludeDir = Join-Path $versionDir "x86-windows\include\xdelta3"
+
+# Create include directory if it doesn't exist
+if (-not (Test-Path $x86IncludeDir)) {
+    New-Item -ItemType Directory -Path $x86IncludeDir -Force | Out-Null
+}
+
+# Copy Debug binaries for x86
+Copy-Item "build-x86\Debug\xdelta3.exe" -Destination (Join-Path $x86BinDir "xdelta3d.exe") -Force
+Copy-Item "build-x86\Debug\xdelta.lib" -Destination (Join-Path $x86LibDir "xdeltad.lib") -Force
+
+# Copy Release binaries for x86
+Copy-Item "build-x86\Release\xdelta3.exe" -Destination (Join-Path $x86BinDir "xdelta3.exe") -Force
+Copy-Item "build-x86\Release\xdelta.lib" -Destination (Join-Path $x86LibDir "xdelta.lib") -Force
+
+# Copy header files
+Copy-Item "xdelta3\xdelta3.h" -Destination $x86IncludeDir -Force
+Copy-Item "xdelta3\xdelta3.c" -Destination $x86IncludeDir -Force
+
 # Create a README file
 $readmePath = Join-Path $versionDir "README.md"
 @"
@@ -117,6 +168,17 @@ Version: $version
 ## Contents
 
 - x64-windows/
+  - bin/
+    - xdelta3.exe - Release build
+    - xdelta3d.exe - Debug build
+  - lib/
+    - xdelta.lib - Release build
+    - xdeltad.lib - Debug build
+  - include/xdelta3/
+    - xdelta3.h
+    - xdelta3.c
+
+- x86-windows/
   - bin/
     - xdelta3.exe - Release build
     - xdelta3d.exe - Debug build
