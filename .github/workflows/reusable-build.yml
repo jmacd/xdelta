@@ -43,17 +43,15 @@ jobs:
       with:
         fetch-depth: 0
 
-    # Setup cache for build outputs
+    # Setup cache for build outputs - using simplified configuration
     - name: Setup build cache
       uses: actions/cache@v4
       with:
         path: |
           build
-          ${{ github.workspace }}/vcpkg/installed
-          ${{ github.workspace }}/vcpkg/packages
-        key: ${{ runner.os }}-${{ matrix.arch }}-build-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c', 'CMakeLists.txt', 'vcpkg.json') }}
+        key: build-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('CMakeLists.txt') }}
         restore-keys: |
-          ${{ runner.os }}-${{ matrix.arch }}-build-
+          build-${{ runner.os }}-${{ matrix.arch }}-
 
     # Setup vcpkg using vcpkg-action
     - name: Setup vcpkg
@@ -295,16 +293,12 @@ jobs:
         # Copy executables
         cp build/xdelta3 artifacts/linux/
 
-        # Create README in artifacts
-        cat > artifacts/linux/README.txt << EOF
-        Xdelta3 Linux Binary
-        ===================
-
-        Built from: ${{ github.repository }}@${{ github.sha }}
-        Build date: $(date +"%Y-%m-%d")
-
-        This package contains the xdelta3 command-line utility for Linux.
-        EOF
+        # Create README in artifacts - using a simplified approach
+        echo "Creating simplified README file..."
+        echo "Xdelta3 Linux Binary" > artifacts/linux/README.txt
+        echo "===================" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "This package contains the xdelta3 command-line utility for Linux." >> artifacts/linux/README.txt
 
         # Create tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
