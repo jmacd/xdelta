@@ -241,7 +241,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (sfile->size_known)
 	{
-	  short_sprintf (srcszbuf, "source size %s [%"Q"u]",
+	  short_sprintf (srcszbuf, "source size %s [%" Q "u]",
 			 main_format_bcnt (source_size, &srccntbuf),
 			 source_size);
 	}
@@ -254,7 +254,7 @@ main_set_source (xd3_stream *stream, xd3_cmd cmd,
 
       if (option_verbose > 1)
 	{
-	  short_sprintf (nbufs, " #bufs %"W"u", lru_size);
+	  short_sprintf (nbufs, " #bufs %" W "u", lru_size);
 	}
 
       XPR(NT "source %s %s blksize %s window %s%s%s\n",
@@ -305,12 +305,12 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 	      main_blklru_list_remove (blru);
 	      main_blklru_list_push_back (& lru_list, blru);
 	      (*blrup) = blru;
-	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %"Q"u lru_size=%"W"u\n",
+	      IF_DEBUG1 (DP(RINT "[getblk_lru] HIT blkno = %" Q "u lru_size=%" W "u\n",
 		    blkno, lru_size));
 	      return 0;
 	    }
 	}
-      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %"Q"u lru_size=%"W"u\n",
+      IF_DEBUG1 (DP(RINT "[getblk_lru] MISS blkno = %" Q "u lru_size=%" W "u\n",
 		    blkno, lru_size));
     }
 
@@ -555,3 +555,4 @@ main_getblk_func (xd3_stream *stream,
 
   return 0;
 }
+

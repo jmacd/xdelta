@@ -49,7 +49,7 @@ void run_test(const char *buf1, const char *buf2,
 
   accum /= ITERS;
 
-  printf("%s : %qu cycles\n", name, accum);
+  printf("%s : % Q u cycles\n", name, accum);
 }
 
 /* Build w/ -fno-builtin for this to be fast, this assumes that there
@@ -136,3 +136,4 @@ int main(/*int argc, char **argv*/) {
 
   return 0;
 }
+

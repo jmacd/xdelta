@@ -602,7 +602,7 @@ main_format_bcnt (xoff_t r, shortbuf *buf)
 
       if (r >= 100 && r < 1000)
 	{
-	  short_sprintf (*buf, "%"Q"u %s", r, fmts[i]);
+	  short_sprintf (*buf, "%" Q "u %s", r, fmts[i]);
 	  return buf->buf;
 	}
 
@@ -1984,8 +1984,8 @@ main_merge_output (xd3_stream *stream, main_file *ofile)
 		  addr = inst->addr - window_start;
 		}
 	      IF_DEBUG2 ({
-		  XPR(NTR "[merge copy] winpos %"W"u take %"W"u "
-		      "addr %"Q"u mode %u\n",
+		  XPR(NTR "[merge copy] winpos %" W "u take %" W "u "
+		      "addr %" Q "u mode %u\n",
 		      window_pos, take, addr, inst->mode);
 		});
 	      if ((ret = xd3_found_match (recode_stream, window_pos, take,
@@ -2275,7 +2275,7 @@ main_pipe_copier (uint8_t     *pipe_buf,
 
   if (option_verbose && skipped != 0)
     {
-      XPR(NT "skipping %"Q"u bytes in %s\n",
+      XPR(NT "skipping %" Q "u bytes in %s\n",
 	  skipped, ifile->filename);
     }
   return 0;
@@ -4088,3 +4088,4 @@ main_help (void)
   XPR(NTR "       -cf target-x.z.tar.gz.vcdiff target-x.y\n");
   return EXIT_SUCCESS;
 }
+

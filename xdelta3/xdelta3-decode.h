@@ -204,7 +204,7 @@ xd3_decode_section (xd3_stream *stream,
 	  /* No allocation/copy needed */
 	  section->buf = stream->next_in;
 	  sect_take    = section->size;
-	  IF_DEBUG1 (DP(RINT "[xd3_decode_section] zerocopy %"W"u @ %"W"u avail %"W"u\n",
+	  IF_DEBUG1 (DP(RINT "[xd3_decode_section] zerocopy %" W "u @ %" W "u avail %" W "u\n",
 			sect_take, section->pos, stream->avail_in));
 	}
       else
@@ -229,7 +229,7 @@ xd3_decode_section (xd3_stream *stream,
 	      section->buf = section->copied1;
 	    }
 
-	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %"W"u @ %"W"u [need %"W"u] avail %"W"u\n",
+	  IF_DEBUG2 (DP(RINT "[xd3_decode_section] take %" W "u @ %" W "u [need %" W "u] avail %" W "u\n",
 			sect_take, section->pos, sect_need, stream->avail_in));
 	  XD3_ASSERT (section->pos + sect_take <= section->alloc1);
 
@@ -247,7 +247,7 @@ xd3_decode_section (xd3_stream *stream,
 
   if (section->pos < section->size)
     {
-      IF_DEBUG1 (DP(RINT "[xd3_decode_section] further input required %"W"u\n",
+      IF_DEBUG1 (DP(RINT "[xd3_decode_section] further input required %" W "u\n",
 		    section->size - section->pos));
       stream->msg = "further input required";
       return XD3_INPUT;
@@ -770,7 +770,7 @@ xd3_decode_emit (xd3_stream *stream)
 
   if (stream->avail_out != stream->dec_tgtlen)
     {
-      IF_DEBUG2 (DP(RINT "AVAIL_OUT(%"W"u) != DEC_TGTLEN(%"W"u)\n",
+      IF_DEBUG2 (DP(RINT "AVAIL_OUT(%" W "u) != DEC_TGTLEN(%" W "u)\n",
 		    stream->avail_out, stream->dec_tgtlen));
       stream->msg = "wrong window length";
       return XD3_INVALID_INPUT;
@@ -1217,3 +1217,4 @@ xd3_decode_input (xd3_stream *stream)
 }
 
 #endif // _XDELTA3_DECODE_H_
+

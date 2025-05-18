@@ -1421,7 +1421,7 @@ xd3_alloc (xd3_stream *stream,
   if (a != NULL)
     {
       IF_DEBUG (stream->alloc_cnt += 1);
-      IF_DEBUG2 (DP(RINT "[stream %p malloc] size %" W "u ptr %p\n",
+      IF_DEBUG2 (DP(RINT "[stream %p malloc] size %" " W " "u ptr %p\n",
 		    (void*)stream, elts * size, a));
     }
   else
@@ -2590,7 +2590,7 @@ xd3_emit_single (xd3_stream *stream, xd3_rinst *single, uint8_t code)
   int has_size = stream->code_table[code].size1 == 0;
   int ret;
 
-  IF_DEBUG2 (DP(RINT "[emit1] %"W"u %s (%"W"u) code %u\n",
+  IF_DEBUG2 (DP(RINT "[emit1] %" W "u %s (%" W "u) code %u\n",
 		single->pos,
 		xd3_rtype_to_string ((xd3_rtype) single->type, 0),
 		single->size,
@@ -3667,7 +3667,7 @@ xd3_srcwin_setup (xd3_stream *stream)
        * for the second block. */
       src->srclen = xd3_min (src->srclen, xd3_source_eof(src) - src->srcbase);
     }
-  IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %"Q"u len %"W"u\n",
+  IF_DEBUG1 (DP(RINT "[srcwin_setup_constrained] base %" Q "u len %" W "u\n",
 		src->srcbase, src->srclen));
 
   XD3_ASSERT (src->srclen);
@@ -4410,13 +4410,13 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 	    }
 
 	  IF_DEBUG1 (DP(RINT
-			"[srcwin_move_point] async getblk return for %"Q"u: %s\n",
+			"[srcwin_move_point] async getblk return for %" Q "u: %s\n",
 			blkno, xd3_strerror (ret)));
 	  return ret;
 	}
 
       IF_DEBUG1 (DP(RINT
-		    "[srcwin_move_point] block %"Q"u T=%"Q"u S=%"Q"u L=%"Q"u EOF=%"Q"u %s\n",
+		    "[srcwin_move_point] block %" Q "u T=%" Q "u S=%" Q "u L=%" Q "u EOF=%" Q "u %s\n",
 		    blkno,
 		    stream->total_in + stream->input_position,
 		    stream->srcwin_cksum_pos,
@@ -4469,8 +4469,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     }
 
   IF_DEBUG1 (DP(RINT
-		"[srcwin_move_point] exited loop T=%"Q"u "
-		"S=%"Q"u EOF=%"Q"u %s\n",
+		"[srcwin_move_point] exited loop T=%" Q "u "
+		"S=%" Q "u EOF=%" Q "u %s\n",
 		stream->total_in + stream->input_position,
 		stream->srcwin_cksum_pos,
 		xd3_source_eof (stream->src),
@@ -4498,8 +4498,8 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
     ((stream->srcwin_cksum_pos - target_cksum_pos) & stream->src->maskby);
 
   IF_DEBUG2 (DP(RINT
-		"[srcwin_move_point] finished T=%"Q"u "
-		"S=%"Q"u L=%"Q"u EOF=%"Q"u %s again in %"W"u\n",
+		"[srcwin_move_point] finished T=%" Q "u "
+		"S=%" Q "u L=%" Q "u EOF=%" Q "u %s again in %" W "u\n",
 		stream->total_in + stream->input_position,
 		stream->srcwin_cksum_pos,
 		target_cksum_pos,
@@ -4817,3 +4817,4 @@ XD3_TEMPLATE(xd3_string_match_) (xd3_stream *stream)
 
 #endif /* XD3_ENCODER */
 #endif /* __XDELTA3_C_TEMPLATE_PASS__ */
+

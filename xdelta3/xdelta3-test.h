@@ -219,7 +219,7 @@ test_printf_xoff (xd3_stream *stream, int ignore)
 {
   char buf[64];
   xoff_t x = XOFF_T_MAX;
-  snprintf_func (buf, sizeof(buf), "%"Q"u", x);
+  snprintf_func (buf, sizeof(buf), "%" Q "u", x);
   const char *expect = XD3_USE_LARGEFILE64 ?
     "18446744073709551615" : "4294967295";
   if (strcmp (buf, expect) == 0) {
@@ -437,7 +437,7 @@ test_compare_files (const char* tgt, const char *rec)
 	{
 	  if (obuf[i] != rbuf[i])
  	    {
-	      XPR(NT "byte %u (read %u @ %"Q"u) %d != %d\n",
+	      XPR(NT "byte %u (read %u @ %" Q "u) %d != %d\n",
 		  (int)i, (int)oc, offset, obuf[i], rbuf[i]);
 	      diffs++;
 	      return XD3_INTERNAL;
@@ -1421,7 +1421,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	  if ((ret = sec->encode (stream, enc_stream,
 				  in_head, out_head, & cfg)))
 	    {
-	      XPR(NT "test %"W"u: encode: %s", test_i, stream->msg);
+	      XPR(NT "test %" W "u: encode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1460,7 +1460,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 					    compress_size, dec_input,
 					    dec_correct, dec_output)))
 	    {
-	      XPR(NT "test %"W"u: decode: %s", test_i, stream->msg);
+	      XPR(NT "test %" W "u: decode: %s", test_i, stream->msg);
 	      goto fail;
 	    }
 
@@ -1829,7 +1829,7 @@ test_command_line_arguments (xd3_stream *stream, int ignore)
       if (ratio >= TEST_ADD_RATIO + TEST_EPSILON)
 	{
 	  XPR(NT "test encode with size ratio %.4f, "
-	     "expected < %.4f (%"Q"u, %"Q"u)\n",
+	     "expected < %.4f (%" Q "u, %" Q "u)\n",
 	    ratio, TEST_ADD_RATIO + TEST_EPSILON, dsize, tsize);
 	  stream->msg = "strange encoding";
 	  return XD3_INTERNAL;
@@ -2756,14 +2756,14 @@ test_string_matching (xd3_stream *stream, int ignore)
 	    default: CHECK(0);
 	    }
 
-	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"W"u/%"W"u",
+	  snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%" W "u/%" W "u",
 			 inst->pos, inst->size);
 	  rptr += strlen (rptr);
 
 	  if (inst->type == XD3_CPY)
 	    {
 	      *rptr++ = '@';
-	      snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%"Q"u", inst->addr);
+	      snprintf_func (rptr, rbuf+TESTBUFSIZE-rptr, "%" Q "u", inst->addr);
 	      rptr += strlen (rptr);
 	    }
 
@@ -2779,7 +2779,7 @@ test_string_matching (xd3_stream *stream, int ignore)
 
       if (strcmp (rbuf, test->result) != 0)
 	{
-	  XPR(NT "test %"W"u: expected %s: got %s", i, test->result, rbuf);
+	  XPR(NT "test %" W "u: expected %s: got %s", i, test->result, rbuf);
 	  stream->msg = "wrong result";
 	  return XD3_INTERNAL;
 	}
@@ -3020,3 +3020,4 @@ failure:
   return ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 #undef DO_TEST
 }
+

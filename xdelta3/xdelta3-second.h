@@ -65,7 +65,7 @@ static inline int xd3_decode_bits (xd3_stream     *stream,
 
  done:
 
-  IF_DEBUG2 (DP(RINT "(d) %"W"u ", value));
+  IF_DEBUG2 (DP(RINT "(d) %" W "u ", value));
 
   (*valuep) = value;
   return 0;
@@ -235,7 +235,7 @@ static inline int xd3_encode_bits (xd3_stream      *stream,
     }
   while (mask != 1);
 
-  IF_DEBUG2 (DP(RINT "(e) %"W"u ", value));
+  IF_DEBUG2 (DP(RINT "(e) %" W "u ", value));
 
   return 0;
 }
@@ -297,7 +297,7 @@ xd3_encode_secondary (xd3_stream      *stream,
     {
       if (comp_size < orig_size)
 	{
-	  IF_DEBUG1(DP(RINT "[encode_secondary] saved %"W"u bytes: %"W"u -> %"W"u (%0.2f%%)\n",
+	  IF_DEBUG1(DP(RINT "[encode_secondary] saved %" W "u bytes: %" W "u -> %" W "u (%0.2f%%)\n",
 		       orig_size - comp_size, orig_size, comp_size,
 		       100.0 * (double) comp_size / (double) orig_size));
 	}
@@ -319,3 +319,4 @@ xd3_encode_secondary (xd3_stream      *stream,
 }
 #endif /* XD3_ENCODER */
 #endif /* _XDELTA3_SECOND_H_ */
+
