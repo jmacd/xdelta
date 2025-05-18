@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 3.14)
 
+#-------------------------------------------------------------------------------------------
+# vcpkg integration
+#-------------------------------------------------------------------------------------------
+# Automatically detect and use vcpkg toolchain if VCPKG_ROOT is defined
+if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+  set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      CACHE STRING "Vcpkg toolchain file")
+  message(STATUS "Using vcpkg toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
+endif()
+
+# Check if we're using vcpkg
+if(DEFINED CMAKE_TOOLCHAIN_FILE)
+  if(CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg.cmake")
+    set(USING_VCPKG TRUE)
+    message(STATUS "Using vcpkg integration")
+
+    # Support for vcpkg manifest mode (vcpkg.json)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg.json")
+      message(STATUS "Detected vcpkg.json - using manifest mode")
+    endif()
+  endif()
+endif()
 # Set project information
 project(xdelta
     VERSION 3.1.1
@@ -13,11 +35,15 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 option(XDELTA_BUILD_TESTS "Build xdelta tests" OFF)
 option(XDELTA_ENABLE_LZMA "Enable LZMA compression support" OFF)
 option(XDELTA_ENABLE_DOCS "Build documentation" OFF)
+option(XDELTA_USE_STATIC_RUNTIME "Link with static C runtime (Windows only)" OFF)
 
 # Include CMake modules
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+#-------------------------------------------------------------------------------------------
+# Compiler settings
+#-------------------------------------------------------------------------------------------
 # Set C standard
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -28,9 +54,42 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Configure static/dynamic runtime linking on Windows
+if(MSVC AND XDELTA_USE_STATIC_RUNTIME)
+    # Use static runtime
+    foreach(flag_var
+        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+        if(${flag_var} MATCHES "/MD")
+            string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+        endif()
+    endforeach()
+
+    # If using vcpkg, ensure static libraries are used
+    if(USING_VCPKG)
+        set(VCPKG_TARGET_TRIPLET "x64-windows-static" CACHE STRING "")
+        message(STATUS "Using static vcpkg libraries with triplet: ${VCPKG_TARGET_TRIPLET}")
+    endif()
+endif()
+
+#-------------------------------------------------------------------------------------------
+# Dependencies
+#-------------------------------------------------------------------------------------------
 # Find dependencies
 if(XDELTA_ENABLE_LZMA)
+    # When using vcpkg, we can specify static/dynamic linking preference
+    if(USING_VCPKG)
+        if(BUILD_SHARED_LIBS)
+            set(LIBLZMA_USE_STATIC_LIBS OFF)
+        else()
+            set(LIBLZMA_USE_STATIC_LIBS ON)
+        endif()
+    endif()
+
     find_package(LibLZMA REQUIRED)
+    message(STATUS "Found LibLZMA: ${LibLZMA_LIBRARIES}")
 endif()
 
 #-------------------------------------------------------------------------------------------
@@ -96,13 +155,66 @@ target_compile_definitions(xdelta
 )
 
 if(XDELTA_ENABLE_LZMA)
-    target_compile_definitions(xdelta PRIVATE SECONDARY_LZMA=1 LZMA_API_STATIC)
-    target_include_directories(xdelta PRIVATE ${LibLZMA_INCLUDE_DIRS})
-    target_link_libraries(xdelta PRIVATE ${LibLZMA_LIBRARIES})
+    # Add LZMA support
+    target_compile_definitions(xdelta PRIVATE SECONDARY_LZMA=1)
+
+    # Add static API definition if using static LZMA
+    if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
+        target_compile_definitions(xdelta PRIVATE LZMA_API_STATIC)
+    endif()
+
+    # Link against LZMA libraries
+    if(LibLZMA_FOUND)
+        # Standard CMake find_package result
+        target_include_directories(xdelta PRIVATE ${LibLZMA_INCLUDE_DIRS})
+        target_link_libraries(xdelta PRIVATE ${LibLZMA_LIBRARIES})
+        message(STATUS "Linking xdelta with LibLZMA: ${LibLZMA_LIBRARIES}")
+    elseif(USING_VCPKG)
+        # vcpkg-specific handling
+        message(STATUS "Using vcpkg-provided LibLZMA")
+
+        # Determine the correct library name based on build type and linking mode
+        set(LZMA_LIB_NAME "liblzma")
+        if(MSVC)
+            if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
+                # Static library
+                if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+                    set(LZMA_LIB_NAME "liblzmad")
+                endif()
+            else()
+                # Dynamic library
+                if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+                    set(LZMA_LIB_NAME "liblzma")
+                endif()
+            endif()
+        endif()
+
+        # Find the library in vcpkg installed directory
+        find_library(VCPKG_LZMA_LIB
+            NAMES ${LZMA_LIB_NAME} lzma
+            PATHS "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/lib"
+            NO_DEFAULT_PATH
+        )
+
+        if(VCPKG_LZMA_LIB)
+            target_include_directories(xdelta PRIVATE
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            target_link_libraries(xdelta PRIVATE ${VCPKG_LZMA_LIB})
+            message(STATUS "Linking xdelta with vcpkg LibLZMA: ${VCPKG_LZMA_LIB}")
+        else()
+            message(WARNING "LibLZMA library not found in vcpkg. LZMA support may not work correctly.")
+        endif()
+    else()
+        message(WARNING "LibLZMA not found. LZMA support may not work correctly.")
+    endif()
 endif()
 
 if(WIN32)
-    target_compile_definitions(xdelta PRIVATE _WIN32=1 XD3_WIN32=1)
+    target_compile_definitions(xdelta PRIVATE
+        _WIN32=1
+        XD3_WIN32=1
+        _CRT_SECURE_NO_WARNINGS
+    )
 endif()
 
 #-------------------------------------------------------------------------------------------
@@ -124,13 +236,33 @@ target_compile_definitions(xdelta3
 )
 
 if(XDELTA_ENABLE_LZMA)
-    target_compile_definitions(xdelta3 PRIVATE SECONDARY_LZMA=1 LZMA_API_STATIC)
-    target_include_directories(xdelta3 PRIVATE ${LibLZMA_INCLUDE_DIRS})
-    target_link_libraries(xdelta3 PRIVATE ${LibLZMA_LIBRARIES})
+    # Add LZMA support
+    target_compile_definitions(xdelta3 PRIVATE SECONDARY_LZMA=1)
+
+    # Add static API definition if using static LZMA
+    if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
+        target_compile_definitions(xdelta3 PRIVATE LZMA_API_STATIC)
+    endif()
+
+    # Link against LZMA libraries
+    if(LibLZMA_FOUND)
+        # Standard CMake find_package result
+        target_include_directories(xdelta3 PRIVATE ${LibLZMA_INCLUDE_DIRS})
+        target_link_libraries(xdelta3 PRIVATE ${LibLZMA_LIBRARIES})
+    elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
+        # Use the same vcpkg library we found for the main library
+        target_include_directories(xdelta3 PRIVATE
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+        target_link_libraries(xdelta3 PRIVATE ${VCPKG_LZMA_LIB})
+    endif()
 endif()
 
 if(WIN32)
-    target_compile_definitions(xdelta3 PRIVATE _WIN32=1 XD3_WIN32=1)
+    target_compile_definitions(xdelta3 PRIVATE
+        _WIN32=1
+        XD3_WIN32=1
+        _CRT_SECURE_NO_WARNINGS
+    )
 endif()
 
 # Optional test executables
@@ -156,13 +288,33 @@ if(XDELTA_BUILD_TESTS)
     )
 
     if(XDELTA_ENABLE_LZMA)
-        target_compile_definitions(xdelta3regtest PRIVATE SECONDARY_LZMA=1 LZMA_API_STATIC)
-        target_include_directories(xdelta3regtest PRIVATE ${LibLZMA_INCLUDE_DIRS})
-        target_link_libraries(xdelta3regtest PRIVATE ${LibLZMA_LIBRARIES})
+        # Add LZMA support
+        target_compile_definitions(xdelta3regtest PRIVATE SECONDARY_LZMA=1)
+
+        # Add static API definition if using static LZMA
+        if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
+            target_compile_definitions(xdelta3regtest PRIVATE LZMA_API_STATIC)
+        endif()
+
+        # Link against LZMA libraries
+        if(LibLZMA_FOUND)
+            # Standard CMake find_package result
+            target_include_directories(xdelta3regtest PRIVATE ${LibLZMA_INCLUDE_DIRS})
+            target_link_libraries(xdelta3regtest PRIVATE ${LibLZMA_LIBRARIES})
+        elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
+            # Use the same vcpkg library we found for the main library
+            target_include_directories(xdelta3regtest PRIVATE
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            target_link_libraries(xdelta3regtest PRIVATE ${VCPKG_LZMA_LIB})
+        endif()
     endif()
 
     if(WIN32)
-        target_compile_definitions(xdelta3regtest PRIVATE _WIN32=1 XD3_WIN32=1)
+        target_compile_definitions(xdelta3regtest PRIVATE
+            _WIN32=1
+            XD3_WIN32=1
+            _CRT_SECURE_NO_WARNINGS
+        )
     endif()
 
     # xdelta3decode
@@ -182,13 +334,33 @@ if(XDELTA_BUILD_TESTS)
     )
 
     if(XDELTA_ENABLE_LZMA)
-        target_compile_definitions(xdelta3decode PRIVATE SECONDARY_LZMA=1 LZMA_API_STATIC)
-        target_include_directories(xdelta3decode PRIVATE ${LibLZMA_INCLUDE_DIRS})
-        target_link_libraries(xdelta3decode PRIVATE ${LibLZMA_LIBRARIES})
+        # Add LZMA support
+        target_compile_definitions(xdelta3decode PRIVATE SECONDARY_LZMA=1)
+
+        # Add static API definition if using static LZMA
+        if(NOT BUILD_SHARED_LIBS OR LIBLZMA_USE_STATIC_LIBS)
+            target_compile_definitions(xdelta3decode PRIVATE LZMA_API_STATIC)
+        endif()
+
+        # Link against LZMA libraries
+        if(LibLZMA_FOUND)
+            # Standard CMake find_package result
+            target_include_directories(xdelta3decode PRIVATE ${LibLZMA_INCLUDE_DIRS})
+            target_link_libraries(xdelta3decode PRIVATE ${LibLZMA_LIBRARIES})
+        elseif(USING_VCPKG AND VCPKG_LZMA_LIB)
+            # Use the same vcpkg library we found for the main library
+            target_include_directories(xdelta3decode PRIVATE
+                "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/include")
+            target_link_libraries(xdelta3decode PRIVATE ${VCPKG_LZMA_LIB})
+        endif()
     endif()
 
     if(WIN32)
-        target_compile_definitions(xdelta3decode PRIVATE _WIN32=1 XD3_WIN32=1)
+        target_compile_definitions(xdelta3decode PRIVATE
+            _WIN32=1
+            XD3_WIN32=1
+            _CRT_SECURE_NO_WARNINGS
+        )
     endif()
 endif()
 
