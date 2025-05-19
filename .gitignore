@@ -38,3 +38,4 @@ vcpkg_installed/
 .vs/
 CMakeUserPresets.json
 xdelta-binaries/
+release-files/
