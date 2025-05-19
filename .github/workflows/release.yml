@@ -849,56 +849,17 @@ jobs:
         VERSION="${{ steps.get_version.outputs.VERSION }}"
         echo "Preparing release files for version $VERSION..."
 
-        # Create a directory for all release files
-        mkdir -p release-files
+        # Make the script executable
+        chmod +x "${{ github.workspace }}/.github/scripts/prepare-release-files.sh"
 
-        # Handle Windows x64 artifacts
-        if [ -f "xdelta3-windows-x64.zip" ]; then
-          echo "✅ Found Windows x64 artifact"
-          cp xdelta3-windows-x64.zip release-files/
-        elif [ -d "windows-x64-artifacts" ]; then
-          echo "Found Windows x64 directory artifact"
-          zip -r release-files/xdelta3-windows-x64.zip windows-x64-artifacts/
-        else
-          echo "❌ Windows x64 artifact not found"
+        # Run the script with version and output directory
+        echo "Running script: ${{ github.workspace }}/.github/scripts/prepare-release-files.sh $VERSION release-files"
+        "${{ github.workspace }}/.github/scripts/prepare-release-files.sh" "$VERSION" "release-files"
+
+        # Verify the script ran successfully
+        if [ ! -d "release-files" ]; then
+          echo "❌ Release files directory not found"
           exit 1
-        fi
-
-        # Handle Windows x86 artifacts
-        if [ -f "xdelta3-windows-x86.zip" ]; then
-          echo "✅ Found Windows x86 artifact"
-          cp xdelta3-windows-x86.zip release-files/
-        elif [ -d "windows-x86-artifacts" ]; then
-          echo "Found Windows x86 directory artifact"
-          zip -r release-files/xdelta3-windows-x86.zip windows-x86-artifacts/
-        else
-          echo "❌ Windows x86 artifact not found"
-          exit 1
-        fi
-
-        # Handle Linux artifacts
-        if [ -f "xdelta3-linux.tar.gz" ]; then
-          echo "✅ Found Linux artifact"
-          cp xdelta3-linux.tar.gz release-files/
-        elif [ -d "xdelta3-linux" ]; then
-          echo "Found Linux directory artifact"
-          tar -czf release-files/xdelta3-linux.tar.gz xdelta3-linux/
-        else
-          echo "❌ Linux artifact not found"
-          exit 1
-        fi
-
-        # Handle macOS artifacts
-        if [ -f "xdelta3-macos.tar.gz" ]; then
-          echo "✅ Found macOS artifact"
-          cp xdelta3-macos.tar.gz release-files/
-        elif [ -d "xdelta3-macos" ]; then
-          echo "Found macOS directory artifact"
-          tar -czf release-files/xdelta3-macos.tar.gz xdelta3-macos/
-        else
-          echo "⚠️ macOS artifact not found (this is expected)"
-          # Create an empty file as a placeholder
-          echo "This is a placeholder for macOS binaries which are currently not supported." > release-files/xdelta3-macos.tar.gz
         fi
 
         # Handle vcpkg binaries

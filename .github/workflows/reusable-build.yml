@@ -43,6 +43,18 @@ jobs:
       with:
         fetch-depth: 0
 
+    # Make all scripts executable
+    - name: Make scripts executable
+      shell: bash
+      run: |
+        if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+        else
+          echo "Script not found, making scripts executable manually"
+          find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+        fi
+
     # Setup ccache for faster builds
     - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2
@@ -205,100 +217,33 @@ jobs:
             Write-Host "No DLLs found at: $dllPath (this may be normal for static builds)"
         }
 
-        # Create README from platform-specific template file
-        Write-Host "Creating README file from platform-specific template..."
+        # Create README using the external script
+        Write-Host "Creating README file using script..."
 
-        # Define template path with backslashes for Windows environment
-        $templatePath = "${{ github.workspace }}\.github\templates\README.windows.txt"
-        Write-Host "Looking for template at: $templatePath"
+        # Make the script executable (in case it's not)
+        $scriptPath = "${{ github.workspace }}\.github\scripts\create-readme-windows.ps1"
 
-        # List the template directory contents for debugging
-        Write-Host "Listing template directory contents:"
-        Get-ChildItem -Path "${{ github.workspace }}\.github\templates" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
-
-        # Create README destination path
-        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-
-        # Copy the template file with improved error handling
+        # Run the script with the artifacts directory as parameter
+        Write-Host "Running script: $scriptPath -ArtifactsDir $artifactsDir"
         try {
-            # Check if template exists
-            if (Test-Path $templatePath) {
-                Write-Host "Platform-specific template file found, copying..."
-                # Use -ErrorAction Stop to ensure errors are caught in the catch block
-                Copy-Item -Path $templatePath -Destination $readmePath -Force -ErrorAction Stop
-                Write-Host "Template copied successfully to: $readmePath"
+            & "$scriptPath" -ArtifactsDir $artifactsDir
 
-                # Verify the copy was successful
-                if (Test-Path $readmePath) {
-                    Write-Host "README.txt verified at: $readmePath"
-                    Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
-                } else {
-                    throw "Copy appeared to succeed but README.txt not found at: $readmePath"
-                }
+            # Verify the README was created
+            $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+            if (Test-Path $readmePath) {
+                Write-Host "README.txt verified at: $readmePath"
+                Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
             } else {
-                # Try alternative path with forward slashes
-                $altTemplatePath = "${{ github.workspace }}/.github/templates/README.windows.txt"
-                Write-Host "Template not found, trying alternative path: $altTemplatePath"
-
-                if (Test-Path $altTemplatePath) {
-                    Write-Host "Template found at alternative path, copying..."
-                    Copy-Item -Path $altTemplatePath -Destination $readmePath -Force -ErrorAction Stop
-                    Write-Host "Template copied successfully from alternative path to: $readmePath"
-                } else {
-                    Write-Host "WARNING: README template file not found at either path, creating a fallback README..."
-                    # Create a simple README as fallback
-                    $readmeContent = "Xdelta3 Windows Binary`r`n"
-                    $readmeContent += "======================`r`n`r`n"
-                    $readmeContent += "This package contains the xdelta3 command-line utility for Windows.`r`n`r`n"
-                    $readmeContent += "Command Line Syntax`r`n"
-                    $readmeContent += "-------------------`r`n`r`n"
-                    $readmeContent += "make patch:`r`n`r`n"
-                    $readmeContent += "  xdelta3.exe -e -s old_file new_file delta_file`r`n`r`n"
-                    $readmeContent += "apply patch:`r`n`r`n"
-                    $readmeContent += "  xdelta3.exe -d -s old_file delta_file decoded_new_file`r`n`r`n"
-                    $readmeContent += "standard options:`r`n"
-                    $readmeContent += "   -0 .. -9     compression level`r`n"
-                    $readmeContent += "   -c           use stdout`r`n"
-                    $readmeContent += "   -d           decompress`r`n"
-                    $readmeContent += "   -e           compress`r`n"
-                    $readmeContent += "   -f           force (overwrite, ignore trailing garbage)`r`n"
-                    $readmeContent += "   -h           show help`r`n"
-                    $readmeContent += "   -q           be quiet`r`n"
-                    $readmeContent += "   -v           be verbose (max 2)`r`n"
-                    $readmeContent += "   -V           show version`r`n`r`n"
-                    $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
-                    # Write the fallback README
-                    Set-Content -Path $readmePath -Value $readmeContent
-                    Write-Host "Fallback README created successfully"
-                }
+                Write-Host "WARNING: README.txt not found after running script"
             }
         } catch {
-            Write-Host "Error copying template: $_"
+            Write-Host "Error running README script: $_"
             Write-Host "Stack trace: $($_.ScriptStackTrace)"
-            Write-Host "WARNING: Failed to copy README template, creating a fallback README..."
+            Write-Host "WARNING: Creating a simple README as fallback..."
+
             # Create a simple README as fallback
-            $readmeContent = "Xdelta3 Windows Binary`r`n"
-            $readmeContent += "======================`r`n`r`n"
-            $readmeContent += "This package contains the xdelta3 command-line utility for Windows.`r`n`r`n"
-            $readmeContent += "Command Line Syntax`r`n"
-            $readmeContent += "-------------------`r`n`r`n"
-            $readmeContent += "make patch:`r`n`r`n"
-            $readmeContent += "  xdelta3.exe -e -s old_file new_file delta_file`r`n`r`n"
-            $readmeContent += "apply patch:`r`n`r`n"
-            $readmeContent += "  xdelta3.exe -d -s old_file delta_file decoded_new_file`r`n`r`n"
-            $readmeContent += "standard options:`r`n"
-            $readmeContent += "   -0 .. -9     compression level`r`n"
-            $readmeContent += "   -c           use stdout`r`n"
-            $readmeContent += "   -d           decompress`r`n"
-            $readmeContent += "   -e           compress`r`n"
-            $readmeContent += "   -f           force (overwrite, ignore trailing garbage)`r`n"
-            $readmeContent += "   -h           show help`r`n"
-            $readmeContent += "   -q           be quiet`r`n"
-            $readmeContent += "   -v           be verbose (max 2)`r`n"
-            $readmeContent += "   -V           show version`r`n`r`n"
-            $readmeContent += "For full documentation, run: xdelta3.exe --help`r`n"
-            # Write the fallback README
-            Set-Content -Path $readmePath -Value $readmeContent
+            $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+            Set-Content -Path $readmePath -Value "Xdelta3 Windows Binary`r`n======================`r`n`r`nThis package contains the xdelta3 command-line utility for Windows.`r`n`r`nFor usage information, run: xdelta3.exe --help"
             Write-Host "Fallback README created successfully"
         }
 
@@ -358,6 +303,9 @@ jobs:
       run: |
         Write-Host "Verifying artifacts before upload..."
 
+        # Use the verification script
+        $scriptPath = "${{ github.workspace }}\.github\scripts\verify-artifacts.ps1"
+
         # Check if we're using archives or directories
         if (${{ inputs.create_archives }}) {
             $artifactPath = "xdelta3-windows-${{ matrix.arch }}.zip"
@@ -370,20 +318,32 @@ jobs:
                 Write-Host "Last modified: $($fileInfo.LastWriteTime)"
             } else {
                 Write-Host "::error::Archive not found: $artifactPath"
-                # Don't exit with error, let the upload step handle it
-                # This way we can see the full logs
             }
         } else {
             $artifactPath = "artifacts/windows-${{ matrix.arch }}"
             Write-Host "Checking directory: $artifactPath"
 
             if (Test-Path $artifactPath) {
-                $files = Get-ChildItem -Path $artifactPath -Recurse
-                Write-Host "Directory exists with $($files.Count) files"
-                $files | ForEach-Object { Write-Host "- $($_.FullName)" }
+                # Run the verification script
+                Write-Host "Running verification script: $scriptPath -ArtifactsDir $artifactPath -Platform windows -Arch ${{ matrix.arch }}"
+                try {
+                    & "$scriptPath" -ArtifactsDir $artifactPath -Platform windows -Arch ${{ matrix.arch }}
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "✅ Artifacts verification passed"
+                    } else {
+                        Write-Host "⚠️ Artifacts verification failed with exit code: $LASTEXITCODE"
+                    }
+                } catch {
+                    Write-Host "Error running verification script: $_"
+                    Write-Host "Falling back to basic verification..."
+
+                    # Basic verification
+                    $files = Get-ChildItem -Path $artifactPath -Recurse
+                    Write-Host "Directory exists with $($files.Count) files"
+                    $files | ForEach-Object { Write-Host "- $($_.FullName)" }
+                }
             } else {
                 Write-Host "::error::Directory not found: $artifactPath"
-                # Don't exit with error, let the upload step handle it
             }
         }
 
@@ -451,6 +411,17 @@ jobs:
       with:
         fetch-depth: 0
 
+    # Make all scripts executable
+    - name: Make scripts executable
+      run: |
+        if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+        else
+          echo "Script not found, making scripts executable manually"
+          find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+        fi
+
     # Setup ccache for faster builds
     - name: Setup ccache
       uses: hendrikmuhs/ccache-action@v1.2
@@ -507,35 +478,15 @@ jobs:
         # Copy executables
         cp build/xdelta3 artifacts/linux/
 
-        # Create README from platform-specific template
-        echo "Creating README file from platform-specific template..."
+        # Create README using the external script
+        echo "Creating README file using script..."
 
-        # Define platform-specific template path
-        PLATFORM_TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.linux.txt"
-        echo "Looking for platform-specific template at: $PLATFORM_TEMPLATE_PATH"
+        # Make the script executable
+        chmod +x "${{ github.workspace }}/.github/scripts/create-readme-linux.sh"
 
-        # List the template directory contents for debugging
-        echo "Listing template directory contents:"
-        ls -la "${{ github.workspace }}/.github/templates/" || echo "Failed to list template directory"
-
-        # Copy the template file with improved error handling
-        if [ -f "$PLATFORM_TEMPLATE_PATH" ]; then
-          echo "Platform-specific template found, copying..."
-          # Use cp with verbose flag for better debugging
-          cp -v "$PLATFORM_TEMPLATE_PATH" artifacts/linux/README.txt
-
-          # Verify the copy was successful
-          if [ -f "artifacts/linux/README.txt" ]; then
-            echo "Template copied successfully, showing first few lines:"
-            head -n 3 artifacts/linux/README.txt
-          else
-            echo "ERROR: Copy command appeared to succeed but README.txt not found"
-            exit 1
-          fi
-        else
-          echo "ERROR: README template file not found at: $PLATFORM_TEMPLATE_PATH"
-          exit 1
-        fi
+        # Run the script with the artifacts directory as parameter
+        echo "Running script: ${{ github.workspace }}/.github/scripts/create-readme-linux.sh artifacts/linux"
+        "${{ github.workspace }}/.github/scripts/create-readme-linux.sh" artifacts/linux
 
         # Verify README was created successfully
         if [ -f "artifacts/linux/README.txt" ]; then
@@ -549,6 +500,46 @@ jobs:
         if [ "${{ inputs.create_archives }}" = "true" ]; then
           tar -czvf xdelta3-linux.tar.gz -C artifacts/linux .
         fi
+
+    # Add a verification step before uploading artifacts
+    - name: Verify artifacts before upload
+      continue-on-error: true  # Continue even if this step fails
+      run: |
+        echo "Verifying artifacts before upload..."
+
+        # Make the script executable
+        chmod +x "${{ github.workspace }}/.github/scripts/verify-artifacts.sh"
+
+        # Check if we're using archives or directories
+        if [ "${{ inputs.create_archives }}" = "true" ]; then
+            ARTIFACT_PATH="xdelta3-linux.tar.gz"
+            echo "Checking archive: $ARTIFACT_PATH"
+
+            if [ -f "$ARTIFACT_PATH" ]; then
+                echo "Archive exists: $ARTIFACT_PATH"
+                ls -la "$ARTIFACT_PATH"
+            else
+                echo "::error::Archive not found: $ARTIFACT_PATH"
+            fi
+        else
+            ARTIFACT_PATH="artifacts/linux"
+            echo "Checking directory: $ARTIFACT_PATH"
+
+            if [ -d "$ARTIFACT_PATH" ]; then
+                # Run the verification script
+                echo "Running verification script: ${{ github.workspace }}/.github/scripts/verify-artifacts.sh $ARTIFACT_PATH linux"
+                "${{ github.workspace }}/.github/scripts/verify-artifacts.sh" "$ARTIFACT_PATH" linux ""
+                if [ $? -eq 0 ]; then
+                    echo "✅ Artifacts verification passed"
+                else
+                    echo "⚠️ Artifacts verification failed with exit code: $?"
+                fi
+            else
+                echo "::error::Directory not found: $ARTIFACT_PATH"
+            fi
+        fi
+
+        echo "Artifact verification complete"
 
     - name: Upload artifacts (directory)
       if: ${{ !inputs.create_archives }}
@@ -583,6 +574,17 @@ jobs:
       with:
         fetch-depth: 0
 
+    # Make all scripts executable
+    - name: Make scripts executable
+      run: |
+        if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+        else
+          echo "Script not found, making scripts executable manually"
+          find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+        fi
+
     - name: Skip macOS build
       run: |
         echo "::warning::macOS build is temporarily disabled due to C++11 literal suffix issues"
@@ -590,93 +592,68 @@ jobs:
         # Create empty artifacts directory for the package job
         mkdir -p artifacts/macos
 
-        # Create README from platform-specific template
-        echo "Creating README file from platform-specific template..."
+        # Create README using the external script
+        echo "Creating README file using script..."
 
-        # Define platform-specific template path
-        PLATFORM_TEMPLATE_PATH="${{ github.workspace }}/.github/templates/README.macos.txt"
-        echo "Looking for platform-specific template at: $PLATFORM_TEMPLATE_PATH"
+        # Make the script executable
+        chmod +x "${{ github.workspace }}/.github/scripts/create-readme-macos.sh"
 
-        # List the template directory contents for debugging
-        echo "Listing template directory contents:"
-        ls -la "${{ github.workspace }}/.github/templates/" || echo "Failed to list template directory"
+        # Run the script with the artifacts directory as parameter
+        echo "Running script: ${{ github.workspace }}/.github/scripts/create-readme-macos.sh artifacts/macos"
+        "${{ github.workspace }}/.github/scripts/create-readme-macos.sh" artifacts/macos
 
-        # Create a fallback README if template is not found
-        if [ ! -f "$PLATFORM_TEMPLATE_PATH" ]; then
-          echo "WARNING: Template file not found, creating a fallback README..."
-          mkdir -p "${{ github.workspace }}/.github/templates/"
-          # Create the template file with individual echo statements to avoid YAML parsing issues
-          echo "Xdelta3 macOS Binary" > "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "======================" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "This package contains the xdelta3 command-line utility for macOS." >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "Command Line Syntax" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "-------------------" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "make patch:" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "  xdelta3 -e -s old_file new_file delta_file" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "apply patch:" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "  xdelta3 -d -s old_file delta_file decoded_new_file" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "standard options:" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -0 .. -9     compression level" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -c           use stdout" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -d           decompress" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -e           compress" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -f           force (overwrite, ignore trailing garbage)" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -h           show help" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -q           be quiet" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -v           be verbose (max 2)" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "   -V           show version" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "For full documentation, run: xdelta3 --help" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "" >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "NOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues." >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "Please use Windows or Linux platforms." >> "${{ github.workspace }}/.github/templates/README.macos.txt"
-          echo "Fallback README template created successfully"
-        fi
-
-        # Copy the template file with improved error handling
-        if [ -f "$PLATFORM_TEMPLATE_PATH" ]; then
-          echo "Platform-specific template found, copying..."
-          # Use cp with verbose flag for better debugging
-          cp -v "$PLATFORM_TEMPLATE_PATH" artifacts/macos/README.txt
-
-          # Verify the copy was successful
-          if [ -f "artifacts/macos/README.txt" ]; then
-            echo "Template copied successfully, showing first few lines:"
-            head -n 3 artifacts/macos/README.txt
-          else
-            echo "ERROR: Copy command appeared to succeed but README.txt not found"
-            # Create a simple README instead of failing
-            echo "Creating a simple README as fallback..."
-            mkdir -p artifacts/macos
-            echo "Xdelta3 macOS Binary (Temporarily Disabled)" > artifacts/macos/README.txt
-            echo "==============================================" >> artifacts/macos/README.txt
-            echo "" >> artifacts/macos/README.txt
-            echo "NOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues." >> artifacts/macos/README.txt
-            echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
-          fi
+        # Verify README was created successfully
+        if [ -f "artifacts/macos/README.txt" ]; then
+          echo "README.txt created successfully"
         else
-          echo "ERROR: README template file not found at: $PLATFORM_TEMPLATE_PATH"
-          # Create a simple README instead of failing
-          echo "Creating a simple README as fallback..."
-          mkdir -p artifacts/macos
-          echo "Xdelta3 macOS Binary (Temporarily Disabled)" > artifacts/macos/README.txt
-          echo "==============================================" >> artifacts/macos/README.txt
-          echo "" >> artifacts/macos/README.txt
-          echo "NOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues." >> artifacts/macos/README.txt
-          echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
+          echo "ERROR: Failed to create README.txt"
+          exit 1
         fi
 
         # Create empty tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
           tar -czvf xdelta3-macos.tar.gz -C artifacts/macos .
         fi
+
+    # Add a verification step before uploading artifacts
+    - name: Verify artifacts before upload
+      continue-on-error: true  # Continue even if this step fails
+      run: |
+        echo "Verifying artifacts before upload..."
+
+        # Make the script executable
+        chmod +x "${{ github.workspace }}/.github/scripts/verify-artifacts.sh"
+
+        # Check if we're using archives or directories
+        if [ "${{ inputs.create_archives }}" = "true" ]; then
+            ARTIFACT_PATH="xdelta3-macos.tar.gz"
+            echo "Checking archive: $ARTIFACT_PATH"
+
+            if [ -f "$ARTIFACT_PATH" ]; then
+                echo "Archive exists: $ARTIFACT_PATH"
+                ls -la "$ARTIFACT_PATH"
+            else
+                echo "::error::Archive not found: $ARTIFACT_PATH"
+            fi
+        else
+            ARTIFACT_PATH="artifacts/macos"
+            echo "Checking directory: $ARTIFACT_PATH"
+
+            if [ -d "$ARTIFACT_PATH" ]; then
+                # Run the verification script
+                echo "Running verification script: ${{ github.workspace }}/.github/scripts/verify-artifacts.sh $ARTIFACT_PATH macos"
+                "${{ github.workspace }}/.github/scripts/verify-artifacts.sh" "$ARTIFACT_PATH" macos ""
+                if [ $? -eq 0 ]; then
+                    echo "✅ Artifacts verification passed"
+                else
+                    echo "⚠️ Artifacts verification failed with exit code: $?"
+                fi
+            else
+                echo "::error::Directory not found: $ARTIFACT_PATH"
+            fi
+        fi
+
+        echo "Artifact verification complete"
 
     - name: Upload artifacts (directory)
       if: ${{ !inputs.create_archives }}
