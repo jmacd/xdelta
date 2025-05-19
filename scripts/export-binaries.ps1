@@ -206,10 +206,47 @@ Include xdelta3.h in your project and link against xdelta.lib.
 Licensed under the Apache License, Version 2.0
 "@ | Out-File -FilePath $readmePath -Encoding utf8
 
+# Verify binary files before creating ZIP
+Write-Host "Verifying binary files..." -ForegroundColor Cyan
+
+# Check x64 binaries
+$x64ExePath = Join-Path $x64BinDir "xdelta3.exe"
+$x64LibPath = Join-Path $x64LibDir "xdelta.lib"
+
+if ((Test-Path $x64ExePath) -and (Get-Item $x64ExePath).Length -gt 0 -and
+    (Test-Path $x64LibPath) -and (Get-Item $x64LibPath).Length -gt 0) {
+    Write-Host "x64 binaries verified: OK" -ForegroundColor Green
+} else {
+    Write-Host "ERROR: x64 binaries are missing or empty" -ForegroundColor Red
+    Write-Host "xdelta3.exe: $(if (Test-Path $x64ExePath) { (Get-Item $x64ExePath).Length } else { 'Not found' })" -ForegroundColor Red
+    Write-Host "xdelta.lib: $(if (Test-Path $x64LibPath) { (Get-Item $x64LibPath).Length } else { 'Not found' })" -ForegroundColor Red
+    exit 1
+}
+
+# Check x86 binaries
+$x86ExePath = Join-Path $x86BinDir "xdelta3.exe"
+$x86LibPath = Join-Path $x86LibDir "xdelta.lib"
+
+if ((Test-Path $x86ExePath) -and (Get-Item $x86ExePath).Length -gt 0 -and
+    (Test-Path $x86LibPath) -and (Get-Item $x86LibPath).Length -gt 0) {
+    Write-Host "x86 binaries verified: OK" -ForegroundColor Green
+} else {
+    Write-Host "ERROR: x86 binaries are missing or empty" -ForegroundColor Red
+    Write-Host "xdelta3.exe: $(if (Test-Path $x86ExePath) { (Get-Item $x86ExePath).Length } else { 'Not found' })" -ForegroundColor Red
+    Write-Host "xdelta.lib: $(if (Test-Path $x86LibPath) { (Get-Item $x86LibPath).Length } else { 'Not found' })" -ForegroundColor Red
+    exit 1
+}
+
 # Create a ZIP file
 $zipPath = Join-Path $OutputDir "xdelta-$version-windows.zip"
 Write-Host "Creating ZIP file: $zipPath" -ForegroundColor Cyan
 Compress-Archive -Path $versionDir -DestinationPath $zipPath -Force
+
+# Verify the ZIP file was created successfully
+if (-not (Test-Path $zipPath)) {
+    Write-Host "ERROR: Failed to create ZIP file" -ForegroundColor Red
+    exit 1
+}
 
 # Calculate SHA512 hash for vcpkg
 $sha512 = (Get-FileHash -Path $zipPath -Algorithm SHA512).Hash.ToLower()
@@ -217,6 +254,38 @@ Write-Host "SHA512: $sha512" -ForegroundColor Green
 
 # Create a hash file for reference
 $sha512 | Out-File -FilePath "$zipPath.sha512" -Encoding utf8 -NoNewline
+
+# Verify the ZIP file contains valid binaries
+Write-Host "Verifying ZIP file contents..." -ForegroundColor Cyan
+$tempExtractDir = Join-Path $env:TEMP "xdelta-verify"
+if (Test-Path $tempExtractDir) {
+    Remove-Item -Path $tempExtractDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $tempExtractDir -Force | Out-Null
+
+try {
+    # Extract the ZIP file
+    Expand-Archive -Path $zipPath -DestinationPath $tempExtractDir -Force
+
+    # Check if the extracted files have content
+    $extractedExePath = Join-Path $tempExtractDir "$version\x64-windows\bin\xdelta3.exe"
+    $extractedLibPath = Join-Path $tempExtractDir "$version\x64-windows\lib\xdelta.lib"
+
+    if ((Test-Path $extractedExePath) -and (Get-Item $extractedExePath).Length -gt 0 -and
+        (Test-Path $extractedLibPath) -and (Get-Item $extractedLibPath).Length -gt 0) {
+        Write-Host "ZIP file contents verified: OK" -ForegroundColor Green
+    } else {
+        Write-Host "ERROR: ZIP file contains missing or empty files" -ForegroundColor Red
+        Write-Host "xdelta3.exe: $(if (Test-Path $extractedExePath) { (Get-Item $extractedExePath).Length } else { 'Not found' })" -ForegroundColor Red
+        Write-Host "xdelta.lib: $(if (Test-Path $extractedLibPath) { (Get-Item $extractedLibPath).Length } else { 'Not found' })" -ForegroundColor Red
+        exit 1
+    }
+} finally {
+    # Clean up
+    if (Test-Path $tempExtractDir) {
+        Remove-Item -Path $tempExtractDir -Recurse -Force
+    }
+}
 
 Write-Host "Export completed successfully!" -ForegroundColor Green
 Write-Host "Binaries exported to: $zipPath"

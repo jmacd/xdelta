@@ -530,7 +530,46 @@ jobs:
 
         # vcpkg binaries
         VERSION="${{ steps.get_version.outputs.VERSION }}"
-        if [ -f "xdelta-${VERSION}-windows.zip" ]; then
+        echo "Generating vcpkg binaries using export-binaries.ps1 script..."
+
+        # Run export-binaries.ps1 script to generate binaries
+        if [ -f "scripts/export-binaries.ps1" ]; then
+          echo "Found export-binaries.ps1 script, running it..."
+          pwsh -ExecutionPolicy Bypass -File scripts/export-binaries.ps1 -OutputDir ./xdelta-binaries
+
+          if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip" ]; then
+            echo "Successfully generated vcpkg binaries"
+            cp "xdelta-binaries/xdelta-${VERSION}-windows.zip" release-files/
+
+            if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" ]; then
+              cp "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" release-files/
+            else
+              # Generate SHA512 if not found
+              sha512sum "xdelta-binaries/xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+            fi
+
+            # Verify the generated binaries are not empty
+            echo "Verifying generated binaries..."
+            mkdir -p temp-extract
+            unzip -q "xdelta-binaries/xdelta-${VERSION}-windows.zip" -d temp-extract
+
+            # Check if the extracted files have content
+            if [ -s "temp-extract/3.1.0/x64-windows/bin/xdelta3.exe" ] && [ -s "temp-extract/3.1.0/x64-windows/lib/xdelta.lib" ]; then
+              echo "Verification passed: Binary files have content"
+            else
+              echo "ERROR: Generated binary files are empty or missing"
+              echo "Contents of extracted directory:"
+              find temp-extract -type f -exec ls -la {} \;
+              exit 1
+            fi
+
+            # Clean up
+            rm -rf temp-extract
+          else
+            echo "ERROR: Failed to generate vcpkg binaries"
+            exit 1
+          fi
+        elif [ -f "xdelta-${VERSION}-windows.zip" ]; then
           echo "Found vcpkg binaries"
           cp "xdelta-${VERSION}-windows.zip" release-files/
           if [ -f "xdelta-${VERSION}-windows.zip.sha512" ]; then
@@ -550,16 +589,12 @@ jobs:
               sha512sum "xdelta-binaries/xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
             fi
           else
-            echo "WARNING: vcpkg binaries not found in directory"
-            # Create dummy files for testing
-            echo "Dummy vcpkg binaries" > "release-files/xdelta-${VERSION}-windows.zip"
-            echo "Dummy SHA512" > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+            echo "ERROR: vcpkg binaries not found in directory"
+            exit 1
           fi
         else
-          echo "WARNING: vcpkg binaries not found"
-          # Create dummy files for testing
-          echo "Dummy vcpkg binaries" > "release-files/xdelta-${VERSION}-windows.zip"
-          echo "Dummy SHA512" > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+          echo "ERROR: vcpkg binaries not found and export-binaries.ps1 script not found"
+          exit 1
         fi
 
         # List all files in the release directory
