@@ -10,10 +10,16 @@ on:
         description: 'Version to release (without v prefix)'
         required: true
         default: '3.1.1'
+      dry_run:
+        description: 'Dry run (validate without creating release)'
+        type: boolean
+        required: false
+        default: false
 
 env:
   BUILD_TYPE: Release
   VCPKG_COMMIT: a34c873a9717a888f58dc05268dea15592c2f0ff  # 2024.03.25 commit hash
+  RELEASE_VALIDATION: true  # Enable strict validation for releases
 
 jobs:
   # Use the reusable workflow for building on all platforms
@@ -35,6 +41,7 @@ jobs:
         fetch-depth: 0
 
     - name: Download Windows x64 artifacts
+      id: download_x64
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
@@ -42,30 +49,73 @@ jobs:
       continue-on-error: true
 
     - name: Download Windows x86 artifacts
+      id: download_x86
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
         path: ./windows-x86-artifacts/
       continue-on-error: true
 
-    - name: List downloaded artifacts
+    - name: Verify downloaded artifacts
+      id: verify_artifacts
       shell: pwsh
       run: |
+        $artifactsOk = $true
+        $errorMessages = @()
+
         Write-Host "Listing downloaded artifacts directories:"
         Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
 
         Write-Host "Checking Windows x64 artifacts:"
         if (Test-Path "./windows-x64-artifacts") {
-            Get-ChildItem -Path "./windows-x64-artifacts" -Recurse | ForEach-Object { Write-Host $_.FullName }
+            $x64Files = Get-ChildItem -Path "./windows-x64-artifacts" -Recurse
+            Write-Host "Found $($x64Files.Count) files in x64 artifacts directory"
+            $x64Files | ForEach-Object { Write-Host "- $($_.FullName) ($($_.Length) bytes)" }
+
+            # Check for executable
+            $x64Exe = Get-ChildItem -Path "./windows-x64-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
+            if ($x64Exe -and $x64Exe.Length -gt 10000) {
+                Write-Host "✅ Found valid x64 executable: $($x64Exe.FullName) ($($x64Exe.Length) bytes)" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Valid x64 executable not found" -ForegroundColor Red
+                $artifactsOk = $false
+                $errorMessages += "Windows x64 executable missing or invalid"
+            }
         } else {
-            Write-Host "Windows x64 artifacts directory not found"
+            Write-Host "❌ Windows x64 artifacts directory not found" -ForegroundColor Red
+            $artifactsOk = $false
+            $errorMessages += "Windows x64 artifacts directory not found"
         }
 
         Write-Host "Checking Windows x86 artifacts:"
         if (Test-Path "./windows-x86-artifacts") {
-            Get-ChildItem -Path "./windows-x86-artifacts" -Recurse | ForEach-Object { Write-Host $_.FullName }
+            $x86Files = Get-ChildItem -Path "./windows-x86-artifacts" -Recurse
+            Write-Host "Found $($x86Files.Count) files in x86 artifacts directory"
+            $x86Files | ForEach-Object { Write-Host "- $($_.FullName) ($($_.Length) bytes)" }
+
+            # Check for executable
+            $x86Exe = Get-ChildItem -Path "./windows-x86-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
+            if ($x86Exe -and $x86Exe.Length -gt 10000) {
+                Write-Host "✅ Found valid x86 executable: $($x86Exe.FullName) ($($x86Exe.Length) bytes)" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Valid x86 executable not found" -ForegroundColor Red
+                $artifactsOk = $false
+                $errorMessages += "Windows x86 executable missing or invalid"
+            }
         } else {
-            Write-Host "Windows x86 artifacts directory not found"
+            Write-Host "❌ Windows x86 artifacts directory not found" -ForegroundColor Red
+            $artifactsOk = $false
+            $errorMessages += "Windows x86 artifacts directory not found"
+        }
+
+        # Set outputs
+        echo "artifacts_ok=$artifactsOk" >> $env:GITHUB_OUTPUT
+        echo "error_messages=$($errorMessages -join '; ')" >> $env:GITHUB_OUTPUT
+
+        # Fail if artifacts are not OK and validation is enabled
+        if (-not $artifactsOk -and $env:RELEASE_VALIDATION -eq 'true') {
+            Write-Host "::error::Artifact validation failed: $($errorMessages -join '; ')"
+            exit 1
         }
 
     - name: Setup vcpkg
@@ -85,9 +135,15 @@ jobs:
         fi
 
     - name: Prepare vcpkg binaries
+      id: prepare_vcpkg
       shell: pwsh
       run: |
         $version = "${{ steps.get_version.outputs.VERSION }}"
+        $validationEnabled = $env:RELEASE_VALIDATION -eq 'true'
+        $errors = @()
+        $warnings = @()
+
+        Write-Host "Preparing vcpkg binaries for version $version (validation: $validationEnabled)..."
 
         # Create directory structure
         $outputDir = ".\xdelta-binaries"
@@ -135,14 +191,30 @@ jobs:
 
                 # Check for executable
                 if (Test-Path ".\x64-extracted\xdelta3.exe") {
-                    Write-Host "x64 executable found in zip"
+                    $exeSize = (Get-Item ".\x64-extracted\xdelta3.exe").Length
+                    Write-Host "x64 executable found in zip ($exeSize bytes)"
+
+                    if ($exeSize -lt 10000 -and $validationEnabled) {
+                        $msg = "x64 executable is suspiciously small: $exeSize bytes"
+                        Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                        $warnings += $msg
+                    }
+
                     Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
                     $x64ExeFound = $true
                 }
 
                 # Check for library files
                 if (Test-Path ".\x64-extracted\xdelta.lib") {
-                    Write-Host "x64 library found in zip"
+                    $libSize = (Get-Item ".\x64-extracted\xdelta.lib").Length
+                    Write-Host "x64 library found in zip ($libSize bytes)"
+
+                    if ($libSize -lt 1000 -and $validationEnabled) {
+                        $msg = "x64 library is suspiciously small: $libSize bytes"
+                        Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                        $warnings += $msg
+                    }
+
                     Copy-Item ".\x64-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
                     $x64LibFound = $true
                 }
@@ -151,7 +223,9 @@ jobs:
                     Copy-Item ".\x64-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
                 }
             } catch {
-                Write-Host "Error extracting x64 zip: $_"
+                $msg = "Error extracting x64 zip: $_"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
             }
         } else {
             Write-Host "x64 zip artifact not found at $x64ZipPath"
@@ -160,42 +234,71 @@ jobs:
         # If zip extraction failed, try direct directory
         if (-not $x64ExeFound -and (Test-Path $x64DirPath)) {
             Write-Host "Checking x64 directory for executable..."
-            $x64ExePath = Get-ChildItem -Path $x64DirPath -Filter "xdelta3.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            $x64ExeFile = Get-ChildItem -Path $x64DirPath -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
 
-            if ($x64ExePath) {
-                Write-Host "x64 executable found at $x64ExePath"
-                Copy-Item $x64ExePath -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+            if ($x64ExeFile) {
+                $exeSize = $x64ExeFile.Length
+                Write-Host "x64 executable found at $($x64ExeFile.FullName) ($exeSize bytes)"
+
+                if ($exeSize -lt 10000 -and $validationEnabled) {
+                    $msg = "x64 executable is suspiciously small: $exeSize bytes"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
+
+                Copy-Item $x64ExeFile.FullName -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
                 $x64ExeFound = $true
             }
 
             # Check for library files
-            $x64LibPath = Get-ChildItem -Path $x64DirPath -Filter "xdelta.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-            if ($x64LibPath) {
-                Write-Host "x64 library found at $x64LibPath"
-                Copy-Item $x64LibPath -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
+            $x64LibFile = Get-ChildItem -Path $x64DirPath -Filter "xdelta.lib" -Recurse | Select-Object -First 1
+            if ($x64LibFile) {
+                $libSize = $x64LibFile.Length
+                Write-Host "x64 library found at $($x64LibFile.FullName) ($libSize bytes)"
+
+                if ($libSize -lt 1000 -and $validationEnabled) {
+                    $msg = "x64 library is suspiciously small: $libSize bytes"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
+
+                Copy-Item $x64LibFile.FullName -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
                 $x64LibFound = $true
             }
 
-            $x64DebugLibPath = Get-ChildItem -Path $x64DirPath -Filter "xdeltad.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-            if ($x64DebugLibPath) {
-                Write-Host "x64 debug library found at $x64DebugLibPath"
-                Copy-Item $x64DebugLibPath -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
+            $x64DebugLibFile = Get-ChildItem -Path $x64DirPath -Filter "xdeltad.lib" -Recurse | Select-Object -First 1
+            if ($x64DebugLibFile) {
+                Write-Host "x64 debug library found at $($x64DebugLibFile.FullName)"
+                Copy-Item $x64DebugLibFile.FullName -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
             }
         }
 
-        # Create dummy files if nothing found
+        # Handle missing files based on validation mode
         if (-not $x64ExeFound) {
-            Write-Host "WARNING: x64 executable not found, creating dummy file"
-            New-Item -ItemType Directory -Path .\x64-extracted -Force | Out-Null
-            New-Item -ItemType File -Path .\x64-extracted\xdelta3.exe -Force | Out-Null
-            Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+            if ($validationEnabled) {
+                $msg = "x64 executable not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            } else {
+                Write-Host "WARNING: x64 executable not found, creating placeholder file"
+                New-Item -ItemType Directory -Path .\x64-extracted -Force | Out-Null
+                New-Item -ItemType File -Path .\x64-extracted\xdelta3.exe -Force | Out-Null
+                Copy-Item ".\x64-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x64-windows\bin\xdelta3.exe") -Force
+            }
         }
+
         if (-not $x64LibFound) {
-            Write-Host "WARNING: x64 library not found, creating dummy files"
-            New-Item -ItemType File -Path .\x64-extracted\xdelta.lib -Force | Out-Null
-            New-Item -ItemType File -Path .\x64-extracted\xdeltad.lib -Force | Out-Null
-            Copy-Item ".\x64-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
-            Copy-Item ".\x64-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
+            if ($validationEnabled) {
+                $msg = "x64 library not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            } else {
+                Write-Host "WARNING: x64 library not found, creating placeholder files"
+                New-Item -ItemType File -Path .\x64-extracted\xdelta.lib -Force | Out-Null
+                New-Item -ItemType File -Path .\x64-extracted\xdeltad.lib -Force | Out-Null
+                Copy-Item ".\x64-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdelta.lib") -Force
+                Copy-Item ".\x64-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x64-windows\lib\xdeltad.lib") -Force
+            }
         }
 
         # Handle x86 artifacts with similar approach
@@ -212,14 +315,30 @@ jobs:
 
                 # Check for executable
                 if (Test-Path ".\x86-extracted\xdelta3.exe") {
-                    Write-Host "x86 executable found in zip"
+                    $exeSize = (Get-Item ".\x86-extracted\xdelta3.exe").Length
+                    Write-Host "x86 executable found in zip ($exeSize bytes)"
+
+                    if ($exeSize -lt 10000 -and $validationEnabled) {
+                        $msg = "x86 executable is suspiciously small: $exeSize bytes"
+                        Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                        $warnings += $msg
+                    }
+
                     Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
                     $x86ExeFound = $true
                 }
 
                 # Check for library files
                 if (Test-Path ".\x86-extracted\xdelta.lib") {
-                    Write-Host "x86 library found in zip"
+                    $libSize = (Get-Item ".\x86-extracted\xdelta.lib").Length
+                    Write-Host "x86 library found in zip ($libSize bytes)"
+
+                    if ($libSize -lt 1000 -and $validationEnabled) {
+                        $msg = "x86 library is suspiciously small: $libSize bytes"
+                        Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                        $warnings += $msg
+                    }
+
                     Copy-Item ".\x86-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
                     $x86LibFound = $true
                 }
@@ -228,7 +347,9 @@ jobs:
                     Copy-Item ".\x86-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
                 }
             } catch {
-                Write-Host "Error extracting x86 zip: $_"
+                $msg = "Error extracting x86 zip: $_"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
             }
         } else {
             Write-Host "x86 zip artifact not found at $x86ZipPath"
@@ -237,53 +358,104 @@ jobs:
         # If zip extraction failed, try direct directory
         if (-not $x86ExeFound -and (Test-Path $x86DirPath)) {
             Write-Host "Checking x86 directory for executable..."
-            $x86ExePath = Get-ChildItem -Path $x86DirPath -Filter "xdelta3.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+            $x86ExeFile = Get-ChildItem -Path $x86DirPath -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
 
-            if ($x86ExePath) {
-                Write-Host "x86 executable found at $x86ExePath"
-                Copy-Item $x86ExePath -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+            if ($x86ExeFile) {
+                $exeSize = $x86ExeFile.Length
+                Write-Host "x86 executable found at $($x86ExeFile.FullName) ($exeSize bytes)"
+
+                if ($exeSize -lt 10000 -and $validationEnabled) {
+                    $msg = "x86 executable is suspiciously small: $exeSize bytes"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
+
+                Copy-Item $x86ExeFile.FullName -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
                 $x86ExeFound = $true
             }
 
             # Check for library files
-            $x86LibPath = Get-ChildItem -Path $x86DirPath -Filter "xdelta.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-            if ($x86LibPath) {
-                Write-Host "x86 library found at $x86LibPath"
-                Copy-Item $x86LibPath -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
+            $x86LibFile = Get-ChildItem -Path $x86DirPath -Filter "xdelta.lib" -Recurse | Select-Object -First 1
+            if ($x86LibFile) {
+                $libSize = $x86LibFile.Length
+                Write-Host "x86 library found at $($x86LibFile.FullName) ($libSize bytes)"
+
+                if ($libSize -lt 1000 -and $validationEnabled) {
+                    $msg = "x86 library is suspiciously small: $libSize bytes"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
+
+                Copy-Item $x86LibFile.FullName -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
                 $x86LibFound = $true
             }
 
-            $x86DebugLibPath = Get-ChildItem -Path $x86DirPath -Filter "xdeltad.lib" -Recurse | Select-Object -First 1 -ExpandProperty FullName
-            if ($x86DebugLibPath) {
-                Write-Host "x86 debug library found at $x86DebugLibPath"
-                Copy-Item $x86DebugLibPath -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
+            $x86DebugLibFile = Get-ChildItem -Path $x86DirPath -Filter "xdeltad.lib" -Recurse | Select-Object -First 1
+            if ($x86DebugLibFile) {
+                Write-Host "x86 debug library found at $($x86DebugLibFile.FullName)"
+                Copy-Item $x86DebugLibFile.FullName -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
             }
         }
 
-        # Create dummy files if nothing found
+        # Handle missing files based on validation mode
         if (-not $x86ExeFound) {
-            Write-Host "WARNING: x86 executable not found, creating dummy file"
-            New-Item -ItemType Directory -Path .\x86-extracted -Force | Out-Null
-            New-Item -ItemType File -Path .\x86-extracted\xdelta3.exe -Force | Out-Null
-            Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+            if ($validationEnabled) {
+                $msg = "x86 executable not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            } else {
+                Write-Host "WARNING: x86 executable not found, creating placeholder file"
+                New-Item -ItemType Directory -Path .\x86-extracted -Force | Out-Null
+                New-Item -ItemType File -Path .\x86-extracted\xdelta3.exe -Force | Out-Null
+                Copy-Item ".\x86-extracted\xdelta3.exe" -Destination (Join-Path $versionDir "x86-windows\bin\xdelta3.exe") -Force
+            }
         }
+
         if (-not $x86LibFound) {
-            Write-Host "WARNING: x86 library not found, creating dummy files"
-            New-Item -ItemType File -Path .\x86-extracted\xdelta.lib -Force | Out-Null
-            New-Item -ItemType File -Path .\x86-extracted\xdeltad.lib -Force | Out-Null
-            Copy-Item ".\x86-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
-            Copy-Item ".\x86-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
+            if ($validationEnabled) {
+                $msg = "x86 library not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            } else {
+                Write-Host "WARNING: x86 library not found, creating placeholder files"
+                New-Item -ItemType File -Path .\x86-extracted\xdelta.lib -Force | Out-Null
+                New-Item -ItemType File -Path .\x86-extracted\xdeltad.lib -Force | Out-Null
+                Copy-Item ".\x86-extracted\xdelta.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdelta.lib") -Force
+                Copy-Item ".\x86-extracted\xdeltad.lib" -Destination (Join-Path $versionDir "x86-windows\lib\xdeltad.lib") -Force
+            }
         }
 
         # Copy header files
-        Copy-Item "xdelta3\xdelta3.h" -Destination (Join-Path $versionDir "x64-windows\include\xdelta3\") -Force
-        Copy-Item "xdelta3\xdelta3.c" -Destination (Join-Path $versionDir "x64-windows\include\xdelta3\") -Force
-        Copy-Item "xdelta3\xdelta3.h" -Destination (Join-Path $versionDir "x86-windows\include\xdelta3\") -Force
-        Copy-Item "xdelta3\xdelta3.c" -Destination (Join-Path $versionDir "x86-windows\include\xdelta3\") -Force
+        try {
+            if (Test-Path "xdelta3\xdelta3.h") {
+                Copy-Item "xdelta3\xdelta3.h" -Destination (Join-Path $versionDir "x64-windows\include\xdelta3\") -Force
+                Copy-Item "xdelta3\xdelta3.h" -Destination (Join-Path $versionDir "x86-windows\include\xdelta3\") -Force
+                Write-Host "✅ Copied xdelta3.h header file" -ForegroundColor Green
+            } else {
+                $msg = "xdelta3.h header file not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            }
+
+            if (Test-Path "xdelta3\xdelta3.c") {
+                Copy-Item "xdelta3\xdelta3.c" -Destination (Join-Path $versionDir "x64-windows\include\xdelta3\") -Force
+                Copy-Item "xdelta3\xdelta3.c" -Destination (Join-Path $versionDir "x86-windows\include\xdelta3\") -Force
+                Write-Host "✅ Copied xdelta3.c source file" -ForegroundColor Green
+            } else {
+                $msg = "xdelta3.c source file not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            }
+        } catch {
+            $msg = "Error copying header files: $_"
+            Write-Host "❌ $msg" -ForegroundColor Red
+            $errors += $msg
+        }
 
         # Create a README file
         $readmePath = Join-Path $versionDir "README.md"
-        @"
+        try {
+            @"
         # Xdelta Binary Distribution
 
         Version: $version
@@ -327,29 +499,158 @@ jobs:
 
         Licensed under the Apache License, Version 2.0
         "@ | Out-File -FilePath $readmePath -Encoding utf8
+            Write-Host "✅ Created README.md file" -ForegroundColor Green
+        } catch {
+            $msg = "Error creating README file: $_"
+            Write-Host "❌ $msg" -ForegroundColor Red
+            $errors += $msg
+        }
 
         # Create a ZIP file
         $zipPath = Join-Path $outputDir "xdelta-$version-windows.zip"
-        Compress-Archive -Path $versionDir -DestinationPath $zipPath -Force
+        try {
+            Compress-Archive -Path $versionDir -DestinationPath $zipPath -Force
+
+            # Verify the ZIP file was created and has content
+            if (Test-Path $zipPath) {
+                $zipSize = (Get-Item $zipPath).Length
+                Write-Host "✅ Created ZIP file: $zipPath ($zipSize bytes)" -ForegroundColor Green
+
+                if ($zipSize -lt 10000 -and $validationEnabled) {
+                    $msg = "ZIP file is suspiciously small: $zipSize bytes"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
+            } else {
+                $msg = "Failed to create ZIP file"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            }
+        } catch {
+            $msg = "Error creating ZIP file: $_"
+            Write-Host "❌ $msg" -ForegroundColor Red
+            $errors += $msg
+        }
 
         # Calculate SHA512 hash for vcpkg
-        $sha512 = (Get-FileHash -Path $zipPath -Algorithm SHA512).Hash.ToLower()
-        $sha512 | Out-File -FilePath "$zipPath.sha512" -Encoding utf8 -NoNewline
+        try {
+            if (Test-Path $zipPath) {
+                $sha512 = (Get-FileHash -Path $zipPath -Algorithm SHA512).Hash.ToLower()
+                $sha512 | Out-File -FilePath "$zipPath.sha512" -Encoding utf8 -NoNewline
+                Write-Host "✅ Created SHA512 hash file: $zipPath.sha512" -ForegroundColor Green
+                Write-Host "SHA512: $sha512"
 
-        # Save the SHA512 hash for later use
-        echo "BINARY_SHA512=$sha512" >> $env:GITHUB_ENV
+                # Save the SHA512 hash for later use
+                echo "BINARY_SHA512=$sha512" >> $env:GITHUB_ENV
 
-        # Update SHA512 in portfile.cmake
-        $portfilePath = ".\vcpkg-registry\ports\xdelta\portfile.cmake"
-        $portfileContent = Get-Content $portfilePath -Raw
-        $updatedContent = $portfileContent -replace 'SHA512 "to-be-filled-after-release"', "SHA512 `"$sha512`""
-        Set-Content -Path $portfilePath -Value $updatedContent
+                # Update SHA512 in portfile.cmake
+                $portfilePath = ".\vcpkg-registry\ports\xdelta\portfile.cmake"
+                if (Test-Path $portfilePath) {
+                    $portfileContent = Get-Content $portfilePath -Raw
+                    $updatedContent = $portfileContent -replace 'SHA512 "to-be-filled-after-release"', "SHA512 `"$sha512`""
+                    $updatedContent = $updatedContent -replace 'SHA512 "将在发布后填写实际的哈希值"', "SHA512 `"$sha512`""
+                    $updatedContent = $updatedContent -replace 'SHA512 "[a-f0-9]+"', "SHA512 `"$sha512`""
+                    Set-Content -Path $portfilePath -Value $updatedContent
+                    Write-Host "✅ Updated SHA512 in portfile.cmake" -ForegroundColor Green
+                } else {
+                    $msg = "portfile.cmake not found at $portfilePath"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
 
-        # Update version in versions/x-/xdelta.json
-        $versionFilePath = ".\vcpkg-registry\versions\x-\xdelta.json"
-        $versionFileContent = Get-Content $versionFilePath -Raw
-        $updatedVersionContent = $versionFileContent -replace '"git-tree": "to-be-filled-after-release"', '"git-tree": "placeholder"'
-        Set-Content -Path $versionFilePath -Value $updatedVersionContent
+                # Update version in versions/x-/xdelta.json
+                $versionFilePath = ".\vcpkg-registry\versions\x-\xdelta.json"
+                if (Test-Path $versionFilePath) {
+                    $versionFileContent = Get-Content $versionFilePath -Raw
+                    $gitTree = git rev-parse HEAD
+                    $updatedVersionContent = $versionFileContent -replace '"git-tree": "to-be-filled-after-release"', "`"git-tree`": `"$gitTree`""
+                    $updatedVersionContent = $updatedVersionContent -replace '"git-tree": "placeholder"', "`"git-tree`": `"$gitTree`""
+                    $updatedVersionContent = $updatedVersionContent -replace '"git-tree": "[a-f0-9]+"', "`"git-tree`": `"$gitTree`""
+                    Set-Content -Path $versionFilePath -Value $updatedVersionContent
+                    Write-Host "✅ Updated git-tree in xdelta.json" -ForegroundColor Green
+                } else {
+                    $msg = "xdelta.json not found at $versionFilePath"
+                    Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                    $warnings += $msg
+                }
+            } else {
+                $msg = "Cannot calculate SHA512 hash: ZIP file not found"
+                Write-Host "❌ $msg" -ForegroundColor Red
+                $errors += $msg
+            }
+        } catch {
+            $msg = "Error calculating SHA512 hash: $_"
+            Write-Host "❌ $msg" -ForegroundColor Red
+            $errors += $msg
+        }
+
+        # Verify the final package
+        try {
+            if (Test-Path $zipPath) {
+                Write-Host "Verifying final package..."
+                $tempExtractDir = Join-Path $env:TEMP "xdelta-verify-$(Get-Random)"
+                New-Item -ItemType Directory -Path $tempExtractDir -Force | Out-Null
+
+                # Extract the ZIP file
+                Expand-Archive -Path $zipPath -DestinationPath $tempExtractDir -Force
+
+                # Check for critical files
+                $criticalFiles = @(
+                    "$version/x64-windows/bin/xdelta3.exe",
+                    "$version/x64-windows/lib/xdelta.lib",
+                    "$version/x86-windows/bin/xdelta3.exe",
+                    "$version/x86-windows/lib/xdelta.lib",
+                    "$version/README.md"
+                )
+
+                $missingFiles = @()
+                foreach ($file in $criticalFiles) {
+                    $filePath = Join-Path $tempExtractDir $file
+                    if (-not (Test-Path $filePath) -or (Get-Item $filePath).Length -eq 0) {
+                        $missingFiles += $file
+                    }
+                }
+
+                if ($missingFiles.Count -eq 0) {
+                    Write-Host "✅ Package verification passed: All critical files present" -ForegroundColor Green
+                } else {
+                    $msg = "Package verification failed: Missing or empty files: $($missingFiles -join ', ')"
+                    Write-Host "❌ $msg" -ForegroundColor Red
+                    $errors += $msg
+                }
+
+                # Clean up
+                Remove-Item -Path $tempExtractDir -Recurse -Force
+            }
+        } catch {
+            $msg = "Error verifying package: $_"
+            Write-Host "❌ $msg" -ForegroundColor Red
+            $errors += $msg
+        }
+
+        # Output summary
+        Write-Host "`n=== Preparation Summary ===" -ForegroundColor Cyan
+        if ($errors.Count -eq 0) {
+            Write-Host "✅ Preparation completed successfully with no errors" -ForegroundColor Green
+            echo "preparation_success=true" >> $env:GITHUB_OUTPUT
+        } else {
+            Write-Host "❌ Preparation completed with $($errors.Count) errors:" -ForegroundColor Red
+            $errors | ForEach-Object { Write-Host "- $_" -ForegroundColor Red }
+            echo "preparation_success=false" >> $env:GITHUB_OUTPUT
+            echo "error_messages=$($errors -join '; ')" >> $env:GITHUB_OUTPUT
+
+            # Fail if validation is enabled
+            if ($validationEnabled) {
+                Write-Host "::error::Preparation failed with errors and validation is enabled"
+                exit 1
+            }
+        }
+
+        if ($warnings.Count -gt 0) {
+            Write-Host "⚠️ $($warnings.Count) warnings were found:" -ForegroundColor Yellow
+            $warnings | ForEach-Object { Write-Host "- $_" -ForegroundColor Yellow }
+            echo "warning_messages=$($warnings -join '; ')" >> $env:GITHUB_OUTPUT
+        }
 
     - name: Upload vcpkg binaries
       uses: actions/upload-artifact@v4
@@ -370,6 +671,7 @@ jobs:
   create-release:
     needs: [build, export-vcpkg-binaries]
     runs-on: ubuntu-latest
+    if: ${{ !github.event.inputs.dry_run || github.event.inputs.dry_run == 'false' }}
 
     steps:
     - uses: actions/checkout@v4
@@ -377,6 +679,7 @@ jobs:
         fetch-depth: 0
 
     - name: Download Windows x64 artifacts
+      id: download_x64
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
@@ -384,6 +687,7 @@ jobs:
       continue-on-error: true
 
     - name: Download Windows x86 artifacts
+      id: download_x86
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
@@ -391,6 +695,7 @@ jobs:
       continue-on-error: true
 
     - name: Download Linux artifacts
+      id: download_linux
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-linux
@@ -398,6 +703,7 @@ jobs:
       continue-on-error: true
 
     - name: Download macOS artifacts
+      id: download_macos
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
@@ -405,6 +711,7 @@ jobs:
       continue-on-error: true
 
     - name: Download vcpkg binaries
+      id: download_vcpkg
       uses: actions/download-artifact@v4
       with:
         name: xdelta-vcpkg-binaries
@@ -420,27 +727,129 @@ jobs:
           echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
         fi
 
-    - name: List downloaded artifacts
+    - name: Verify downloaded artifacts
+      id: verify_artifacts
       run: |
         echo "Listing downloaded artifacts:"
         ls -la
 
-        # Check for specific artifacts
+        # Initialize variables
+        ARTIFACTS_OK=true
+        ERROR_MESSAGES=""
+        WARNING_MESSAGES=""
+
+        # Function to check file size
+        check_file_size() {
+          local file=$1
+          local min_size=$2
+          local file_size=$(stat -c%s "$file" 2>/dev/null)
+
+          if [ -z "$file_size" ]; then
+            return 1
+          fi
+
+          if [ "$file_size" -lt "$min_size" ]; then
+            return 1
+          fi
+
+          return 0
+        }
+
+        # Check Windows x64 artifact
         echo "Checking for Windows x64 artifact:"
         if [ -f "xdelta3-windows-x64.zip" ]; then
-          echo "Found xdelta3-windows-x64.zip"
+          echo "✅ Found xdelta3-windows-x64.zip ($(stat -c%s "xdelta3-windows-x64.zip") bytes)"
+
+          # Check file size
+          if ! check_file_size "xdelta3-windows-x64.zip" 10000; then
+            echo "⚠️ Windows x64 artifact is suspiciously small"
+            WARNING_MESSAGES="${WARNING_MESSAGES}Windows x64 artifact is suspiciously small; "
+          fi
         else
-          echo "xdelta3-windows-x64.zip not found"
+          echo "❌ xdelta3-windows-x64.zip not found"
+          ARTIFACTS_OK=false
+          ERROR_MESSAGES="${ERROR_MESSAGES}Windows x64 artifact not found; "
         fi
 
+        # Check Windows x86 artifact
+        echo "Checking for Windows x86 artifact:"
+        if [ -f "xdelta3-windows-x86.zip" ]; then
+          echo "✅ Found xdelta3-windows-x86.zip ($(stat -c%s "xdelta3-windows-x86.zip") bytes)"
+
+          # Check file size
+          if ! check_file_size "xdelta3-windows-x86.zip" 10000; then
+            echo "⚠️ Windows x86 artifact is suspiciously small"
+            WARNING_MESSAGES="${WARNING_MESSAGES}Windows x86 artifact is suspiciously small; "
+          fi
+        else
+          echo "❌ xdelta3-windows-x86.zip not found"
+          ARTIFACTS_OK=false
+          ERROR_MESSAGES="${ERROR_MESSAGES}Windows x86 artifact not found; "
+        fi
+
+        # Check Linux artifact
+        echo "Checking for Linux artifact:"
+        if [ -f "xdelta3-linux.tar.gz" ]; then
+          echo "✅ Found xdelta3-linux.tar.gz ($(stat -c%s "xdelta3-linux.tar.gz") bytes)"
+
+          # Check file size
+          if ! check_file_size "xdelta3-linux.tar.gz" 10000; then
+            echo "⚠️ Linux artifact is suspiciously small"
+            WARNING_MESSAGES="${WARNING_MESSAGES}Linux artifact is suspiciously small; "
+          fi
+        else
+          echo "❌ xdelta3-linux.tar.gz not found"
+          ARTIFACTS_OK=false
+          ERROR_MESSAGES="${ERROR_MESSAGES}Linux artifact not found; "
+        fi
+
+        # Check vcpkg binaries
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
         echo "Checking for vcpkg binaries:"
-        if [ -f "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip" ]; then
-          echo "Found xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip"
+        if [ -f "xdelta-${VERSION}-windows.zip" ]; then
+          echo "✅ Found xdelta-${VERSION}-windows.zip ($(stat -c%s "xdelta-${VERSION}-windows.zip") bytes)"
+
+          # Check file size
+          if ! check_file_size "xdelta-${VERSION}-windows.zip" 10000; then
+            echo "⚠️ vcpkg binaries artifact is suspiciously small"
+            WARNING_MESSAGES="${WARNING_MESSAGES}vcpkg binaries artifact is suspiciously small; "
+          fi
+
+          # Check SHA512 file
+          if [ -f "xdelta-${VERSION}-windows.zip.sha512" ]; then
+            echo "✅ Found SHA512 hash file"
+
+            # Verify SHA512 hash
+            ACTUAL_HASH=$(sha512sum "xdelta-${VERSION}-windows.zip" | awk '{print $1}')
+            STORED_HASH=$(cat "xdelta-${VERSION}-windows.zip.sha512")
+
+            if [ "$ACTUAL_HASH" = "$STORED_HASH" ]; then
+              echo "✅ SHA512 hash verified"
+            else
+              echo "❌ SHA512 hash mismatch"
+              ARTIFACTS_OK=false
+              ERROR_MESSAGES="${ERROR_MESSAGES}SHA512 hash mismatch for vcpkg binaries; "
+            fi
+          else
+            echo "⚠️ SHA512 hash file not found"
+            WARNING_MESSAGES="${WARNING_MESSAGES}SHA512 hash file not found; "
+          fi
         else
-          echo "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip not found"
+          echo "❌ xdelta-${VERSION}-windows.zip not found"
+          ARTIFACTS_OK=false
+          ERROR_MESSAGES="${ERROR_MESSAGES}vcpkg binaries not found; "
         fi
 
-    # Note: Get version step was moved above
+        # Set outputs
+        echo "artifacts_ok=$ARTIFACTS_OK" >> $GITHUB_OUTPUT
+        echo "error_messages=$ERROR_MESSAGES" >> $GITHUB_OUTPUT
+        echo "warning_messages=$WARNING_MESSAGES" >> $GITHUB_OUTPUT
+
+        # Fail if artifacts are not OK and validation is enabled
+        if [ "$ARTIFACTS_OK" = "false" ] && [ "$RELEASE_VALIDATION" = "true" ]; then
+          echo "::error::Artifact validation failed: $ERROR_MESSAGES"
+          exit 1
+        fi
 
     - name: Generate changelog
       id: changelog
@@ -461,148 +870,293 @@ jobs:
         fi
 
     - name: Prepare release files
+      id: prepare_release_files
       run: |
+        # Initialize variables
+        PREPARATION_OK=true
+        ERROR_MESSAGES=""
+        WARNING_MESSAGES=""
+        VALIDATION_ENABLED="${{ env.RELEASE_VALIDATION }}"
+        VERSION="${{ steps.get_version.outputs.VERSION }}"
+
+        echo "Preparing release files for version $VERSION (validation: $VALIDATION_ENABLED)..."
+
         # Create a directory for all release files
         mkdir -p release-files
 
-        # Check for artifacts in both zip and directory formats
-        # Windows x64 artifacts
-        if [ -f "xdelta3-windows-x64.zip" ]; then
-          echo "Found Windows x64 zip artifact"
-          cp xdelta3-windows-x64.zip release-files/
-        elif [ -d "xdelta3-windows-x64" ] || [ -d "windows-x64-artifacts" ]; then
-          echo "Found Windows x64 directory artifact"
-          # Create a zip from the directory
-          if [ -d "xdelta3-windows-x64" ]; then
-            zip -r release-files/xdelta3-windows-x64.zip xdelta3-windows-x64/
-          else
-            zip -r release-files/xdelta3-windows-x64.zip windows-x64-artifacts/
+        # Function to check file size
+        check_file_size() {
+          local file=$1
+          local min_size=$2
+          local file_size=$(stat -c%s "$file" 2>/dev/null)
+
+          if [ -z "$file_size" ] || [ "$file_size" -lt "$min_size" ]; then
+            return 1
           fi
-        else
-          echo "WARNING: Windows x64 artifact not found"
-          # Create a dummy file for testing
-          echo "Dummy Windows x64 file" > release-files/xdelta3-windows-x64.zip
-        fi
 
-        # Windows x86 artifacts
-        if [ -f "xdelta3-windows-x86.zip" ]; then
-          echo "Found Windows x86 zip artifact"
-          cp xdelta3-windows-x86.zip release-files/
-        elif [ -d "xdelta3-windows-x86" ] || [ -d "windows-x86-artifacts" ]; then
-          echo "Found Windows x86 directory artifact"
-          # Create a zip from the directory
-          if [ -d "xdelta3-windows-x86" ]; then
-            zip -r release-files/xdelta3-windows-x86.zip xdelta3-windows-x86/
-          else
-            zip -r release-files/xdelta3-windows-x86.zip windows-x86-artifacts/
-          fi
-        else
-          echo "WARNING: Windows x86 artifact not found"
-          # Create a dummy file for testing
-          echo "Dummy Windows x86 file" > release-files/xdelta3-windows-x86.zip
-        fi
+          return 0
+        }
 
-        # Linux artifacts
-        if [ -f "xdelta3-linux.tar.gz" ]; then
-          echo "Found Linux artifact"
-          cp xdelta3-linux.tar.gz release-files/
-        elif [ -d "xdelta3-linux" ]; then
-          echo "Found Linux directory artifact"
-          tar -czf release-files/xdelta3-linux.tar.gz xdelta3-linux/
-        else
-          echo "WARNING: Linux artifact not found"
-          # Create a dummy file for testing
-          echo "Dummy Linux file" > release-files/xdelta3-linux.tar.gz
-        fi
+        # Function to handle artifact
+        handle_artifact() {
+          local artifact_type=$1
+          local source_file=$2
+          local target_file=$3
+          local dir_source=$4
+          local min_size=${5:-10000}
 
-        # macOS artifacts
-        if [ -f "xdelta3-macos.tar.gz" ]; then
-          echo "Found macOS artifact"
-          cp xdelta3-macos.tar.gz release-files/
-        elif [ -d "xdelta3-macos" ]; then
-          echo "Found macOS directory artifact"
-          tar -czf release-files/xdelta3-macos.tar.gz xdelta3-macos/
-        else
-          echo "WARNING: macOS artifact not found"
-          # Create a dummy file for testing
-          echo "Dummy macOS file" > release-files/xdelta3-macos.tar.gz
-        fi
+          if [ -f "$source_file" ]; then
+            echo "✅ Found $artifact_type artifact: $source_file"
 
-        # vcpkg binaries
-        VERSION="${{ steps.get_version.outputs.VERSION }}"
-        echo "Generating vcpkg binaries using export-binaries.ps1 script..."
+            # Check file size
+            if ! check_file_size "$source_file" "$min_size"; then
+              echo "⚠️ $artifact_type artifact is suspiciously small: $(stat -c%s "$source_file") bytes"
+              WARNING_MESSAGES="${WARNING_MESSAGES}$artifact_type artifact is suspiciously small; "
 
-        # Run export-binaries.ps1 script to generate binaries
-        if [ -f "scripts/export-binaries.ps1" ]; then
-          echo "Found export-binaries.ps1 script, running it..."
-          pwsh -ExecutionPolicy Bypass -File scripts/export-binaries.ps1 -OutputDir ./xdelta-binaries
-
-          if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip" ]; then
-            echo "Successfully generated vcpkg binaries"
-            cp "xdelta-binaries/xdelta-${VERSION}-windows.zip" release-files/
-
-            if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" ]; then
-              cp "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" release-files/
-            else
-              # Generate SHA512 if not found
-              sha512sum "xdelta-binaries/xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
+              if [ "$VALIDATION_ENABLED" = "true" ]; then
+                echo "❌ Validation failed: $artifact_type artifact is too small"
+                PREPARATION_OK=false
+                ERROR_MESSAGES="${ERROR_MESSAGES}$artifact_type artifact is too small; "
+                return 1
+              fi
             fi
 
-            # Verify the generated binaries are not empty
-            echo "Verifying generated binaries..."
-            mkdir -p temp-extract
-            unzip -q "xdelta-binaries/xdelta-${VERSION}-windows.zip" -d temp-extract
+            # Copy the file
+            cp "$source_file" "release-files/$target_file"
+            echo "✅ Copied $artifact_type artifact to release-files/$target_file"
+            return 0
+          elif [ -d "$dir_source" ]; then
+            echo "Found $artifact_type directory artifact"
 
-            # Check if the extracted files have content
-            if [ -s "temp-extract/3.1.0/x64-windows/bin/xdelta3.exe" ] && [ -s "temp-extract/3.1.0/x64-windows/lib/xdelta.lib" ]; then
-              echo "Verification passed: Binary files have content"
+            # Create archive from directory
+            if [[ "$target_file" == *.zip ]]; then
+              echo "Creating ZIP archive from directory..."
+              zip -r "release-files/$target_file" "$dir_source/"
             else
-              echo "ERROR: Generated binary files are empty or missing"
-              echo "Contents of extracted directory:"
-              find temp-extract -type f -exec ls -la {} \;
-              exit 1
+              echo "Creating TAR.GZ archive from directory..."
+              tar -czf "release-files/$target_file" -C "$dir_source" .
             fi
 
-            # Clean up
-            rm -rf temp-extract
+            # Check if the archive was created successfully
+            if [ -f "release-files/$target_file" ]; then
+              echo "✅ Created $artifact_type archive: release-files/$target_file"
+
+              # Check file size
+              if ! check_file_size "release-files/$target_file" "$min_size"; then
+                echo "⚠️ Generated $artifact_type archive is suspiciously small: $(stat -c%s "release-files/$target_file") bytes"
+                WARNING_MESSAGES="${WARNING_MESSAGES}Generated $artifact_type archive is suspiciously small; "
+
+                if [ "$VALIDATION_ENABLED" = "true" ]; then
+                  echo "❌ Validation failed: Generated $artifact_type archive is too small"
+                  PREPARATION_OK=false
+                  ERROR_MESSAGES="${ERROR_MESSAGES}Generated $artifact_type archive is too small; "
+                  return 1
+                fi
+              fi
+
+              return 0
+            else
+              echo "❌ Failed to create $artifact_type archive"
+              PREPARATION_OK=false
+              ERROR_MESSAGES="${ERROR_MESSAGES}Failed to create $artifact_type archive; "
+              return 1
+            fi
           else
-            echo "ERROR: Failed to generate vcpkg binaries"
+            echo "❌ $artifact_type artifact not found"
+
+            if [ "$VALIDATION_ENABLED" = "true" ]; then
+              PREPARATION_OK=false
+              ERROR_MESSAGES="${ERROR_MESSAGES}$artifact_type artifact not found; "
+              return 1
+            else
+              # Create a placeholder file for non-validation mode
+              echo "⚠️ Creating placeholder $artifact_type file for testing"
+              echo "PLACEHOLDER: This is not a real $artifact_type binary. This file was created because the actual artifact was not found." > "release-files/$target_file"
+              WARNING_MESSAGES="${WARNING_MESSAGES}Created placeholder for missing $artifact_type artifact; "
+              return 0
+            fi
+          fi
+        }
+
+        # Handle Windows x64 artifacts
+        handle_artifact "Windows x64" "xdelta3-windows-x64.zip" "xdelta3-windows-x64.zip" "windows-x64-artifacts"
+
+        # Handle Windows x86 artifacts
+        handle_artifact "Windows x86" "xdelta3-windows-x86.zip" "xdelta3-windows-x86.zip" "windows-x86-artifacts"
+
+        # Handle Linux artifacts
+        handle_artifact "Linux" "xdelta3-linux.tar.gz" "xdelta3-linux.tar.gz" "xdelta3-linux"
+
+        # Handle macOS artifacts
+        handle_artifact "macOS" "xdelta3-macos.tar.gz" "xdelta3-macos.tar.gz" "xdelta3-macos"
+
+        # Handle vcpkg binaries
+        echo "Handling vcpkg binaries..."
+        VCPKG_BINARY_FILE="xdelta-${VERSION}-windows.zip"
+        VCPKG_BINARY_SHA512="${VCPKG_BINARY_FILE}.sha512"
+
+        if [ -f "$VCPKG_BINARY_FILE" ]; then
+          echo "✅ Found vcpkg binaries: $VCPKG_BINARY_FILE"
+          cp "$VCPKG_BINARY_FILE" "release-files/"
+
+          # Handle SHA512 file
+          if [ -f "$VCPKG_BINARY_SHA512" ]; then
+            echo "✅ Found SHA512 hash file"
+            cp "$VCPKG_BINARY_SHA512" "release-files/"
+          else
+            echo "⚠️ SHA512 hash file not found, generating one..."
+            sha512sum "$VCPKG_BINARY_FILE" | awk '{print $1}' > "release-files/${VCPKG_BINARY_SHA512}"
+            WARNING_MESSAGES="${WARNING_MESSAGES}Generated missing SHA512 hash file; "
+          fi
+        elif [ -d "xdelta-binaries" ] && [ -f "xdelta-binaries/${VCPKG_BINARY_FILE}" ]; then
+          echo "✅ Found vcpkg binaries in xdelta-binaries directory"
+          cp "xdelta-binaries/${VCPKG_BINARY_FILE}" "release-files/"
+
+          # Handle SHA512 file
+          if [ -f "xdelta-binaries/${VCPKG_BINARY_SHA512}" ]; then
+            echo "✅ Found SHA512 hash file"
+            cp "xdelta-binaries/${VCPKG_BINARY_SHA512}" "release-files/"
+          else
+            echo "⚠️ SHA512 hash file not found, generating one..."
+            sha512sum "xdelta-binaries/${VCPKG_BINARY_FILE}" | awk '{print $1}' > "release-files/${VCPKG_BINARY_SHA512}"
+            WARNING_MESSAGES="${WARNING_MESSAGES}Generated missing SHA512 hash file; "
+          fi
+        else
+          echo "❌ vcpkg binaries not found"
+
+          if [ "$VALIDATION_ENABLED" = "true" ]; then
+            PREPARATION_OK=false
+            ERROR_MESSAGES="${ERROR_MESSAGES}vcpkg binaries not found; "
+          else
+            # Create a placeholder file for non-validation mode
+            echo "⚠️ Creating placeholder vcpkg binaries file for testing"
+            echo "PLACEHOLDER: This is not a real vcpkg binary package. This file was created because the actual artifact was not found." > "release-files/${VCPKG_BINARY_FILE}"
+            echo "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" > "release-files/${VCPKG_BINARY_SHA512}"
+            WARNING_MESSAGES="${WARNING_MESSAGES}Created placeholder for missing vcpkg binaries; "
+          fi
+        fi
+
+        # Verify all release files
+        echo "Verifying release files..."
+        if [ -d "release-files" ]; then
+          echo "Files prepared for release:"
+          ls -la release-files/
+
+          # Check if all required files exist
+          REQUIRED_FILES=(
+            "xdelta3-windows-x64.zip"
+            "xdelta3-windows-x86.zip"
+            "xdelta3-linux.tar.gz"
+            "xdelta-${VERSION}-windows.zip"
+            "xdelta-${VERSION}-windows.zip.sha512"
+          )
+
+          MISSING_FILES=()
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "release-files/$file" ]; then
+              MISSING_FILES+=("$file")
+            elif ! check_file_size "release-files/$file" 100; then
+              echo "⚠️ File is suspiciously small: $file ($(stat -c%s "release-files/$file") bytes)"
+              WARNING_MESSAGES="${WARNING_MESSAGES}File is suspiciously small: $file; "
+            fi
+          done
+
+          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+            echo "✅ All required files are present"
+          else
+            echo "❌ Missing required files: ${MISSING_FILES[*]}"
+            if [ "$VALIDATION_ENABLED" = "true" ]; then
+              PREPARATION_OK=false
+              ERROR_MESSAGES="${ERROR_MESSAGES}Missing required files: ${MISSING_FILES[*]}; "
+            else
+              WARNING_MESSAGES="${WARNING_MESSAGES}Missing required files: ${MISSING_FILES[*]}; "
+            fi
+          fi
+        else
+          echo "❌ release-files directory not found"
+          PREPARATION_OK=false
+          ERROR_MESSAGES="${ERROR_MESSAGES}release-files directory not found; "
+        fi
+
+        # Set outputs
+        echo "preparation_ok=$PREPARATION_OK" >> $GITHUB_OUTPUT
+        echo "error_messages=$ERROR_MESSAGES" >> $GITHUB_OUTPUT
+        echo "warning_messages=$WARNING_MESSAGES" >> $GITHUB_OUTPUT
+
+        # Output summary
+        echo "=== Release Files Preparation Summary ==="
+        if [ "$PREPARATION_OK" = "true" ]; then
+          echo "✅ Release files prepared successfully"
+        else
+          echo "❌ Release files preparation failed with errors:"
+          echo "$ERROR_MESSAGES"
+
+          # Fail if validation is enabled
+          if [ "$VALIDATION_ENABLED" = "true" ]; then
+            echo "::error::Release files preparation failed: $ERROR_MESSAGES"
             exit 1
           fi
-        elif [ -f "xdelta-${VERSION}-windows.zip" ]; then
-          echo "Found vcpkg binaries"
-          cp "xdelta-${VERSION}-windows.zip" release-files/
-          if [ -f "xdelta-${VERSION}-windows.zip.sha512" ]; then
-            cp "xdelta-${VERSION}-windows.zip.sha512" release-files/
-          else
-            # Generate SHA512 if not found
-            sha512sum "xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
-          fi
-        elif [ -d "xdelta-binaries" ]; then
-          echo "Found vcpkg binaries directory"
-          if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip" ]; then
-            cp "xdelta-binaries/xdelta-${VERSION}-windows.zip" release-files/
-            if [ -f "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" ]; then
-              cp "xdelta-binaries/xdelta-${VERSION}-windows.zip.sha512" release-files/
-            else
-              # Generate SHA512 if not found
-              sha512sum "xdelta-binaries/xdelta-${VERSION}-windows.zip" | awk '{print $1}' > "release-files/xdelta-${VERSION}-windows.zip.sha512"
-            fi
-          else
-            echo "ERROR: vcpkg binaries not found in directory"
-            exit 1
-          fi
-        else
-          echo "ERROR: vcpkg binaries not found and export-binaries.ps1 script not found"
-          exit 1
         fi
 
-        # List all files in the release directory
-        echo "Files prepared for release:"
-        ls -la release-files/
+        if [ -n "$WARNING_MESSAGES" ]; then
+          echo "⚠️ Warnings during release files preparation:"
+          echo "$WARNING_MESSAGES"
+        fi
+
+    - name: Verify release readiness
+      id: verify_release
+      run: |
+        # Check if previous steps were successful
+        ARTIFACTS_OK="${{ steps.verify_artifacts.outputs.artifacts_ok }}"
+        PREPARATION_OK="${{ steps.prepare_release_files.outputs.preparation_ok }}"
+        VALIDATION_ENABLED="${{ env.RELEASE_VALIDATION }}"
+
+        echo "Verifying release readiness..."
+        echo "Artifacts validation: $ARTIFACTS_OK"
+        echo "Release files preparation: $PREPARATION_OK"
+        echo "Validation enabled: $VALIDATION_ENABLED"
+
+        # Check if we can proceed with the release
+        if [ "$ARTIFACTS_OK" != "true" ] || [ "$PREPARATION_OK" != "true" ]; then
+          echo "❌ Release prerequisites not met:"
+
+          if [ "$ARTIFACTS_OK" != "true" ]; then
+            echo "  - Artifact validation failed: ${{ steps.verify_artifacts.outputs.error_messages }}"
+          fi
+
+          if [ "$PREPARATION_OK" != "true" ]; then
+            echo "  - Release files preparation failed: ${{ steps.prepare_release_files.outputs.error_messages }}"
+          fi
+
+          if [ "$VALIDATION_ENABLED" = "true" ]; then
+            echo "::error::Cannot proceed with release due to validation failures"
+            exit 1
+          else
+            echo "⚠️ Proceeding with release despite validation failures because validation is disabled"
+          fi
+        else
+          echo "✅ All release prerequisites met"
+        fi
+
+        # Check for warnings
+        ARTIFACT_WARNINGS="${{ steps.verify_artifacts.outputs.warning_messages }}"
+        PREPARATION_WARNINGS="${{ steps.prepare_release_files.outputs.warning_messages }}"
+
+        if [ -n "$ARTIFACT_WARNINGS" ] || [ -n "$PREPARATION_WARNINGS" ]; then
+          echo "⚠️ Release has warnings:"
+
+          if [ -n "$ARTIFACT_WARNINGS" ]; then
+            echo "  - Artifact warnings: $ARTIFACT_WARNINGS"
+          fi
+
+          if [ -n "$PREPARATION_WARNINGS" ]; then
+            echo "  - Preparation warnings: $PREPARATION_WARNINGS"
+          fi
+        fi
 
     - name: Create Release
       id: create_release
+      if: success() || (env.RELEASE_VALIDATION != 'true')
       uses: softprops/action-gh-release@v1
       with:
         name: Xdelta3 ${{ steps.get_version.outputs.VERSION }}

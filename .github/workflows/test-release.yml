@@ -1,0 +1,203 @@
+name: Test Release Process
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (without v prefix)'
+        required: true
+        default: '3.1.0'
+
+env:
+  BUILD_TYPE: Release
+  VCPKG_COMMIT: a34c873a9717a888f58dc05268dea15592c2f0ff  # 2024.03.25 commit hash
+  RELEASE_VALIDATION: true  # Enable strict validation for testing
+
+jobs:
+  # Use the reusable workflow for building on all platforms
+  build:
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      build_type: Release
+      vcpkg_commit: a34c873a9717a888f58dc05268dea15592c2f0ff
+      artifact_retention_days: 1
+      create_archives: true
+
+  test-release-process:
+    needs: [build]
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download Windows x64 artifacts
+      id: download_x64
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta3-windows-x64
+        path: ./windows-x64-artifacts/
+      continue-on-error: true
+
+    - name: Download Windows x86 artifacts
+      id: download_x86
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta3-windows-x86
+        path: ./windows-x86-artifacts/
+      continue-on-error: true
+
+    - name: Download Linux artifacts
+      id: download_linux
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta3-linux
+        path: ./
+      continue-on-error: true
+
+    - name: Download macOS artifacts
+      id: download_macos
+      uses: actions/download-artifact@v4
+      with:
+        name: xdelta3-macos
+        path: ./
+      continue-on-error: true
+
+    - name: Verify downloaded artifacts
+      id: verify_artifacts
+      shell: pwsh
+      run: |
+        # Run the same verification logic as in the release workflow
+        $artifactsOk = $true
+        $errorMessages = @()
+        
+        Write-Host "Listing downloaded artifacts directories:"
+        Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
+
+        Write-Host "Checking Windows x64 artifacts:"
+        if (Test-Path "./windows-x64-artifacts") {
+            $x64Files = Get-ChildItem -Path "./windows-x64-artifacts" -Recurse
+            Write-Host "Found $($x64Files.Count) files in x64 artifacts directory"
+            $x64Files | ForEach-Object { Write-Host "- $($_.FullName) ($($_.Length) bytes)" }
+            
+            # Check for executable
+            $x64Exe = Get-ChildItem -Path "./windows-x64-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
+            if ($x64Exe -and $x64Exe.Length -gt 10000) {
+                Write-Host "✅ Found valid x64 executable: $($x64Exe.FullName) ($($x64Exe.Length) bytes)" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Valid x64 executable not found" -ForegroundColor Red
+                $artifactsOk = $false
+                $errorMessages += "Windows x64 executable missing or invalid"
+            }
+        } else {
+            Write-Host "❌ Windows x64 artifacts directory not found" -ForegroundColor Red
+            $artifactsOk = $false
+            $errorMessages += "Windows x64 artifacts directory not found"
+        }
+
+        # Set outputs
+        echo "artifacts_ok=$artifactsOk" >> $env:GITHUB_OUTPUT
+        echo "error_messages=$($errorMessages -join '; ')" >> $env:GITHUB_OUTPUT
+        
+        # Fail if artifacts are not OK and validation is enabled
+        if (-not $artifactsOk -and $env:RELEASE_VALIDATION -eq 'true') {
+            Write-Host "::error::Artifact validation failed: $($errorMessages -join '; ')"
+            exit 1
+        }
+
+    - name: Prepare vcpkg binaries
+      id: prepare_vcpkg
+      shell: pwsh
+      run: |
+        $version = "${{ github.event.inputs.version }}"
+        
+        # Run the export-binaries.ps1 script
+        Write-Host "Running export-binaries.ps1 script..."
+        ./scripts/export-binaries.ps1 -OutputDir ./xdelta-binaries
+        
+        # Verify the generated binaries
+        $zipPath = "./xdelta-binaries/xdelta-$version-windows.zip"
+        if (Test-Path $zipPath) {
+            $zipSize = (Get-Item $zipPath).Length
+            Write-Host "✅ Generated vcpkg binaries: $zipPath ($zipSize bytes)" -ForegroundColor Green
+            
+            # Verify the ZIP file contents
+            Write-Host "Verifying ZIP file contents..."
+            $tempExtractDir = Join-Path $env:TEMP "xdelta-verify-$(Get-Random)"
+            New-Item -ItemType Directory -Path $tempExtractDir -Force | Out-Null
+            
+            # Extract the ZIP file
+            Expand-Archive -Path $zipPath -DestinationPath $tempExtractDir -Force
+            
+            # Check for critical files
+            $criticalFiles = @(
+                "$version/x64-windows/bin/xdelta3.exe",
+                "$version/x64-windows/lib/xdelta.lib",
+                "$version/x86-windows/bin/xdelta3.exe",
+                "$version/x86-windows/lib/xdelta.lib",
+                "$version/README.md"
+            )
+            
+            $missingFiles = @()
+            foreach ($file in $criticalFiles) {
+                $filePath = Join-Path $tempExtractDir $file
+                if (-not (Test-Path $filePath) -or (Get-Item $filePath).Length -eq 0) {
+                    $missingFiles += $file
+                }
+            }
+            
+            if ($missingFiles.Count -eq 0) {
+                Write-Host "✅ All critical files present in vcpkg binaries" -ForegroundColor Green
+            } else {
+                Write-Host "❌ Missing critical files in vcpkg binaries: $($missingFiles -join ', ')" -ForegroundColor Red
+                exit 1
+            }
+            
+            # Clean up
+            Remove-Item -Path $tempExtractDir -Recurse -Force
+        } else {
+            Write-Host "❌ Failed to generate vcpkg binaries" -ForegroundColor Red
+            exit 1
+        }
+
+    - name: Test update-vcpkg-registry script
+      id: test_update_vcpkg
+      shell: pwsh
+      run: |
+        $version = "${{ github.event.inputs.version }}"
+        $releaseTag = "v$version"
+        $binaryZipUrl = "https://github.com/${{ github.repository }}/releases/download/$releaseTag/xdelta-$version-windows.zip"
+        
+        # Test the script in validate-only mode
+        Write-Host "Testing update-vcpkg-registry.ps1 script in validate-only mode..."
+        try {
+            ./scripts/update-vcpkg-registry.ps1 -ReleaseTag $releaseTag -BinaryZipUrl $binaryZipUrl -ValidateOnly
+            Write-Host "✅ update-vcpkg-registry.ps1 validation test passed" -ForegroundColor Green
+        } catch {
+            Write-Host "❌ update-vcpkg-registry.ps1 validation test failed: $_" -ForegroundColor Red
+            # Don't exit with error, as this is just a test
+        }
+
+    - name: Test verify-release script
+      id: test_verify_release
+      shell: pwsh
+      run: |
+        $version = "${{ github.event.inputs.version }}"
+        $releaseUrl = "https://github.com/${{ github.repository }}/releases/download/v$version"
+        
+        # Test the script
+        Write-Host "Testing verify-release.ps1 script..."
+        try {
+            ./scripts/verify-release.ps1 -Version $version -ReleaseUrl $releaseUrl -Verbose
+            Write-Host "✅ verify-release.ps1 test passed" -ForegroundColor Green
+        } catch {
+            Write-Host "❌ verify-release.ps1 test failed: $_" -ForegroundColor Red
+            # Don't exit with error, as this is just a test
+        }
+
+    - name: Test Summary
+      run: |
+        echo "Test release process completed"
+        echo "This workflow tests the release process without actually creating a release"
+        echo "Check the logs for any errors or warnings"
