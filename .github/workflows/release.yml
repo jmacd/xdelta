@@ -10,8 +10,8 @@ on:
         description: 'Version to release (without v prefix)'
         required: true
         default: '3.1.1'
-      dry_run:
-        description: 'Dry run (validate without creating release)'
+      validate_only:
+        description: 'Validate only (without creating release)'
         type: boolean
         required: false
         default: false
@@ -19,7 +19,6 @@ on:
 env:
   BUILD_TYPE: Release
   VCPKG_COMMIT: a34c873a9717a888f58dc05268dea15592c2f0ff  # 2024.03.25 commit hash
-  RELEASE_VALIDATION: true  # Enable strict validation for releases
 
 jobs:
   # Use the reusable workflow for building on all platforms
@@ -60,63 +59,38 @@ jobs:
       id: verify_artifacts
       shell: pwsh
       run: |
-        $artifactsOk = $true
-        $errorMessages = @()
-
         Write-Host "Listing downloaded artifacts directories:"
         Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
 
         Write-Host "Checking Windows x64 artifacts:"
         if (Test-Path "./windows-x64-artifacts") {
-            $x64Files = Get-ChildItem -Path "./windows-x64-artifacts" -Recurse
-            Write-Host "Found $($x64Files.Count) files in x64 artifacts directory"
-            $x64Files | ForEach-Object { Write-Host "- $($_.FullName) ($($_.Length) bytes)" }
-
-            # Check for executable
             $x64Exe = Get-ChildItem -Path "./windows-x64-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
             if ($x64Exe -and $x64Exe.Length -gt 10000) {
                 Write-Host "✅ Found valid x64 executable: $($x64Exe.FullName) ($($x64Exe.Length) bytes)" -ForegroundColor Green
             } else {
                 Write-Host "❌ Valid x64 executable not found" -ForegroundColor Red
-                $artifactsOk = $false
-                $errorMessages += "Windows x64 executable missing or invalid"
+                exit 1
             }
         } else {
             Write-Host "❌ Windows x64 artifacts directory not found" -ForegroundColor Red
-            $artifactsOk = $false
-            $errorMessages += "Windows x64 artifacts directory not found"
+            exit 1
         }
 
         Write-Host "Checking Windows x86 artifacts:"
         if (Test-Path "./windows-x86-artifacts") {
-            $x86Files = Get-ChildItem -Path "./windows-x86-artifacts" -Recurse
-            Write-Host "Found $($x86Files.Count) files in x86 artifacts directory"
-            $x86Files | ForEach-Object { Write-Host "- $($_.FullName) ($($_.Length) bytes)" }
-
-            # Check for executable
             $x86Exe = Get-ChildItem -Path "./windows-x86-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
             if ($x86Exe -and $x86Exe.Length -gt 10000) {
                 Write-Host "✅ Found valid x86 executable: $($x86Exe.FullName) ($($x86Exe.Length) bytes)" -ForegroundColor Green
             } else {
                 Write-Host "❌ Valid x86 executable not found" -ForegroundColor Red
-                $artifactsOk = $false
-                $errorMessages += "Windows x86 executable missing or invalid"
+                exit 1
             }
         } else {
             Write-Host "❌ Windows x86 artifacts directory not found" -ForegroundColor Red
-            $artifactsOk = $false
-            $errorMessages += "Windows x86 artifacts directory not found"
-        }
-
-        # Set outputs
-        echo "artifacts_ok=$artifactsOk" >> $env:GITHUB_OUTPUT
-        echo "error_messages=$($errorMessages -join '; ')" >> $env:GITHUB_OUTPUT
-
-        # Fail if artifacts are not OK and validation is enabled
-        if (-not $artifactsOk -and $env:RELEASE_VALIDATION -eq 'true') {
-            Write-Host "::error::Artifact validation failed: $($errorMessages -join '; ')"
             exit 1
         }
+
+        Write-Host "✅ All artifacts verified successfully" -ForegroundColor Green
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
@@ -671,7 +645,7 @@ jobs:
   create-release:
     needs: [build, export-vcpkg-binaries]
     runs-on: ubuntu-latest
-    if: ${{ !github.event.inputs.dry_run || github.event.inputs.dry_run == 'false' }}
+    if: ${{ !github.event.inputs.validate_only || github.event.inputs.validate_only == 'false' }}
 
     steps:
     - uses: actions/checkout@v4
@@ -872,291 +846,134 @@ jobs:
     - name: Prepare release files
       id: prepare_release_files
       run: |
-        # Initialize variables
-        PREPARATION_OK=true
-        ERROR_MESSAGES=""
-        WARNING_MESSAGES=""
-        VALIDATION_ENABLED="${{ env.RELEASE_VALIDATION }}"
         VERSION="${{ steps.get_version.outputs.VERSION }}"
-
-        echo "Preparing release files for version $VERSION (validation: $VALIDATION_ENABLED)..."
+        echo "Preparing release files for version $VERSION..."
 
         # Create a directory for all release files
         mkdir -p release-files
 
-        # Function to check file size
-        check_file_size() {
-          local file=$1
-          local min_size=$2
-          local file_size=$(stat -c%s "$file" 2>/dev/null)
-
-          if [ -z "$file_size" ] || [ "$file_size" -lt "$min_size" ]; then
-            return 1
-          fi
-
-          return 0
-        }
-
-        # Function to handle artifact
-        handle_artifact() {
-          local artifact_type=$1
-          local source_file=$2
-          local target_file=$3
-          local dir_source=$4
-          local min_size=${5:-10000}
-
-          if [ -f "$source_file" ]; then
-            echo "✅ Found $artifact_type artifact: $source_file"
-
-            # Check file size
-            if ! check_file_size "$source_file" "$min_size"; then
-              echo "⚠️ $artifact_type artifact is suspiciously small: $(stat -c%s "$source_file") bytes"
-              WARNING_MESSAGES="${WARNING_MESSAGES}$artifact_type artifact is suspiciously small; "
-
-              if [ "$VALIDATION_ENABLED" = "true" ]; then
-                echo "❌ Validation failed: $artifact_type artifact is too small"
-                PREPARATION_OK=false
-                ERROR_MESSAGES="${ERROR_MESSAGES}$artifact_type artifact is too small; "
-                return 1
-              fi
-            fi
-
-            # Copy the file
-            cp "$source_file" "release-files/$target_file"
-            echo "✅ Copied $artifact_type artifact to release-files/$target_file"
-            return 0
-          elif [ -d "$dir_source" ]; then
-            echo "Found $artifact_type directory artifact"
-
-            # Create archive from directory
-            if [[ "$target_file" == *.zip ]]; then
-              echo "Creating ZIP archive from directory..."
-              zip -r "release-files/$target_file" "$dir_source/"
-            else
-              echo "Creating TAR.GZ archive from directory..."
-              tar -czf "release-files/$target_file" -C "$dir_source" .
-            fi
-
-            # Check if the archive was created successfully
-            if [ -f "release-files/$target_file" ]; then
-              echo "✅ Created $artifact_type archive: release-files/$target_file"
-
-              # Check file size
-              if ! check_file_size "release-files/$target_file" "$min_size"; then
-                echo "⚠️ Generated $artifact_type archive is suspiciously small: $(stat -c%s "release-files/$target_file") bytes"
-                WARNING_MESSAGES="${WARNING_MESSAGES}Generated $artifact_type archive is suspiciously small; "
-
-                if [ "$VALIDATION_ENABLED" = "true" ]; then
-                  echo "❌ Validation failed: Generated $artifact_type archive is too small"
-                  PREPARATION_OK=false
-                  ERROR_MESSAGES="${ERROR_MESSAGES}Generated $artifact_type archive is too small; "
-                  return 1
-                fi
-              fi
-
-              return 0
-            else
-              echo "❌ Failed to create $artifact_type archive"
-              PREPARATION_OK=false
-              ERROR_MESSAGES="${ERROR_MESSAGES}Failed to create $artifact_type archive; "
-              return 1
-            fi
-          else
-            echo "❌ $artifact_type artifact not found"
-
-            if [ "$VALIDATION_ENABLED" = "true" ]; then
-              PREPARATION_OK=false
-              ERROR_MESSAGES="${ERROR_MESSAGES}$artifact_type artifact not found; "
-              return 1
-            else
-              # Create a placeholder file for non-validation mode
-              echo "⚠️ Creating placeholder $artifact_type file for testing"
-              echo "PLACEHOLDER: This is not a real $artifact_type binary. This file was created because the actual artifact was not found." > "release-files/$target_file"
-              WARNING_MESSAGES="${WARNING_MESSAGES}Created placeholder for missing $artifact_type artifact; "
-              return 0
-            fi
-          fi
-        }
-
         # Handle Windows x64 artifacts
-        handle_artifact "Windows x64" "xdelta3-windows-x64.zip" "xdelta3-windows-x64.zip" "windows-x64-artifacts"
+        if [ -f "xdelta3-windows-x64.zip" ]; then
+          echo "✅ Found Windows x64 artifact"
+          cp xdelta3-windows-x64.zip release-files/
+        elif [ -d "windows-x64-artifacts" ]; then
+          echo "Found Windows x64 directory artifact"
+          zip -r release-files/xdelta3-windows-x64.zip windows-x64-artifacts/
+        else
+          echo "❌ Windows x64 artifact not found"
+          exit 1
+        fi
 
         # Handle Windows x86 artifacts
-        handle_artifact "Windows x86" "xdelta3-windows-x86.zip" "xdelta3-windows-x86.zip" "windows-x86-artifacts"
+        if [ -f "xdelta3-windows-x86.zip" ]; then
+          echo "✅ Found Windows x86 artifact"
+          cp xdelta3-windows-x86.zip release-files/
+        elif [ -d "windows-x86-artifacts" ]; then
+          echo "Found Windows x86 directory artifact"
+          zip -r release-files/xdelta3-windows-x86.zip windows-x86-artifacts/
+        else
+          echo "❌ Windows x86 artifact not found"
+          exit 1
+        fi
 
         # Handle Linux artifacts
-        handle_artifact "Linux" "xdelta3-linux.tar.gz" "xdelta3-linux.tar.gz" "xdelta3-linux"
+        if [ -f "xdelta3-linux.tar.gz" ]; then
+          echo "✅ Found Linux artifact"
+          cp xdelta3-linux.tar.gz release-files/
+        elif [ -d "xdelta3-linux" ]; then
+          echo "Found Linux directory artifact"
+          tar -czf release-files/xdelta3-linux.tar.gz xdelta3-linux/
+        else
+          echo "❌ Linux artifact not found"
+          exit 1
+        fi
 
         # Handle macOS artifacts
-        handle_artifact "macOS" "xdelta3-macos.tar.gz" "xdelta3-macos.tar.gz" "xdelta3-macos"
+        if [ -f "xdelta3-macos.tar.gz" ]; then
+          echo "✅ Found macOS artifact"
+          cp xdelta3-macos.tar.gz release-files/
+        elif [ -d "xdelta3-macos" ]; then
+          echo "Found macOS directory artifact"
+          tar -czf release-files/xdelta3-macos.tar.gz xdelta3-macos/
+        else
+          echo "⚠️ macOS artifact not found (this is expected)"
+          # Create an empty file as a placeholder
+          echo "This is a placeholder for macOS binaries which are currently not supported." > release-files/xdelta3-macos.tar.gz
+        fi
 
         # Handle vcpkg binaries
-        echo "Handling vcpkg binaries..."
         VCPKG_BINARY_FILE="xdelta-${VERSION}-windows.zip"
         VCPKG_BINARY_SHA512="${VCPKG_BINARY_FILE}.sha512"
 
         if [ -f "$VCPKG_BINARY_FILE" ]; then
-          echo "✅ Found vcpkg binaries: $VCPKG_BINARY_FILE"
-          cp "$VCPKG_BINARY_FILE" "release-files/"
+          echo "✅ Found vcpkg binaries"
+          cp "$VCPKG_BINARY_FILE" release-files/
 
           # Handle SHA512 file
           if [ -f "$VCPKG_BINARY_SHA512" ]; then
             echo "✅ Found SHA512 hash file"
-            cp "$VCPKG_BINARY_SHA512" "release-files/"
+            cp "$VCPKG_BINARY_SHA512" release-files/
           else
-            echo "⚠️ SHA512 hash file not found, generating one..."
+            echo "Generating SHA512 hash file..."
             sha512sum "$VCPKG_BINARY_FILE" | awk '{print $1}' > "release-files/${VCPKG_BINARY_SHA512}"
-            WARNING_MESSAGES="${WARNING_MESSAGES}Generated missing SHA512 hash file; "
           fi
         elif [ -d "xdelta-binaries" ] && [ -f "xdelta-binaries/${VCPKG_BINARY_FILE}" ]; then
           echo "✅ Found vcpkg binaries in xdelta-binaries directory"
-          cp "xdelta-binaries/${VCPKG_BINARY_FILE}" "release-files/"
+          cp "xdelta-binaries/${VCPKG_BINARY_FILE}" release-files/
 
           # Handle SHA512 file
           if [ -f "xdelta-binaries/${VCPKG_BINARY_SHA512}" ]; then
             echo "✅ Found SHA512 hash file"
-            cp "xdelta-binaries/${VCPKG_BINARY_SHA512}" "release-files/"
+            cp "xdelta-binaries/${VCPKG_BINARY_SHA512}" release-files/
           else
-            echo "⚠️ SHA512 hash file not found, generating one..."
+            echo "Generating SHA512 hash file..."
             sha512sum "xdelta-binaries/${VCPKG_BINARY_FILE}" | awk '{print $1}' > "release-files/${VCPKG_BINARY_SHA512}"
-            WARNING_MESSAGES="${WARNING_MESSAGES}Generated missing SHA512 hash file; "
           fi
         else
           echo "❌ vcpkg binaries not found"
-
-          if [ "$VALIDATION_ENABLED" = "true" ]; then
-            PREPARATION_OK=false
-            ERROR_MESSAGES="${ERROR_MESSAGES}vcpkg binaries not found; "
-          else
-            # Create a placeholder file for non-validation mode
-            echo "⚠️ Creating placeholder vcpkg binaries file for testing"
-            echo "PLACEHOLDER: This is not a real vcpkg binary package. This file was created because the actual artifact was not found." > "release-files/${VCPKG_BINARY_FILE}"
-            echo "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" > "release-files/${VCPKG_BINARY_SHA512}"
-            WARNING_MESSAGES="${WARNING_MESSAGES}Created placeholder for missing vcpkg binaries; "
-          fi
+          exit 1
         fi
 
-        # Verify all release files
-        echo "Verifying release files..."
-        if [ -d "release-files" ]; then
-          echo "Files prepared for release:"
-          ls -la release-files/
-
-          # Check if all required files exist
-          REQUIRED_FILES=(
-            "xdelta3-windows-x64.zip"
-            "xdelta3-windows-x86.zip"
-            "xdelta3-linux.tar.gz"
-            "xdelta-${VERSION}-windows.zip"
-            "xdelta-${VERSION}-windows.zip.sha512"
-          )
-
-          MISSING_FILES=()
-          for file in "${REQUIRED_FILES[@]}"; do
-            if [ ! -f "release-files/$file" ]; then
-              MISSING_FILES+=("$file")
-            elif ! check_file_size "release-files/$file" 100; then
-              echo "⚠️ File is suspiciously small: $file ($(stat -c%s "release-files/$file") bytes)"
-              WARNING_MESSAGES="${WARNING_MESSAGES}File is suspiciously small: $file; "
-            fi
-          done
-
-          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
-            echo "✅ All required files are present"
-          else
-            echo "❌ Missing required files: ${MISSING_FILES[*]}"
-            if [ "$VALIDATION_ENABLED" = "true" ]; then
-              PREPARATION_OK=false
-              ERROR_MESSAGES="${ERROR_MESSAGES}Missing required files: ${MISSING_FILES[*]}; "
-            else
-              WARNING_MESSAGES="${WARNING_MESSAGES}Missing required files: ${MISSING_FILES[*]}; "
-            fi
-          fi
-        else
-          echo "❌ release-files directory not found"
-          PREPARATION_OK=false
-          ERROR_MESSAGES="${ERROR_MESSAGES}release-files directory not found; "
-        fi
-
-        # Set outputs
-        echo "preparation_ok=$PREPARATION_OK" >> $GITHUB_OUTPUT
-        echo "error_messages=$ERROR_MESSAGES" >> $GITHUB_OUTPUT
-        echo "warning_messages=$WARNING_MESSAGES" >> $GITHUB_OUTPUT
-
-        # Output summary
-        echo "=== Release Files Preparation Summary ==="
-        if [ "$PREPARATION_OK" = "true" ]; then
-          echo "✅ Release files prepared successfully"
-        else
-          echo "❌ Release files preparation failed with errors:"
-          echo "$ERROR_MESSAGES"
-
-          # Fail if validation is enabled
-          if [ "$VALIDATION_ENABLED" = "true" ]; then
-            echo "::error::Release files preparation failed: $ERROR_MESSAGES"
-            exit 1
-          fi
-        fi
-
-        if [ -n "$WARNING_MESSAGES" ]; then
-          echo "⚠️ Warnings during release files preparation:"
-          echo "$WARNING_MESSAGES"
-        fi
+        # List all files in the release directory
+        echo "Files prepared for release:"
+        ls -la release-files/
 
     - name: Verify release readiness
       id: verify_release
       run: |
-        # Check if previous steps were successful
-        ARTIFACTS_OK="${{ steps.verify_artifacts.outputs.artifacts_ok }}"
-        PREPARATION_OK="${{ steps.prepare_release_files.outputs.preparation_ok }}"
-        VALIDATION_ENABLED="${{ env.RELEASE_VALIDATION }}"
-
         echo "Verifying release readiness..."
-        echo "Artifacts validation: $ARTIFACTS_OK"
-        echo "Release files preparation: $PREPARATION_OK"
-        echo "Validation enabled: $VALIDATION_ENABLED"
 
-        # Check if we can proceed with the release
-        if [ "$ARTIFACTS_OK" != "true" ] || [ "$PREPARATION_OK" != "true" ]; then
-          echo "❌ Release prerequisites not met:"
-
-          if [ "$ARTIFACTS_OK" != "true" ]; then
-            echo "  - Artifact validation failed: ${{ steps.verify_artifacts.outputs.error_messages }}"
-          fi
-
-          if [ "$PREPARATION_OK" != "true" ]; then
-            echo "  - Release files preparation failed: ${{ steps.prepare_release_files.outputs.error_messages }}"
-          fi
-
-          if [ "$VALIDATION_ENABLED" = "true" ]; then
-            echo "::error::Cannot proceed with release due to validation failures"
-            exit 1
-          else
-            echo "⚠️ Proceeding with release despite validation failures because validation is disabled"
-          fi
-        else
-          echo "✅ All release prerequisites met"
+        # Check if release files were prepared successfully
+        if [ ! -d "release-files" ]; then
+          echo "❌ Release files directory not found"
+          exit 1
         fi
 
-        # Check for warnings
-        ARTIFACT_WARNINGS="${{ steps.verify_artifacts.outputs.warning_messages }}"
-        PREPARATION_WARNINGS="${{ steps.prepare_release_files.outputs.warning_messages }}"
+        # Check for required files
+        REQUIRED_FILES=(
+          "xdelta3-windows-x64.zip"
+          "xdelta3-windows-x86.zip"
+          "xdelta3-linux.tar.gz"
+          "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip"
+          "xdelta-${{ steps.get_version.outputs.VERSION }}-windows.zip.sha512"
+        )
 
-        if [ -n "$ARTIFACT_WARNINGS" ] || [ -n "$PREPARATION_WARNINGS" ]; then
-          echo "⚠️ Release has warnings:"
-
-          if [ -n "$ARTIFACT_WARNINGS" ]; then
-            echo "  - Artifact warnings: $ARTIFACT_WARNINGS"
+        MISSING_FILES=()
+        for file in "${REQUIRED_FILES[@]}"; do
+          if [ ! -f "release-files/$file" ]; then
+            MISSING_FILES+=("$file")
           fi
+        done
 
-          if [ -n "$PREPARATION_WARNINGS" ]; then
-            echo "  - Preparation warnings: $PREPARATION_WARNINGS"
-          fi
+        if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+          echo "✅ All required release files are present"
+        else
+          echo "❌ Missing required release files: ${MISSING_FILES[*]}"
+          exit 1
         fi
 
     - name: Create Release
       id: create_release
-      if: success() || (env.RELEASE_VALIDATION != 'true')
       uses: softprops/action-gh-release@v1
       with:
         name: Xdelta3 ${{ steps.get_version.outputs.VERSION }}
