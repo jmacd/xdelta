@@ -217,34 +217,19 @@ jobs:
             Write-Host "No DLLs found at: $dllPath (this may be normal for static builds)"
         }
 
-        # Create README using the external script
-        Write-Host "Creating README file using script..."
+        # Create README and process artifacts using the unified script
+        Write-Host "Processing artifacts using unified script..."
 
-        # Make the script executable (in case it's not)
-        $scriptPath = "${{ github.workspace }}\.github\scripts\create-readme-windows.ps1"
+        # Use bash to run the unified script
+        bash -c "chmod +x '${{ github.workspace }}/.github/scripts/process-artifacts.sh' && '${{ github.workspace }}/.github/scripts/process-artifacts.sh' create windows '$artifactsDir' '${{ matrix.arch }}'"
 
-        # Run the script with the artifacts directory as parameter
-        Write-Host "Running script: $scriptPath -ArtifactsDir $artifactsDir"
-        try {
-            & "$scriptPath" -ArtifactsDir $artifactsDir
-
-            # Verify the README was created
-            $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-            if (Test-Path $readmePath) {
-                Write-Host "README.txt verified at: $readmePath"
-                Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
-            } else {
-                Write-Host "WARNING: README.txt not found after running script"
-            }
-        } catch {
-            Write-Host "Error running README script: $_"
-            Write-Host "Stack trace: $($_.ScriptStackTrace)"
-            Write-Host "WARNING: Creating a simple README as fallback..."
-
-            # Create a simple README as fallback
-            $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-            Set-Content -Path $readmePath -Value "Xdelta3 Windows Binary`r`n======================`r`n`r`nThis package contains the xdelta3 command-line utility for Windows.`r`n`r`nFor usage information, run: xdelta3.exe --help"
-            Write-Host "Fallback README created successfully"
+        # Verify the README was created
+        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+        if (Test-Path $readmePath) {
+            Write-Host "README.txt verified at: $readmePath"
+            Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
+        } else {
+            Write-Host "WARNING: README.txt not found after running script"
         }
 
         # Create zip archive if requested with detailed error handling
@@ -298,56 +283,51 @@ jobs:
 
     # Add a verification step before uploading artifacts
     - name: Verify artifacts before upload
-      shell: pwsh
+      shell: bash
       continue-on-error: true  # Continue even if this step fails
       run: |
-        Write-Host "Verifying artifacts before upload..."
+        echo "Verifying artifacts before upload..."
 
-        # Use the verification script
-        $scriptPath = "${{ github.workspace }}\.github\scripts\verify-artifacts.ps1"
+        # Make the script executable
+        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
 
         # Check if we're using archives or directories
-        if (${{ inputs.create_archives }}) {
-            $artifactPath = "xdelta3-windows-${{ matrix.arch }}.zip"
-            Write-Host "Checking archive: $artifactPath"
+        if [ "${{ inputs.create_archives }}" = "true" ]; then
+            ARTIFACT_PATH="xdelta3-windows-${{ matrix.arch }}.zip"
+            echo "Checking archive: $ARTIFACT_PATH"
 
-            if (Test-Path $artifactPath) {
-                $fileInfo = Get-Item $artifactPath
-                Write-Host "Archive exists: $artifactPath"
-                Write-Host "Size: $($fileInfo.Length) bytes"
-                Write-Host "Last modified: $($fileInfo.LastWriteTime)"
-            } else {
-                Write-Host "::error::Archive not found: $artifactPath"
-            }
-        } else {
-            $artifactPath = "artifacts/windows-${{ matrix.arch }}"
-            Write-Host "Checking directory: $artifactPath"
+            if [ -f "$ARTIFACT_PATH" ]; then
+                echo "Archive exists: $ARTIFACT_PATH"
+                ls -la "$ARTIFACT_PATH"
 
-            if (Test-Path $artifactPath) {
-                # Run the verification script
-                Write-Host "Running verification script: $scriptPath -ArtifactsDir $artifactPath -Platform windows -Arch ${{ matrix.arch }}"
-                try {
-                    & "$scriptPath" -ArtifactsDir $artifactPath -Platform windows -Arch ${{ matrix.arch }}
-                    if ($LASTEXITCODE -eq 0) {
-                        Write-Host "✅ Artifacts verification passed"
-                    } else {
-                        Write-Host "⚠️ Artifacts verification failed with exit code: $LASTEXITCODE"
-                    }
-                } catch {
-                    Write-Host "Error running verification script: $_"
-                    Write-Host "Falling back to basic verification..."
+                # Verify archive contents
+                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify windows-archive "$ARTIFACT_PATH" "${{ matrix.arch }}"
+                if [ $? -eq 0 ]; then
+                    echo "✅ Archive verification passed"
+                else
+                    echo "⚠️ Archive verification failed"
+                fi
+            else
+                echo "::error::Archive not found: $ARTIFACT_PATH"
+            fi
+        else
+            ARTIFACT_PATH="artifacts/windows-${{ matrix.arch }}"
+            echo "Checking directory: $ARTIFACT_PATH"
 
-                    # Basic verification
-                    $files = Get-ChildItem -Path $artifactPath -Recurse
-                    Write-Host "Directory exists with $($files.Count) files"
-                    $files | ForEach-Object { Write-Host "- $($_.FullName)" }
-                }
-            } else {
-                Write-Host "::error::Directory not found: $artifactPath"
-            }
-        }
+            if [ -d "$ARTIFACT_PATH" ]; then
+                # Verify directory contents
+                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify windows "$ARTIFACT_PATH" "${{ matrix.arch }}"
+                if [ $? -eq 0 ]; then
+                    echo "✅ Directory verification passed"
+                else
+                    echo "⚠️ Directory verification failed"
+                fi
+            else
+                echo "::error::Directory not found: $ARTIFACT_PATH"
+            fi
+        fi
 
-        Write-Host "Artifact verification complete"
+        echo "Artifact verification complete"
 
     - name: Upload artifacts (directory)
       if: ${{ !inputs.create_archives }}
@@ -478,15 +458,15 @@ jobs:
         # Copy executables
         cp build/xdelta3 artifacts/linux/
 
-        # Create README using the external script
-        echo "Creating README file using script..."
+        # Process artifacts using the unified script
+        echo "Processing artifacts using unified script..."
 
-        # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/create-readme-linux.sh"
+        # Make the script executable and run it
+        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
+        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" create linux artifacts/linux
 
-        # Run the script with the artifacts directory as parameter
-        echo "Running script: ${{ github.workspace }}/.github/scripts/create-readme-linux.sh artifacts/linux"
-        "${{ github.workspace }}/.github/scripts/create-readme-linux.sh" artifacts/linux
+        # Verify artifacts
+        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify linux artifacts/linux
 
         # Verify README was created successfully
         if [ -f "artifacts/linux/README.txt" ]; then
@@ -508,7 +488,7 @@ jobs:
         echo "Verifying artifacts before upload..."
 
         # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/verify-artifacts.sh"
+        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
 
         # Check if we're using archives or directories
         if [ "${{ inputs.create_archives }}" = "true" ]; then
@@ -518,6 +498,14 @@ jobs:
             if [ -f "$ARTIFACT_PATH" ]; then
                 echo "Archive exists: $ARTIFACT_PATH"
                 ls -la "$ARTIFACT_PATH"
+
+                # Verify archive contents
+                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify linux-archive "$ARTIFACT_PATH"
+                if [ $? -eq 0 ]; then
+                    echo "✅ Archive verification passed"
+                else
+                    echo "⚠️ Archive verification failed"
+                fi
             else
                 echo "::error::Archive not found: $ARTIFACT_PATH"
             fi
@@ -526,13 +514,12 @@ jobs:
             echo "Checking directory: $ARTIFACT_PATH"
 
             if [ -d "$ARTIFACT_PATH" ]; then
-                # Run the verification script
-                echo "Running verification script: ${{ github.workspace }}/.github/scripts/verify-artifacts.sh $ARTIFACT_PATH linux"
-                "${{ github.workspace }}/.github/scripts/verify-artifacts.sh" "$ARTIFACT_PATH" linux ""
+                # Verify directory contents
+                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify linux "$ARTIFACT_PATH"
                 if [ $? -eq 0 ]; then
-                    echo "✅ Artifacts verification passed"
+                    echo "✅ Directory verification passed"
                 else
-                    echo "⚠️ Artifacts verification failed with exit code: $?"
+                    echo "⚠️ Directory verification failed"
                 fi
             else
                 echo "::error::Directory not found: $ARTIFACT_PATH"
@@ -592,15 +579,15 @@ jobs:
         # Create empty artifacts directory for the package job
         mkdir -p artifacts/macos
 
-        # Create README using the external script
-        echo "Creating README file using script..."
+        # Process artifacts using the unified script
+        echo "Processing artifacts using unified script..."
 
-        # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/create-readme-macos.sh"
+        # Make the script executable and run it
+        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
+        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" create macos artifacts/macos
 
-        # Run the script with the artifacts directory as parameter
-        echo "Running script: ${{ github.workspace }}/.github/scripts/create-readme-macos.sh artifacts/macos"
-        "${{ github.workspace }}/.github/scripts/create-readme-macos.sh" artifacts/macos
+        # Verify artifacts
+        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify macos artifacts/macos
 
         # Verify README was created successfully
         if [ -f "artifacts/macos/README.txt" ]; then
@@ -622,7 +609,7 @@ jobs:
         echo "Verifying artifacts before upload..."
 
         # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/verify-artifacts.sh"
+        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
 
         # Check if we're using archives or directories
         if [ "${{ inputs.create_archives }}" = "true" ]; then
@@ -632,6 +619,14 @@ jobs:
             if [ -f "$ARTIFACT_PATH" ]; then
                 echo "Archive exists: $ARTIFACT_PATH"
                 ls -la "$ARTIFACT_PATH"
+
+                # Verify archive contents
+                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify macos-archive "$ARTIFACT_PATH"
+                if [ $? -eq 0 ]; then
+                    echo "✅ Archive verification passed"
+                else
+                    echo "⚠️ Archive verification failed"
+                fi
             else
                 echo "::error::Archive not found: $ARTIFACT_PATH"
             fi
@@ -640,13 +635,12 @@ jobs:
             echo "Checking directory: $ARTIFACT_PATH"
 
             if [ -d "$ARTIFACT_PATH" ]; then
-                # Run the verification script
-                echo "Running verification script: ${{ github.workspace }}/.github/scripts/verify-artifacts.sh $ARTIFACT_PATH macos"
-                "${{ github.workspace }}/.github/scripts/verify-artifacts.sh" "$ARTIFACT_PATH" macos ""
+                # Verify directory contents
+                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify macos "$ARTIFACT_PATH"
                 if [ $? -eq 0 ]; then
-                    echo "✅ Artifacts verification passed"
+                    echo "✅ Directory verification passed"
                 else
-                    echo "⚠️ Artifacts verification failed with exit code: $?"
+                    echo "⚠️ Directory verification failed"
                 fi
             else
                 echo "::error::Directory not found: $ARTIFACT_PATH"
