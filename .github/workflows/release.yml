@@ -657,7 +657,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
-        path: ./
+        path: ./windows-x64/
       continue-on-error: true
 
     - name: Download Windows x86 artifacts
@@ -665,7 +665,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
-        path: ./
+        path: ./windows-x86/
       continue-on-error: true
 
     - name: Download Linux artifacts
@@ -673,7 +673,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-linux
-        path: ./
+        path: ./linux/
       continue-on-error: true
 
     - name: Download macOS artifacts
@@ -681,7 +681,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
-        path: ./
+        path: ./macos/
       continue-on-error: true
 
     - name: Download vcpkg binaries
@@ -707,6 +707,14 @@ jobs:
         echo "Listing downloaded artifacts:"
         ls -la
 
+        # List directories
+        echo "Listing directories:"
+        find . -type d -maxdepth 1 | sort
+
+        # List Windows x64 directory
+        echo "Listing Windows x64 directory:"
+        ls -la ./windows-x64/
+
         # Initialize variables
         ARTIFACTS_OK=true
         ERROR_MESSAGES=""
@@ -731,48 +739,69 @@ jobs:
 
         # Check Windows x64 artifact
         echo "Checking for Windows x64 artifact:"
-        if [ -f "xdelta3-windows-x64.zip" ]; then
-          echo "✅ Found xdelta3-windows-x64.zip ($(stat -c%s "xdelta3-windows-x64.zip") bytes)"
+        if [ -f "windows-x64/xdelta3-windows-x64.zip" ]; then
+          echo "✅ Found windows-x64/xdelta3-windows-x64.zip ($(stat -c%s "windows-x64/xdelta3-windows-x64.zip") bytes)"
+          # Copy to root for compatibility with existing scripts
+          cp windows-x64/xdelta3-windows-x64.zip ./
 
           # Check file size
           if ! check_file_size "xdelta3-windows-x64.zip" 10000; then
             echo "⚠️ Windows x64 artifact is suspiciously small"
             WARNING_MESSAGES="${WARNING_MESSAGES}Windows x64 artifact is suspiciously small; "
           fi
+        elif [ -f "windows-x64/xdelta3.exe" ]; then
+          echo "✅ Found windows-x64/xdelta3.exe, creating zip archive"
+          # Create zip archive
+          zip -j xdelta3-windows-x64.zip windows-x64/xdelta3.exe windows-x64/README.txt
+          echo "Created xdelta3-windows-x64.zip ($(stat -c%s "xdelta3-windows-x64.zip") bytes)"
         else
-          echo "❌ xdelta3-windows-x64.zip not found"
+          echo "❌ Windows x64 artifact not found"
           ARTIFACTS_OK=false
           ERROR_MESSAGES="${ERROR_MESSAGES}Windows x64 artifact not found; "
         fi
 
         # Check Windows x86 artifact
         echo "Checking for Windows x86 artifact:"
-        if [ -f "xdelta3-windows-x86.zip" ]; then
-          echo "✅ Found xdelta3-windows-x86.zip ($(stat -c%s "xdelta3-windows-x86.zip") bytes)"
+        if [ -f "windows-x86/xdelta3-windows-x86.zip" ]; then
+          echo "✅ Found windows-x86/xdelta3-windows-x86.zip ($(stat -c%s "windows-x86/xdelta3-windows-x86.zip") bytes)"
+          # Copy to root for compatibility with existing scripts
+          cp windows-x86/xdelta3-windows-x86.zip ./
 
           # Check file size
           if ! check_file_size "xdelta3-windows-x86.zip" 10000; then
             echo "⚠️ Windows x86 artifact is suspiciously small"
             WARNING_MESSAGES="${WARNING_MESSAGES}Windows x86 artifact is suspiciously small; "
           fi
+        elif [ -f "windows-x86/xdelta3.exe" ]; then
+          echo "✅ Found windows-x86/xdelta3.exe, creating zip archive"
+          # Create zip archive
+          zip -j xdelta3-windows-x86.zip windows-x86/xdelta3.exe windows-x86/README.txt
+          echo "Created xdelta3-windows-x86.zip ($(stat -c%s "xdelta3-windows-x86.zip") bytes)"
         else
-          echo "❌ xdelta3-windows-x86.zip not found"
+          echo "❌ Windows x86 artifact not found"
           ARTIFACTS_OK=false
           ERROR_MESSAGES="${ERROR_MESSAGES}Windows x86 artifact not found; "
         fi
 
         # Check Linux artifact
         echo "Checking for Linux artifact:"
-        if [ -f "xdelta3-linux.tar.gz" ]; then
-          echo "✅ Found xdelta3-linux.tar.gz ($(stat -c%s "xdelta3-linux.tar.gz") bytes)"
+        if [ -f "linux/xdelta3-linux.tar.gz" ]; then
+          echo "✅ Found linux/xdelta3-linux.tar.gz ($(stat -c%s "linux/xdelta3-linux.tar.gz") bytes)"
+          # Copy to root for compatibility with existing scripts
+          cp linux/xdelta3-linux.tar.gz ./
 
           # Check file size
           if ! check_file_size "xdelta3-linux.tar.gz" 10000; then
             echo "⚠️ Linux artifact is suspiciously small"
             WARNING_MESSAGES="${WARNING_MESSAGES}Linux artifact is suspiciously small; "
           fi
+        elif [ -f "linux/xdelta3" ]; then
+          echo "✅ Found linux/xdelta3, creating tar.gz archive"
+          # Create tar.gz archive
+          tar -czf xdelta3-linux.tar.gz -C linux .
+          echo "Created xdelta3-linux.tar.gz ($(stat -c%s "xdelta3-linux.tar.gz") bytes)"
         else
-          echo "❌ xdelta3-linux.tar.gz not found"
+          echo "❌ Linux artifact not found"
           ARTIFACTS_OK=false
           ERROR_MESSAGES="${ERROR_MESSAGES}Linux artifact not found; "
         fi

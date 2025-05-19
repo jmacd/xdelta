@@ -270,6 +270,11 @@ jobs:
                     $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
                     $zip.Entries | ForEach-Object { Write-Host "  $($_.FullName)" }
                     $zip.Dispose()
+
+                    # Copy the zip file to artifacts directory for consistency
+                    $artifactsZipPath = Join-Path -Path $artifactsDir -ChildPath $zipPath
+                    Write-Host "Copying zip file to artifacts directory: $artifactsZipPath"
+                    Copy-Item -Path $zipPath -Destination $artifactsDir -Force
                 } else {
                     throw "Failed to create zip archive: $zipPath"
                 }
@@ -479,6 +484,8 @@ jobs:
         # Create tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
           tar -czvf xdelta3-linux.tar.gz -C artifacts/linux .
+          # Copy the tarball to artifacts directory for consistency
+          cp xdelta3-linux.tar.gz artifacts/linux/
         fi
 
     # Add a verification step before uploading artifacts
@@ -600,6 +607,8 @@ jobs:
         # Create empty tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
           tar -czvf xdelta3-macos.tar.gz -C artifacts/macos .
+          # Copy the tarball to artifacts directory for consistency
+          cp xdelta3-macos.tar.gz artifacts/macos/
         fi
 
     # Add a verification step before uploading artifacts
