@@ -14,7 +14,7 @@ env:
 jobs:
   # Use the reusable workflow for building on all platforms
   build:
-    uses: ./.github/reusable/build.yml
+    uses: ./.github/reusable/build.yml@optimize-ci-workflows
     with:
       build_type: Release
       vcpkg_commit: a34c873a9717a888f58dc05268dea15592c2f0ff
@@ -24,7 +24,7 @@ jobs:
   # Test the export-vcpkg-binaries job from the release workflow
   test-vcpkg-export:
     needs: [build]
-    uses: ./.github/reusable/vcpkg-export.yml
+    uses: ./.github/reusable/vcpkg-export.yml@optimize-ci-workflows
     with:
       version: ${{ env.TEST_VERSION }}
       vcpkg_commit: ${{ env.VCPKG_COMMIT }}
@@ -34,7 +34,7 @@ jobs:
   # Test the release file preparation process
   test-release-preparation:
     needs: [build, test-vcpkg-export]
-    uses: ./.github/reusable/release-preparation.yml
+    uses: ./.github/reusable/release-preparation.yml@optimize-ci-workflows
     with:
       version: ${{ env.TEST_VERSION }}
       artifacts_dir: './artifacts'
