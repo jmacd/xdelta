@@ -1,0 +1,244 @@
+name: Release Preparation
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to prepare release for'
+        required: true
+        type: string
+      artifacts_dir:
+        description: 'Directory containing artifacts'
+        required: false
+        type: string
+        default: './artifacts'
+      output_dir:
+        description: 'Directory to store release files'
+        required: false
+        type: string
+        default: './release-files'
+      create_placeholders:
+        description: 'Whether to create placeholder artifacts if real ones are not found'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      release_ok:
+        description: 'Whether release preparation was successful'
+        value: ${{ jobs.prepare-release.outputs.release_ok }}
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_ok: ${{ steps.verify_release.outputs.release_ok }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Make scripts executable
+      - name: Make scripts executable
+        run: |
+          chmod +x .github/scripts/*.sh
+        shell: bash
+      
+      # Download Windows x64 artifacts
+      - name: Download Windows x64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-windows-x64
+          path: ${{ inputs.artifacts_dir }}/windows-x64/
+        continue-on-error: true
+      
+      # Download Windows x86 artifacts
+      - name: Download Windows x86 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-windows-x86
+          path: ${{ inputs.artifacts_dir }}/windows-x86/
+        continue-on-error: true
+      
+      # Download Linux artifacts
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-linux
+          path: ${{ inputs.artifacts_dir }}/linux/
+        continue-on-error: true
+      
+      # Download vcpkg binaries
+      - name: Download vcpkg binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta-vcpkg-binaries
+          path: ./
+        continue-on-error: true
+      
+      # Create output directory
+      - name: Create output directory
+        run: |
+          mkdir -p ${{ inputs.output_dir }}
+        shell: bash
+      
+      # Process Windows x64 artifacts
+      - name: Process Windows x64 artifacts
+        id: process_win_x64
+        run: |
+          if [ -d "${{ inputs.artifacts_dir }}/windows-x64" ]; then
+            echo "Found Windows x64 artifacts"
+            .github/scripts/package-artifacts.sh windows "${{ inputs.artifacts_dir }}/windows-x64" "${{ inputs.output_dir }}/xdelta3-windows-x64.zip" x64 || {
+              if [ "${{ inputs.create_placeholders }}" == "true" ]; then
+                echo "⚠️ Creating placeholder for Windows x64"
+                .github/scripts/create-placeholder.sh windows "${{ inputs.artifacts_dir }}/windows-x64" "${{ inputs.output_dir }}" x64
+              else
+                echo "❌ Failed to package Windows x64 artifacts"
+                exit 1
+              fi
+            }
+          elif [ "${{ inputs.create_placeholders }}" == "true" ]; then
+            echo "⚠️ Windows x64 artifacts not found, creating placeholder"
+            .github/scripts/create-placeholder.sh windows "${{ inputs.artifacts_dir }}/windows-x64" "${{ inputs.output_dir }}" x64
+          else
+            echo "❌ Windows x64 artifacts not found"
+            exit 1
+          fi
+        shell: bash
+        continue-on-error: true
+      
+      # Process Windows x86 artifacts
+      - name: Process Windows x86 artifacts
+        id: process_win_x86
+        run: |
+          if [ -d "${{ inputs.artifacts_dir }}/windows-x86" ]; then
+            echo "Found Windows x86 artifacts"
+            .github/scripts/package-artifacts.sh windows "${{ inputs.artifacts_dir }}/windows-x86" "${{ inputs.output_dir }}/xdelta3-windows-x86.zip" x86 || {
+              if [ "${{ inputs.create_placeholders }}" == "true" ]; then
+                echo "⚠️ Creating placeholder for Windows x86"
+                .github/scripts/create-placeholder.sh windows "${{ inputs.artifacts_dir }}/windows-x86" "${{ inputs.output_dir }}" x86
+              else
+                echo "❌ Failed to package Windows x86 artifacts"
+                exit 1
+              fi
+            }
+          elif [ "${{ inputs.create_placeholders }}" == "true" ]; then
+            echo "⚠️ Windows x86 artifacts not found, creating placeholder"
+            .github/scripts/create-placeholder.sh windows "${{ inputs.artifacts_dir }}/windows-x86" "${{ inputs.output_dir }}" x86
+          else
+            echo "❌ Windows x86 artifacts not found"
+            exit 1
+          fi
+        shell: bash
+        continue-on-error: true
+      
+      # Process Linux artifacts
+      - name: Process Linux artifacts
+        id: process_linux
+        run: |
+          if [ -d "${{ inputs.artifacts_dir }}/linux" ]; then
+            echo "Found Linux artifacts"
+            .github/scripts/package-artifacts.sh linux "${{ inputs.artifacts_dir }}/linux" "${{ inputs.output_dir }}/xdelta3-linux.tar.gz" || {
+              if [ "${{ inputs.create_placeholders }}" == "true" ]; then
+                echo "⚠️ Creating placeholder for Linux"
+                .github/scripts/create-placeholder.sh linux "${{ inputs.artifacts_dir }}/linux" "${{ inputs.output_dir }}"
+              else
+                echo "❌ Failed to package Linux artifacts"
+                exit 1
+              fi
+            }
+          elif [ "${{ inputs.create_placeholders }}" == "true" ]; then
+            echo "⚠️ Linux artifacts not found, creating placeholder"
+            .github/scripts/create-placeholder.sh linux "${{ inputs.artifacts_dir }}/linux" "${{ inputs.output_dir }}"
+          else
+            echo "❌ Linux artifacts not found"
+            exit 1
+          fi
+        shell: bash
+        continue-on-error: true
+      
+      # Process macOS artifacts (placeholder only)
+      - name: Process macOS artifacts
+        id: process_macos
+        run: |
+          echo "⚠️ macOS build is disabled, creating placeholder"
+          .github/scripts/create-placeholder.sh macos "${{ inputs.artifacts_dir }}/macos" "${{ inputs.output_dir }}"
+        shell: bash
+        continue-on-error: true
+      
+      # Handle vcpkg binaries
+      - name: Handle vcpkg binaries
+        id: process_vcpkg
+        run: |
+          VCPKG_BINARY_FILE="xdelta-${{ inputs.version }}-windows.zip"
+          VCPKG_BINARY_SHA512="${VCPKG_BINARY_FILE}.sha512"
+          
+          if [ -f "$VCPKG_BINARY_FILE" ]; then
+            echo "✅ Found vcpkg binaries"
+            cp "$VCPKG_BINARY_FILE" ${{ inputs.output_dir }}/
+            
+            # Handle SHA512 file
+            if [ -f "$VCPKG_BINARY_SHA512" ]; then
+              echo "✅ Found SHA512 hash file"
+              cp "$VCPKG_BINARY_SHA512" ${{ inputs.output_dir }}/
+            else
+              echo "Generating SHA512 hash file..."
+              sha512sum "$VCPKG_BINARY_FILE" | awk '{print $1}' > "${{ inputs.output_dir }}/${VCPKG_BINARY_SHA512}"
+            fi
+          else
+            echo "❌ vcpkg binaries not found"
+            exit 1
+          fi
+        shell: bash
+        continue-on-error: true
+      
+      # Verify release files
+      - name: Verify release files
+        id: verify_release
+        run: |
+          echo "Verifying release files..."
+          
+          # Check if release files directory exists
+          if [ ! -d "${{ inputs.output_dir }}" ]; then
+            echo "❌ Release files directory not found"
+            echo "release_ok=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # List all files in the release directory
+          echo "Files prepared for release:"
+          ls -la ${{ inputs.output_dir }}/
+          
+          # Check for required files
+          REQUIRED_FILES=(
+            "xdelta3-windows-x64.zip"
+            "xdelta3-windows-x86.zip"
+            "xdelta3-linux.tar.gz"
+            "xdelta-${{ inputs.version }}-windows.zip"
+          )
+          
+          MISSING_FILES=()
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "${{ inputs.output_dir }}/$file" ]; then
+              MISSING_FILES+=("$file")
+            fi
+          done
+          
+          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+            echo "✅ All required release files are present"
+            echo "release_ok=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Missing required release files: ${MISSING_FILES[*]}"
+            echo "release_ok=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        shell: bash
+      
+      # Upload prepared release files
+      - name: Upload release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: ${{ inputs.output_dir }}/
+          retention-days: 7

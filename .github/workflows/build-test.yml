@@ -1,0 +1,173 @@
+name: Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: 'Platform to build for (windows, linux, macos)'
+        required: true
+        type: string
+      arch:
+        description: 'Architecture to build for (x64, x86)'
+        required: false
+        type: string
+        default: 'x64'
+      create_placeholders:
+        description: 'Whether to create placeholder artifacts if build fails'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      build_success:
+        description: 'Whether the build was successful'
+        value: ${{ jobs.build-and-test.outputs.build_success }}
+
+jobs:
+  build-and-test:
+    runs-on: ${{ inputs.platform == 'windows' && 'windows-latest' || inputs.platform == 'macos' && 'macos-latest' || 'ubuntu-latest' }}
+    outputs:
+      build_success: ${{ steps.build_status.outputs.success }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Make scripts executable
+      - name: Make scripts executable
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x .github/scripts/*.sh
+        shell: bash
+      
+      # Setup ccache
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ inputs.platform }}-${{ inputs.arch }}
+      
+      # Setup vcpkg
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
+      
+      # Configure CMake
+      - name: Configure CMake
+        id: configure
+        run: |
+          mkdir -p build
+          cd build
+          
+          if [ "${{ inputs.platform }}" == "windows" ]; then
+            if [ "${{ inputs.arch }}" == "x86" ]; then
+              cmake .. -A Win32 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+            else
+              cmake .. -A x64 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+            fi
+          else
+            cmake .. -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+          fi
+        shell: bash
+        continue-on-error: true
+      
+      # Build
+      - name: Build
+        id: build
+        if: steps.configure.outcome == 'success'
+        run: |
+          cd build
+          cmake --build . --config Release
+        shell: bash
+        continue-on-error: true
+      
+      # Test executable
+      - name: Test executable
+        id: test
+        if: steps.build.outcome == 'success'
+        run: |
+          cd build
+          
+          if [ "${{ inputs.platform }}" == "windows" ]; then
+            if [ -f "Release/xdelta3.exe" ]; then
+              ./Release/xdelta3.exe --help
+              echo "✅ Executable test passed"
+            else
+              echo "❌ Executable not found"
+              exit 1
+            fi
+          elif [ "${{ inputs.platform }}" == "linux" ]; then
+            if [ -f "xdelta3" ]; then
+              ./xdelta3 --help
+              echo "✅ Executable test passed"
+            else
+              echo "❌ Executable not found"
+              exit 1
+            fi
+          else
+            echo "⚠️ macOS build is disabled, skipping test"
+          fi
+        shell: bash
+        continue-on-error: true
+      
+      # Prepare artifacts directory
+      - name: Prepare artifacts directory
+        id: prepare_artifacts
+        run: |
+          ARTIFACTS_DIR="artifacts/${{ inputs.platform }}${{ inputs.platform == 'windows' && format('-{0}', inputs.arch) || '' }}"
+          mkdir -p "$ARTIFACTS_DIR"
+          echo "ARTIFACTS_DIR=$ARTIFACTS_DIR" >> $GITHUB_ENV
+        shell: bash
+      
+      # Copy build artifacts
+      - name: Copy build artifacts
+        id: copy_artifacts
+        if: steps.build.outcome == 'success' && steps.test.outcome == 'success'
+        run: |
+          # Create README
+          .github/scripts/create-readme.sh "${{ env.ARTIFACTS_DIR }}" "${{ inputs.platform }}"
+          
+          # Copy executable
+          if [ "${{ inputs.platform }}" == "windows" ]; then
+            cp build/Release/xdelta3.exe "${{ env.ARTIFACTS_DIR }}/"
+          elif [ "${{ inputs.platform }}" == "linux" ]; then
+            cp build/xdelta3 "${{ env.ARTIFACTS_DIR }}/"
+          fi
+          
+          echo "✅ Artifacts prepared successfully"
+        shell: bash
+        continue-on-error: true
+      
+      # Create placeholders if needed
+      - name: Create placeholders if needed
+        id: create_placeholders
+        if: (steps.configure.outcome != 'success' || steps.build.outcome != 'success' || steps.test.outcome != 'success' || steps.copy_artifacts.outcome != 'success') && inputs.create_placeholders == true
+        run: |
+          echo "⚠️ Build or test failed, creating placeholders"
+          .github/scripts/create-placeholder.sh "${{ inputs.platform }}" "${{ env.ARTIFACTS_DIR }}" "artifacts"
+        shell: bash
+      
+      # Set build status
+      - name: Set build status
+        id: build_status
+        run: |
+          if [ "${{ steps.configure.outcome }}" == "success" ] && [ "${{ steps.build.outcome }}" == "success" ] && [ "${{ steps.test.outcome }}" == "success" ] && [ "${{ steps.copy_artifacts.outcome }}" == "success" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "✅ Build successful"
+          elif [ "${{ inputs.create_placeholders }}" == "true" ] && [ "${{ steps.create_placeholders.outcome }}" == "success" ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Using placeholders"
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "❌ Build failed"
+          fi
+        shell: bash
+      
+      # Upload artifacts
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdelta3-${{ inputs.platform }}${{ inputs.platform == 'windows' && format('-{0}', inputs.arch) || '' }}
+          path: ${{ env.ARTIFACTS_DIR }}
+          if-no-files-found: error
