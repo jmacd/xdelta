@@ -26,9 +26,9 @@ jobs:
     needs: [build]
     uses: ./.github/workflows/reusable-vcpkg-export.yml
     with:
-      version: ${{ env.TEST_VERSION }}
-      vcpkg_commit: ${{ env.VCPKG_COMMIT }}
-      validation_level: ${{ env.RELEASE_VALIDATION }}
+      version: "3.1.0-test"
+      vcpkg_commit: "a34c873a9717a888f58dc05268dea15592c2f0ff"
+      validation_level: "normal"
       create_placeholders: true
 
   # Test the release file preparation process
@@ -36,8 +36,8 @@ jobs:
     needs: [build, test-vcpkg-export]
     uses: ./.github/workflows/reusable-release-preparation.yml
     with:
-      version: ${{ env.TEST_VERSION }}
+      version: "3.1.0-test"
       artifacts_dir: './artifacts'
       output_dir: './release-files'
-      validation_level: ${{ env.RELEASE_VALIDATION }}
+      validation_level: "normal"
       create_placeholders: true
