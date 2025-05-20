@@ -81,14 +81,14 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
         cache-key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+        no-install: true  # Don't install dependencies yet, we'll do it manually
       continue-on-error: true
 
-    # Retry vcpkg setup if it fails
-    - name: Retry vcpkg setup if needed
-      if: steps.vcpkg.outcome != 'success'
+    # Install vcpkg dependencies manually
+    - name: Install vcpkg dependencies
       shell: pwsh
       run: |
-        Write-Host "First vcpkg setup attempt failed, retrying..."
+        Write-Host "Installing vcpkg dependencies manually..."
 
         # Try to install dependencies directly
         $maxAttempts = 3
@@ -98,8 +98,9 @@ jobs:
           Write-Host "Attempt $attempt of $maxAttempts to install vcpkg dependencies"
 
           try {
-            # Install liblzma directly
-            vcpkg install liblzma:${{ matrix.triplet }} --triplet=${{ matrix.triplet }}
+            # Install liblzma directly with verbose output
+            Write-Host "Installing liblzma:${{ matrix.triplet }}"
+            vcpkg install liblzma:${{ matrix.triplet }} --triplet=${{ matrix.triplet }} --debug
             if ($LASTEXITCODE -eq 0) {
               Write-Host "✅ Successfully installed dependencies"
               break
@@ -118,6 +119,10 @@ jobs:
           Write-Host "⚠️ Failed to install dependencies after $maxAttempts attempts"
           # Continue anyway, CMake might be able to find system libraries
         }
+
+        # List installed packages for debugging
+        Write-Host "Listing installed vcpkg packages:"
+        vcpkg list
 
     - name: Configure CMake with retry
       shell: pwsh
