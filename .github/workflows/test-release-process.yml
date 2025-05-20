@@ -36,7 +36,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
-        path: ./windows-x64-artifacts/
+        path: ./artifacts/windows-x64/
       continue-on-error: true
 
     - name: Download Windows x86 artifacts
@@ -44,7 +44,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
-        path: ./windows-x86-artifacts/
+        path: ./artifacts/windows-x86/
       continue-on-error: true
 
     - name: Verify downloaded artifacts
@@ -59,8 +59,8 @@ jobs:
 
         # Verify Windows x64 artifacts
         echo "Checking Windows x64 artifacts:"
-        if [ -d "./windows-x64-artifacts" ]; then
-          .github/scripts/unified-artifacts.sh verify windows "./windows-x64-artifacts" "x64"
+        if [ -d "./artifacts/windows-x64" ]; then
+          .github/scripts/unified-artifacts.sh verify windows "./artifacts/windows-x64" "x64"
           if [ $? -eq 0 ]; then
             echo "✅ Windows x64 artifacts verified"
           else
@@ -74,8 +74,8 @@ jobs:
 
         # Verify Windows x86 artifacts
         echo "Checking Windows x86 artifacts:"
-        if [ -d "./windows-x86-artifacts" ]; then
-          .github/scripts/unified-artifacts.sh verify windows "./windows-x86-artifacts" "x86"
+        if [ -d "./artifacts/windows-x86" ]; then
+          .github/scripts/unified-artifacts.sh verify windows "./artifacts/windows-x86" "x86"
           if [ $? -eq 0 ]; then
             echo "✅ Windows x86 artifacts verified"
           else
@@ -135,10 +135,10 @@ jobs:
         Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
 
         # Check if artifact files exist in both zip and directory format
-        $x64ZipPath = ".\windows-x64-artifacts\xdelta3-windows-x64.zip"
-        $x86ZipPath = ".\windows-x86-artifacts\xdelta3-windows-x86.zip"
-        $x64DirPath = ".\windows-x64-artifacts"
-        $x86DirPath = ".\windows-x86-artifacts"
+        $x64ZipPath = ".\artifacts\windows-x64\xdelta3-windows-x64.zip"
+        $x86ZipPath = ".\artifacts\windows-x86\xdelta3-windows-x86.zip"
+        $x64DirPath = ".\artifacts\windows-x64"
+        $x86DirPath = ".\artifacts\windows-x86"
 
         # Handle x64 artifacts
         Write-Host "Checking for x64 artifacts..."
@@ -259,6 +259,27 @@ jobs:
                     Write-Host "⚠️ $msg" -ForegroundColor Yellow
                     $warnings += $msg
                 }
+
+                # Verify ZIP integrity
+                try {
+                    # Test if the ZIP file can be read
+                    $testExtract = New-Item -ItemType Directory -Path ".\test-extract" -Force
+                    Expand-Archive -Path $zipPath -DestinationPath $testExtract -Force
+
+                    # Check if extraction succeeded and contains expected files
+                    $extractedFiles = Get-ChildItem -Path $testExtract -Recurse
+                    if ($extractedFiles.Count -lt 5) {
+                        $msg = "ZIP file contains suspiciously few files: $($extractedFiles.Count)"
+                        Write-Host "⚠️ $msg" -ForegroundColor Yellow
+                        $warnings += $msg
+                    } else {
+                        Write-Host "✅ ZIP file integrity verified" -ForegroundColor Green
+                    }
+                } catch {
+                    $msg = "ZIP file integrity check failed: $_"
+                    Write-Host "❌ $msg" -ForegroundColor Red
+                    $errors += $msg
+                }
             } else {
                 $msg = "Failed to create ZIP file"
                 Write-Host "❌ $msg" -ForegroundColor Red
@@ -336,7 +357,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x64
-        path: ./windows-x64/
+        path: ./artifacts/windows-x64/
       continue-on-error: true
 
     - name: Download Windows x86 artifacts
@@ -344,7 +365,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-windows-x86
-        path: ./windows-x86/
+        path: ./artifacts/windows-x86/
       continue-on-error: true
 
     - name: Download Linux artifacts
@@ -352,7 +373,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-linux
-        path: ./linux/
+        path: ./artifacts/linux/
       continue-on-error: true
 
     - name: Download macOS artifacts
@@ -360,7 +381,7 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: xdelta3-macos
-        path: ./macos/
+        path: ./artifacts/macos/
       continue-on-error: true
 
     - name: Download vcpkg binaries
@@ -409,20 +430,20 @@ jobs:
 
         # Check Windows x64 artifact
         echo "Checking for Windows x64 artifact:"
-        if [ -f "windows-x64/xdelta3-windows-x64.zip" ]; then
-          echo "✅ Found windows-x64/xdelta3-windows-x64.zip ($(stat -c%s "windows-x64/xdelta3-windows-x64.zip") bytes)"
+        if [ -f "artifacts/windows-x64/xdelta3-windows-x64.zip" ]; then
+          echo "✅ Found artifacts/windows-x64/xdelta3-windows-x64.zip ($(stat -c%s "artifacts/windows-x64/xdelta3-windows-x64.zip") bytes)"
           # Copy to root for compatibility with existing scripts
-          cp windows-x64/xdelta3-windows-x64.zip ./
+          cp artifacts/windows-x64/xdelta3-windows-x64.zip ./
 
           # Check file size
           if ! check_file_size "xdelta3-windows-x64.zip" 10000; then
             echo "⚠️ Windows x64 artifact is suspiciously small"
             WARNING_MESSAGES="${WARNING_MESSAGES}Windows x64 artifact is suspiciously small; "
           fi
-        elif [ -f "windows-x64/xdelta3.exe" ]; then
-          echo "✅ Found windows-x64/xdelta3.exe, creating zip archive"
+        elif [ -f "artifacts/windows-x64/xdelta3.exe" ]; then
+          echo "✅ Found artifacts/windows-x64/xdelta3.exe, creating zip archive"
           # Create zip archive
-          zip -j xdelta3-windows-x64.zip windows-x64/xdelta3.exe windows-x64/README.txt
+          zip -j xdelta3-windows-x64.zip artifacts/windows-x64/xdelta3.exe artifacts/windows-x64/README.txt
           echo "Created xdelta3-windows-x64.zip ($(stat -c%s "xdelta3-windows-x64.zip") bytes)"
         else
           echo "❌ Windows x64 artifact not found"
@@ -494,9 +515,9 @@ jobs:
         if [ -f "xdelta3-windows-x64.zip" ]; then
           echo "✅ Found Windows x64 zip artifact"
           cp xdelta3-windows-x64.zip release-files/
-        elif [ -d "windows-x64" ]; then
+        elif [ -d "artifacts/windows-x64" ]; then
           echo "Found Windows x64 directory artifact"
-          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows windows-x64 x64 release-files/xdelta3-windows-x64.zip
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows artifacts/windows-x64 x64 release-files/xdelta3-windows-x64.zip
         else
           echo "❌ Windows x64 artifact not found"
           exit 1
@@ -506,9 +527,9 @@ jobs:
         if [ -f "xdelta3-windows-x86.zip" ]; then
           echo "✅ Found Windows x86 zip artifact"
           cp xdelta3-windows-x86.zip release-files/
-        elif [ -d "windows-x86" ]; then
+        elif [ -d "artifacts/windows-x86" ]; then
           echo "Found Windows x86 directory artifact"
-          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows windows-x86 x86 release-files/xdelta3-windows-x86.zip
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows artifacts/windows-x86 x86 release-files/xdelta3-windows-x86.zip
         else
           echo "❌ Windows x86 artifact not found"
           exit 1
@@ -518,9 +539,9 @@ jobs:
         if [ -f "xdelta3-linux.tar.gz" ]; then
           echo "✅ Found Linux tar artifact"
           cp xdelta3-linux.tar.gz release-files/
-        elif [ -d "linux" ]; then
+        elif [ -d "artifacts/linux" ]; then
           echo "Found Linux directory artifact"
-          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package linux linux "" release-files/xdelta3-linux.tar.gz
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package linux artifacts/linux "" release-files/xdelta3-linux.tar.gz
         else
           echo "❌ Linux artifact not found"
           exit 1
@@ -530,9 +551,9 @@ jobs:
         if [ -f "xdelta3-macos.tar.gz" ]; then
           echo "✅ Found macOS tar artifact"
           cp xdelta3-macos.tar.gz release-files/
-        elif [ -d "macos" ]; then
+        elif [ -d "artifacts/macos" ]; then
           echo "Found macOS directory artifact"
-          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package macos macos "" release-files/xdelta3-macos.tar.gz
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package macos artifacts/macos "" release-files/xdelta3-macos.tar.gz
         else
           echo "⚠️ macOS artifact not found (this is expected)"
           # Create an empty file as a placeholder
@@ -597,6 +618,35 @@ jobs:
           echo "❌ Missing required release files: ${MISSING_FILES[*]}"
           exit 1
         fi
+
+        # Verify file integrity
+        echo "Verifying file integrity..."
+
+        # Check ZIP files
+        for zip_file in release-files/*.zip; do
+          if [ -f "$zip_file" ]; then
+            echo "Checking integrity of $zip_file"
+            if unzip -t "$zip_file" > /dev/null; then
+              echo "✅ $zip_file is valid"
+            else
+              echo "❌ $zip_file is corrupted"
+              exit 1
+            fi
+          fi
+        done
+
+        # Check tar.gz files
+        for tar_file in release-files/*.tar.gz; do
+          if [ -f "$tar_file" ] && [ "$(stat -c%s "$tar_file")" -gt 100 ]; then
+            echo "Checking integrity of $tar_file"
+            if tar -tzf "$tar_file" > /dev/null; then
+              echo "✅ $tar_file is valid"
+            else
+              echo "❌ $tar_file is corrupted"
+              exit 1
+            fi
+          fi
+        done
 
         echo "✅ Release process test completed successfully"
 
