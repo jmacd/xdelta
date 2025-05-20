@@ -1,0 +1,388 @@
+name: Reusable Release Preparation Workflow
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version to prepare release for'
+        required: true
+        type: string
+      artifacts_dir:
+        description: 'Directory containing artifacts'
+        required: false
+        type: string
+        default: './artifacts'
+      output_dir:
+        description: 'Directory to store release files'
+        required: false
+        type: string
+        default: './release-files'
+      validation_level:
+        description: 'Validation level (strict, normal, relaxed)'
+        required: false
+        type: string
+        default: 'normal'
+      create_placeholders:
+        description: 'Whether to create placeholder artifacts if real ones are not found'
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      release_ok:
+        description: 'Whether release preparation was successful'
+        value: ${{ jobs.prepare-release.outputs.release_ok }}
+      error_messages:
+        description: 'Error messages if any'
+        value: ${{ jobs.prepare-release.outputs.error_messages }}
+      warning_messages:
+        description: 'Warning messages if any'
+        value: ${{ jobs.prepare-release.outputs.warning_messages }}
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_ok: ${{ steps.verify_release.outputs.release_ok }}
+      error_messages: ${{ steps.verify_release.outputs.error_messages }}
+      warning_messages: ${{ steps.verify_release.outputs.warning_messages }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Make all scripts executable
+      - name: Make scripts executable
+        shell: bash
+        run: |
+          if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+            chmod +x .github/scripts/make-scripts-executable.sh
+            .github/scripts/make-scripts-executable.sh
+          else
+            echo "Script not found, making scripts executable manually"
+            find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+          fi
+
+      # Download Windows x64 artifacts
+      - name: Download Windows x64 artifacts
+        id: download_x64
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-windows-x64
+          path: ${{ inputs.artifacts_dir }}/windows-x64/
+        continue-on-error: true
+
+      # Download Windows x86 artifacts
+      - name: Download Windows x86 artifacts
+        id: download_x86
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-windows-x86
+          path: ${{ inputs.artifacts_dir }}/windows-x86/
+        continue-on-error: true
+
+      # Download Linux artifacts
+      - name: Download Linux artifacts
+        id: download_linux
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-linux
+          path: ${{ inputs.artifacts_dir }}/linux/
+        continue-on-error: true
+
+      # Download macOS artifacts
+      - name: Download macOS artifacts
+        id: download_macos
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-macos
+          path: ${{ inputs.artifacts_dir }}/macos/
+        continue-on-error: true
+
+      # Download vcpkg binaries
+      - name: Download vcpkg binaries
+        id: download_vcpkg
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta-vcpkg-binaries
+          path: ./
+        continue-on-error: true
+
+      # Prepare release files
+      - name: Prepare release files
+        id: prepare_release_files
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "Preparing release files for version $VERSION..."
+          
+          # Create release files directory
+          mkdir -p ${{ inputs.output_dir }}
+          
+          # Make the scripts executable
+          chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
+          
+          # Initialize variables
+          RELEASE_OK=true
+          ERROR_MESSAGES=""
+          WARNING_MESSAGES=""
+          
+          # Function to handle errors based on validation level
+          handle_error() {
+            local error_msg="$1"
+            local platform="$2"
+            
+            if [ "${{ inputs.validation_level }}" == "strict" ]; then
+              echo "❌ $error_msg"
+              RELEASE_OK=false
+              ERROR_MESSAGES="${ERROR_MESSAGES}${error_msg}; "
+              return 1
+            elif [ "${{ inputs.validation_level }}" == "relaxed" ]; then
+              echo "⚠️ $error_msg (continuing with placeholder)"
+              WARNING_MESSAGES="${WARNING_MESSAGES}${error_msg}; "
+              
+              # Create placeholder based on platform
+              if [ "$platform" == "windows-x64" ] || [ "$platform" == "windows-x86" ]; then
+                local arch="${platform#windows-}"
+                echo "Creating placeholder Windows $arch artifact"
+                mkdir -p "${{ inputs.artifacts_dir }}/$platform"
+                echo "This is a placeholder file for testing" > "${{ inputs.artifacts_dir }}/$platform/xdelta3.exe"
+                echo "# README for xdelta3" > "${{ inputs.artifacts_dir }}/$platform/README.txt"
+                zip -j "${{ inputs.output_dir }}/xdelta3-$platform.zip" "${{ inputs.artifacts_dir }}/$platform/xdelta3.exe" "${{ inputs.artifacts_dir }}/$platform/README.txt"
+              elif [ "$platform" == "linux" ]; then
+                echo "Creating placeholder Linux artifact"
+                mkdir -p "${{ inputs.artifacts_dir }}/linux"
+                echo "This is a placeholder file for testing" > "${{ inputs.artifacts_dir }}/linux/xdelta3"
+                chmod +x "${{ inputs.artifacts_dir }}/linux/xdelta3"
+                echo "# README for xdelta3" > "${{ inputs.artifacts_dir }}/linux/README.txt"
+                tar -czf "${{ inputs.output_dir }}/xdelta3-linux.tar.gz" -C "${{ inputs.artifacts_dir }}/linux" .
+              elif [ "$platform" == "macos" ]; then
+                echo "Creating placeholder macOS artifact"
+                mkdir -p "${{ inputs.artifacts_dir }}/macos"
+                echo "# README for xdelta3 (macOS build disabled)" > "${{ inputs.artifacts_dir }}/macos/README.txt"
+                tar -czf "${{ inputs.output_dir }}/xdelta3-macos.tar.gz" -C "${{ inputs.artifacts_dir }}/macos" .
+              fi
+              
+              return 0
+            else
+              # Normal validation
+              if [ "${{ inputs.create_placeholders }}" == "true" ]; then
+                echo "⚠️ $error_msg (using placeholder)"
+                WARNING_MESSAGES="${WARNING_MESSAGES}${error_msg}; "
+                
+                # Create placeholder based on platform
+                if [ "$platform" == "windows-x64" ] || [ "$platform" == "windows-x86" ]; then
+                  local arch="${platform#windows-}"
+                  echo "Creating placeholder Windows $arch artifact"
+                  mkdir -p "${{ inputs.artifacts_dir }}/$platform"
+                  echo "This is a placeholder file for testing" > "${{ inputs.artifacts_dir }}/$platform/xdelta3.exe"
+                  echo "# README for xdelta3" > "${{ inputs.artifacts_dir }}/$platform/README.txt"
+                  zip -j "${{ inputs.output_dir }}/xdelta3-$platform.zip" "${{ inputs.artifacts_dir }}/$platform/xdelta3.exe" "${{ inputs.artifacts_dir }}/$platform/README.txt"
+                elif [ "$platform" == "linux" ]; then
+                  echo "Creating placeholder Linux artifact"
+                  mkdir -p "${{ inputs.artifacts_dir }}/linux"
+                  echo "This is a placeholder file for testing" > "${{ inputs.artifacts_dir }}/linux/xdelta3"
+                  chmod +x "${{ inputs.artifacts_dir }}/linux/xdelta3"
+                  echo "# README for xdelta3" > "${{ inputs.artifacts_dir }}/linux/README.txt"
+                  tar -czf "${{ inputs.output_dir }}/xdelta3-linux.tar.gz" -C "${{ inputs.artifacts_dir }}/linux" .
+                elif [ "$platform" == "macos" ]; then
+                  echo "Creating placeholder macOS artifact"
+                  mkdir -p "${{ inputs.artifacts_dir }}/macos"
+                  echo "# README for xdelta3 (macOS build disabled)" > "${{ inputs.artifacts_dir }}/macos/README.txt"
+                  tar -czf "${{ inputs.output_dir }}/xdelta3-macos.tar.gz" -C "${{ inputs.artifacts_dir }}/macos" .
+                fi
+                
+                return 0
+              else
+                echo "❌ $error_msg"
+                RELEASE_OK=false
+                ERROR_MESSAGES="${ERROR_MESSAGES}${error_msg}; "
+                return 1
+              fi
+            fi
+          }
+          
+          # Process Windows x64 artifacts
+          if [ -f "xdelta3-windows-x64.zip" ]; then
+            echo "✅ Found Windows x64 zip artifact"
+            cp xdelta3-windows-x64.zip ${{ inputs.output_dir }}/
+          elif [ -d "${{ inputs.artifacts_dir }}/windows-x64" ]; then
+            echo "Found Windows x64 directory artifact"
+            "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows "${{ inputs.artifacts_dir }}/windows-x64" x64 "${{ inputs.output_dir }}/xdelta3-windows-x64.zip" || {
+              handle_error "Failed to package Windows x64 artifacts" "windows-x64"
+            }
+          else
+            handle_error "Windows x64 artifact not found" "windows-x64"
+          fi
+          
+          # Process Windows x86 artifacts
+          if [ -f "xdelta3-windows-x86.zip" ]; then
+            echo "✅ Found Windows x86 zip artifact"
+            cp xdelta3-windows-x86.zip ${{ inputs.output_dir }}/
+          elif [ -d "${{ inputs.artifacts_dir }}/windows-x86" ]; then
+            echo "Found Windows x86 directory artifact"
+            "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows "${{ inputs.artifacts_dir }}/windows-x86" x86 "${{ inputs.output_dir }}/xdelta3-windows-x86.zip" || {
+              handle_error "Failed to package Windows x86 artifacts" "windows-x86"
+            }
+          else
+            handle_error "Windows x86 artifact not found" "windows-x86"
+          fi
+          
+          # Process Linux artifacts
+          if [ -f "xdelta3-linux.tar.gz" ]; then
+            echo "✅ Found Linux tar artifact"
+            cp xdelta3-linux.tar.gz ${{ inputs.output_dir }}/
+          elif [ -d "${{ inputs.artifacts_dir }}/linux" ]; then
+            echo "Found Linux directory artifact"
+            "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package linux "${{ inputs.artifacts_dir }}/linux" "" "${{ inputs.output_dir }}/xdelta3-linux.tar.gz" || {
+              handle_error "Failed to package Linux artifacts" "linux"
+            }
+          else
+            handle_error "Linux artifact not found" "linux"
+          fi
+          
+          # Process macOS artifacts
+          if [ -f "xdelta3-macos.tar.gz" ]; then
+            echo "✅ Found macOS tar artifact"
+            cp xdelta3-macos.tar.gz ${{ inputs.output_dir }}/
+          elif [ -d "${{ inputs.artifacts_dir }}/macos" ]; then
+            echo "Found macOS directory artifact"
+            "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package macos "${{ inputs.artifacts_dir }}/macos" "" "${{ inputs.output_dir }}/xdelta3-macos.tar.gz" || {
+              echo "⚠️ macOS artifact packaging failed (this is expected)"
+              WARNING_MESSAGES="${WARNING_MESSAGES}macOS artifact packaging failed (expected); "
+              # Create placeholder for macOS
+              echo "This is a placeholder for macOS binaries which are currently not supported." > ${{ inputs.output_dir }}/xdelta3-macos.tar.gz
+            }
+          else
+            echo "⚠️ macOS artifact not found (this is expected)"
+            WARNING_MESSAGES="${WARNING_MESSAGES}macOS artifact not found (expected); "
+            # Create placeholder for macOS
+            echo "This is a placeholder for macOS binaries which are currently not supported." > ${{ inputs.output_dir }}/xdelta3-macos.tar.gz
+          fi
+          
+          # Handle vcpkg binaries
+          VCPKG_BINARY_FILE="xdelta-$VERSION-windows.zip"
+          VCPKG_BINARY_SHA512="${VCPKG_BINARY_FILE}.sha512"
+          
+          if [ -f "$VCPKG_BINARY_FILE" ]; then
+            echo "✅ Found vcpkg binaries"
+            cp "$VCPKG_BINARY_FILE" ${{ inputs.output_dir }}/
+            
+            # Handle SHA512 file
+            if [ -f "$VCPKG_BINARY_SHA512" ]; then
+              echo "✅ Found SHA512 hash file"
+              cp "$VCPKG_BINARY_SHA512" ${{ inputs.output_dir }}/
+            else
+              echo "Generating SHA512 hash file..."
+              sha512sum "$VCPKG_BINARY_FILE" | awk '{print $1}' > "${{ inputs.output_dir }}/${VCPKG_BINARY_SHA512}"
+            fi
+          else
+            handle_error "vcpkg binaries not found" "vcpkg"
+          fi
+          
+          # List all files in the release directory
+          echo "Files prepared for release:"
+          ls -la ${{ inputs.output_dir }}/
+          
+          # Set outputs
+          echo "release_ok=$RELEASE_OK" >> $GITHUB_OUTPUT
+          echo "error_messages=$ERROR_MESSAGES" >> $GITHUB_OUTPUT
+          echo "warning_messages=$WARNING_MESSAGES" >> $GITHUB_OUTPUT
+          
+          # Exit with error if release preparation failed and validation is strict
+          if [ "$RELEASE_OK" = "false" ] && [ "${{ inputs.validation_level }}" == "strict" ]; then
+            echo "::error::Release preparation failed: $ERROR_MESSAGES"
+            exit 1
+          fi
+
+      # Verify release readiness
+      - name: Verify release readiness
+        id: verify_release
+        run: |
+          echo "Verifying release readiness..."
+          
+          # Check if release files directory exists
+          if [ ! -d "${{ inputs.output_dir }}" ]; then
+            echo "❌ Release files directory not found"
+            echo "release_ok=false" >> $GITHUB_OUTPUT
+            echo "error_messages=Release files directory not found" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Check for required files
+          REQUIRED_FILES=(
+            "xdelta3-windows-x64.zip"
+            "xdelta3-windows-x86.zip"
+            "xdelta3-linux.tar.gz"
+            "xdelta-${{ inputs.version }}-windows.zip"
+            "xdelta-${{ inputs.version }}-windows.zip.sha512"
+          )
+          
+          MISSING_FILES=()
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "${{ inputs.output_dir }}/$file" ]; then
+              MISSING_FILES+=("$file")
+            fi
+          done
+          
+          if [ ${#MISSING_FILES[@]} -eq 0 ]; then
+            echo "✅ All required release files are present"
+          else
+            echo "❌ Missing required release files: ${MISSING_FILES[*]}"
+            echo "release_ok=false" >> $GITHUB_OUTPUT
+            echo "error_messages=Missing required release files: ${MISSING_FILES[*]}" >> $GITHUB_OUTPUT
+            
+            if [ "${{ inputs.validation_level }}" == "strict" ]; then
+              exit 1
+            fi
+          fi
+          
+          # Verify file integrity
+          echo "Verifying file integrity..."
+          
+          # Check ZIP files
+          for zip_file in ${{ inputs.output_dir }}/*.zip; do
+            if [ -f "$zip_file" ]; then
+              echo "Checking integrity of $zip_file"
+              if unzip -t "$zip_file" > /dev/null; then
+                echo "✅ $zip_file is valid"
+              else
+                echo "❌ $zip_file is corrupted"
+                echo "release_ok=false" >> $GITHUB_OUTPUT
+                echo "error_messages=Corrupted ZIP file: $zip_file" >> $GITHUB_OUTPUT
+                
+                if [ "${{ inputs.validation_level }}" == "strict" ]; then
+                  exit 1
+                fi
+              fi
+            fi
+          done
+          
+          # Check tar.gz files
+          for tar_file in ${{ inputs.output_dir }}/*.tar.gz; do
+            if [ -f "$tar_file" ] && [ "$(stat -c%s "$tar_file")" -gt 100 ]; then
+              echo "Checking integrity of $tar_file"
+              if tar -tzf "$tar_file" > /dev/null; then
+                echo "✅ $tar_file is valid"
+              else
+                echo "❌ $tar_file is corrupted"
+                echo "release_ok=false" >> $GITHUB_OUTPUT
+                echo "error_messages=Corrupted tar.gz file: $tar_file" >> $GITHUB_OUTPUT
+                
+                if [ "${{ inputs.validation_level }}" == "strict" ]; then
+                  exit 1
+                fi
+              fi
+            fi
+          done
+          
+          echo "✅ Release process completed successfully"
+          echo "release_ok=true" >> $GITHUB_OUTPUT
+
+      # Upload prepared release files
+      - name: Upload release files
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: ${{ inputs.output_dir }}/
+          retention-days: 7

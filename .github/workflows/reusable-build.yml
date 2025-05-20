@@ -75,51 +75,20 @@ jobs:
         github-binarycache: true
         cache-key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
 
-    # Check if liblzma is installed correctly
-    - name: Verify liblzma installation
+    - name: Configure CMake
       shell: pwsh
       run: |
-        $vcpkgInstallDir = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}"
-        if (Test-Path "$vcpkgInstallDir/include/lzma.h") {
-            Write-Host "lzma.h found at $vcpkgInstallDir/include/lzma.h"
-        } else {
-            Write-Host "ERROR: lzma.h not found in $vcpkgInstallDir/include/"
-
-            # Check if the include directory exists
-            if (Test-Path "$vcpkgInstallDir/include") {
-                Write-Host "Listing files in include directory:"
-                Get-ChildItem -Recurse -Path "$vcpkgInstallDir/include" | Select-Object FullName
-            } else {
-                Write-Host "Include directory does not exist at $vcpkgInstallDir/include"
-            }
-
-            # Check if there are any lzma-related files in the installation
-            Write-Host "Searching for lzma-related files in vcpkg installation:"
-            Get-ChildItem -Recurse -Path "$vcpkgInstallDir" -Filter "*lzma*" | Select-Object FullName
-
-            # Try to find lzma.h in the entire workspace
-            Write-Host "Searching for lzma.h in the entire workspace:"
-            Get-ChildItem -Recurse -Path "${{ github.workspace }}" -Filter "lzma.h" | Select-Object FullName
-        }
-
-    - name: Configure CMake
-      run: |
-        # Simple configuration relying on vcpkg integration
-        Write-Host "Configuring CMake with vcpkg toolchain..."
-
-        # Ensure vcpkg toolchain file exists
+        # Get vcpkg paths
         $vcpkgToolchain = "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-        if (Test-Path $vcpkgToolchain) {
-            Write-Host "vcpkg toolchain file found at: $vcpkgToolchain"
-        } else {
+        $vcpkgIncludePath = "${{ github.workspace }}/vcpkg_installed/${{ matrix.triplet }}/include"
+        $vcpkgLibPath = "${{ github.workspace }}/vcpkg_installed/${{ matrix.triplet }}/lib"
+        
+        # Ensure paths exist
+        if (-not (Test-Path $vcpkgToolchain)) {
             Write-Host "ERROR: vcpkg toolchain file not found at: $vcpkgToolchain"
             exit 1
         }
-
-        # Add explicit include paths for liblzma if needed
-        $vcpkgIncludePath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/include"
-        $vcpkgLibPath = "${{ github.workspace }}/vcpkg/installed/${{ matrix.triplet }}/lib"
-
+        
         # Configure with detailed output and ccache
         cmake -B build -S . ${{ matrix.cmake_arch }} `
           -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} `
@@ -141,88 +110,38 @@ jobs:
     - name: Test executable
       shell: pwsh
       run: |
-        # Test if the executable works by running --help
+        # Test if the executable works
         $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
-
-        # Check if the executable exists
         if (Test-Path $exePath) {
-            Write-Host "Testing $exePath with --help command..."
-
-            # Run the command and explicitly ignore the exit code
-            try {
-                # Capture output but ignore errors
-                $output = & $exePath --help 2>&1
-                Write-Host "Command output:"
-                $output | ForEach-Object { Write-Host $_ }
-            } catch {
-                # Ignore any errors
-                Write-Host "Command threw an exception, but we're ignoring it: $_"
+            Write-Host "Testing executable: $exePath"
+            & $exePath --help
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✅ Executable test passed"
+            } else {
+                Write-Host "⚠️ Executable test returned non-zero exit code: $LASTEXITCODE"
             }
-
-            # We don't check the exit code here since xdelta3 --help may return 0 or 1
-            # The important thing is that it displays help information
-            Write-Host "Executable test passed!"
         } else {
-            Write-Error "Executable not found at $exePath"
+            Write-Host "❌ Executable not found at: $exePath"
             exit 1
         }
 
     - name: Prepare artifacts
       shell: pwsh
-      continue-on-error: true  # Continue even if this step fails
       run: |
-        # Create artifacts directory with PowerShell
-        $artifactsDir = Join-Path -Path "artifacts" -ChildPath "windows-${{ matrix.arch }}"
-        Write-Host "Creating artifacts directory: $artifactsDir"
-        New-Item -ItemType Directory -Force -Path $artifactsDir | Out-Null
-
-        # Check if directory was created successfully
-        if (-not (Test-Path $artifactsDir)) {
-            Write-Error "Failed to create artifacts directory: $artifactsDir"
-            exit 1
-        }
-
-        # Locate the executable
-        $exePath = Join-Path -Path "build" -ChildPath "${{ inputs.build_type }}" -AdditionalChildPath "xdelta3.exe"
-        Write-Host "Looking for executable at: $exePath"
-
-        # Check if executable exists
-        if (Test-Path $exePath) {
-            # Copy executable
-            $destPath = Join-Path -Path $artifactsDir -ChildPath "xdelta3.exe"
-            Write-Host "Copying executable to: $destPath"
-            Copy-Item -Path $exePath -Destination $destPath -Force
-
-            # Verify copy was successful
-            if (Test-Path $destPath) {
-                Write-Host "Successfully copied executable"
-            } else {
-                Write-Error "Failed to copy executable"
-                exit 1
-            }
-        } else {
-            Write-Error "Executable not found at: $exePath"
-            # List build directory contents for debugging
-            Write-Host "Contents of build directory:"
-            Get-ChildItem -Path "build" -Recurse | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName }
-            exit 1
-        }
-
-        # Copy required DLLs if using dynamic linking
-        $dllPath = Join-Path -Path "build" -ChildPath "vcpkg_installed" -AdditionalChildPath "${{ matrix.triplet }}", "bin"
-        if (Test-Path $dllPath) {
-            Write-Host "Copying DLLs from: $dllPath"
-            Copy-Item -Path "$dllPath\*.dll" -Destination $artifactsDir -Force
-        } else {
-            Write-Host "No DLLs found at: $dllPath (this may be normal for static builds)"
-        }
-
+        # Create artifacts directory
+        $artifactsDir = "artifacts\windows-${{ matrix.arch }}"
+        New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+        
+        # Copy executable
+        $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
+        Copy-Item $exePath -Destination $artifactsDir
+        
         # Create README and process artifacts using the unified script
         Write-Host "Processing artifacts using unified script..."
-
+        
         # Use bash to run the unified script
         bash -c "chmod +x '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' && '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' create windows '$artifactsDir' '${{ matrix.arch }}'"
-
+        
         # Verify the README was created
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
         if (Test-Path $readmePath) {
@@ -231,166 +150,20 @@ jobs:
         } else {
             Write-Host "WARNING: README.txt not found after running script"
         }
-
-        # Create zip archive if requested with detailed error handling
-        if (${{ inputs.create_archives }}) {
-            try {
-                $zipPath = "xdelta3-windows-${{ matrix.arch }}.zip"
-                Write-Host "Creating zip archive: $zipPath"
-
-                # Check if source directory exists and has files
-                Write-Host "Checking source directory: $artifactsDir"
-                if (Test-Path $artifactsDir) {
-                    $files = Get-ChildItem -Path $artifactsDir -Recurse
-                    Write-Host "Files found in artifacts directory: $($files.Count)"
-                    $files | ForEach-Object { Write-Host "- $($_.FullName)" }
-                } else {
-                    throw "Artifacts directory does not exist: $artifactsDir"
-                }
-
-                # Check if destination path is valid
-                $zipDir = Split-Path -Parent $zipPath
-                if ($zipDir -and -not (Test-Path $zipDir)) {
-                    Write-Host "Creating directory for zip file: $zipDir"
-                    New-Item -ItemType Directory -Force -Path $zipDir | Out-Null
-                }
-
-                # Use unified script to create the package
-                Write-Host "Using unified script to create package..."
-                bash -c "chmod +x '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' && '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' package windows '$artifactsDir' '${{ matrix.arch }}' '$zipPath'"
-
-                # Verify zip file was created
-                if (Test-Path $zipPath) {
-                    Write-Host "Zip archive created successfully: $zipPath"
-                    Write-Host "Zip file size: $((Get-Item $zipPath).Length) bytes"
-
-                    # List the contents of the zip file for verification
-                    Write-Host "Listing contents of the zip file:"
-                    Add-Type -AssemblyName System.IO.Compression.FileSystem
-                    $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-                    $zip.Entries | ForEach-Object { Write-Host "  $($_.FullName)" }
-                    $zip.Dispose()
-                } else {
-                    throw "Failed to create zip archive: $zipPath"
-                }
-            } catch {
-                Write-Host "Error creating zip archive: $_"
-                Write-Host "Stack trace: $($_.ScriptStackTrace)"
-                # Continue execution but log the error
-                Write-Error "Failed to create zip archive. This is a non-fatal error, continuing with build."
-            }
+        
+        # Create archive if requested
+        if ("${{ inputs.create_archives }}" -eq "true") {
+            $zipPath = "artifacts\windows-${{ matrix.arch }}\xdelta3-windows-${{ matrix.arch }}.zip"
+            Write-Host "Creating ZIP archive: $zipPath"
+            Compress-Archive -Path "$artifactsDir\*" -DestinationPath $zipPath -Force
         }
 
-    # Add a verification step before uploading artifacts
-    - name: Verify artifacts before upload
-      shell: bash
-      continue-on-error: true  # Continue even if this step fails
-      run: |
-        echo "Verifying artifacts before upload..."
-
-        # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
-
-        # Define artifact paths
-        if [ "${{ inputs.create_archives }}" = "true" ]; then
-            # Verify both the archive and directory
-            ARCHIVE_PATH="xdelta3-windows-${{ matrix.arch }}.zip"
-            ARTIFACTS_DIR="artifacts/windows-${{ matrix.arch }}"
-
-            echo "Checking archive: $ARCHIVE_PATH"
-            if [ -f "$ARCHIVE_PATH" ]; then
-                echo "Archive exists: $ARCHIVE_PATH"
-                ls -la "$ARCHIVE_PATH"
-
-                # Extract archive to temp directory for verification
-                TEMP_DIR=$(mktemp -d)
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" extract "$ARCHIVE_PATH" "$TEMP_DIR" "windows"
-
-                # Verify extracted contents
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify windows "$TEMP_DIR" "${{ matrix.arch }}"
-                if [ $? -eq 0 ]; then
-                    echo "✅ Archive verification passed"
-                else
-                    echo "⚠️ Archive verification failed"
-                fi
-
-                # Clean up temp directory
-                rm -rf "$TEMP_DIR"
-            else
-                echo "::error::Archive not found: $ARCHIVE_PATH"
-            fi
-        else
-            ARTIFACTS_DIR="artifacts/windows-${{ matrix.arch }}"
-            echo "Checking directory: $ARTIFACTS_DIR"
-
-            if [ -d "$ARTIFACTS_DIR" ]; then
-                # Verify directory contents
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify windows "$ARTIFACTS_DIR" "${{ matrix.arch }}"
-                if [ $? -eq 0 ]; then
-                    echo "✅ Directory verification passed"
-                else
-                    echo "⚠️ Directory verification failed"
-                fi
-            else
-                echo "::error::Directory not found: $ARTIFACTS_DIR"
-            fi
-        fi
-
-        echo "Artifact verification complete"
-
-    - name: Upload artifacts (directory)
-      if: ${{ !inputs.create_archives }}
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
-      continue-on-error: true  # Continue even if this step fails
       with:
         name: xdelta3-windows-${{ matrix.arch }}
-        path: artifacts/windows-${{ matrix.arch }}
+        path: artifacts/windows-${{ matrix.arch }}/
         retention-days: ${{ inputs.artifact_retention_days }}
-
-    - name: Upload artifacts (archive)
-      if: ${{ inputs.create_archives }}
-      uses: actions/upload-artifact@v4
-      continue-on-error: true  # Continue even if this step fails
-      with:
-        name: xdelta3-windows-${{ matrix.arch }}
-        path: xdelta3-windows-${{ matrix.arch }}.zip
-        retention-days: ${{ inputs.artifact_retention_days }}
-
-    # Final verification step to ensure the build process completes successfully
-    - name: Final build verification
-      shell: pwsh
-      continue-on-error: true  # Continue even if this step fails
-      run: |
-        Write-Host "Performing final build verification..."
-
-        # Check if executable exists
-        $exePath = Join-Path -Path "build" -ChildPath "${{ inputs.build_type }}" -AdditionalChildPath "xdelta3.exe"
-        if (Test-Path $exePath) {
-            Write-Host "✅ Executable exists: $exePath"
-        } else {
-            Write-Host "❌ Executable not found: $exePath"
-        }
-
-        # Check if README was created
-        $artifactsDir = Join-Path -Path "artifacts" -ChildPath "windows-${{ matrix.arch }}"
-        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-        if (Test-Path $readmePath) {
-            Write-Host "✅ README exists: $readmePath"
-        } else {
-            Write-Host "❌ README not found: $readmePath"
-        }
-
-        # Check if archive was created (if applicable)
-        if (${{ inputs.create_archives }}) {
-            $zipPath = "xdelta3-windows-${{ matrix.arch }}.zip"
-            if (Test-Path $zipPath) {
-                Write-Host "✅ Archive exists: $zipPath"
-            } else {
-                Write-Host "❌ Archive not found: $zipPath"
-            }
-        }
-
-        Write-Host "Final verification complete. Build process finished successfully."
 
   build-linux:
     runs-on: ubuntu-latest
@@ -443,40 +216,41 @@ jobs:
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
-      run: cmake --build build --config ${{ inputs.build_type }} -j $(nproc)
+      run: cmake --build build --config ${{ inputs.build_type }}
 
     - name: Test executable
       run: |
-        # Test if the executable works by running --help
+        # Test if the executable works
         if [ -f "build/xdelta3" ]; then
-          echo "Testing build/xdelta3 with --help command..."
+          echo "Testing executable: build/xdelta3"
           ./build/xdelta3 --help
-
-          # We don't check the exit code here since xdelta3 --help may return 0 or 1
-          # The important thing is that it displays help information
-          echo "Executable test passed!"
+          if [ $? -eq 0 ]; then
+            echo "✅ Executable test passed"
+          else
+            echo "⚠️ Executable test returned non-zero exit code: $?"
+          fi
         else
-          echo "Executable not found at build/xdelta3"
+          echo "❌ Executable not found at: build/xdelta3"
           exit 1
         fi
 
     - name: Prepare artifacts
       run: |
         mkdir -p artifacts/linux
-
+        
         # Copy executables
         cp build/xdelta3 artifacts/linux/
-
+        
         # Process artifacts using the unified script
         echo "Processing artifacts using unified script..."
-
+        
         # Make the script executable and run it
         chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
         "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" create linux artifacts/linux
-
+        
         # Verify artifacts
         "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux artifacts/linux
-
+        
         # Verify README was created successfully
         if [ -f "artifacts/linux/README.txt" ]; then
           echo "README.txt created successfully"
@@ -484,97 +258,25 @@ jobs:
           echo "ERROR: Failed to create README.txt"
           exit 1
         fi
-
-        # Create tarball if requested
-        if [ "${{ inputs.create_archives }}" = "true" ]; then
-          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package linux artifacts/linux "" xdelta3-linux.tar.gz
+        
+        # Create archive if requested
+        if [ "${{ inputs.create_archives }}" == "true" ]; then
+          echo "Creating tar.gz archive: artifacts/linux/xdelta3-linux.tar.gz"
+          tar -czf artifacts/linux/xdelta3-linux.tar.gz -C artifacts/linux .
         fi
 
-    # Add a verification step before uploading artifacts
-    - name: Verify artifacts before upload
-      continue-on-error: true  # Continue even if this step fails
-      run: |
-        echo "Verifying artifacts before upload..."
-
-        # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
-
-        # Define artifact paths
-        if [ "${{ inputs.create_archives }}" = "true" ]; then
-            # Verify both the archive and directory
-            ARCHIVE_PATH="xdelta3-linux.tar.gz"
-            ARTIFACTS_DIR="artifacts/linux"
-
-            echo "Checking archive: $ARCHIVE_PATH"
-            if [ -f "$ARCHIVE_PATH" ]; then
-                echo "Archive exists: $ARCHIVE_PATH"
-                ls -la "$ARCHIVE_PATH"
-
-                # Extract archive to temp directory for verification
-                TEMP_DIR=$(mktemp -d)
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" extract "$ARCHIVE_PATH" "$TEMP_DIR" "linux"
-
-                # Verify extracted contents
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux "$TEMP_DIR"
-                if [ $? -eq 0 ]; then
-                    echo "✅ Archive verification passed"
-                else
-                    echo "⚠️ Archive verification failed"
-                fi
-
-                # Clean up temp directory
-                rm -rf "$TEMP_DIR"
-            else
-                echo "::error::Archive not found: $ARCHIVE_PATH"
-            fi
-        else
-            ARTIFACTS_DIR="artifacts/linux"
-            echo "Checking directory: $ARTIFACTS_DIR"
-
-            if [ -d "$ARTIFACTS_DIR" ]; then
-                # Verify directory contents
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux "$ARTIFACTS_DIR"
-                if [ $? -eq 0 ]; then
-                    echo "✅ Directory verification passed"
-                else
-                    echo "⚠️ Directory verification failed"
-                fi
-            else
-                echo "::error::Directory not found: $ARTIFACTS_DIR"
-            fi
-        fi
-
-        echo "Artifact verification complete"
-
-    - name: Upload artifacts (directory)
-      if: ${{ !inputs.create_archives }}
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: xdelta3-linux
-        path: artifacts/linux
-        retention-days: ${{ inputs.artifact_retention_days }}
-
-    - name: Upload artifacts (archive)
-      if: ${{ inputs.create_archives }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: xdelta3-linux
-        path: xdelta3-linux.tar.gz
+        path: artifacts/linux/
         retention-days: ${{ inputs.artifact_retention_days }}
 
   build-macos:
-    runs-on: ubuntu-latest
-
-    # TEMPORARILY DISABLED: macOS support is currently disabled
-    # Known issues:
-    # 1. Format string issues with '%"Z"d' pattern in xdelta3.c
-    # 2. Various warnings in xdelta3-fgk.h
-    # 3. Compatibility issues with static_assert implementation
-    #
-    # These issues need to be addressed in a future PR.
+    runs-on: macos-latest
+    continue-on-error: true  # Allow macOS build to fail without failing the workflow
 
     steps:
-    # Add checkout step to ensure template files are available
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
@@ -590,104 +292,29 @@ jobs:
           find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
         fi
 
-    - name: Skip macOS build
+    # Create placeholder artifacts for macOS
+    - name: Create placeholder artifacts
       run: |
-        echo "::warning::macOS build is temporarily disabled due to C++11 literal suffix issues"
-        echo "macOS support is temporarily disabled. Please use Windows or Linux platforms."
-        # Create empty artifacts directory for the package job
         mkdir -p artifacts/macos
-
-        # Process artifacts using the unified script
-        echo "Processing artifacts using unified script..."
-
-        # Make the script executable and run it
-        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
-        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" create macos artifacts/macos
-
-        # Verify artifacts
-        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify macos artifacts/macos
-
-        # Verify README was created successfully
-        if [ -f "artifacts/macos/README.txt" ]; then
-          echo "README.txt created successfully"
-        else
-          echo "ERROR: Failed to create README.txt"
-          exit 1
+        
+        # Create README explaining macOS build is disabled
+        echo "# Xdelta3 macOS Binary (Temporarily Disabled)" > artifacts/macos/README.txt
+        echo "=============================================" >> artifacts/macos/README.txt
+        echo "" >> artifacts/macos/README.txt
+        echo "NOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues." >> artifacts/macos/README.txt
+        echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
+        echo "" >> artifacts/macos/README.txt
+        echo "For more information, see the project repository." >> artifacts/macos/README.txt
+        
+        # Create archive if requested
+        if [ "${{ inputs.create_archives }}" == "true" ]; then
+          echo "Creating tar.gz archive: artifacts/macos/xdelta3-macos.tar.gz"
+          tar -czf artifacts/macos/xdelta3-macos.tar.gz -C artifacts/macos .
         fi
 
-        # Create empty tarball if requested
-        if [ "${{ inputs.create_archives }}" = "true" ]; then
-          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package macos artifacts/macos "" xdelta3-macos.tar.gz
-        fi
-
-    # Add a verification step before uploading artifacts
-    - name: Verify artifacts before upload
-      continue-on-error: true  # Continue even if this step fails
-      run: |
-        echo "Verifying artifacts before upload..."
-
-        # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
-
-        # Define artifact paths
-        if [ "${{ inputs.create_archives }}" = "true" ]; then
-            # Verify both the archive and directory
-            ARCHIVE_PATH="xdelta3-macos.tar.gz"
-            ARTIFACTS_DIR="artifacts/macos"
-
-            echo "Checking archive: $ARCHIVE_PATH"
-            if [ -f "$ARCHIVE_PATH" ]; then
-                echo "Archive exists: $ARCHIVE_PATH"
-                ls -la "$ARCHIVE_PATH"
-
-                # Extract archive to temp directory for verification
-                TEMP_DIR=$(mktemp -d)
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" extract "$ARCHIVE_PATH" "$TEMP_DIR" "macos"
-
-                # Verify extracted contents
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify macos "$TEMP_DIR"
-                if [ $? -eq 0 ]; then
-                    echo "✅ Archive verification passed"
-                else
-                    echo "⚠️ Archive verification failed"
-                fi
-
-                # Clean up temp directory
-                rm -rf "$TEMP_DIR"
-            else
-                echo "::error::Archive not found: $ARCHIVE_PATH"
-            fi
-        else
-            ARTIFACTS_DIR="artifacts/macos"
-            echo "Checking directory: $ARTIFACTS_DIR"
-
-            if [ -d "$ARTIFACTS_DIR" ]; then
-                # Verify directory contents
-                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify macos "$ARTIFACTS_DIR"
-                if [ $? -eq 0 ]; then
-                    echo "✅ Directory verification passed"
-                else
-                    echo "⚠️ Directory verification failed"
-                fi
-            else
-                echo "::error::Directory not found: $ARTIFACTS_DIR"
-            fi
-        fi
-
-        echo "Artifact verification complete"
-
-    - name: Upload artifacts (directory)
-      if: ${{ !inputs.create_archives }}
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: xdelta3-macos
-        path: artifacts/macos
-        retention-days: ${{ inputs.artifact_retention_days }}
-
-    - name: Upload artifacts (archive)
-      if: ${{ inputs.create_archives }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: xdelta3-macos
-        path: xdelta3-macos.tar.gz
+        path: artifacts/macos/
         retention-days: ${{ inputs.artifact_retention_days }}
