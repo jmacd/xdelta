@@ -62,25 +62,52 @@ jobs:
         with:
           vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
       
+      # Set environment variables to help with downloads
+      - name: Set vcpkg environment variables
+        run: |
+          echo "VCPKG_KEEP_ENV_VARS=HTTP_PROXY;HTTPS_PROXY;http_proxy;https_proxy" | Out-File -Append -FilePath $env:GITHUB_ENV
+          echo "VCPKG_MAX_CONCURRENCY=2" | Out-File -Append -FilePath $env:GITHUB_ENV
+        shell: pwsh
+      
       - name: Export vcpkg binaries
         run: |
           $version = "${{ github.event.inputs.version }}"
           $outputFile = "xdelta-$version-windows.zip"
           
-          # Export vcpkg binaries
-          vcpkg export xdelta3 --zip --output=$outputFile
+          # Try to export with retry
+          $maxAttempts = 3
+          $attempt = 1
+          
+          while ($attempt -le $maxAttempts) {
+            Write-Host "Attempt $attempt of $maxAttempts to export vcpkg binaries"
+            
+            try {
+              # Export vcpkg binaries
+              vcpkg export xdelta3 --zip --output=$outputFile
+              
+              # Check if export was successful
+              if (Test-Path $outputFile) {
+                Write-Host "✅ vcpkg export successful: $outputFile"
+                break
+              }
+            }
+            catch {
+              Write-Host "Error during export: $_"
+            }
+            
+            Write-Host "Attempt $attempt failed, waiting before retry..."
+            Start-Sleep -Seconds 30
+            $attempt++
+          }
+          
+          if ($attempt -gt $maxAttempts) {
+            Write-Host "❌ vcpkg export failed after $maxAttempts attempts"
+            exit 1
+          }
           
           # Create SHA512 hash
           $hash = Get-FileHash -Algorithm SHA512 -Path $outputFile
           $hash.Hash | Out-File -FilePath "$outputFile.sha512"
-          
-          # Verify files
-          if (Test-Path $outputFile) {
-            Write-Host "✅ vcpkg export successful: $outputFile"
-          } else {
-            Write-Host "❌ vcpkg export failed"
-            exit 1
-          }
         shell: pwsh
       
       - name: Upload vcpkg binaries

@@ -27,68 +27,162 @@ jobs:
     runs-on: ${{ inputs.platform == 'windows' && 'windows-latest' || inputs.platform == 'macos' && 'macos-latest' || 'ubuntu-latest' }}
     outputs:
       build_success: ${{ steps.build_status.outputs.success }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       # Make scripts executable
       - name: Make scripts executable
         if: runner.os != 'Windows'
         run: |
           chmod +x .github/scripts/*.sh
         shell: bash
-      
+
       # Setup ccache
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
           key: ${{ inputs.platform }}-${{ inputs.arch }}
-      
-      # Setup vcpkg
+
+      # Setup vcpkg with retry mechanism
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgGitCommitId: 'a42af01b72c28a8e1d7b48107b33e4f286a55ef6'
-      
-      # Configure CMake
+
+      # Pre-download vcpkg dependencies with retry
+      - name: Pre-download vcpkg dependencies
+        id: vcpkg_download
+        run: |
+          # Set environment variables to help with downloads
+          echo "VCPKG_KEEP_ENV_VARS=HTTP_PROXY;HTTPS_PROXY;http_proxy;https_proxy" >> $GITHUB_ENV
+          echo "VCPKG_MAX_CONCURRENCY=2" >> $GITHUB_ENV
+
+          # Create vcpkg.json for direct dependency installation
+          echo '{
+            "name": "xdelta3",
+            "version": "3.1.0",
+            "dependencies": [
+              "liblzma"
+            ]
+          }' > vcpkg.json
+
+          # Try to install dependencies with retry
+          max_attempts=3
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts to install vcpkg dependencies"
+
+            if [ "${{ inputs.platform }}" == "windows" ]; then
+              if [ "${{ inputs.arch }}" == "x86" ]; then
+                vcpkg install liblzma:x86-windows --triplet=x86-windows && break
+              else
+                vcpkg install liblzma:x64-windows --triplet=x64-windows && break
+              fi
+            elif [ "${{ inputs.platform }}" == "linux" ]; then
+              vcpkg install liblzma:x64-linux --triplet=x64-linux && break
+            elif [ "${{ inputs.platform }}" == "macos" ]; then
+              vcpkg install liblzma:x64-osx --triplet=x64-osx && break
+            fi
+
+            echo "Attempt $attempt failed, waiting before retry..."
+            sleep 30
+            attempt=$((attempt+1))
+          done
+
+          if [ $attempt -gt $max_attempts ]; then
+            echo "Failed to install vcpkg dependencies after $max_attempts attempts"
+            # Don't fail the build, we'll try to continue with CMake
+            # which might use a cached version or try again
+          else
+            echo "Successfully installed vcpkg dependencies"
+          fi
+        shell: bash
+        continue-on-error: true
+
+      # Configure CMake with retry
       - name: Configure CMake
         id: configure
         run: |
           mkdir -p build
           cd build
-          
-          if [ "${{ inputs.platform }}" == "windows" ]; then
-            if [ "${{ inputs.arch }}" == "x86" ]; then
-              cmake .. -A Win32 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+
+          # Try to configure with retry
+          max_attempts=3
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts to configure CMake"
+
+            # Add additional CMake options to help with dependency resolution
+            EXTRA_OPTIONS="-DCMAKE_DISABLE_FIND_PACKAGE_LibLZMA=OFF -DVCPKG_TARGET_TRIPLET=${{ inputs.platform == 'windows' && inputs.arch == 'x86' && 'x86-windows' || inputs.platform == 'windows' && 'x64-windows' || inputs.platform == 'linux' && 'x64-linux' || 'x64-osx' }}"
+
+            if [ "${{ inputs.platform }}" == "windows" ]; then
+              if [ "${{ inputs.arch }}" == "x86" ]; then
+                cmake .. -A Win32 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake $EXTRA_OPTIONS && break
+              else
+                cmake .. -A x64 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake $EXTRA_OPTIONS && break
+              fi
             else
-              cmake .. -A x64 -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+              cmake .. -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake $EXTRA_OPTIONS && break
             fi
+
+            echo "Attempt $attempt failed, waiting before retry..."
+            sleep 30
+            attempt=$((attempt+1))
+          done
+
+          if [ $attempt -gt $max_attempts ]; then
+            echo "Failed to configure CMake after $max_attempts attempts"
+            exit 1
           else
-            cmake .. -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+            echo "Successfully configured CMake"
           fi
         shell: bash
         continue-on-error: true
-      
-      # Build
+
+      # Build with retry
       - name: Build
         id: build
         if: steps.configure.outcome == 'success'
         run: |
           cd build
-          cmake --build . --config Release
+
+          # Try to build with retry
+          max_attempts=3
+          attempt=1
+
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts to build"
+
+            # Use lower concurrency to avoid network issues
+            cmake --build . --config Release --parallel 2 && break
+
+            echo "Attempt $attempt failed, waiting before retry..."
+            sleep 30
+            attempt=$((attempt+1))
+          done
+
+          if [ $attempt -gt $max_attempts ]; then
+            echo "Failed to build after $max_attempts attempts"
+            exit 1
+          else
+            echo "Successfully built project"
+          fi
         shell: bash
         continue-on-error: true
-      
+
       # Test executable
       - name: Test executable
         id: test
         if: steps.build.outcome == 'success'
         run: |
           cd build
-          
+
           if [ "${{ inputs.platform }}" == "windows" ]; then
             if [ -f "Release/xdelta3.exe" ]; then
               ./Release/xdelta3.exe --help
@@ -110,7 +204,7 @@ jobs:
           fi
         shell: bash
         continue-on-error: true
-      
+
       # Prepare artifacts directory
       - name: Prepare artifacts directory
         id: prepare_artifacts
@@ -119,7 +213,7 @@ jobs:
           mkdir -p "$ARTIFACTS_DIR"
           echo "ARTIFACTS_DIR=$ARTIFACTS_DIR" >> $GITHUB_ENV
         shell: bash
-      
+
       # Copy build artifacts
       - name: Copy build artifacts
         id: copy_artifacts
@@ -127,18 +221,18 @@ jobs:
         run: |
           # Create README
           .github/scripts/create-readme.sh "${{ env.ARTIFACTS_DIR }}" "${{ inputs.platform }}"
-          
+
           # Copy executable
           if [ "${{ inputs.platform }}" == "windows" ]; then
             cp build/Release/xdelta3.exe "${{ env.ARTIFACTS_DIR }}/"
           elif [ "${{ inputs.platform }}" == "linux" ]; then
             cp build/xdelta3 "${{ env.ARTIFACTS_DIR }}/"
           fi
-          
+
           echo "✅ Artifacts prepared successfully"
         shell: bash
         continue-on-error: true
-      
+
       # Create placeholders if needed
       - name: Create placeholders if needed
         id: create_placeholders
@@ -147,7 +241,7 @@ jobs:
           echo "⚠️ Build or test failed, creating placeholders"
           .github/scripts/create-placeholder.sh "${{ inputs.platform }}" "${{ env.ARTIFACTS_DIR }}" "artifacts"
         shell: bash
-      
+
       # Set build status
       - name: Set build status
         id: build_status
@@ -163,7 +257,7 @@ jobs:
             echo "❌ Build failed"
           fi
         shell: bash
-      
+
       # Upload artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
