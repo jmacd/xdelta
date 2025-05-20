@@ -239,37 +239,37 @@ jobs:
         # Create README manually to avoid path issues
         Write-Host "Creating README.txt manually..."
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-        $readmeContent = @'
-Xdelta3 Windows Binary
-======================
 
-This package contains the xdelta3 command-line utility for Windows.
+        # Write README content directly line by line
+        Set-Content -Path $readmePath -Value "Xdelta3 Windows Binary"
+        Add-Content -Path $readmePath -Value "======================"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "This package contains the xdelta3 command-line utility for Windows."
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "Command Line Syntax"
+        Add-Content -Path $readmePath -Value "-------------------"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "make patch:"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "  xdelta3.exe -e -s old_file new_file delta_file"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "apply patch:"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "  xdelta3.exe -d -s old_file delta_file decoded_new_file"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "standard options:"
+        Add-Content -Path $readmePath -Value "   -0 .. -9     compression level"
+        Add-Content -Path $readmePath -Value "   -c           use stdout"
+        Add-Content -Path $readmePath -Value "   -d           decompress"
+        Add-Content -Path $readmePath -Value "   -e           compress"
+        Add-Content -Path $readmePath -Value "   -f           force (overwrite, ignore trailing garbage)"
+        Add-Content -Path $readmePath -Value "   -h           show help"
+        Add-Content -Path $readmePath -Value "   -q           be quiet"
+        Add-Content -Path $readmePath -Value "   -v           be verbose (max 2)"
+        Add-Content -Path $readmePath -Value "   -V           show version"
+        Add-Content -Path $readmePath -Value ""
+        Add-Content -Path $readmePath -Value "For full documentation, run: xdelta3.exe --help"
 
-Command Line Syntax
--------------------
-
-make patch:
-
-  xdelta3.exe -e -s old_file new_file delta_file
-
-apply patch:
-
-  xdelta3.exe -d -s old_file delta_file decoded_new_file
-
-standard options:
-   -0 .. -9     compression level
-   -c           use stdout
-   -d           decompress
-   -e           compress
-   -f           force (overwrite, ignore trailing garbage)
-   -h           show help
-   -q           be quiet
-   -v           be verbose (max 2)
-   -V           show version
-
-For full documentation, run: xdelta3.exe --help
-'@
-        Set-Content -Path $readmePath -Value $readmeContent
         Write-Host "README.txt created manually"
 
         # Create archive if requested
@@ -446,36 +446,36 @@ For full documentation, run: xdelta3.exe --help
 
         # Create README manually to avoid script dependencies
         echo "Creating README.txt manually..."
-        cat > artifacts/linux/README.txt << EOF
-Xdelta3 Linux Binary
-===================
 
-This package contains the xdelta3 command-line utility for Linux.
-
-Command Line Syntax
--------------------
-
-make patch:
-
-  xdelta3 -e -s old_file new_file delta_file
-
-apply patch:
-
-  xdelta3 -d -s old_file delta_file decoded_new_file
-
-standard options:
-   -0 .. -9     compression level
-   -c           use stdout
-   -d           decompress
-   -e           compress
-   -f           force (overwrite, ignore trailing garbage)
-   -h           show help
-   -q           be quiet
-   -v           be verbose (max 2)
-   -V           show version
-
-For full documentation, run: xdelta3 --help
-EOF
+        # Write README content line by line
+        echo "Xdelta3 Linux Binary" > artifacts/linux/README.txt
+        echo "===================" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "This package contains the xdelta3 command-line utility for Linux." >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "Command Line Syntax" >> artifacts/linux/README.txt
+        echo "-------------------" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "make patch:" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "  xdelta3 -e -s old_file new_file delta_file" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "apply patch:" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "  xdelta3 -d -s old_file delta_file decoded_new_file" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "standard options:" >> artifacts/linux/README.txt
+        echo "   -0 .. -9     compression level" >> artifacts/linux/README.txt
+        echo "   -c           use stdout" >> artifacts/linux/README.txt
+        echo "   -d           decompress" >> artifacts/linux/README.txt
+        echo "   -e           compress" >> artifacts/linux/README.txt
+        echo "   -f           force (overwrite, ignore trailing garbage)" >> artifacts/linux/README.txt
+        echo "   -h           show help" >> artifacts/linux/README.txt
+        echo "   -q           be quiet" >> artifacts/linux/README.txt
+        echo "   -v           be verbose (max 2)" >> artifacts/linux/README.txt
+        echo "   -V           show version" >> artifacts/linux/README.txt
+        echo "" >> artifacts/linux/README.txt
+        echo "For full documentation, run: xdelta3 --help" >> artifacts/linux/README.txt
 
         # Verify README was created successfully
         if [ -f "artifacts/linux/README.txt" ]; then
