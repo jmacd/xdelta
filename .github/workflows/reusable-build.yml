@@ -240,7 +240,7 @@ jobs:
         Write-Host "Creating README.txt manually..."
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
 
-        # Write README content directly line by line
+        # Create README content
         Set-Content -Path $readmePath -Value "Xdelta3 Windows Binary"
         Add-Content -Path $readmePath -Value "======================"
         Add-Content -Path $readmePath -Value ""
