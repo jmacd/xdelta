@@ -231,20 +231,41 @@ jobs:
         $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
         Copy-Item $exePath -Destination $artifactsDir
 
-        # Create README and process artifacts using the unified script
-        Write-Host "Processing artifacts using unified script..."
-
-        # Use bash to run the unified script
-        bash -c "chmod +x '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' && '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' create windows '$artifactsDir' '${{ matrix.arch }}'"
-
-        # Verify the README was created
+        # Create README manually to avoid path issues
+        Write-Host "Creating README.txt manually..."
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
-        if (Test-Path $readmePath) {
-            Write-Host "README.txt verified at: $readmePath"
-            Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
-        } else {
-            Write-Host "WARNING: README.txt not found after running script"
-        }
+        $readmeContent = @'
+Xdelta3 Windows Binary
+======================
+
+This package contains the xdelta3 command-line utility for Windows.
+
+Command Line Syntax
+-------------------
+
+make patch:
+
+  xdelta3.exe -e -s old_file new_file delta_file
+
+apply patch:
+
+  xdelta3.exe -d -s old_file delta_file decoded_new_file
+
+standard options:
+   -0 .. -9     compression level
+   -c           use stdout
+   -d           decompress
+   -e           compress
+   -f           force (overwrite, ignore trailing garbage)
+   -h           show help
+   -q           be quiet
+   -v           be verbose (max 2)
+   -V           show version
+
+For full documentation, run: xdelta3.exe --help
+'@
+        Set-Content -Path $readmePath -Value $readmeContent
+        Write-Host "README.txt created manually"
 
         # Create archive if requested
         if ("${{ inputs.create_archives }}" -eq "true") {
