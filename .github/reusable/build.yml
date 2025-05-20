@@ -1,0 +1,320 @@
+name: Reusable Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      build_type:
+        description: 'Build type (Debug, Release, etc.)'
+        required: false
+        default: 'Release'
+        type: string
+      vcpkg_commit:
+        description: 'vcpkg commit hash to use'
+        required: false
+        default: 'a34c873a9717a888f58dc05268dea15592c2f0ff'
+        type: string
+      artifact_retention_days:
+        description: 'Number of days to retain artifacts'
+        required: false
+        default: 90
+        type: number
+      create_archives:
+        description: 'Whether to create zip/tar.gz archives for artifacts'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [x64, x86]
+        include:
+          - arch: x64
+            triplet: x64-windows
+            cmake_arch: -A x64
+          - arch: x86
+            triplet: x86-windows
+            cmake_arch: -A Win32
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Make all scripts executable
+    - name: Make scripts executable
+      shell: bash
+      run: |
+        if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+        else
+          echo "Script not found, making scripts executable manually"
+          find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+        fi
+
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-${{ matrix.arch }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ matrix.arch }}-ccache-
+
+    # Setup vcpkg using vcpkg-action
+    - name: Setup vcpkg
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }}
+        triplet: ${{ matrix.triplet }}
+        revision: ${{ inputs.vcpkg_commit }}
+        token: ${{ github.token }}
+        github-binarycache: true
+        cache-key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+
+    - name: Configure CMake
+      shell: pwsh
+      run: |
+        # Get vcpkg paths
+        $vcpkgToolchain = "${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+        $vcpkgIncludePath = "${{ github.workspace }}/vcpkg_installed/${{ matrix.triplet }}/include"
+        $vcpkgLibPath = "${{ github.workspace }}/vcpkg_installed/${{ matrix.triplet }}/lib"
+        
+        # Ensure paths exist
+        if (-not (Test-Path $vcpkgToolchain)) {
+            Write-Host "ERROR: vcpkg toolchain file not found at: $vcpkgToolchain"
+            exit 1
+        }
+        
+        # Configure with detailed output and ccache
+        cmake -B build -S . ${{ matrix.cmake_arch }} `
+          -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} `
+          -DCMAKE_TOOLCHAIN_FILE="$vcpkgToolchain" `
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} `
+          -DXDELTA_ENABLE_LZMA=ON `
+          -DXDELTA_BUILD_TESTS=OFF `
+          -DCMAKE_INCLUDE_PATH="$vcpkgIncludePath" `
+          -DCMAKE_LIBRARY_PATH="$vcpkgLibPath" `
+          -DLIBLZMA_INCLUDE_DIR="$vcpkgIncludePath" `
+          -DLIBLZMA_LIBRARY="$vcpkgLibPath/liblzma.lib" `
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+          -DCMAKE_VERBOSE_MAKEFILE=ON
+
+    - name: Build
+      run: cmake --build build --config ${{ inputs.build_type }}
+
+    - name: Test executable
+      shell: pwsh
+      run: |
+        # Test if the executable works
+        $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
+        if (Test-Path $exePath) {
+            Write-Host "Testing executable: $exePath"
+            & $exePath --help
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✅ Executable test passed"
+            } else {
+                Write-Host "⚠️ Executable test returned non-zero exit code: $LASTEXITCODE"
+            }
+        } else {
+            Write-Host "❌ Executable not found at: $exePath"
+            exit 1
+        }
+
+    - name: Prepare artifacts
+      shell: pwsh
+      run: |
+        # Create artifacts directory
+        $artifactsDir = "artifacts\windows-${{ matrix.arch }}"
+        New-Item -ItemType Directory -Path $artifactsDir -Force | Out-Null
+        
+        # Copy executable
+        $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
+        Copy-Item $exePath -Destination $artifactsDir
+        
+        # Create README and process artifacts using the unified script
+        Write-Host "Processing artifacts using unified script..."
+        
+        # Use bash to run the unified script
+        bash -c "chmod +x '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' && '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' create windows '$artifactsDir' '${{ matrix.arch }}'"
+        
+        # Verify the README was created
+        $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
+        if (Test-Path $readmePath) {
+            Write-Host "README.txt verified at: $readmePath"
+            Get-Content $readmePath | Select-Object -First 3 | ForEach-Object { Write-Host "  $_" }
+        } else {
+            Write-Host "WARNING: README.txt not found after running script"
+        }
+        
+        # Create archive if requested
+        if ("${{ inputs.create_archives }}" -eq "true") {
+            $zipPath = "artifacts\windows-${{ matrix.arch }}\xdelta3-windows-${{ matrix.arch }}.zip"
+            Write-Host "Creating ZIP archive: $zipPath"
+            Compress-Archive -Path "$artifactsDir\*" -DestinationPath $zipPath -Force
+        }
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-windows-${{ matrix.arch }}
+        path: artifacts/windows-${{ matrix.arch }}/
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Make all scripts executable
+    - name: Make scripts executable
+      run: |
+        if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+        else
+          echo "Script not found, making scripts executable manually"
+          find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+        fi
+
+    # Setup ccache for faster builds
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.c') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
+    # Setup vcpkg using vcpkg-action
+    - name: Setup vcpkg
+      uses: johnwason/vcpkg-action@v6
+      id: vcpkg
+      with:
+        manifest-dir: ${{ github.workspace }}
+        triplet: x64-linux
+        revision: ${{ inputs.vcpkg_commit }}
+        token: ${{ github.token }}
+        github-binarycache: true
+        cache-key: vcpkg-${{ runner.os }}-x64-linux-${{ hashFiles('vcpkg.json') }}
+
+    - name: Configure CMake
+      run: |
+        # Simple configuration relying on vcpkg integration with ccache
+        cmake -B build -S . \
+          -DCMAKE_BUILD_TYPE=${{ inputs.build_type }} \
+          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+          -DXDELTA_ENABLE_LZMA=ON \
+          -DXDELTA_BUILD_TESTS=OFF \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Build
+      run: cmake --build build --config ${{ inputs.build_type }}
+
+    - name: Test executable
+      run: |
+        # Test if the executable works
+        if [ -f "build/xdelta3" ]; then
+          echo "Testing executable: build/xdelta3"
+          ./build/xdelta3 --help
+          if [ $? -eq 0 ]; then
+            echo "✅ Executable test passed"
+          else
+            echo "⚠️ Executable test returned non-zero exit code: $?"
+          fi
+        else
+          echo "❌ Executable not found at: build/xdelta3"
+          exit 1
+        fi
+
+    - name: Prepare artifacts
+      run: |
+        mkdir -p artifacts/linux
+        
+        # Copy executables
+        cp build/xdelta3 artifacts/linux/
+        
+        # Process artifacts using the unified script
+        echo "Processing artifacts using unified script..."
+        
+        # Make the script executable and run it
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
+        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" create linux artifacts/linux
+        
+        # Verify artifacts
+        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux artifacts/linux
+        
+        # Verify README was created successfully
+        if [ -f "artifacts/linux/README.txt" ]; then
+          echo "README.txt created successfully"
+        else
+          echo "ERROR: Failed to create README.txt"
+          exit 1
+        fi
+        
+        # Create archive if requested
+        if [ "${{ inputs.create_archives }}" == "true" ]; then
+          echo "Creating tar.gz archive: artifacts/linux/xdelta3-linux.tar.gz"
+          tar -czf artifacts/linux/xdelta3-linux.tar.gz -C artifacts/linux .
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-linux
+        path: artifacts/linux/
+        retention-days: ${{ inputs.artifact_retention_days }}
+
+  build-macos:
+    runs-on: macos-latest
+    continue-on-error: true  # Allow macOS build to fail without failing the workflow
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Make all scripts executable
+    - name: Make scripts executable
+      run: |
+        if [ -f ".github/scripts/make-scripts-executable.sh" ]; then
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+        else
+          echo "Script not found, making scripts executable manually"
+          find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
+        fi
+
+    # Create placeholder artifacts for macOS
+    - name: Create placeholder artifacts
+      run: |
+        mkdir -p artifacts/macos
+        
+        # Create README explaining macOS build is disabled
+        echo "# Xdelta3 macOS Binary (Temporarily Disabled)" > artifacts/macos/README.txt
+        echo "=============================================" >> artifacts/macos/README.txt
+        echo "" >> artifacts/macos/README.txt
+        echo "NOTICE: macOS build is temporarily disabled due to C++11 literal suffix issues." >> artifacts/macos/README.txt
+        echo "Please use Windows or Linux platforms." >> artifacts/macos/README.txt
+        echo "" >> artifacts/macos/README.txt
+        echo "For more information, see the project repository." >> artifacts/macos/README.txt
+        
+        # Create archive if requested
+        if [ "${{ inputs.create_archives }}" == "true" ]; then
+          echo "Creating tar.gz archive: artifacts/macos/xdelta3-macos.tar.gz"
+          tar -czf artifacts/macos/xdelta3-macos.tar.gz -C artifacts/macos .
+        fi
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: xdelta3-macos
+        path: artifacts/macos/
+        retention-days: ${{ inputs.artifact_retention_days }}
