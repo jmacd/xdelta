@@ -81,7 +81,6 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
         cache-key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
-        no-install: true  # Don't install dependencies yet, we'll do it manually
       continue-on-error: true
 
     # Install vcpkg dependencies manually
@@ -328,7 +327,6 @@ jobs:
         token: ${{ github.token }}
         github-binarycache: true
         cache-key: vcpkg-${{ runner.os }}-x64-linux-${{ hashFiles('vcpkg.json') }}
-        no-install: true  # Don't install dependencies yet, we'll do it manually
       continue-on-error: true
 
     # Install vcpkg dependencies manually
