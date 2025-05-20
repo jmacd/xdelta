@@ -221,7 +221,7 @@ jobs:
         Write-Host "Processing artifacts using unified script..."
 
         # Use bash to run the unified script
-        bash -c "chmod +x '${{ github.workspace }}/.github/scripts/process-artifacts.sh' && '${{ github.workspace }}/.github/scripts/process-artifacts.sh' create windows '$artifactsDir' '${{ matrix.arch }}'"
+        bash -c "chmod +x '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' && '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' create windows '$artifactsDir' '${{ matrix.arch }}'"
 
         # Verify the README was created
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"
@@ -255,9 +255,9 @@ jobs:
                     New-Item -ItemType Directory -Force -Path $zipDir | Out-Null
                 }
 
-                # Create the zip file with error handling
-                Write-Host "Running Compress-Archive command..."
-                Compress-Archive -Path "$artifactsDir\*" -DestinationPath $zipPath -Force -ErrorAction Stop
+                # Use unified script to create the package
+                Write-Host "Using unified script to create package..."
+                bash -c "chmod +x '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' && '${{ github.workspace }}/.github/scripts/unified-artifacts.sh' package windows '$artifactsDir' '${{ matrix.arch }}' '$zipPath'"
 
                 # Verify zip file was created
                 if (Test-Path $zipPath) {
@@ -270,11 +270,6 @@ jobs:
                     $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
                     $zip.Entries | ForEach-Object { Write-Host "  $($_.FullName)" }
                     $zip.Dispose()
-
-                    # Copy the zip file to artifacts directory for consistency
-                    $artifactsZipPath = Join-Path -Path $artifactsDir -ChildPath $zipPath
-                    Write-Host "Copying zip file to artifacts directory: $artifactsZipPath"
-                    Copy-Item -Path $zipPath -Destination $artifactsDir -Force
                 } else {
                     throw "Failed to create zip archive: $zipPath"
                 }
@@ -294,41 +289,50 @@ jobs:
         echo "Verifying artifacts before upload..."
 
         # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
 
-        # Check if we're using archives or directories
+        # Define artifact paths
         if [ "${{ inputs.create_archives }}" = "true" ]; then
-            ARTIFACT_PATH="xdelta3-windows-${{ matrix.arch }}.zip"
-            echo "Checking archive: $ARTIFACT_PATH"
+            # Verify both the archive and directory
+            ARCHIVE_PATH="xdelta3-windows-${{ matrix.arch }}.zip"
+            ARTIFACTS_DIR="artifacts/windows-${{ matrix.arch }}"
 
-            if [ -f "$ARTIFACT_PATH" ]; then
-                echo "Archive exists: $ARTIFACT_PATH"
-                ls -la "$ARTIFACT_PATH"
+            echo "Checking archive: $ARCHIVE_PATH"
+            if [ -f "$ARCHIVE_PATH" ]; then
+                echo "Archive exists: $ARCHIVE_PATH"
+                ls -la "$ARCHIVE_PATH"
 
-                # Verify archive contents
-                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify windows-archive "$ARTIFACT_PATH" "${{ matrix.arch }}"
+                # Extract archive to temp directory for verification
+                TEMP_DIR=$(mktemp -d)
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" extract "$ARCHIVE_PATH" "$TEMP_DIR" "windows"
+
+                # Verify extracted contents
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify windows "$TEMP_DIR" "${{ matrix.arch }}"
                 if [ $? -eq 0 ]; then
                     echo "✅ Archive verification passed"
                 else
                     echo "⚠️ Archive verification failed"
                 fi
+
+                # Clean up temp directory
+                rm -rf "$TEMP_DIR"
             else
-                echo "::error::Archive not found: $ARTIFACT_PATH"
+                echo "::error::Archive not found: $ARCHIVE_PATH"
             fi
         else
-            ARTIFACT_PATH="artifacts/windows-${{ matrix.arch }}"
-            echo "Checking directory: $ARTIFACT_PATH"
+            ARTIFACTS_DIR="artifacts/windows-${{ matrix.arch }}"
+            echo "Checking directory: $ARTIFACTS_DIR"
 
-            if [ -d "$ARTIFACT_PATH" ]; then
+            if [ -d "$ARTIFACTS_DIR" ]; then
                 # Verify directory contents
-                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify windows "$ARTIFACT_PATH" "${{ matrix.arch }}"
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify windows "$ARTIFACTS_DIR" "${{ matrix.arch }}"
                 if [ $? -eq 0 ]; then
                     echo "✅ Directory verification passed"
                 else
                     echo "⚠️ Directory verification failed"
                 fi
             else
-                echo "::error::Directory not found: $ARTIFACT_PATH"
+                echo "::error::Directory not found: $ARTIFACTS_DIR"
             fi
         fi
 
@@ -467,11 +471,11 @@ jobs:
         echo "Processing artifacts using unified script..."
 
         # Make the script executable and run it
-        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
-        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" create linux artifacts/linux
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
+        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" create linux artifacts/linux
 
         # Verify artifacts
-        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify linux artifacts/linux
+        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux artifacts/linux
 
         # Verify README was created successfully
         if [ -f "artifacts/linux/README.txt" ]; then
@@ -483,9 +487,7 @@ jobs:
 
         # Create tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
-          tar -czvf xdelta3-linux.tar.gz -C artifacts/linux .
-          # Copy the tarball to artifacts directory for consistency
-          cp xdelta3-linux.tar.gz artifacts/linux/
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package linux artifacts/linux "" xdelta3-linux.tar.gz
         fi
 
     # Add a verification step before uploading artifacts
@@ -495,41 +497,50 @@ jobs:
         echo "Verifying artifacts before upload..."
 
         # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
 
-        # Check if we're using archives or directories
+        # Define artifact paths
         if [ "${{ inputs.create_archives }}" = "true" ]; then
-            ARTIFACT_PATH="xdelta3-linux.tar.gz"
-            echo "Checking archive: $ARTIFACT_PATH"
+            # Verify both the archive and directory
+            ARCHIVE_PATH="xdelta3-linux.tar.gz"
+            ARTIFACTS_DIR="artifacts/linux"
 
-            if [ -f "$ARTIFACT_PATH" ]; then
-                echo "Archive exists: $ARTIFACT_PATH"
-                ls -la "$ARTIFACT_PATH"
+            echo "Checking archive: $ARCHIVE_PATH"
+            if [ -f "$ARCHIVE_PATH" ]; then
+                echo "Archive exists: $ARCHIVE_PATH"
+                ls -la "$ARCHIVE_PATH"
 
-                # Verify archive contents
-                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify linux-archive "$ARTIFACT_PATH"
+                # Extract archive to temp directory for verification
+                TEMP_DIR=$(mktemp -d)
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" extract "$ARCHIVE_PATH" "$TEMP_DIR" "linux"
+
+                # Verify extracted contents
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux "$TEMP_DIR"
                 if [ $? -eq 0 ]; then
                     echo "✅ Archive verification passed"
                 else
                     echo "⚠️ Archive verification failed"
                 fi
+
+                # Clean up temp directory
+                rm -rf "$TEMP_DIR"
             else
-                echo "::error::Archive not found: $ARTIFACT_PATH"
+                echo "::error::Archive not found: $ARCHIVE_PATH"
             fi
         else
-            ARTIFACT_PATH="artifacts/linux"
-            echo "Checking directory: $ARTIFACT_PATH"
+            ARTIFACTS_DIR="artifacts/linux"
+            echo "Checking directory: $ARTIFACTS_DIR"
 
-            if [ -d "$ARTIFACT_PATH" ]; then
+            if [ -d "$ARTIFACTS_DIR" ]; then
                 # Verify directory contents
-                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify linux "$ARTIFACT_PATH"
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify linux "$ARTIFACTS_DIR"
                 if [ $? -eq 0 ]; then
                     echo "✅ Directory verification passed"
                 else
                     echo "⚠️ Directory verification failed"
                 fi
             else
-                echo "::error::Directory not found: $ARTIFACT_PATH"
+                echo "::error::Directory not found: $ARTIFACTS_DIR"
             fi
         fi
 
@@ -590,11 +601,11 @@ jobs:
         echo "Processing artifacts using unified script..."
 
         # Make the script executable and run it
-        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
-        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" create macos artifacts/macos
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
+        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" create macos artifacts/macos
 
         # Verify artifacts
-        "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify macos artifacts/macos
+        "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify macos artifacts/macos
 
         # Verify README was created successfully
         if [ -f "artifacts/macos/README.txt" ]; then
@@ -606,9 +617,7 @@ jobs:
 
         # Create empty tarball if requested
         if [ "${{ inputs.create_archives }}" = "true" ]; then
-          tar -czvf xdelta3-macos.tar.gz -C artifacts/macos .
-          # Copy the tarball to artifacts directory for consistency
-          cp xdelta3-macos.tar.gz artifacts/macos/
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package macos artifacts/macos "" xdelta3-macos.tar.gz
         fi
 
     # Add a verification step before uploading artifacts
@@ -618,41 +627,50 @@ jobs:
         echo "Verifying artifacts before upload..."
 
         # Make the script executable
-        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
 
-        # Check if we're using archives or directories
+        # Define artifact paths
         if [ "${{ inputs.create_archives }}" = "true" ]; then
-            ARTIFACT_PATH="xdelta3-macos.tar.gz"
-            echo "Checking archive: $ARTIFACT_PATH"
+            # Verify both the archive and directory
+            ARCHIVE_PATH="xdelta3-macos.tar.gz"
+            ARTIFACTS_DIR="artifacts/macos"
 
-            if [ -f "$ARTIFACT_PATH" ]; then
-                echo "Archive exists: $ARTIFACT_PATH"
-                ls -la "$ARTIFACT_PATH"
+            echo "Checking archive: $ARCHIVE_PATH"
+            if [ -f "$ARCHIVE_PATH" ]; then
+                echo "Archive exists: $ARCHIVE_PATH"
+                ls -la "$ARCHIVE_PATH"
 
-                # Verify archive contents
-                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify macos-archive "$ARTIFACT_PATH"
+                # Extract archive to temp directory for verification
+                TEMP_DIR=$(mktemp -d)
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" extract "$ARCHIVE_PATH" "$TEMP_DIR" "macos"
+
+                # Verify extracted contents
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify macos "$TEMP_DIR"
                 if [ $? -eq 0 ]; then
                     echo "✅ Archive verification passed"
                 else
                     echo "⚠️ Archive verification failed"
                 fi
+
+                # Clean up temp directory
+                rm -rf "$TEMP_DIR"
             else
-                echo "::error::Archive not found: $ARTIFACT_PATH"
+                echo "::error::Archive not found: $ARCHIVE_PATH"
             fi
         else
-            ARTIFACT_PATH="artifacts/macos"
-            echo "Checking directory: $ARTIFACT_PATH"
+            ARTIFACTS_DIR="artifacts/macos"
+            echo "Checking directory: $ARTIFACTS_DIR"
 
-            if [ -d "$ARTIFACT_PATH" ]; then
+            if [ -d "$ARTIFACTS_DIR" ]; then
                 # Verify directory contents
-                "${{ github.workspace }}/.github/scripts/process-artifacts.sh" verify macos "$ARTIFACT_PATH"
+                "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" verify macos "$ARTIFACTS_DIR"
                 if [ $? -eq 0 ]; then
                     echo "✅ Directory verification passed"
                 else
                     echo "⚠️ Directory verification failed"
                 fi
             else
-                echo "::error::Directory not found: $ARTIFACT_PATH"
+                echo "::error::Directory not found: $ARTIFACTS_DIR"
             fi
         fi
 

@@ -21,13 +21,13 @@ jobs:
   test:
     name: Test ${{ inputs.platform }}-${{ inputs.arch }}
     runs-on: ${{ inputs.platform == 'windows' && 'windows-latest' || inputs.platform == 'linux' && 'ubuntu-latest' || 'macos-latest' }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       # Make all scripts executable
       - name: Make scripts executable
         shell: bash
@@ -39,27 +39,27 @@ jobs:
             echo "Script not found, making scripts executable manually"
             find .github/scripts -name "*.sh" -type f -exec chmod +x {} \;
           fi
-      
+
       # Download artifacts
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: xdelta3-${{ inputs.platform }}${{ inputs.arch != 'x64' && '-' || '' }}${{ inputs.arch != 'x64' && inputs.arch || '' }}
           path: ${{ inputs.artifacts_dir }}
-      
+
       # Verify artifacts
       - name: Verify artifacts
         shell: bash
         run: |
-          chmod +x .github/scripts/process-artifacts.sh
-          .github/scripts/process-artifacts.sh verify ${{ inputs.platform }} ${{ inputs.artifacts_dir }} ${{ inputs.arch }}
-      
+          chmod +x .github/scripts/unified-artifacts.sh
+          .github/scripts/unified-artifacts.sh verify ${{ inputs.platform }} ${{ inputs.artifacts_dir }} ${{ inputs.arch }}
+
       # Test executable
       - name: Test executable
         shell: bash
         run: |
           echo "Testing executable..."
-          
+
           if [ "${{ inputs.platform }}" = "windows" ]; then
             EXE_PATH="${{ inputs.artifacts_dir }}/xdelta3.exe"
             if [ -f "$EXE_PATH" ]; then

@@ -57,40 +57,45 @@ jobs:
 
     - name: Verify downloaded artifacts
       id: verify_artifacts
-      shell: pwsh
+      shell: bash
       run: |
-        Write-Host "Listing downloaded artifacts directories:"
-        Get-ChildItem -Path .\ -Directory | ForEach-Object { Write-Host $_.FullName }
+        echo "Listing downloaded artifacts directories:"
+        ls -la
 
-        Write-Host "Checking Windows x64 artifacts:"
-        if (Test-Path "./windows-x64-artifacts") {
-            $x64Exe = Get-ChildItem -Path "./windows-x64-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
-            if ($x64Exe -and $x64Exe.Length -gt 10000) {
-                Write-Host "✅ Found valid x64 executable: $($x64Exe.FullName) ($($x64Exe.Length) bytes)" -ForegroundColor Green
-            } else {
-                Write-Host "❌ Valid x64 executable not found" -ForegroundColor Red
-                exit 1
-            }
-        } else {
-            Write-Host "❌ Windows x64 artifacts directory not found" -ForegroundColor Red
+        # Make scripts executable
+        chmod +x .github/scripts/unified-artifacts.sh
+
+        # Verify Windows x64 artifacts
+        echo "Checking Windows x64 artifacts:"
+        if [ -d "./windows-x64-artifacts" ]; then
+          .github/scripts/unified-artifacts.sh verify windows "./windows-x64-artifacts" "x64"
+          if [ $? -eq 0 ]; then
+            echo "✅ Windows x64 artifacts verified"
+          else
+            echo "❌ Windows x64 artifacts verification failed"
             exit 1
-        }
+          fi
+        else
+          echo "❌ Windows x64 artifacts directory not found"
+          exit 1
+        fi
 
-        Write-Host "Checking Windows x86 artifacts:"
-        if (Test-Path "./windows-x86-artifacts") {
-            $x86Exe = Get-ChildItem -Path "./windows-x86-artifacts" -Filter "xdelta3.exe" -Recurse | Select-Object -First 1
-            if ($x86Exe -and $x86Exe.Length -gt 10000) {
-                Write-Host "✅ Found valid x86 executable: $($x86Exe.FullName) ($($x86Exe.Length) bytes)" -ForegroundColor Green
-            } else {
-                Write-Host "❌ Valid x86 executable not found" -ForegroundColor Red
-                exit 1
-            }
-        } else {
-            Write-Host "❌ Windows x86 artifacts directory not found" -ForegroundColor Red
+        # Verify Windows x86 artifacts
+        echo "Checking Windows x86 artifacts:"
+        if [ -d "./windows-x86-artifacts" ]; then
+          .github/scripts/unified-artifacts.sh verify windows "./windows-x86-artifacts" "x86"
+          if [ $? -eq 0 ]; then
+            echo "✅ Windows x86 artifacts verified"
+          else
+            echo "❌ Windows x86 artifacts verification failed"
             exit 1
-        }
+          fi
+        else
+          echo "❌ Windows x86 artifacts directory not found"
+          exit 1
+        fi
 
-        Write-Host "✅ All artifacts verified successfully" -ForegroundColor Green
+        echo "✅ All artifacts verified successfully"
 
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
@@ -882,7 +887,7 @@ jobs:
         mkdir -p release-files
 
         # Make the scripts executable
-        chmod +x "${{ github.workspace }}/.github/scripts/process-artifacts.sh"
+        chmod +x "${{ github.workspace }}/.github/scripts/unified-artifacts.sh"
 
         # Process Windows x64 artifacts
         if [ -f "xdelta3-windows-x64.zip" ]; then
@@ -890,7 +895,7 @@ jobs:
           cp xdelta3-windows-x64.zip release-files/
         elif [ -d "windows-x64" ]; then
           echo "Found Windows x64 directory artifact"
-          "${{ github.workspace }}/.github/scripts/process-artifacts.sh" package windows windows-x64 x64 release-files/xdelta3-windows-x64.zip
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows windows-x64 x64 release-files/xdelta3-windows-x64.zip
         else
           echo "❌ Windows x64 artifact not found"
           exit 1
@@ -902,7 +907,7 @@ jobs:
           cp xdelta3-windows-x86.zip release-files/
         elif [ -d "windows-x86" ]; then
           echo "Found Windows x86 directory artifact"
-          "${{ github.workspace }}/.github/scripts/process-artifacts.sh" package windows windows-x86 x86 release-files/xdelta3-windows-x86.zip
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package windows windows-x86 x86 release-files/xdelta3-windows-x86.zip
         else
           echo "❌ Windows x86 artifact not found"
           exit 1
@@ -914,7 +919,7 @@ jobs:
           cp xdelta3-linux.tar.gz release-files/
         elif [ -d "linux" ]; then
           echo "Found Linux directory artifact"
-          "${{ github.workspace }}/.github/scripts/process-artifacts.sh" package linux linux "" release-files/xdelta3-linux.tar.gz
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package linux linux "" release-files/xdelta3-linux.tar.gz
         else
           echo "❌ Linux artifact not found"
           exit 1
@@ -926,7 +931,7 @@ jobs:
           cp xdelta3-macos.tar.gz release-files/
         elif [ -d "macos" ]; then
           echo "Found macOS directory artifact"
-          "${{ github.workspace }}/.github/scripts/process-artifacts.sh" package macos macos "" release-files/xdelta3-macos.tar.gz
+          "${{ github.workspace }}/.github/scripts/unified-artifacts.sh" package macos macos "" release-files/xdelta3-macos.tar.gz
         else
           echo "⚠️ macOS artifact not found (this is expected)"
           # Create an empty file as a placeholder
