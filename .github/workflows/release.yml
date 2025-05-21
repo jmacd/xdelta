@@ -1,0 +1,226 @@
+name: Release Workflow
+
+on:
+  release:
+    types: [published, created]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (without v prefix)'
+        required: false
+        default: ''
+      create_release:
+        description: 'Create GitHub release if it does not exist'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            # For release event, extract version from tag
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          elif [[ "${{ github.event.inputs.version }}" != "" ]]; then
+            # For workflow_dispatch with version input
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Extract from CMakeLists.txt
+            VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+          fi
+
+          echo "Using version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create release if needed
+        if: github.event.inputs.create_release == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Xdelta3 ${{ steps.get_version.outputs.version }}
+          tag_name: v${{ steps.get_version.outputs.version }}
+          draft: false
+          prerelease: false
+          body: |
+            # Xdelta3 ${{ steps.get_version.outputs.version }}
+
+            Automatic release created by GitHub Actions.
+
+            ## Included Files
+            - Windows binaries (x64, x86)
+            - Linux binaries
+            - vcpkg package files
+
+      # Call reusable build workflow to build all platforms
+      - name: Build all platforms
+        uses: ./.github/workflows/reusable-build.yml
+        with:
+          build_type: Release
+          create_archives: true
+          artifact_retention_days: 90
+
+  package:
+    name: Package for vcpkg
+    needs: build
+    runs-on: windows-latest
+    outputs:
+      sha512: ${{ steps.outputs.outputs.sha512 }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+
+      - name: List downloaded artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse downloaded-artifacts | Select-Object FullName, Length | Format-Table -AutoSize
+
+      - name: Make scripts executable
+        shell: bash
+        run: |
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+
+      - name: Create vcpkg package structure
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ needs.build.outputs.version }}"
+          $sha512 = ./.github/scripts/prepare-vcpkg-package.ps1 -Version $version -ArtifactsDir "downloaded-artifacts"
+
+          # Output hash for later use
+          echo "SHA512 hash: $sha512"
+          echo "sha512=$sha512" >> $env:GITHUB_OUTPUT
+
+      - name: Upload vcpkg package
+        uses: actions/upload-artifact@v4
+        with:
+          name: vcpkg-package
+          path: xdelta-${{ needs.build.outputs.version }}-windows.zip*
+          retention-days: 90
+
+      - name: Set outputs
+        id: outputs
+        shell: pwsh
+        run: |
+          echo "sha512=${{ steps.package.outputs.sha512 }}" >> $env:GITHUB_OUTPUT
+
+  release:
+    name: Attach to GitHub Release
+    needs: [build, package]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.build.outputs.version }}
+          files: |
+            artifacts/xdelta3-windows-x64/xdelta3-windows-x64.zip
+            artifacts/xdelta3-windows-x86/xdelta3-windows-x86.zip
+            artifacts/xdelta3-linux/xdelta3-linux.tar.gz
+            artifacts/vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip
+            artifacts/vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip.sha512
+
+  update-vcpkg-registry:
+    name: Update vcpkg Registry
+    needs: [build, package, release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download vcpkg package
+        uses: actions/download-artifact@v4
+        with:
+          name: vcpkg-package
+          path: vcpkg-package
+
+      - name: Get SHA512 hash
+        id: get_hash
+        run: |
+          if [ -n "${{ needs.package.outputs.sha512 }}" ]; then
+            # Use SHA512 from package job output
+            SHA512="${{ needs.package.outputs.sha512 }}"
+            echo "Using SHA512 from package job output: $SHA512"
+            echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
+          elif [ -f "vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip.sha512" ]; then
+            # Use SHA512 from downloaded artifact
+            SHA512=$(cat vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip.sha512)
+            echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
+            echo "SHA512 hash from file: $SHA512"
+          else
+            echo "SHA512 hash file not found, checking artifacts"
+            find vcpkg-package -type f -name "*.sha512" | sort
+
+            # Try to find any SHA512 file
+            SHA512_FILE=$(find vcpkg-package -type f -name "*.sha512" | head -n 1)
+            if [ -n "$SHA512_FILE" ]; then
+              SHA512=$(cat "$SHA512_FILE")
+              echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
+              echo "Using SHA512 hash from $SHA512_FILE: $SHA512"
+            else
+              echo "No SHA512 hash found, failing"
+              exit 1
+            fi
+          fi
+
+      - name: Make scripts executable
+        shell: bash
+        run: |
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+
+      - name: Update vcpkg registry files
+        run: |
+          ./.github/scripts/update-vcpkg-registry.sh -v "${{ needs.build.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
+
+      - name: Verify vcpkg registry files
+        run: |
+          ./.github/scripts/verify-vcpkg-registry.sh -v "${{ needs.build.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update vcpkg registry for version ${{ needs.build.outputs.version }}"
+          title: "Update vcpkg registry for version ${{ needs.build.outputs.version }}"
+          body: |
+            This PR updates the vcpkg registry for version ${{ needs.build.outputs.version }}.
+
+            Changes:
+            - Updated SHA512 hash in portfile.cmake: `${{ steps.get_hash.outputs.SHA512 }}`
+            - Updated version references
+            - Updated git-tree reference
+            - Updated baseline.json
+
+            This PR was created automatically by the release workflow.
+          branch: update-vcpkg-registry-${{ needs.build.outputs.version }}
+          base: release3_1_apl
