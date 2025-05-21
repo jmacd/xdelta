@@ -16,8 +16,8 @@ on:
         type: boolean
 
 jobs:
-  build:
-    name: Build Binaries
+  get-version:
+    name: Get Version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get_version.outputs.version }}
@@ -86,20 +86,22 @@ jobs:
             - Linux binaries
             - vcpkg package files
 
-      # Call reusable build workflow to build all platforms
-      - name: Build all platforms
-        uses: ./.github/workflows/reusable-build.yml
-        with:
-          build_type: Release
-          create_archives: true
-          artifact_retention_days: 90
+  build-binaries:
+    name: Build Binaries
+    needs: get-version
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      build_type: Release
+      create_archives: true
+      artifact_retention_days: 90
 
   package:
     name: Package for vcpkg
-    needs: build
+    needs: [get-version, build-binaries]
     runs-on: windows-latest
     outputs:
       sha512: ${{ steps.outputs.outputs.sha512 }}
+      version: ${{ needs.get-version.outputs.version }}
 
     steps:
       - name: Checkout code
@@ -125,7 +127,7 @@ jobs:
         id: package
         shell: pwsh
         run: |
-          $version = "${{ needs.build.outputs.version }}"
+          $version = "${{ needs.get-version.outputs.version }}"
           $sha512 = ./.github/scripts/prepare-vcpkg-package.ps1 -Version $version -ArtifactsDir "downloaded-artifacts"
 
           # Output hash for later use
@@ -136,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vcpkg-package
-          path: xdelta-${{ needs.build.outputs.version }}-windows.zip*
+          path: xdelta-${{ needs.get-version.outputs.version }}-windows.zip*
           retention-days: 90
 
       - name: Set outputs
@@ -147,7 +149,7 @@ jobs:
 
   release:
     name: Attach to GitHub Release
-    needs: [build, package]
+    needs: [get-version, build-binaries, package]
     runs-on: ubuntu-latest
 
     steps:
@@ -162,17 +164,17 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ needs.build.outputs.version }}
+          tag_name: v${{ needs.get-version.outputs.version }}
           files: |
             artifacts/xdelta3-windows-x64/xdelta3-windows-x64.zip
             artifacts/xdelta3-windows-x86/xdelta3-windows-x86.zip
             artifacts/xdelta3-linux/xdelta3-linux.tar.gz
-            artifacts/vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip
-            artifacts/vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip.sha512
+            artifacts/vcpkg-package/xdelta-${{ needs.get-version.outputs.version }}-windows.zip
+            artifacts/vcpkg-package/xdelta-${{ needs.get-version.outputs.version }}-windows.zip.sha512
 
   update-vcpkg-registry:
     name: Update vcpkg Registry
-    needs: [build, package, release]
+    needs: [get-version, package, release]
     runs-on: ubuntu-latest
 
     steps:
@@ -193,9 +195,9 @@ jobs:
             SHA512="${{ needs.package.outputs.sha512 }}"
             echo "Using SHA512 from package job output: $SHA512"
             echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
-          elif [ -f "vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip.sha512" ]; then
+          elif [ -f "vcpkg-package/xdelta-${{ needs.get-version.outputs.version }}-windows.zip.sha512" ]; then
             # Use SHA512 from downloaded artifact
-            SHA512=$(cat vcpkg-package/xdelta-${{ needs.build.outputs.version }}-windows.zip.sha512)
+            SHA512=$(cat vcpkg-package/xdelta-${{ needs.get-version.outputs.version }}-windows.zip.sha512)
             echo "SHA512=$SHA512" >> $GITHUB_OUTPUT
             echo "SHA512 hash from file: $SHA512"
           else
@@ -222,20 +224,20 @@ jobs:
 
       - name: Update vcpkg registry files
         run: |
-          ./.github/scripts/update-vcpkg-registry.sh -v "${{ needs.build.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
+          ./.github/scripts/update-vcpkg-registry.sh -v "${{ needs.get-version.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
 
       - name: Verify vcpkg registry files
         run: |
-          ./.github/scripts/verify-vcpkg-registry.sh -v "${{ needs.build.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
+          ./.github/scripts/verify-vcpkg-registry.sh -v "${{ needs.get-version.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update vcpkg registry for version ${{ needs.build.outputs.version }}"
-          title: "Update vcpkg registry for version ${{ needs.build.outputs.version }}"
+          commit-message: "Update vcpkg registry for version ${{ needs.get-version.outputs.version }}"
+          title: "Update vcpkg registry for version ${{ needs.get-version.outputs.version }}"
           body: |
-            This PR updates the vcpkg registry for version ${{ needs.build.outputs.version }}.
+            This PR updates the vcpkg registry for version ${{ needs.get-version.outputs.version }}.
 
             Changes:
             - Updated SHA512 hash in portfile.cmake: `${{ steps.get_hash.outputs.SHA512 }}`
@@ -244,5 +246,5 @@ jobs:
             - Updated baseline.json
 
             This PR was created automatically by the release workflow.
-          branch: update-vcpkg-registry-${{ needs.build.outputs.version }}
+          branch: update-vcpkg-registry-${{ needs.get-version.outputs.version }}
           base: release3_1_apl
