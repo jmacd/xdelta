@@ -361,20 +361,23 @@ jobs:
 
       - name: Get version
         id: get_version
+        shell: pwsh
         run: |
-          # Extract from CMakeLists.txt - specifically look for project version
-          VERSION=$(grep -oP 'project\(xdelta[^)]*VERSION\s+\K[0-9.]+' CMakeLists.txt)
+          # Extract version from CMakeLists.txt using PowerShell
+          $cmakeContent = Get-Content -Path "CMakeLists.txt" -Raw
 
-          # Validate version format (must be in format X.Y.Z)
-          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Could not extract valid version from CMakeLists.txt"
-            echo "Extracted value: '$VERSION'"
-            echo "Falling back to hardcoded version 3.1.0"
-            VERSION="3.1.0"
-          fi
+          # Look for project version using PowerShell regex
+          if ($cmakeContent -match 'project\s*\(\s*xdelta[^)]*VERSION\s+(\d+\.\d+\.\d+)') {
+              $version = $matches[1]
+              Write-Host "Found version in project(): $version"
+          } else {
+              # Fallback to hardcoded version
+              $version = "3.1.0"
+              Write-Host "Could not extract version from CMakeLists.txt, using fallback: $version"
+          }
 
-          echo "Using version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          Write-Host "Using version: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Download package artifacts
         uses: actions/download-artifact@v4

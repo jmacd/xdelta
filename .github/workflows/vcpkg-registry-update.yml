@@ -44,8 +44,23 @@ jobs:
       id: check_version
       shell: bash
       run: |
-        # Get current version from CMakeLists.txt
-        CURRENT_VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+        # Get current version from CMakeLists.txt - specifically look for project version
+        # Use a more reliable grep pattern that doesn't rely on Perl regex
+        CURRENT_VERSION=$(grep -o 'project(xdelta.*VERSION [0-9.]*' CMakeLists.txt | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+
+        # If that fails, try a simpler pattern
+        if [[ -z "$CURRENT_VERSION" ]]; then
+          echo "First extraction method failed, trying alternative..."
+          CURRENT_VERSION=$(grep 'VERSION' CMakeLists.txt | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+        fi
+
+        # If still no version, use hardcoded fallback
+        if [[ -z "$CURRENT_VERSION" ]]; then
+          echo "Could not extract version from CMakeLists.txt"
+          CURRENT_VERSION="3.1.0"
+          echo "Using fallback version: $CURRENT_VERSION"
+        fi
+
         echo "Current version: $CURRENT_VERSION"
 
         # Get previous commit
@@ -53,8 +68,22 @@ jobs:
 
         # Check if CMakeLists.txt changed
         if git diff --name-only $PREVIOUS_COMMIT HEAD | grep -q "CMakeLists.txt"; then
-          # Get previous version
-          PREVIOUS_VERSION=$(git show $PREVIOUS_COMMIT:CMakeLists.txt | grep -oP 'VERSION\s+\K[0-9.]+')
+          # Get previous version using the same reliable method
+          PREVIOUS_VERSION=$(git show $PREVIOUS_COMMIT:CMakeLists.txt | grep -o 'project(xdelta.*VERSION [0-9.]*' | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+
+          # If that fails, try the simpler pattern
+          if [[ -z "$PREVIOUS_VERSION" ]]; then
+            echo "First extraction method failed for previous version, trying alternative..."
+            PREVIOUS_VERSION=$(git show $PREVIOUS_COMMIT:CMakeLists.txt | grep 'VERSION' | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+          fi
+
+          # If still no version, use hardcoded fallback
+          if [[ -z "$PREVIOUS_VERSION" ]]; then
+            echo "Could not extract previous version from CMakeLists.txt"
+            PREVIOUS_VERSION="3.1.0"
+            echo "Using fallback previous version: $PREVIOUS_VERSION"
+          fi
+
           echo "Previous version: $PREVIOUS_VERSION"
 
           if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then

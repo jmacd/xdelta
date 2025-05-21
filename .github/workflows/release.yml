@@ -30,6 +30,7 @@ jobs:
 
       - name: Get version
         id: get_version
+        shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
             # For release event, extract version from tag
@@ -39,8 +40,29 @@ jobs:
             # For workflow_dispatch with version input
             VERSION="${{ github.event.inputs.version }}"
           else
-            # Extract from CMakeLists.txt
-            VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+            # Extract from CMakeLists.txt - specifically look for project version
+            # Use a more reliable grep pattern that doesn't rely on Perl regex
+            VERSION=$(grep -o 'project(xdelta.*VERSION [0-9.]*' CMakeLists.txt | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+
+            # If that fails, try a simpler pattern
+            if [[ -z "$VERSION" ]]; then
+              echo "First extraction method failed, trying alternative..."
+              VERSION=$(grep 'VERSION' CMakeLists.txt | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+            fi
+
+            # If still no version, use hardcoded fallback
+            if [[ -z "$VERSION" ]]; then
+              echo "Could not extract version from CMakeLists.txt"
+              VERSION="3.1.0"
+              echo "Using fallback version: $VERSION"
+            fi
+          fi
+
+          # Validate version format
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Warning: Version format is not X.Y.Z: '$VERSION'"
+            echo "Falling back to hardcoded version 3.1.0"
+            VERSION="3.1.0"
           fi
 
           echo "Using version: $VERSION"
