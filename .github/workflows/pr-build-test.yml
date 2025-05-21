@@ -307,9 +307,10 @@ jobs:
             exit 1
           }
 
-  test-vcpkg-update:
-    name: Test vcpkg Registry Update
+  test-vcpkg-integration:
+    name: Test vcpkg Integration
     runs-on: ubuntu-latest
+    needs: [test-package]
 
     steps:
       - name: Checkout code
@@ -338,38 +339,50 @@ jobs:
           echo "Using version: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Generate dummy SHA512
+      - name: Download package artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: xdelta3-windows-x64
+          path: downloaded-artifacts/xdelta3-windows-x64
+
+      - name: Generate SHA512 hash from package
         id: sha512
         run: |
-          # Generate a dummy SHA512 hash for testing
-          # Use a fixed string to avoid issues with special characters
-          DUMMY_TEXT="dummy-hash-for-testing-${{ steps.get_version.outputs.version }}"
-          echo "Generating SHA512 hash for: $DUMMY_TEXT"
-
-          # Use a more reliable way to generate SHA512 hash
-          if command -v openssl &> /dev/null; then
-            # Use openssl if available
-            DUMMY_SHA512=$(echo -n "$DUMMY_TEXT" | openssl dgst -sha512 | awk '{print $NF}')
+          # Generate SHA512 hash from the downloaded package
+          if [ -f "downloaded-artifacts/xdelta3-windows-x64/xdelta3-windows-x64.zip" ]; then
+            PACKAGE_SHA512=$(sha512sum "downloaded-artifacts/xdelta3-windows-x64/xdelta3-windows-x64.zip" | awk '{print $1}')
+            echo "Using SHA512 from package: $PACKAGE_SHA512"
           else
-            # Fallback to sha512sum
-            DUMMY_SHA512=$(echo -n "$DUMMY_TEXT" | sha512sum | awk '{print $1}')
+            # Generate a dummy SHA512 hash for testing
+            echo "Package not found, generating dummy SHA512"
+            DUMMY_TEXT="dummy-hash-for-testing-${{ steps.get_version.outputs.version }}"
+
+            # Use a reliable way to generate SHA512 hash
+            if command -v openssl &> /dev/null; then
+              # Use openssl if available
+              PACKAGE_SHA512=$(echo -n "$DUMMY_TEXT" | openssl dgst -sha512 | awk '{print $NF}')
+            else
+              # Fallback to sha512sum
+              PACKAGE_SHA512=$(echo -n "$DUMMY_TEXT" | sha512sum | awk '{print $1}')
+            fi
           fi
 
           # Verify the hash is valid
-          if ! [[ $DUMMY_SHA512 =~ ^[a-f0-9]{128}$ ]]; then
-            echo "Error: Generated SHA512 hash is invalid: $DUMMY_SHA512"
+          if ! [[ $PACKAGE_SHA512 =~ ^[a-f0-9]{128}$ ]]; then
+            echo "Error: Generated SHA512 hash is invalid: $PACKAGE_SHA512"
             echo "Using a fixed dummy hash instead"
-            DUMMY_SHA512="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+            PACKAGE_SHA512="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
           fi
 
-          echo "sha512=$DUMMY_SHA512" >> $GITHUB_OUTPUT
-          echo "Using dummy SHA512: $DUMMY_SHA512"
+          echo "sha512=$PACKAGE_SHA512" >> $GITHUB_OUTPUT
+          echo "Using SHA512: $PACKAGE_SHA512"
 
-      - name: Test update script (dry run)
+      - name: Test vcpkg registry update (dry run)
         run: |
+          echo "Testing vcpkg registry update with version ${{ steps.get_version.outputs.version }} and SHA512 ${{ steps.sha512.outputs.sha512 }}"
           ./.github/scripts/update-vcpkg-registry.sh -v "${{ steps.get_version.outputs.version }}" -s "${{ steps.sha512.outputs.sha512 }}" --dry-run
 
-      - name: Test vcpkg registry structure
+      - name: Verify vcpkg registry structure
         run: |
           # Check if all required files exist
           echo "Checking vcpkg registry structure..."
@@ -377,6 +390,7 @@ jobs:
           # Check portfile.cmake
           if [ -f "vcpkg-registry/ports/xdelta/portfile.cmake" ]; then
             echo "✅ portfile.cmake exists"
+            grep -n "SHA512" "vcpkg-registry/ports/xdelta/portfile.cmake" || echo "SHA512 not found in portfile.cmake"
           else
             echo "❌ portfile.cmake is missing"
             exit 1
@@ -385,6 +399,7 @@ jobs:
           # Check vcpkg.json
           if [ -f "vcpkg-registry/ports/xdelta/vcpkg.json" ]; then
             echo "✅ vcpkg.json exists"
+            grep -n "version" "vcpkg-registry/ports/xdelta/vcpkg.json" || echo "version not found in vcpkg.json"
           else
             echo "❌ vcpkg.json is missing"
             exit 1
@@ -393,6 +408,7 @@ jobs:
           # Check xdelta.json
           if [ -f "vcpkg-registry/versions/x-/xdelta.json" ]; then
             echo "✅ xdelta.json exists"
+            grep -n "version\|git-tree" "vcpkg-registry/versions/x-/xdelta.json" || echo "version or git-tree not found in xdelta.json"
           else
             echo "❌ xdelta.json is missing"
             exit 1
@@ -401,9 +417,31 @@ jobs:
           # Check baseline.json
           if [ -f "vcpkg-registry/versions/baseline.json" ]; then
             echo "✅ baseline.json exists"
+            grep -n "baseline" "vcpkg-registry/versions/baseline.json" || echo "baseline not found in baseline.json"
           else
             echo "❌ baseline.json is missing"
             exit 1
           fi
 
           echo "✅ vcpkg registry structure is valid"
+
+      - name: Test vcpkg registry update (actual update)
+        run: |
+          # Make a backup of the original files
+          mkdir -p backup
+          cp vcpkg-registry/ports/xdelta/portfile.cmake backup/
+          cp vcpkg-registry/ports/xdelta/vcpkg.json backup/
+          cp vcpkg-registry/versions/x-/xdelta.json backup/
+          cp vcpkg-registry/versions/baseline.json backup/
+
+          # Run the update script
+          ./.github/scripts/update-vcpkg-registry.sh -v "${{ steps.get_version.outputs.version }}" -s "${{ steps.sha512.outputs.sha512 }}"
+
+          # Verify the update
+          ./.github/scripts/verify-vcpkg-registry.sh -v "${{ steps.get_version.outputs.version }}" -s "${{ steps.sha512.outputs.sha512 }}"
+
+          # Restore the original files
+          cp backup/portfile.cmake vcpkg-registry/ports/xdelta/
+          cp backup/vcpkg.json vcpkg-registry/ports/xdelta/
+          cp backup/xdelta.json vcpkg-registry/versions/x-/
+          cp backup/baseline.json vcpkg-registry/versions/
