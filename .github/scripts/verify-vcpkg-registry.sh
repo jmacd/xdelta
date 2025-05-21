@@ -67,57 +67,90 @@ if [[ ! -f "$BASELINE_JSON_PATH" ]]; then
   exit 1
 fi
 
+# Initialize verification status
+VERIFICATION_FAILED=0
+
 # Verify portfile.cmake
-PORTFILE_SHA512=$(grep -oP 'SHA512 "\K[a-f0-9]+(?=")' "$PORTFILE_PATH")
+echo "Checking portfile.cmake SHA512..."
+PORTFILE_CONTENT=$(cat "$PORTFILE_PATH")
+echo "portfile.cmake content (excerpt):"
+grep -n "SHA512" "$PORTFILE_PATH" || echo "SHA512 not found in portfile.cmake"
+
+# Try different patterns to extract SHA512
+PORTFILE_SHA512=$(grep -oP 'SHA512 "\K[a-f0-9]+(?=")' "$PORTFILE_PATH" || echo "")
+if [[ -z "$PORTFILE_SHA512" ]]; then
+  # Try alternative pattern
+  PORTFILE_SHA512=$(grep -o 'SHA512 "[a-f0-9]*"' "$PORTFILE_PATH" | grep -o '"[a-f0-9]*"' | tr -d '"' || echo "")
+fi
+
 if [[ "$PORTFILE_SHA512" == "$SHA512" ]]; then
   echo "✅ portfile.cmake SHA512 is correct"
 else
   echo "❌ portfile.cmake SHA512 is incorrect"
   echo "  Expected: $SHA512"
   echo "  Found:    $PORTFILE_SHA512"
-  exit 1
+  # Don't exit immediately, continue checking other files
+  VERIFICATION_FAILED=1
 fi
 
 # Verify vcpkg.json
-VCPKG_JSON_VERSION=$(grep -oP '"version": "\K[0-9.]+(?=")' "$VCPKG_JSON_PATH")
+echo "Checking vcpkg.json version..."
+grep -n "version" "$VCPKG_JSON_PATH" || echo "version not found in vcpkg.json"
+
+VCPKG_JSON_VERSION=$(grep -oP '"version": "\K[0-9.]+(?=")' "$VCPKG_JSON_PATH" || echo "")
 if [[ "$VCPKG_JSON_VERSION" == "$VERSION" ]]; then
   echo "✅ vcpkg.json version is correct"
 else
   echo "❌ vcpkg.json version is incorrect"
   echo "  Expected: $VERSION"
   echo "  Found:    $VCPKG_JSON_VERSION"
-  exit 1
+  VERIFICATION_FAILED=1
 fi
 
 # Verify versions/x-/xdelta.json
-VERSION_JSON_VERSION=$(grep -oP '"version": "\K[0-9.]+(?=")' "$VERSION_JSON_PATH")
+echo "Checking xdelta.json version..."
+grep -n "version" "$VERSION_JSON_PATH" || echo "version not found in xdelta.json"
+
+VERSION_JSON_VERSION=$(grep -oP '"version": "\K[0-9.]+(?=")' "$VERSION_JSON_PATH" || echo "")
 if [[ "$VERSION_JSON_VERSION" == "$VERSION" ]]; then
   echo "✅ xdelta.json version is correct"
 else
   echo "❌ xdelta.json version is incorrect"
   echo "  Expected: $VERSION"
   echo "  Found:    $VERSION_JSON_VERSION"
-  exit 1
+  VERIFICATION_FAILED=1
 fi
 
 # Verify git-tree exists
+echo "Checking xdelta.json git-tree..."
+grep -n "git-tree" "$VERSION_JSON_PATH" || echo "git-tree not found in xdelta.json"
+
 if grep -q '"git-tree":' "$VERSION_JSON_PATH"; then
   echo "✅ xdelta.json git-tree exists"
 else
   echo "❌ xdelta.json git-tree is missing"
-  exit 1
+  VERIFICATION_FAILED=1
 fi
 
 # Verify baseline.json
-BASELINE_VERSION=$(grep -oP '"baseline": "\K[0-9.]+(?=")' "$BASELINE_JSON_PATH")
+echo "Checking baseline.json version..."
+grep -n "baseline" "$BASELINE_JSON_PATH" || echo "baseline not found in baseline.json"
+
+BASELINE_VERSION=$(grep -oP '"baseline": "\K[0-9.]+(?=")' "$BASELINE_JSON_PATH" || echo "")
 if [[ "$BASELINE_VERSION" == "$VERSION" ]]; then
   echo "✅ baseline.json version is correct"
 else
   echo "❌ baseline.json version is incorrect"
   echo "  Expected: $VERSION"
   echo "  Found:    $BASELINE_VERSION"
-  exit 1
+  VERIFICATION_FAILED=1
 fi
 
-echo "✅ All vcpkg registry files are correctly updated!"
-exit 0
+# Check final verification status
+if [[ $VERIFICATION_FAILED -eq 0 ]]; then
+  echo "✅ All vcpkg registry files are correctly updated!"
+  exit 0
+else
+  echo "❌ Some vcpkg registry files have issues. See details above."
+  exit 1
+fi
