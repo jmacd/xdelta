@@ -264,12 +264,23 @@ jobs:
 
       - name: Get version
         id: get_version
-        shell: bash
+        shell: pwsh
         run: |
-          # Extract from CMakeLists.txt
-          VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
-          echo "Using version: $VERSION"
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # Extract version from CMakeLists.txt using PowerShell
+          $cmakeContent = Get-Content -Path "CMakeLists.txt" -Raw
+
+          # Look for project version using PowerShell regex
+          if ($cmakeContent -match 'project\s*\(\s*xdelta[^)]*VERSION\s+(\d+\.\d+\.\d+)') {
+              $version = $matches[1]
+              Write-Host "Found version in project(): $version"
+          } else {
+              # Fallback to hardcoded version
+              $version = "3.1.0"
+              Write-Host "Could not extract version from CMakeLists.txt, using fallback: $version"
+          }
+
+          Write-Host "Using version: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Create vcpkg package structure
         shell: pwsh
