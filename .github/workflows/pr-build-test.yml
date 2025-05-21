@@ -1,0 +1,279 @@
+name: PR Build Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - release3_1_apl
+    paths:
+      - 'CMakeLists.txt'
+      - 'vcpkg.json'
+      - 'xdelta3/**'
+      - '.github/workflows/reusable-build.yml'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+
+jobs:
+  test-build:
+    name: Test Build Process
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      # Call reusable build workflow to build all platforms
+      - name: Build all platforms
+        uses: ./.github/workflows/reusable-build.yml
+        with:
+          build_type: Release
+          create_archives: true
+          artifact_retention_days: 1
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+      
+      - name: Verify build artifacts
+        shell: bash
+        run: |
+          echo "Verifying build artifacts..."
+          
+          # Check Windows x64 artifacts
+          if [ -d "downloaded-artifacts/xdelta3-windows-x64" ]; then
+            echo "✅ Windows x64 artifacts exist"
+            if [ -f "downloaded-artifacts/xdelta3-windows-x64/xdelta3.exe" ]; then
+              echo "✅ Windows x64 executable exists"
+            else
+              echo "❌ Windows x64 executable is missing"
+              exit 1
+            fi
+          else
+            echo "❌ Windows x64 artifacts are missing"
+            exit 1
+          fi
+          
+          # Check Windows x86 artifacts
+          if [ -d "downloaded-artifacts/xdelta3-windows-x86" ]; then
+            echo "✅ Windows x86 artifacts exist"
+            if [ -f "downloaded-artifacts/xdelta3-windows-x86/xdelta3.exe" ]; then
+              echo "✅ Windows x86 executable exists"
+            else
+              echo "❌ Windows x86 executable is missing"
+              exit 1
+            fi
+          else
+            echo "❌ Windows x86 artifacts are missing"
+            exit 1
+          fi
+          
+          # Check Linux artifacts
+          if [ -d "downloaded-artifacts/xdelta3-linux" ]; then
+            echo "✅ Linux artifacts exist"
+            if [ -f "downloaded-artifacts/xdelta3-linux/xdelta3" ]; then
+              echo "✅ Linux executable exists"
+            else
+              echo "❌ Linux executable is missing"
+              exit 1
+            fi
+          else
+            echo "❌ Linux artifacts are missing"
+            exit 1
+          fi
+          
+          echo "✅ All build artifacts verified successfully"
+  
+  test-package:
+    name: Test Package Creation
+    runs-on: windows-latest
+    needs: test-build
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: downloaded-artifacts
+      
+      - name: Make scripts executable
+        shell: bash
+        run: |
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+      
+      - name: Get version
+        id: get_version
+        shell: bash
+        run: |
+          # Extract from CMakeLists.txt
+          VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+          echo "Using version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Create vcpkg package structure
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          
+          # Run the package preparation script
+          ./.github/scripts/prepare-vcpkg-package.ps1 -Version $version -ArtifactsDir "downloaded-artifacts"
+          
+          # Verify the package was created
+          if (Test-Path "xdelta-$version-windows.zip") {
+            Write-Host "✅ vcpkg package created successfully"
+          } else {
+            Write-Host "❌ Failed to create vcpkg package"
+            exit 1
+          }
+          
+          # Verify SHA512 hash file was created
+          if (Test-Path "xdelta-$version-windows.zip.sha512") {
+            Write-Host "✅ SHA512 hash file created successfully"
+            $sha512 = Get-Content "xdelta-$version-windows.zip.sha512"
+            Write-Host "SHA512: $sha512"
+          } else {
+            Write-Host "❌ Failed to create SHA512 hash file"
+            exit 1
+          }
+      
+      - name: Test package structure
+        shell: pwsh
+        run: |
+          $version = "${{ steps.get_version.outputs.version }}"
+          
+          # Extract the package
+          Expand-Archive -Path "xdelta-$version-windows.zip" -DestinationPath "extracted-package" -Force
+          
+          # Verify package structure
+          $requiredPaths = @(
+            "extracted-package/xdelta-$version-windows/$version/x64-windows/bin/xdelta3.exe",
+            "extracted-package/xdelta-$version-windows/$version/x86-windows/bin/xdelta3.exe",
+            "extracted-package/xdelta-$version-windows/$version/x64-windows/include/xdelta3/xdelta3.h",
+            "extracted-package/xdelta-$version-windows/$version/x86-windows/include/xdelta3/xdelta3.h",
+            "extracted-package/xdelta-$version-windows/$version/x64-windows/lib/xdelta.lib",
+            "extracted-package/xdelta-$version-windows/$version/x86-windows/lib/xdelta.lib"
+          )
+          
+          $allFilesExist = $true
+          foreach ($path in $requiredPaths) {
+            if (Test-Path $path) {
+              Write-Host "✅ $path exists"
+            } else {
+              Write-Host "❌ $path is missing"
+              $allFilesExist = $false
+            }
+          }
+          
+          if ($allFilesExist) {
+            Write-Host "✅ Package structure is valid"
+          } else {
+            Write-Host "❌ Package structure is invalid"
+            exit 1
+          }
+  
+  test-vcpkg-update:
+    name: Test vcpkg Registry Update
+    runs-on: ubuntu-latest
+    needs: test-package
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Make scripts executable
+        run: |
+          chmod +x .github/scripts/make-scripts-executable.sh
+          .github/scripts/make-scripts-executable.sh
+      
+      - name: Get version
+        id: get_version
+        run: |
+          # Extract from CMakeLists.txt
+          VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+          
+          # Validate version format (must be in format X.Y.Z)
+          if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: Invalid version format: $VERSION"
+            echo "Version must be in format X.Y.Z (e.g., 3.1.0)"
+            exit 1
+          fi
+          
+          echo "Using version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Generate dummy SHA512
+        id: sha512
+        run: |
+          # Generate a dummy SHA512 hash for testing
+          # Use a fixed string to avoid issues with special characters
+          DUMMY_TEXT="dummy-hash-for-testing-${{ steps.get_version.outputs.version }}"
+          echo "Generating SHA512 hash for: $DUMMY_TEXT"
+          
+          # Use a more reliable way to generate SHA512 hash
+          if command -v openssl &> /dev/null; then
+            # Use openssl if available
+            DUMMY_SHA512=$(echo -n "$DUMMY_TEXT" | openssl dgst -sha512 | awk '{print $NF}')
+          else
+            # Fallback to sha512sum
+            DUMMY_SHA512=$(echo -n "$DUMMY_TEXT" | sha512sum | awk '{print $1}')
+          fi
+          
+          # Verify the hash is valid
+          if ! [[ $DUMMY_SHA512 =~ ^[a-f0-9]{128}$ ]]; then
+            echo "Error: Generated SHA512 hash is invalid: $DUMMY_SHA512"
+            echo "Using a fixed dummy hash instead"
+            DUMMY_SHA512="1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+          fi
+          
+          echo "sha512=$DUMMY_SHA512" >> $GITHUB_OUTPUT
+          echo "Using dummy SHA512: $DUMMY_SHA512"
+      
+      - name: Test update script (dry run)
+        run: |
+          ./.github/scripts/update-vcpkg-registry.sh -v "${{ steps.get_version.outputs.version }}" -s "${{ steps.sha512.outputs.sha512 }}" --dry-run
+      
+      - name: Test vcpkg registry structure
+        run: |
+          # Check if all required files exist
+          echo "Checking vcpkg registry structure..."
+          
+          # Check portfile.cmake
+          if [ -f "vcpkg-registry/ports/xdelta/portfile.cmake" ]; then
+            echo "✅ portfile.cmake exists"
+          else
+            echo "❌ portfile.cmake is missing"
+            exit 1
+          fi
+          
+          # Check vcpkg.json
+          if [ -f "vcpkg-registry/ports/xdelta/vcpkg.json" ]; then
+            echo "✅ vcpkg.json exists"
+          else
+            echo "❌ vcpkg.json is missing"
+            exit 1
+          fi
+          
+          # Check xdelta.json
+          if [ -f "vcpkg-registry/versions/x-/xdelta.json" ]; then
+            echo "✅ xdelta.json exists"
+          else
+            echo "❌ xdelta.json is missing"
+            exit 1
+          fi
+          
+          # Check baseline.json
+          if [ -f "vcpkg-registry/versions/baseline.json" ]; then
+            echo "✅ baseline.json exists"
+          else
+            echo "❌ baseline.json is missing"
+            exit 1
+          fi
+          
+          echo "✅ vcpkg registry structure is valid"
