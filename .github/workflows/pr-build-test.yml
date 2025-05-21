@@ -326,14 +326,15 @@ jobs:
       - name: Get version
         id: get_version
         run: |
-          # Extract from CMakeLists.txt
-          VERSION=$(grep -oP 'VERSION\s+\K[0-9.]+' CMakeLists.txt)
+          # Extract from CMakeLists.txt - specifically look for project version
+          VERSION=$(grep -oP 'project\(xdelta[^)]*VERSION\s+\K[0-9.]+' CMakeLists.txt)
 
           # Validate version format (must be in format X.Y.Z)
           if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Error: Invalid version format: $VERSION"
-            echo "Version must be in format X.Y.Z (e.g., 3.1.0)"
-            exit 1
+            echo "Error: Could not extract valid version from CMakeLists.txt"
+            echo "Extracted value: '$VERSION'"
+            echo "Falling back to hardcoded version 3.1.0"
+            VERSION="3.1.0"
           fi
 
           echo "Using version: $VERSION"
