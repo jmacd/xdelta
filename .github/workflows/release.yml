@@ -231,56 +231,20 @@ jobs:
           ./.github/scripts/verify-vcpkg-registry.sh -v "${{ needs.get-version.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
 
       - name: Push to vcpkg-registry branch
-        run: |
-          # Configure git
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: |
+            Update vcpkg registry for version ${{ needs.get-version.outputs.version }}
 
-          # Fetch latest changes from remote
-          echo "Fetching latest changes from remote..."
-          git fetch origin
+            - Updated SHA512 hash in portfile.cmake: ${{ steps.get_hash.outputs.SHA512 }}
+            - Updated version references
+            - Updated git-tree reference
+            - Updated baseline.json
 
-          # Store current vcpkg-registry folder content
-          echo "Storing vcpkg-registry folder content..."
-          cp -r vcpkg-registry /tmp/vcpkg-registry-backup
-
-          # Switch to vcpkg-registry branch and update it
-          echo "Switching to vcpkg-registry branch..."
-          if git ls-remote --heads origin vcpkg-registry | grep -q vcpkg-registry; then
-            echo "vcpkg-registry branch exists, checking out and pulling latest..."
-            # Use explicit remote reference to avoid ambiguity
-            git checkout -B vcpkg-registry-temp origin/vcpkg-registry
-            git branch -D vcpkg-registry 2>/dev/null || true
-            git checkout -b vcpkg-registry
-            git pull --rebase origin vcpkg-registry
-          else
-            echo "vcpkg-registry branch doesn't exist, creating new branch..."
-            git checkout -b vcpkg-registry
-          fi
-
-          # Copy back the updated vcpkg-registry files
-          echo "Copying updated vcpkg-registry files..."
-          rm -rf vcpkg-registry 2>/dev/null || true
-          cp -r /tmp/vcpkg-registry-backup vcpkg-registry
-
-          # Check if there are changes to commit
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "No changes to commit to vcpkg-registry"
-            exit 0
-          fi
-
-          # Add and commit vcpkg registry changes
-          git add vcpkg-registry/
-          git commit -m "Update vcpkg registry for version ${{ needs.get-version.outputs.version }}
-
-          - Updated SHA512 hash in portfile.cmake: ${{ steps.get_hash.outputs.SHA512 }}
-          - Updated version references
-          - Updated git-tree reference
-          - Updated baseline.json
-
-          This commit was created automatically by the release workflow."
-
-          # Push to vcpkg-registry branch
-          git push origin vcpkg-registry
-
-          echo "✅ Successfully pushed vcpkg registry updates to vcpkg-registry branch"
+            This commit was created automatically by the release workflow.
+          branch: vcpkg-registry
+          create_branch: true
+          file_pattern: 'vcpkg-registry/'
+          commit_user_name: 'GitHub Actions'
+          commit_user_email: 'actions@github.com'
+          commit_author: 'GitHub Actions <actions@github.com>'
