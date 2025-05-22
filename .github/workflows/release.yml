@@ -242,8 +242,9 @@ jobs:
           git checkout -B vcpkg-registry origin/vcpkg-registry
           git pull origin vcpkg-registry
 
-          # Copy the updated files
-          cp -r /tmp/vcpkg-registry-updated/* vcpkg-registry/
+          # Copy the updated files to root directory (new structure)
+          cp -r /tmp/vcpkg-registry-updated/ports .
+          cp -r /tmp/vcpkg-registry-updated/versions .
 
       - name: Commit and push to vcpkg-registry branch
         uses: stefanzweifel/git-auto-commit-action@v5
@@ -257,7 +258,7 @@ jobs:
             - Updated baseline.json
 
             This commit was created automatically by the release workflow.
-          file_pattern: 'vcpkg-registry/'
+          file_pattern: 'ports/ versions/'
           commit_user_name: 'GitHub Actions'
           commit_user_email: 'actions@github.com'
           commit_author: 'GitHub Actions <actions@github.com>'
