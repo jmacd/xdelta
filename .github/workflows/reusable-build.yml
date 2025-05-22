@@ -235,6 +235,30 @@ jobs:
         $exePath = "build\${{ inputs.build_type }}\xdelta3.exe"
         Copy-Item $exePath -Destination $artifactsDir
 
+        # Copy required DLLs from vcpkg
+        Write-Host "Copying required DLLs..."
+        $vcpkgBinDir = "vcpkg\installed\${{ matrix.arch }}-windows\bin"
+        if (Test-Path $vcpkgBinDir) {
+            # Copy liblzma DLL if it exists
+            $liblzmaDll = Join-Path $vcpkgBinDir "liblzma.dll"
+            if (Test-Path $liblzmaDll) {
+                Copy-Item $liblzmaDll -Destination $artifactsDir
+                Write-Host "✅ Copied liblzma.dll"
+            } else {
+                Write-Host "⚠️ liblzma.dll not found at: $liblzmaDll"
+            }
+
+            # Copy any other required DLLs
+            Get-ChildItem -Path $vcpkgBinDir -Filter "*.dll" | ForEach-Object {
+                if ($_.Name -match "(lzma|zlib|bzip2)") {
+                    Copy-Item $_.FullName -Destination $artifactsDir
+                    Write-Host "✅ Copied $($_.Name)"
+                }
+            }
+        } else {
+            Write-Host "⚠️ vcpkg bin directory not found: $vcpkgBinDir"
+        }
+
         # Create README manually to avoid path issues
         Write-Host "Creating README.txt manually..."
         $readmePath = Join-Path -Path $artifactsDir -ChildPath "README.txt"

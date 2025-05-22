@@ -247,4 +247,4 @@ jobs:
 
             This PR was created automatically by the release workflow.
           branch: update-vcpkg-registry-${{ needs.get-version.outputs.version }}
-          base: release3_1_apl
+          base: vcpkg-registry
