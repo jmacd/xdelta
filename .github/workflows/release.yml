@@ -240,20 +240,28 @@ jobs:
           echo "Fetching latest changes from remote..."
           git fetch origin
 
+          # Store current vcpkg-registry folder content
+          echo "Storing vcpkg-registry folder content..."
+          cp -r vcpkg-registry /tmp/vcpkg-registry-backup
+
           # Switch to vcpkg-registry branch and update it
           echo "Switching to vcpkg-registry branch..."
           if git ls-remote --heads origin vcpkg-registry | grep -q vcpkg-registry; then
             echo "vcpkg-registry branch exists, checking out and pulling latest..."
-            git checkout vcpkg-registry
+            # Use explicit remote reference to avoid ambiguity
+            git checkout -B vcpkg-registry-temp origin/vcpkg-registry
+            git branch -D vcpkg-registry 2>/dev/null || true
+            git checkout -b vcpkg-registry
             git pull --rebase origin vcpkg-registry
           else
             echo "vcpkg-registry branch doesn't exist, creating new branch..."
             git checkout -b vcpkg-registry
           fi
 
-          # Copy vcpkg-registry files from release3_1_apl branch
-          echo "Copying vcpkg-registry files from release3_1_apl branch..."
-          git checkout release3_1_apl -- vcpkg-registry/
+          # Copy back the updated vcpkg-registry files
+          echo "Copying updated vcpkg-registry files..."
+          rm -rf vcpkg-registry 2>/dev/null || true
+          cp -r /tmp/vcpkg-registry-backup vcpkg-registry
 
           # Check if there are changes to commit
           if git diff --quiet && git diff --staged --quiet; then
