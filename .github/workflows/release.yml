@@ -230,21 +230,30 @@ jobs:
         run: |
           ./.github/scripts/verify-vcpkg-registry.sh -v "${{ needs.get-version.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update vcpkg registry for version ${{ needs.get-version.outputs.version }}"
-          title: "Update vcpkg registry for version ${{ needs.get-version.outputs.version }}"
-          body: |
-            This PR updates the vcpkg registry for version ${{ needs.get-version.outputs.version }}.
+      - name: Push to vcpkg-registry branch
+        run: |
+          # Configure git
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
 
-            Changes:
-            - Updated SHA512 hash in portfile.cmake: `${{ steps.get_hash.outputs.SHA512 }}`
-            - Updated version references
-            - Updated git-tree reference
-            - Updated baseline.json
+          # Check if there are changes to commit
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
 
-            This PR was created automatically by the release workflow.
-          branch: update-vcpkg-registry-${{ needs.get-version.outputs.version }}
-          base: vcpkg-registry
+          # Commit changes
+          git add vcpkg-registry/
+          git commit -m "Update vcpkg registry for version ${{ needs.get-version.outputs.version }}
+
+          - Updated SHA512 hash in portfile.cmake: ${{ steps.get_hash.outputs.SHA512 }}
+          - Updated version references
+          - Updated git-tree reference
+          - Updated baseline.json
+
+          This commit was created automatically by the release workflow."
+
+          # Push directly to vcpkg-registry branch
+          git push origin HEAD:vcpkg-registry
+
+          echo "✅ Successfully pushed vcpkg registry updates to vcpkg-registry branch"
