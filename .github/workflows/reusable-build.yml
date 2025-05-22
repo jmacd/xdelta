@@ -485,7 +485,8 @@ jobs:
         # Create archive if requested
         if [ "${{ inputs.create_archives }}" == "true" ]; then
           echo "Creating tar.gz archive: artifacts/linux/xdelta3-linux.tar.gz"
-          tar --warning=no-file-changed -czf artifacts/linux/xdelta3-linux.tar.gz -C artifacts/linux .
+          # Use tar without --warning option for better compatibility
+          tar -czf artifacts/linux/xdelta3-linux.tar.gz -C artifacts/linux .
         fi
 
     - name: Upload artifacts
@@ -532,7 +533,8 @@ jobs:
         # Create archive if requested
         if [ "${{ inputs.create_archives }}" == "true" ]; then
           echo "Creating tar.gz archive: artifacts/macos/xdelta3-macos.tar.gz"
-          tar --warning=no-file-changed -czf artifacts/macos/xdelta3-macos.tar.gz -C artifacts/macos .
+          # Use tar without --warning option for better compatibility
+          tar -czf artifacts/macos/xdelta3-macos.tar.gz -C artifacts/macos .
         fi
 
     - name: Upload artifacts
