@@ -230,7 +230,22 @@ jobs:
         run: |
           ./.github/scripts/verify-vcpkg-registry.sh -v "${{ needs.get-version.outputs.version }}" -s "${{ steps.get_hash.outputs.SHA512 }}"
 
-      - name: Push to vcpkg-registry branch
+      - name: Checkout vcpkg-registry branch
+        run: |
+          # Fetch all branches
+          git fetch origin
+
+          # Store the updated vcpkg-registry files
+          cp -r vcpkg-registry /tmp/vcpkg-registry-updated
+
+          # Switch to vcpkg-registry branch
+          git checkout vcpkg-registry
+          git pull origin vcpkg-registry
+
+          # Copy the updated files
+          cp -r /tmp/vcpkg-registry-updated/* vcpkg-registry/
+
+      - name: Commit and push to vcpkg-registry branch
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: |
@@ -242,8 +257,6 @@ jobs:
             - Updated baseline.json
 
             This commit was created automatically by the release workflow.
-          branch: vcpkg-registry
-          create_branch: true
           file_pattern: 'vcpkg-registry/'
           commit_user_name: 'GitHub Actions'
           commit_user_email: 'actions@github.com'
