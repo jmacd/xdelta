@@ -238,6 +238,10 @@ jobs:
           # Store the updated vcpkg-registry files
           cp -r vcpkg-registry /tmp/vcpkg-registry-updated
 
+          # Clean working directory to avoid conflicts
+          git add .
+          git stash push -m "Temporary stash before branch switch"
+
           # Switch to vcpkg-registry branch (use explicit remote reference)
           git checkout -B vcpkg-registry origin/vcpkg-registry
           git pull origin vcpkg-registry
