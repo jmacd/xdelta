@@ -106,6 +106,10 @@ xsnprintf_func (char *str, size_t n, const char *fmt, ...)
 #include <unistd.h> /* lots */
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() and fstat() */
+#include <sys/ioctl.h> /* ioctl() */
+#ifndef BLKGETSIZE64
+#   define BLKGETSIZE64 _IOR(0x12,114,size_t)
+#endif
 #else
 #if defined(_MSC_VER)
 #define strtoll _strtoi64
@@ -944,11 +948,23 @@ main_file_stat (main_file *xfile, xoff_t *size)
       return ret;
     }
 
-  if (! S_ISREG (sbuf.st_mode))
+  if (S_ISBLK (sbuf.st_mode))
+    {
+      uint64_t blk_size;
+      if (ioctl (XFNO (xfile), BLKGETSIZE64, &blk_size) < 0)
+        {
+          return get_errno ();
+        }
+      (*size) = (xoff_t)blk_size;
+    }
+  else if (S_ISREG (sbuf.st_mode))
+    {
+      (*size) = sbuf.st_size;
+    }
+  else
     {
       return ESPIPE;
     }
-  (*size) = sbuf.st_size;
 #endif
   return ret;
 }
