@@ -62,6 +62,6 @@ File bug reports and browse open support issues here:
 
   https://github.com/jmacd/xdelta/issues
 
-The source distribution contains the C/C++/Python APIs, Unix, Microsoft VC++
-and Cygwin builds.  Xdelta3 is covered under the terms of the APL, see
-LICENSE.
+The source distribution contains the C/C++ library and command-line
+tool, built with CMake (see "Building" above).  Xdelta3 is covered under
+the terms of the APL, see LICENSE.
