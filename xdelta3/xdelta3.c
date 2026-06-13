@@ -211,7 +211,7 @@
    single compilation unit includes the core library features,
    configurable string-match templates, optional main() command-line
    tool, misc optional features, and a regression test.  Features are
-   controled with CPP #defines, see Makefile.am.
+   controled with CPP #defines, see CMakeLists.txt.
 
    The initial __XDELTA3_C_HEADER_PASS__ starts first, the _INLINE_ and
    _TEMPLATE_ sections follow.  Easy stuff first, hard stuff last.
@@ -241,16 +241,6 @@
                         soft-coded string matcher for experimenting
                         with arbitrary values.
      xdelta3-list.h     A cyclic list template
-
-   Misc little debug utilities:
-
-     badcopy.c          Randomly modifies an input file based on two
-                        parameters: (1) the probability that a byte in
-                        the file is replaced with a pseudo-random value,
-                        and (2) the mean change size.  Changes are
-                        generated using an expoential distribution
-                        which approximates the expected error_prob
-			distribution.
    --------------------------------------------------------------------
 
    This file itself is unusually large.  I hope to defend this layout
@@ -932,7 +922,7 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 
       if (inst->size <= 17)
 	{
-	  inst->code1 += inst->size;
+	  inst->code1 += (uint8_t)inst->size;
 
 	  if ( (inst->size == 1) &&
 	       (prev != NULL) &&
@@ -955,7 +945,7 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 
 	if (inst->size <= 18 && inst->size >= 4)
 	  {
-	    inst->code1 += inst->size - 3;
+	    inst->code1 += (uint8_t)(inst->size - 3);
 
 	    if ( (prev != NULL) &&
 		 (prev->type == XD3_ADD) &&
@@ -972,7 +962,7 @@ xd3_choose_instruction (xd3_rinst *prev, xd3_rinst *inst)
 		else if ( (inst->size == 4) &&
 			  (mode       >= 6) )
 		  {
-		    prev->code2 = 235 + ((mode - 6) * 4) + (prev->size - 1);
+		    prev->code2 = (uint8_t)(235 + ((mode - 6) * 4) + (prev->size - 1));
 
 		    XD3_ASSERT (prev->code2 <= 246);
 		  }
@@ -1089,7 +1079,7 @@ static uint32_t adler32 (uint32_t adler, const uint8_t *buf, usize_t len)
 
     while (len > 0)
       {
-        k    = (len < A32_NMAX) ? len : A32_NMAX;
+        k    = (int)((len < A32_NMAX) ? len : A32_NMAX);
         len -= k;
 
 	while (k >= 16)
@@ -1328,7 +1318,7 @@ xd3_encode_address (xd3_stream *stream,
       /* 2 + s_near offsets past the VCD_NEAR modes */
       bestm = acache->s_near + 2 + d/256;
 
-      if ((ret = xd3_emit_byte (stream, & ADDR_TAIL (stream), bestd)))
+      if ((ret = xd3_emit_byte (stream, & ADDR_TAIL (stream), (uint8_t)bestd)))
 	{
 	  return ret;
 	}
@@ -1345,7 +1335,7 @@ xd3_encode_address (xd3_stream *stream,
 
   xd3_update_cache (acache, addr);
 
-  (*mode) += bestm;
+  (*mode) += (uint8_t)bestm;
 
   return 0;
 }
@@ -4399,7 +4389,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
       int ret;
       xd3_blksize_div (stream->srcwin_cksum_pos,
 		       stream->src, &blkno, &blkrem);
-      oldpos = blkrem;
+      oldpos = (ssize_t)blkrem;
 
       if ((ret = xd3_getblk (stream, blkno)))
 	{
@@ -4424,7 +4414,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 		    xd3_source_eof (stream->src),
 		    stream->src->eof_known ? "known" : "unknown"));
 
-      blkpos = xd3_bytes_on_srcblk (stream->src, blkno);
+      blkpos = (ssize_t)xd3_bytes_on_srcblk (stream->src, blkno);
 
       if (blkpos < (ssize_t) stream->smatcher.large_look)
 	{
@@ -4442,7 +4432,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
        * the number of bytes available.  Each iteration inspects
        * large_look bytes then steps back large_step bytes.  The
        * if-stmt above ensures at least one large_look of data. */
-      blkpos -= stream->smatcher.large_look;
+      blkpos -= (ssize_t)stream->smatcher.large_look;
       blkbaseoffset = stream->src->blksize * blkno;
 
       do
@@ -4461,7 +4451,7 @@ xd3_srcwin_move_point (xd3_stream *stream, usize_t *next_move_point)
 
 	  IF_DEBUG (stream->large_ckcnt += 1);
 
-	  blkpos -= stream->smatcher.large_step;
+	  blkpos -= (ssize_t)stream->smatcher.large_step;
 	}
       while (blkpos >= oldpos);
 

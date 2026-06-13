@@ -112,6 +112,30 @@ mt_exp_rand (uint32_t mean, uint32_t max_value)
 #include <sys/wait.h>
 #endif
 
+#if XD3_WIN32
+#include <process.h>  /* for _getpid */
+#define xd3_test_getpid _getpid
+#else
+#define xd3_test_getpid getpid
+#endif
+
+/* Directory for the test harness's scratch files.  Honors the platform's
+ * temp-directory environment variables, falling back to /tmp on POSIX and
+ * the current directory on Windows. */
+static const char*
+test_tmpdir (void)
+{
+  const char *t;
+#if XD3_WIN32
+  if ((t = getenv ("TEMP")) != NULL) return t;
+  if ((t = getenv ("TMP")) != NULL) return t;
+  return ".";
+#else
+  if ((t = getenv ("TMPDIR")) != NULL) return t;
+  return "/tmp";
+#endif
+}
+
 #define MSG_IS(x) (stream->msg != NULL && strcmp ((x), stream->msg) == 0)
 
 static const usize_t TWO_MEGS_AND_DELTA = (3 << 20);
@@ -198,7 +222,7 @@ test_random_numbers (xd3_stream *stream, int ignore)
 
   for (i = 0; i < n_rounds; i += 1)
     {
-      sum += mt_exp_rand (mean, UINT32_MAX);
+      sum += mt_exp_rand ((uint32_t)mean, UINT32_MAX);
     }
 
   average = (double) sum / (double) n_rounds;
@@ -256,25 +280,26 @@ test_cleanup (void)
 int test_setup (void)
 {
   static int x = 0;
-  pid_t pid = getpid();
+  int pid = (int) xd3_test_getpid();
+  const char *tmp = test_tmpdir();
   x++;
 
   test_cleanup();
 
   snprintf_func (TEST_TARGET_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.target.%d", pid, x);
+		 "%s/xdtest.%d.target.%d", tmp, pid, x);
   snprintf_func (TEST_SOURCE_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.source.%d", pid, x);
+		 "%s/xdtest.%d.source.%d", tmp, pid, x);
   snprintf_func (TEST_DELTA_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.delta.%d", pid, x);
+		 "%s/xdtest.%d.delta.%d", tmp, pid, x);
   snprintf_func (TEST_RECON_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.recon.%d", pid, x);
+		 "%s/xdtest.%d.recon.%d", tmp, pid, x);
   snprintf_func (TEST_RECON2_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.recon2.%d", pid, x);
+		 "%s/xdtest.%d.recon2.%d", tmp, pid, x);
   snprintf_func (TEST_COPY_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.copy.%d", pid, x);
+		 "%s/xdtest.%d.copy.%d", tmp, pid, x);
   snprintf_func (TEST_NOPERM_FILE, TESTFILESIZE,
-		 "/tmp/xdtest.%d.noperm.%d", pid, x);
+		 "%s/xdtest.%d.noperm.%d", tmp, pid, x);
 
   test_cleanup();
   return 0;
@@ -1470,7 +1495,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	   * decoding.  Really looking for faults here. */
 	  {
 	    int i;
-	    int bytes = xd3_min (compress_size, 10U);
+	    int bytes = (int) xd3_min (compress_size, 10U);
 	    for (i = 0; i < bytes * 8; i += 1)
 	      {
 		dec_input[i/8] ^= 1 << (i%8);

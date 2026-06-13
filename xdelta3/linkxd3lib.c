@@ -33,10 +33,10 @@ int main() {
 #if XD3_ENCODER
   use (xd3_encode_input (&stream));
   use (xd3_encode_stream (& stream, NULL, 0, NULL, NULL, 0));
-  use (xd3_set_appheader (& stream));
+  xd3_set_appheader (& stream, NULL, 0);
   use (xd3_encoder_used_source (& stream));
-  use (xd3_encoder_srcbase (& stream));
-  use (xd3_encoder_srclen (& stream));
+  use ((int) xd3_encoder_srcbase (& stream));
+  use ((int) xd3_encoder_srclen (& stream));
 #endif
   return 0;
 }

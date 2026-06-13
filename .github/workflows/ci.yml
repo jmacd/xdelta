@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [ release3_1_apl, release3_0_apl, main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  cmake:
+    name: ${{ matrix.os }} / lzma=${{ matrix.lzma }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        lzma: [ "on", "off" ]
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install liblzma (Linux)
+        if: runner.os == 'Linux' && matrix.lzma == 'on'
+        run: sudo apt-get update && sudo apt-get install -y liblzma-dev
+
+      - name: Install liblzma (macOS)
+        if: runner.os == 'macOS' && matrix.lzma == 'on'
+        run: brew install xz
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LZMA_MODE=${{ matrix.lzma }}
+          -DXD3_WERROR=ON
+          -DCMAKE_PREFIX_PATH="$(brew --prefix 2>/dev/null || echo /usr)"
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  windows:
+    name: windows-latest / lzma=${{ matrix.lzma }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lzma: [ "on", "off" ]
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install liblzma (vcpkg)
+        if: matrix.lzma == 'on'
+        run: vcpkg install liblzma:x64-windows
+
+      - name: Configure (no lzma)
+        if: matrix.lzma == 'off'
+        run: cmake -B build -A x64 -DXD3_LZMA_MODE=off -DXD3_WERROR=ON
+
+      - name: Configure (vcpkg lzma)
+        if: matrix.lzma == 'on'
+        run: >
+          cmake -B build -A x64 -DXD3_LZMA_MODE=on -DXD3_WERROR=ON
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  go-regtest:
+    name: go regression harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Build xdelta3
+        working-directory: xdelta3
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+
+      - name: Vet
+        working-directory: xdelta3/go
+        run: go vet ./...
+
+      - name: Run harness (smoke + small offset tests)
+        working-directory: xdelta3/go
+        run: go run . -xdelta3 "$GITHUB_WORKSPACE/xdelta3/build/xdelta3" -min-offset 20 -max-offset 22
+

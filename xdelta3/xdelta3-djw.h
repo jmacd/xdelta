@@ -327,9 +327,9 @@ djw_update_mtf (uint8_t *mtf, usize_t mtf_i)
   int k;
   usize_t sym = mtf[mtf_i];
 
-  for (k = mtf_i; k != 0; k -= 1) { mtf[k] = mtf[k-1]; }
+  for (k = (int)mtf_i; k != 0; k -= 1) { mtf[k] = mtf[k-1]; }
 
-  mtf[0] = sym;
+  mtf[0] = (uint8_t)sym;
   return sym;
 }
 
@@ -453,7 +453,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
       ents[ents_size].depth  = 1 + xd3_max (h1->depth, h2->depth);
       ents[ents_size].parent = 0;
 
-      h1->parent = h2->parent = ents_size;
+      h1->parent = h2->parent = (uint32_t)ents_size;
 
       heap_insert (heap, ents, ++heap_last, ents_size++);
     }
@@ -478,7 +478,7 @@ djw_build_prefix (const djw_weight *freq, uint8_t *clen, usize_t asize, usize_t 
 
       /* clen is 0-origin, unlike ents. */
       IF_DEBUG2 (DP(RINT "clen[%"W"u] = %"W"u\n", i-1, b));
-      clen[i-1] = b;
+      clen[i-1] = (uint8_t)b;
     }
 
   IF_DEBUG (if (first_bits == 0) first_bits = total_bits);
@@ -576,7 +576,7 @@ djw_compute_mtf_1_2 (djw_prefix  *prefix,
 
       for (k = j; k >= 1; k -= 1) { mtf[k] = mtf[k-1]; }
 
-      mtf[0] = sym;
+      mtf[0] = (uint8_t)sym;
 
       if (j == 0)
 	{
@@ -740,7 +740,7 @@ djw_compute_selector_1_2 (djw_prefix *prefix,
   uint8_t grmtf[DJW_MAX_GROUPS];
   usize_t i;
 
-  for (i = 0; i < groups; i += 1) { grmtf[i] = i; }
+  for (i = 0; i < groups; i += 1) { grmtf[i] = (uint8_t)i; }
 
   djw_compute_mtf_1_2 (prefix, grmtf, gbest_freq, groups);
 }
@@ -957,7 +957,7 @@ xd3_encode_huff (xd3_stream   *stream,
       /* DJW Huffman */
       djw_weight evolve_freq[DJW_MAX_GROUPS][ALPHABET_SIZE];
       uint8_t evolve_clen[DJW_MAX_GROUPS][ALPHABET_SIZE];
-      djw_weight left = input_bytes;
+      djw_weight left = (djw_weight)input_bytes;
       usize_t gp;
       usize_t niter = 0;
       usize_t select_bits;
@@ -1005,7 +1005,7 @@ xd3_encode_huff (xd3_stream   *stream,
       for (gp = 0; gp < groups; gp += 1)
 	{
 	  djw_weight sum  = 0;
-	  djw_weight goal = left / (groups - gp);
+	  djw_weight goal = (djw_weight)(left / (groups - gp));
 
 	  IF_DEBUG2 (usize_t nz = 0);
 
@@ -1099,7 +1099,7 @@ xd3_encode_huff (xd3_stream   *stream,
 	    }
 
 	  XD3_ASSERT(gbest_no < gbest_max);
-	  gbest[gbest_no++] = winner;
+	  gbest[gbest_no++] = (uint8_t)winner;
 	  IF_DEBUG2 (gcount[winner] += 1);
 
 	  p  = p0;
@@ -1399,7 +1399,7 @@ djw_build_decoder (xd3_stream    *stream,
     {
       if ((l = *ci++) != 0)
 	{
-	  inorder[tmp_base[l]++] = i;
+	  inorder[tmp_base[l]++] = (uint8_t)i;
 	}
     }
 
@@ -1511,7 +1511,7 @@ djw_decode_clclen (xd3_stream     *stream,
 	  return ret;
 	}
 
-      cl_clen[i] = value;
+      cl_clen[i] = (uint8_t)value;
     }
 
   /* Set the rest to zero. */
@@ -1571,7 +1571,7 @@ djw_decode_1_2 (xd3_stream     *stream,
       if (mtf != 0)
 	{
 	  usize_t sym = djw_update_mtf (mtfvals, mtf);
-	  values[n++] = sym;
+	  values[n++] = (uint8_t)sym;
 	  mtf = 0;
 	  continue;
 	}
@@ -1742,8 +1742,8 @@ xd3_decode_huff (xd3_stream     *stream,
 					  input_end, DJW_GBCLEN_BITS,
 					  & value))) { goto fail; }
 
-	      sel_clen[gp] = value;
-	      sel_mtf[gp]  = gp;
+	      sel_clen[gp] = (uint8_t)value;
+	      sel_mtf[gp]  = (uint8_t)gp;
 	    }
 
 	  if ((sel_group = (uint8_t*) xd3_alloc (stream, sectors, 1)) == NULL)
@@ -1812,7 +1812,7 @@ xd3_decode_huff (xd3_stream     *stream,
 		    goto fail;
 		  }
 
-		*output++ = sym;
+		*output++ = (uint8_t)sym;
 	      }
 	    while (--n);
 	  }

@@ -214,7 +214,7 @@ static int fgk_init (xd3_stream *stream, fgk_stream *h, int is_encode)
   /* Zero frequency nodes are inserted in the first alphabet_size
    * positions, with Value, weight, and a pointer to the next zero
    * frequency node.  */
-  for (si = h->alphabet_size - 1; si >= 0; si -= 1)
+  for (si = (ssize_t)h->alphabet_size - 1; si >= 0; si -= 1)
     {
       fgk_init_node (h->alphabet + si, (usize_t) si, h->alphabet_size);
     }
@@ -643,7 +643,7 @@ static void fgk_factor_remaining (fgk_stream *h)
 {
   unsigned int i;
 
-  i = (--h->zero_freq_count);
+  i = (unsigned int)(--h->zero_freq_count);
   h->zero_freq_exp = 0;
 
   while (i > 1)
@@ -835,7 +835,7 @@ xd3_decode_fgk (xd3_stream     *stream,
 
 	  if (! done) { continue; }
 
-	  *output++ = fgk_decode_data (sec_stream);
+	  *output++ = (uint8_t)fgk_decode_data (sec_stream);
 
 	  if (output == output_max)
 	    {

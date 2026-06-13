@@ -76,7 +76,7 @@ xsnprintf_func (char *str, size_t n, const char *fmt, ...)
   va_end (a);
   if (ret < 0)
     {
-      ret = n;
+      ret = (int)n;
     }
   return ret;
 }
@@ -996,6 +996,20 @@ xd3_posix_io (int fd, uint8_t *buf, size_t size,
   if (nread != NULL) { (*nread) = nproc; }
   return 0;
 }
+
+/* Thin wrappers with the xd3_posix_func signature, used instead of an
+ * incompatible function-pointer cast of read()/write(). */
+static int
+xd3_posix_read_func (int fd, uint8_t *buf, usize_t size)
+{
+  return (int) read (fd, buf, size);
+}
+
+static int
+xd3_posix_write_func (int fd, uint8_t *buf, usize_t size)
+{
+  return (int) write (fd, buf, size);
+}
 #endif
 
 #if XD3_WIN32
@@ -1009,7 +1023,7 @@ xd3_win32_io (HANDLE file, uint8_t *buf, size_t size,
   while (nproc < size)
     {
       DWORD nproc2 = 0;  /* hmm */
-	  DWORD nremain = size - nproc;
+	  DWORD nremain = (DWORD)(size - nproc);
       if ((is_read ?
 	   ReadFile (file, buf + nproc, nremain, &nproc2, NULL) :
 	   WriteFile (file, buf + nproc, nremain, &nproc2, NULL)) == 0)
@@ -1059,7 +1073,7 @@ main_file_read (main_file  *ifile,
     }
 
 #elif XD3_POSIX
-  ret = xd3_posix_io (ifile->file, buf, size, (xd3_posix_func*) &read, nread);
+  ret = xd3_posix_io (ifile->file, buf, size, xd3_posix_read_func, nread);
 #elif XD3_WIN32
   ret = xd3_win32_io (ifile->file, buf, size, 1 /* is_read */, nread);
 #endif
@@ -1093,7 +1107,7 @@ main_file_write (main_file *ofile, uint8_t *buf, usize_t size, const char *msg)
   if (result != size) { ret = get_errno (); }
 
 #elif XD3_POSIX
-  ret = xd3_posix_io (ofile->file, buf, size, (xd3_posix_func*) &write, NULL);
+  ret = xd3_posix_io (ofile->file, buf, size, xd3_posix_write_func, NULL);
 
 #elif XD3_WIN32
   ret = xd3_win32_io (ofile->file, buf, size, 0, NULL);
@@ -1120,7 +1134,9 @@ main_file_seek (main_file *xfile, xoff_t pos)
   int ret = 0;
 
 #if XD3_STDIO
-  if (fseek (xfile->file, pos, SEEK_SET) != 0) { ret = get_errno (); }
+  /* Note: fseek's offset is long, which is 32-bit on Windows; the
+   * XD3_WIN32 path uses 64-bit seeks for large files. */
+  if (fseek (xfile->file, (long)pos, SEEK_SET) != 0) { ret = get_errno (); }
 
 #elif XD3_POSIX
   if ((xoff_t) lseek (xfile->file, pos, SEEK_SET) != pos)
@@ -2114,7 +2130,7 @@ main_pipe_write (int outfd, uint8_t *exist_buf, usize_t remain)
   int ret;
 
   if ((ret = xd3_posix_io (outfd, exist_buf, remain,
-			   (xd3_posix_func*) &write, NULL)))
+			   xd3_posix_write_func, NULL)))
     {
       return ret;
     }
