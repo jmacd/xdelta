@@ -107,10 +107,6 @@ if(WIN32)
     XD3_WIN32=1 XD3_POSIX=0 XD3_STDIO=0
     EXTERNAL_COMPRESSION=0 SHELL_TESTS=0)
 endif()
-# MSVC flags the standard C library functions (snprintf, etc.) as unsafe.
-if(MSVC)
-  list(APPEND XD3_PLATFORM_DEFS _CRT_SECURE_NO_WARNINGS)
-endif()
 
 # Warnings-as-errors flags, applied only to the core targets (the C++ test
 # harness and vendored cpp-btree have their own pre-existing warnings).  GCC
@@ -134,6 +130,12 @@ function(xd3_configure_target target)
   set_target_properties(${target} PROPERTIES
     C_STANDARD 99 C_STANDARD_REQUIRED ON
     CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+  # MSVC deprecates the standard ("unsafe") and POSIX-named C library
+  # functions used throughout; silence both classes of C4996.
+  if(MSVC)
+    target_compile_definitions(${target} PRIVATE
+      _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
+  endif()
   if(UNIX)
     target_link_libraries(${target} PRIVATE m)
   endif()
