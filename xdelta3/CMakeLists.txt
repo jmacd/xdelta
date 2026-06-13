@@ -142,27 +142,33 @@ target_compile_definitions(xdelta3decode PRIVATE
 # Regression-test executables
 # ---------------------------------------------------------------------------
 if(XD3_BUILD_TESTS)
-  add_executable(xdelta3regtest
-    testing/regtest.cc
-    testing/regtest_c.c)
-  xd3_configure_target(xdelta3regtest)
-  target_compile_definitions(xdelta3regtest PRIVATE
-    REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
-    XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1
-    ${XD3_PLATFORM_DEFS})
-  target_link_libraries(xdelta3regtest PRIVATE ${XD3_LZMA_LIBRARIES})
+  # The C++ regression harness in testing/ is POSIX-only: it includes
+  # <unistd.h> and uses the __typeof__ extension, neither of which MSVC
+  # supports.  (The historical Visual Studio build never built it either.)
+  # Skip it under MSVC; the built-in `xdelta3 test` still runs on Windows.
+  if(NOT MSVC)
+    add_executable(xdelta3regtest
+      testing/regtest.cc
+      testing/regtest_c.c)
+    xd3_configure_target(xdelta3regtest)
+    target_compile_definitions(xdelta3regtest PRIVATE
+      REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
+      XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1
+      ${XD3_PLATFORM_DEFS})
+    target_link_libraries(xdelta3regtest PRIVATE ${XD3_LZMA_LIBRARIES})
 
-  add_executable(xdelta3checksum
-    testing/checksum_test.cc
-    testing/checksum_test_c.c)
-  xd3_configure_target(xdelta3checksum)
-  target_include_directories(xdelta3checksum PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/cpp-btree)
-  target_compile_definitions(xdelta3checksum PRIVATE
-    REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
-    XD3_MAIN=1 NOT_MAIN=1
-    ${XD3_PLATFORM_DEFS})
-  target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
+    add_executable(xdelta3checksum
+      testing/checksum_test.cc
+      testing/checksum_test_c.c)
+    xd3_configure_target(xdelta3checksum)
+    target_include_directories(xdelta3checksum PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/cpp-btree)
+    target_compile_definitions(xdelta3checksum PRIVATE
+      REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
+      XD3_MAIN=1 NOT_MAIN=1
+      ${XD3_PLATFORM_DEFS})
+    target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
+  endif()
 
   # xdelta3link references every public API symbol; building it verifies the
   # library links and catches signature drift in xdelta3.h.  It is a
