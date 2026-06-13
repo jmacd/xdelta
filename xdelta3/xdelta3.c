@@ -211,7 +211,7 @@
    single compilation unit includes the core library features,
    configurable string-match templates, optional main() command-line
    tool, misc optional features, and a regression test.  Features are
-   controled with CPP #defines, see Makefile.am.
+   controled with CPP #defines, see CMakeLists.txt.
 
    The initial __XDELTA3_C_HEADER_PASS__ starts first, the _INLINE_ and
    _TEMPLATE_ sections follow.  Easy stuff first, hard stuff last.

@@ -1,7 +1,6 @@
 # CMake build for xdelta3.
 #
-# This is the modern, cross-platform build.  The legacy autotools build
-# (configure.ac / Makefile.am) remains available.
+# This is the cross-platform build.
 #
 #   cmake -B build -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build
@@ -80,7 +79,7 @@ include(CheckCSourceRuns)
 configure_file(config.h.cmake config.h @ONLY)
 
 # ---------------------------------------------------------------------------
-# Common compiler flags (mirrors Makefile.am WFLAGS).
+# Common compiler flags.
 # ---------------------------------------------------------------------------
 include(CheckCCompilerFlag)
 set(XD3_WFLAGS "")

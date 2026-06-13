@@ -40,9 +40,6 @@ liblzma is autodetected.  Force it on or off with `-DXD3_LZMA_MODE=on`
 or `-DXD3_LZMA_MODE=off`.  On Homebrew systems, point CMake at the
 prefix with `-DCMAKE_PREFIX_PATH="$(brew --prefix)"`.
 
-The legacy GNU Autotools build (`./generate_build_files.sh && ./configure
-&& make`) is also still present.
-
 Testing
 -------
 
