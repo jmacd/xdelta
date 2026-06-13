@@ -20,6 +20,8 @@ set(XD3_LZMA_MODE "auto" CACHE STRING
   "liblzma secondary compression: auto, on, or off")
 set_property(CACHE XD3_LZMA_MODE PROPERTY STRINGS auto on off)
 
+option(XD3_WERROR "Treat compiler warnings as errors for the core targets" OFF)
+
 include(CheckTypeSize)
 include(CheckIncludeFile)
 include(CheckCSourceRuns)
@@ -105,6 +107,24 @@ if(WIN32)
     XD3_WIN32=1 XD3_POSIX=0 XD3_STDIO=0
     EXTERNAL_COMPRESSION=0 SHELL_TESTS=0)
 endif()
+# MSVC flags the standard C library functions (snprintf, etc.) as unsafe.
+if(MSVC)
+  list(APPEND XD3_PLATFORM_DEFS _CRT_SECURE_NO_WARNINGS)
+endif()
+
+# Warnings-as-errors flags, applied only to the core targets (the C++ test
+# harness and vendored cpp-btree have their own pre-existing warnings).  GCC
+# is intentionally excluded: it emits many additional, largely false-positive
+# diagnostics (implicit-fallthrough, format-truncation, stringop-overflow)
+# that are out of scope here.
+set(XD3_WERROR_FLAGS "")
+if(XD3_WERROR)
+  if(MSVC)
+    set(XD3_WERROR_FLAGS /WX)
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    set(XD3_WERROR_FLAGS -Werror)
+  endif()
+endif()
 
 # Helper to apply shared settings to a target.
 function(xd3_configure_target target)
@@ -127,6 +147,7 @@ xd3_configure_target(xdelta3)
 target_compile_definitions(xdelta3 PRIVATE
   REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=1 XD3_DEBUG=0
   ${XD3_PLATFORM_DEFS})
+target_compile_options(xdelta3 PRIVATE ${XD3_WERROR_FLAGS})
 target_link_libraries(xdelta3 PRIVATE ${XD3_LZMA_LIBRARIES})
 
 # ---------------------------------------------------------------------------
@@ -137,6 +158,7 @@ xd3_configure_target(xdelta3decode)
 target_compile_definitions(xdelta3decode PRIVATE
   REGRESSION_TEST=0 SECONDARY_DJW=0 SECONDARY_FGK=0 SECONDARY_LZMA=0
   XD3_MAIN=1 XD3_ENCODER=0 XD3_STDIO=1 EXTERNAL_COMPRESSION=0 VCDIFF_TOOLS=0)
+target_compile_options(xdelta3decode PRIVATE ${XD3_WERROR_FLAGS})
 
 # ---------------------------------------------------------------------------
 # Regression-test executables
@@ -179,6 +201,7 @@ if(XD3_BUILD_TESTS)
   target_compile_definitions(xdelta3link PRIVATE
     REGRESSION_TEST=0 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=0
     ${XD3_PLATFORM_DEFS})
+  target_compile_options(xdelta3link PRIVATE ${XD3_WERROR_FLAGS})
   target_link_libraries(xdelta3link PRIVATE ${XD3_LZMA_LIBRARIES})
 
   enable_testing()

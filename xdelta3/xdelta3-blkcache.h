@@ -281,7 +281,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
   if (do_src_fifo)
     {
       /* Direct lookup assumes sequential scan w/o skipping blocks. */
-      int idx = blkno % lru_size;
+      int idx = (int)(blkno % lru_size);
       blru = & lru[idx];
       if (blru->blkno == blkno)
 	{
@@ -316,7 +316,7 @@ main_getblk_lru (xd3_source *source, xoff_t blkno,
 
   if (do_src_fifo)
     {
-      int idx = blkno % lru_size;
+      int idx = (int)(blkno % lru_size);
       blru = & lru[idx];
     }
   else

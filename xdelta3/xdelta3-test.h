@@ -222,7 +222,7 @@ test_random_numbers (xd3_stream *stream, int ignore)
 
   for (i = 0; i < n_rounds; i += 1)
     {
-      sum += mt_exp_rand (mean, UINT32_MAX);
+      sum += mt_exp_rand ((uint32_t)mean, UINT32_MAX);
     }
 
   average = (double) sum / (double) n_rounds;
@@ -1495,7 +1495,7 @@ test_secondary (xd3_stream *stream, const xd3_sec_type *sec, usize_t groups)
 	   * decoding.  Really looking for faults here. */
 	  {
 	    int i;
-	    int bytes = xd3_min (compress_size, 10U);
+	    int bytes = (int) xd3_min (compress_size, 10U);
 	    for (i = 0; i < bytes * 8; i += 1)
 	      {
 		dec_input[i/8] ^= 1 << (i%8);
