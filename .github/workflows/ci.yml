@@ -78,6 +78,28 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
+  blockdev-test:
+    name: ${{ matrix.os }} / block-device source
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Block-device source test
+        run: ./testing/blockdev_test.sh ./build/xdelta3
+
   go-regtest:
     name: go regression harness
     runs-on: ubuntu-latest
