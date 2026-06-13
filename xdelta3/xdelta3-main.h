@@ -916,7 +916,7 @@ main_file_open (main_file *xfile, const char* name, int mode)
   return ret;
 }
 
-#ifndef _WIN32
+#ifdef S_ISBLK
 /* Query the byte size of an open block device.  There is no portable
  * POSIX way to do this, so each platform needs its own ioctl.  On
  * success returns 0 and sets *size; on failure (including platforms
@@ -957,7 +957,7 @@ main_blockdev_size (int fd, xoff_t *size)
   return ENOTTY; /* No known method; caller falls back to unsized. */
 #endif
 }
-#endif /* !_WIN32 */
+#endif /* S_ISBLK */
 
 int
 main_file_stat (main_file *xfile, xoff_t *size)
@@ -999,6 +999,7 @@ main_file_stat (main_file *xfile, xoff_t *size)
     {
       (*size) = sbuf.st_size;
     }
+#ifdef S_ISBLK
   else if (S_ISBLK (sbuf.st_mode))
     {
       /* stat() reports st_size == 0 for block devices; query the real
@@ -1009,6 +1010,7 @@ main_file_stat (main_file *xfile, xoff_t *size)
           return ret;
         }
     }
+#endif
   else
     {
       return ESPIPE;
