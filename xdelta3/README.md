@@ -23,6 +23,39 @@ The command-line syntax is detailed here:
 
 Run 'xdelta3 -h' for brief help.  Run 'xdelta3 test' for built-in tests.
 
+Building
+--------
+
+The recommended build uses CMake (>= 3.13) and a C99 / C++11 compiler.
+liblzma (XZ Utils) is used for secondary compression when available:
+
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  ctest --test-dir build          # runs the built-in regression test
+
+This produces the `xdelta3` command-line tool (in `build/`) plus the
+`xdelta3decode`, `xdelta3regtest`, and `xdelta3checksum` helpers.
+
+liblzma is autodetected.  Force it on or off with `-DXD3_LZMA_MODE=on`
+or `-DXD3_LZMA_MODE=off`.  On Homebrew systems, point CMake at the
+prefix with `-DCMAKE_PREFIX_PATH="$(brew --prefix)"`.
+
+The legacy GNU Autotools build (`./generate_build_files.sh && ./configure
+&& make`) is also still present.
+
+Testing
+-------
+
+`xdelta3 test` and `ctest` run the built-in C test suite.  An additional
+regression test harness, written in Go (1.21+), drives the command-line
+tool end to end:
+
+  (cd go && go run . -xdelta3 ../build/xdelta3)
+
+See `go run . -h` in the `go/` directory for its flags (including the
+optional `-dataset`/`-compare` comparison test).
+
+
 Sample commands (like gzip, -e means encode, -d means decode)
 
   xdelta3 -9 -S lzma -e -f -s OLD_FILE NEW_FILE DELTA_FILE
