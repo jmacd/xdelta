@@ -42,6 +42,41 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  windows:
+    name: windows-latest / lzma=${{ matrix.lzma }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lzma: [ "on", "off" ]
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install liblzma (vcpkg)
+        if: matrix.lzma == 'on'
+        run: vcpkg install liblzma:x64-windows
+
+      - name: Configure (no lzma)
+        if: matrix.lzma == 'off'
+        run: cmake -B build -A x64 -DXD3_LZMA_MODE=off
+
+      - name: Configure (vcpkg lzma)
+        if: matrix.lzma == 'on'
+        run: >
+          cmake -B build -A x64 -DXD3_LZMA_MODE=on
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
   go-regtest:
     name: go regression harness
     runs-on: ubuntu-latest

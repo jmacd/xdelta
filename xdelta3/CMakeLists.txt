@@ -95,6 +95,17 @@ endif()
 # config.h lives in the build directory; the sources are in the source dir.
 set(XD3_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Platform I/O selection and feature defines.  On Windows, use the Win32
+# file API and disable features that need a POSIX shell or subprocesses
+# (external compression and the shell-based self tests).  Targets that use
+# the portable C stdio path (xdelta3decode) set their own XD3_STDIO=1.
+set(XD3_PLATFORM_DEFS "")
+if(WIN32)
+  set(XD3_PLATFORM_DEFS
+    XD3_WIN32=1 XD3_POSIX=0 XD3_STDIO=0
+    EXTERNAL_COMPRESSION=0 SHELL_TESTS=0)
+endif()
+
 # Helper to apply shared settings to a target.
 function(xd3_configure_target target)
   target_include_directories(${target} PRIVATE ${XD3_INCLUDE_DIRS})
@@ -114,7 +125,8 @@ endfunction()
 add_executable(xdelta3 xdelta3.c)
 xd3_configure_target(xdelta3)
 target_compile_definitions(xdelta3 PRIVATE
-  REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=1 XD3_DEBUG=0)
+  REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=1 XD3_DEBUG=0
+  ${XD3_PLATFORM_DEFS})
 target_link_libraries(xdelta3 PRIVATE ${XD3_LZMA_LIBRARIES})
 
 # ---------------------------------------------------------------------------
@@ -136,7 +148,8 @@ if(XD3_BUILD_TESTS)
   xd3_configure_target(xdelta3regtest)
   target_compile_definitions(xdelta3regtest PRIVATE
     REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
-    XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1)
+    XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1
+    ${XD3_PLATFORM_DEFS})
   target_link_libraries(xdelta3regtest PRIVATE ${XD3_LZMA_LIBRARIES})
 
   add_executable(xdelta3checksum
@@ -147,7 +160,8 @@ if(XD3_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp-btree)
   target_compile_definitions(xdelta3checksum PRIVATE
     REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
-    XD3_MAIN=1 NOT_MAIN=1)
+    XD3_MAIN=1 NOT_MAIN=1
+    ${XD3_PLATFORM_DEFS})
   target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
 
   # xdelta3link references every public API symbol; building it verifies the
@@ -157,7 +171,8 @@ if(XD3_BUILD_TESTS)
   add_executable(xdelta3link linkxd3lib.c xdelta3.c)
   xd3_configure_target(xdelta3link)
   target_compile_definitions(xdelta3link PRIVATE
-    REGRESSION_TEST=0 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=0)
+    REGRESSION_TEST=0 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=0
+    ${XD3_PLATFORM_DEFS})
   target_link_libraries(xdelta3link PRIVATE ${XD3_LZMA_LIBRARIES})
 
   enable_testing()
