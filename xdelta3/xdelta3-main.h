@@ -106,6 +106,14 @@ xsnprintf_func (char *str, size_t n, const char *fmt, ...)
 #include <unistd.h> /* lots */
 #include <sys/time.h> /* gettimeofday() */
 #include <sys/stat.h> /* stat() and fstat() */
+#if defined(__linux__)
+#include <sys/ioctl.h>
+#include <linux/fs.h> /* BLKGETSIZE64 */
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__DragonFly__) || \
+      defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/ioctl.h>
+#include <sys/disk.h> /* DKIOCGETBLOCK*, DIOCGMEDIASIZE */
+#endif
 #else
 #if defined(_MSC_VER)
 #define strtoll _strtoi64
@@ -908,6 +916,49 @@ main_file_open (main_file *xfile, const char* name, int mode)
   return ret;
 }
 
+#ifdef S_ISBLK
+/* Query the byte size of an open block device.  There is no portable
+ * POSIX way to do this, so each platform needs its own ioctl.  On
+ * success returns 0 and sets *size; on failure (including platforms
+ * with no known method) returns an errno, in which case the caller
+ * treats the source as unsized (the historical degraded behavior). */
+static int
+main_blockdev_size (int fd, xoff_t *size)
+{
+#if defined(__linux__) && defined(BLKGETSIZE64)
+  uint64_t bytes = 0;
+  if (ioctl (fd, BLKGETSIZE64, &bytes) < 0)
+    {
+      return get_errno ();
+    }
+  (*size) = (xoff_t) bytes;
+  return 0;
+#elif defined(__APPLE__) && defined(DKIOCGETBLOCKCOUNT)
+  uint32_t blocksize = 0;
+  uint64_t blockcount = 0;
+  if (ioctl (fd, DKIOCGETBLOCKSIZE, &blocksize) < 0 ||
+      ioctl (fd, DKIOCGETBLOCKCOUNT, &blockcount) < 0)
+    {
+      return get_errno ();
+    }
+  (*size) = (xoff_t) blockcount * (xoff_t) blocksize;
+  return 0;
+#elif defined(DIOCGMEDIASIZE)
+  off_t bytes = 0; /* FreeBSD/DragonFly */
+  if (ioctl (fd, DIOCGMEDIASIZE, &bytes) < 0)
+    {
+      return get_errno ();
+    }
+  (*size) = (xoff_t) bytes;
+  return 0;
+#else
+  (void) fd;
+  (void) size;
+  return ENOTTY; /* No known method; caller falls back to unsized. */
+#endif
+}
+#endif /* S_ISBLK */
+
 int
 main_file_stat (main_file *xfile, xoff_t *size)
 {
@@ -944,11 +995,26 @@ main_file_stat (main_file *xfile, xoff_t *size)
       return ret;
     }
 
-  if (! S_ISREG (sbuf.st_mode))
+  if (S_ISREG (sbuf.st_mode))
+    {
+      (*size) = sbuf.st_size;
+    }
+#ifdef S_ISBLK
+  else if (S_ISBLK (sbuf.st_mode))
+    {
+      /* stat() reports st_size == 0 for block devices; query the real
+       * device size so the source is treated as seekable and sized
+       * rather than falling into non-seekable (FIFO) mode. */
+      if ((ret = main_blockdev_size (XFNO (xfile), size)))
+        {
+          return ret;
+        }
+    }
+#endif
+  else
     {
       return ESPIPE;
     }
-  (*size) = sbuf.st_size;
 #endif
   return ret;
 }
