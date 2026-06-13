@@ -43,15 +43,16 @@ xdelta3checksum_SOURCES = $(common_SOURCES) \
 	testing/checksum_test_c.c
 
 # These sources constitute a regression test written in Go, that is
-# not automatically built or run.  Install Go-1.5.x or later, add
-# `pwd`/go in $GOPATH, and (cd go/src && go run regtest.go).
-# TODO(jmacd): replace hard-coded path names in regtest.go w/ flags.
+# not automatically built or run.  Install Go 1.21 or later and run:
+#   (cd go && go run . -xdelta3 /path/to/xdelta3)
 GOLANG_SRCS = \
-	go/src/xdelta/test.go \
-	go/src/xdelta/rstream.go \
-	go/src/xdelta/tgroup.go \
-	go/src/xdelta/run.go \
-	go/src/regtest.go
+	go/go.mod \
+	go/go.sum \
+	go/xdelta/test.go \
+	go/xdelta/rstream.go \
+	go/xdelta/tgroup.go \
+	go/xdelta/run.go \
+	go/regtest.go
 
 # Note: for extra sanity checks, enable -Wconversion. Note there
 # are a lot of false positives.
@@ -160,8 +161,6 @@ EXTRA_DIST = \
 	cpp-btree/safe_btree_map.h \
 	cpp-btree/safe_btree_set.h \
 	cpp-btree/safe_btree_test.cc \
-	testing/xdelta3-regtest.py \
-	testing/xdelta3-test.py \
 	xdelta3.1 \
 	xdelta3.i \
 	xdelta3.vcxproj \

@@ -41,3 +41,28 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  go-regtest:
+    name: go regression harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Build xdelta3
+        working-directory: xdelta3
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j
+
+      - name: Vet
+        working-directory: xdelta3/go
+        run: go vet ./...
+
+      - name: Run harness (smoke + small offset tests)
+        working-directory: xdelta3/go
+        run: go run . -xdelta3 "$GITHUB_WORKSPACE/xdelta3/build/xdelta3" -min-offset 20 -max-offset 22
+

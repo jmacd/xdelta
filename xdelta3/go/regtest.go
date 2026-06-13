@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"path"
@@ -8,14 +9,22 @@ import (
 	"sort"
 	"time"
 
-	"xdelta"
+	"github.com/jmacd/xdelta/xdelta3/go/xdelta"
 )
 
-const (
-	xdataset = "/volume/home/jmacd/src/testdata"
-	xcompare = "/volume/home/jmacd/src/xdelta-devel/xdelta3/build/x86_64-pc-linux-gnu-m64/xoff64/xdelta3"
-	xdelta3  = "/volume/home/jmacd/src/xdelta-64bithash/xdelta3/build/x86_64-pc-linux-gnu-m64/usize64/xoff64/xdelta3"
-	seed = 1422253499919909358
+var (
+	flagXdelta3 = flag.String("xdelta3", "",
+		"path to the xdelta3 binary under test (required)")
+	flagCompare = flag.String("compare", "",
+		"path to a reference xdelta3 binary (enables the dataset test)")
+	flagDataset = flag.String("dataset", "",
+		"directory of input files (enables the dataset test)")
+	flagSeed = flag.Int64("seed", 1422253499919909358,
+		"random seed for the offset test")
+	flagMinOffset = flag.Uint("min-offset", 20,
+		"smallest offset test exponent (file size grows as 3<<i)")
+	flagMaxOffset = flag.Uint("max-offset", 22,
+		"largest offset test exponent (file size grows as 3<<i)")
 )
 
 type Config struct {
@@ -92,7 +101,7 @@ func (to *TestOutput) String() string {
 }
 
 // P is the test program, Q is the reference version.
-func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
+func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program, xdataset string) {
 	dir, err := os.Open(xdataset)
 	if err != nil {
 		t.Panic(err)
@@ -157,7 +166,7 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program) {
 		}
 	}
 	var keys []uint
-	for k, _ := range testSum {
+	for k := range testSum {
 		keys = append(keys, k)
 	}
 	for _, k := range keys {		
@@ -233,8 +242,8 @@ func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, leng
 	// The decoder output ("read", above) is compared with the
 	// test-provided output ("write", below).  The following
 	// generates two identical inputs.
-	t.WriteRstreams("encode", seed, offset, length, enc.Srcin, enc.Stdin)
-	t.WriteRstreams("decode", seed, offset, length, dec.Srcin, write)
+	t.WriteRstreams("encode", *flagSeed, offset, length, enc.Srcin, enc.Stdin)
+	t.WriteRstreams("decode", *flagSeed, offset, length, dec.Srcin, write)
 	t.Wait(enc, dec)
 
 	expect := cfg.srcbuf_size - offset
@@ -245,6 +254,13 @@ func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, leng
 }
 
 func main() {
+	flag.Parse()
+	if *flagXdelta3 == "" {
+		fmt.Fprintln(os.Stderr, "error: -xdelta3 is required")
+		flag.Usage()
+		os.Exit(2)
+	}
+
 	r, err := xdelta.NewRunner()
 	if err != nil {
 		panic(err)
@@ -253,11 +269,11 @@ func main() {
 
 	cfg := NewC()
 
-	prog := xdelta.Program{xdelta3}
+	prog := xdelta.Program{Path: *flagXdelta3}
 
 	r.RunTest("smoketest", func(t *xdelta.TestGroup) { cfg.smokeTest(t, prog) })
 
-	for i := uint(29); i <= 33; i += 1 {
+	for i := *flagMinOffset; i <= *flagMaxOffset; i += 1 {
 		// The arguments to offsetTest are offset, source
 		// window size, and file size. The source window size
 		// is (2 << i) and (in the 3.0x release branch) is
@@ -265,10 +281,14 @@ func main() {
 		// 30.
 		cfg.srcbuf_size = 2 << i
 		r.RunTest(fmt.Sprint("offset", i), func(t *xdelta.TestGroup) {
-			cfg.offsetTest(t, prog, 1 << i, 3 << i) })
+			cfg.offsetTest(t, prog, 1<<i, 3<<i)
+		})
 	}
-	
-	comp := xdelta.Program{xcompare}
 
-	r.RunTest("dataset", func(t *xdelta.TestGroup) { cfg.datasetTest(t, prog, comp) })
+	if *flagDataset != "" && *flagCompare != "" {
+		comp := xdelta.Program{Path: *flagCompare}
+		r.RunTest("dataset", func(t *xdelta.TestGroup) {
+			cfg.datasetTest(t, prog, comp, *flagDataset)
+		})
+	}
 }
