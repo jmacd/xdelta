@@ -1,0 +1,161 @@
+# CMake build for xdelta3.
+#
+# This is the modern, cross-platform build.  The legacy autotools build
+# (configure.ac / Makefile.am) remains available.
+#
+#   cmake -B build -DCMAKE_BUILD_TYPE=Release
+#   cmake --build build
+#   ctest --test-dir build        # runs the built-in regression test
+#
+cmake_minimum_required(VERSION 3.13)
+
+project(xdelta3
+  VERSION 3.1.1
+  DESCRIPTION "VCDIFF (RFC 3284) delta compression library and tool"
+  HOMEPAGE_URL "https://github.com/jmacd/xdelta"
+  LANGUAGES C CXX)
+
+option(XD3_BUILD_TESTS "Build the regression-test executables" ON)
+
+set(XD3_LZMA_MODE "auto" CACHE STRING
+  "liblzma secondary compression: auto, on, or off")
+set_property(CACHE XD3_LZMA_MODE PROPERTY STRINGS auto on off)
+
+include(CheckTypeSize)
+include(CheckIncludeFile)
+include(CheckCSourceRuns)
+
+# ---------------------------------------------------------------------------
+# Feature / size detection -> config.h
+# ---------------------------------------------------------------------------
+check_type_size("size_t"             SIZEOF_SIZE_T)
+check_type_size("unsigned int"       SIZEOF_UNSIGNED_INT)
+check_type_size("unsigned long"      SIZEOF_UNSIGNED_LONG)
+check_type_size("unsigned long long" SIZEOF_UNSIGNED_LONG_LONG)
+
+# liblzma (secondary compression).
+set(HAVE_LZMA_H OFF)
+set(XD3_LZMA_LIBRARIES "")
+if(NOT XD3_LZMA_MODE STREQUAL "off")
+  find_package(LibLZMA)
+  if(LibLZMA_FOUND)
+    set(HAVE_LZMA_H ON)
+    set(XD3_LZMA_LIBRARIES LibLZMA::LibLZMA)
+  else()
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+      pkg_check_modules(LIBLZMA IMPORTED_TARGET QUIET liblzma)
+      if(LIBLZMA_FOUND)
+        set(HAVE_LZMA_H ON)
+        set(XD3_LZMA_LIBRARIES PkgConfig::LIBLZMA)
+      endif()
+    endif()
+  endif()
+  if(NOT HAVE_LZMA_H AND XD3_LZMA_MODE STREQUAL "on")
+    message(FATAL_ERROR "XD3_LZMA_MODE=on but liblzma was not found")
+  endif()
+endif()
+message(STATUS "xdelta3: liblzma secondary compression: ${HAVE_LZMA_H}")
+
+# Does the target require naturally-aligned memory access?
+set(HAVE_ALIGNED_ACCESS_REQUIRED OFF)
+if(NOT CMAKE_CROSSCOMPILING)
+  check_c_source_runs("
+    int main(void) {
+      static char buf[8] = {0};
+      unsigned int *p = (unsigned int *)(buf + 1);
+      *p = 0x12345678u;
+      return (*p == 0x12345678u) ? 0 : 1;
+    }" XD3_UNALIGNED_ACCESS_OK)
+  if(NOT XD3_UNALIGNED_ACCESS_OK)
+    set(HAVE_ALIGNED_ACCESS_REQUIRED ON)
+  endif()
+else()
+  # Cannot run a probe; assume strict alignment for safety.
+  set(HAVE_ALIGNED_ACCESS_REQUIRED ON)
+endif()
+
+include(CheckCSourceRuns)
+
+configure_file(config.h.cmake config.h @ONLY)
+
+# ---------------------------------------------------------------------------
+# Common compiler flags (mirrors Makefile.am WFLAGS).
+# ---------------------------------------------------------------------------
+include(CheckCCompilerFlag)
+set(XD3_WFLAGS "")
+if(NOT MSVC)
+  foreach(flag
+      -Wall -Wshadow -fno-builtin -Wextra -Wsign-compare
+      -Wformat=2 -Wno-format-nonliteral
+      -Wno-unused-parameter -Wno-unused-function)
+    list(APPEND XD3_WFLAGS ${flag})
+  endforeach()
+endif()
+
+# config.h lives in the build directory; the sources are in the source dir.
+set(XD3_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Helper to apply shared settings to a target.
+function(xd3_configure_target target)
+  target_include_directories(${target} PRIVATE ${XD3_INCLUDE_DIRS})
+  target_compile_definitions(${target} PRIVATE HAVE_CONFIG_H=1)
+  target_compile_options(${target} PRIVATE ${XD3_WFLAGS})
+  set_target_properties(${target} PROPERTIES
+    C_STANDARD 99 C_STANDARD_REQUIRED ON
+    CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+  if(UNIX)
+    target_link_libraries(${target} PRIVATE m)
+  endif()
+endfunction()
+
+# ---------------------------------------------------------------------------
+# xdelta3 - the command-line tool / library driver
+# ---------------------------------------------------------------------------
+add_executable(xdelta3 xdelta3.c)
+xd3_configure_target(xdelta3)
+target_compile_definitions(xdelta3 PRIVATE
+  REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=1 XD3_DEBUG=0)
+target_link_libraries(xdelta3 PRIVATE ${XD3_LZMA_LIBRARIES})
+
+# ---------------------------------------------------------------------------
+# xdelta3decode - minimal decode-only build (no encoder, no secondary comp.)
+# ---------------------------------------------------------------------------
+add_executable(xdelta3decode xdelta3.c)
+xd3_configure_target(xdelta3decode)
+target_compile_definitions(xdelta3decode PRIVATE
+  REGRESSION_TEST=0 SECONDARY_DJW=0 SECONDARY_FGK=0 SECONDARY_LZMA=0
+  XD3_MAIN=1 XD3_ENCODER=0 XD3_STDIO=1 EXTERNAL_COMPRESSION=0 VCDIFF_TOOLS=0)
+
+# ---------------------------------------------------------------------------
+# Regression-test executables
+# ---------------------------------------------------------------------------
+if(XD3_BUILD_TESTS)
+  add_executable(xdelta3regtest
+    testing/regtest.cc
+    testing/regtest_c.c)
+  xd3_configure_target(xdelta3regtest)
+  target_compile_definitions(xdelta3regtest PRIVATE
+    REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
+    XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1)
+  target_link_libraries(xdelta3regtest PRIVATE ${XD3_LZMA_LIBRARIES})
+
+  add_executable(xdelta3checksum
+    testing/checksum_test.cc
+    testing/checksum_test_c.c)
+  xd3_configure_target(xdelta3checksum)
+  target_include_directories(xdelta3checksum PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp-btree)
+  target_compile_definitions(xdelta3checksum PRIVATE
+    REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
+    XD3_MAIN=1 NOT_MAIN=1)
+  target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
+
+  enable_testing()
+  add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
+  set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
+endif()
+
+install(TARGETS xdelta3 RUNTIME DESTINATION bin)
+install(FILES xdelta3.h DESTINATION include)
+install(FILES xdelta3.1 DESTINATION share/man/man1)

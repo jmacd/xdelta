@@ -167,8 +167,22 @@ typedef ULONGLONG      uint64_t;
 #define _FILE_OFFSET_BITS 64
 #endif
 
-static_assert(SIZEOF_SIZE_T == sizeof(size_t), "SIZEOF_SIZE_T not correctly set");
-static_assert(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), "SIZEOF_UNSIGNED_LONG_LONG not correctly set");
+/* Portable compile-time assertion.  C11 and later provide
+ * _Static_assert; under C99 we fall back to a negative-size-array
+ * typedef trick.  (The standard <assert.h> "static_assert" macro is
+ * only defined for C11+, so it cannot be used while the build still
+ * targets C99.) */
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define XD3_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+#else
+#define XD3_STATIC_ASSERT_PASTE2(a, b) a##b
+#define XD3_STATIC_ASSERT_PASTE(a, b) XD3_STATIC_ASSERT_PASTE2(a, b)
+#define XD3_STATIC_ASSERT(cond, msg) \
+  typedef char XD3_STATIC_ASSERT_PASTE(xd3_static_assert_, __LINE__)[(cond) ? 1 : -1]
+#endif
+
+XD3_STATIC_ASSERT(SIZEOF_SIZE_T == sizeof(size_t), "SIZEOF_SIZE_T not correctly set");
+XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long), "SIZEOF_UNSIGNED_LONG_LONG not correctly set");
 
 /* Set a xoff_t typedef and the "Q" printf insert. */
 #if defined(_WIN32)

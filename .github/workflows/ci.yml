@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ release3_1_apl, release3_0_apl, main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  cmake:
+    name: ${{ matrix.os }} / lzma=${{ matrix.lzma }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        lzma: [ "on", "off" ]
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install liblzma (Linux)
+        if: runner.os == 'Linux' && matrix.lzma == 'on'
+        run: sudo apt-get update && sudo apt-get install -y liblzma-dev
+
+      - name: Install liblzma (macOS)
+        if: runner.os == 'macOS' && matrix.lzma == 'on'
+        run: brew install xz
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LZMA_MODE=${{ matrix.lzma }}
+          -DCMAKE_PREFIX_PATH="$(brew --prefix 2>/dev/null || echo /usr)"
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

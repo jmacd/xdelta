@@ -17,7 +17,7 @@ AC_CHECK_SIZEOF(unsigned long long)
 
 AC_ARG_WITH(
     [liblzma],
-    [AC_HELP_STRING(
+    [AS_HELP_STRING(
         [--with-liblzma],
         [build with liblzma support @<:@default=autodetect@:>@])],
     [USE_LIBLZMA=$withval],
