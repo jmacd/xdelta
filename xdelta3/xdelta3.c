@@ -241,16 +241,6 @@
                         soft-coded string matcher for experimenting
                         with arbitrary values.
      xdelta3-list.h     A cyclic list template
-
-   Misc little debug utilities:
-
-     badcopy.c          Randomly modifies an input file based on two
-                        parameters: (1) the probability that a byte in
-                        the file is replaced with a pseudo-random value,
-                        and (2) the mean change size.  Changes are
-                        generated using an expoential distribution
-                        which approximates the expected error_prob
-			distribution.
    --------------------------------------------------------------------
 
    This file itself is unusually large.  I hope to defend this layout

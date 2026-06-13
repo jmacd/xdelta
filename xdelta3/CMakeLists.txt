@@ -150,6 +150,16 @@ if(XD3_BUILD_TESTS)
     XD3_MAIN=1 NOT_MAIN=1)
   target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
 
+  # xdelta3link references every public API symbol; building it verifies the
+  # library links and catches signature drift in xdelta3.h.  It is a
+  # compile/link check only -- it is not run, since it intentionally passes
+  # NULL/uninitialized arguments.
+  add_executable(xdelta3link linkxd3lib.c xdelta3.c)
+  xd3_configure_target(xdelta3link)
+  target_compile_definitions(xdelta3link PRIVATE
+    REGRESSION_TEST=0 SECONDARY_DJW=1 SECONDARY_FGK=1 XD3_MAIN=0)
+  target_link_libraries(xdelta3link PRIVATE ${XD3_LZMA_LIBRARIES})
+
   enable_testing()
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
