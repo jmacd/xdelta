@@ -470,6 +470,10 @@ main_alloc (void   *opaque,
 	    size_t  items,
 	    usize_t  size)
 {
+  if (XD3_MUL_SIZE_OVERFLOW (items, size))
+    {
+      return NULL;
+    }
   return main_malloc1 (items * size);
 }
 
@@ -3611,6 +3615,13 @@ setup_environment (int argc,
   }
 
   (*env_free) = (char*) main_malloc((usize_t) strlen(v) + 1);
+  if (*env_free == NULL) {
+    /* Allocation failed; fall back to the unmodified command line. */
+    (*argc_out) = argc;
+    (*argv_out) = argv;
+    (*argv_free) = NULL;
+    return;
+  }
   strcpy(*env_free, v);
 
   /* Space needed for extra args, at least # of spaces */
@@ -3621,7 +3632,27 @@ setup_environment (int argc,
     }
   }
 
-  (*argv_free) = (char**) main_malloc(sizeof(char*) * (n + 1));
+  /* Guard the argv allocation size against integer overflow before
+   * multiplying.  On overflow, discard the parsed environment and fall
+   * back to the unmodified command line. */
+  if (n < 0 || XD3_MUL_SIZE_OVERFLOW (sizeof(char*), (size_t) n + 1)) {
+    main_free1 (NULL, *env_free);
+    (*env_free) = NULL;
+    (*argc_out) = argc;
+    (*argv_out) = argv;
+    (*argv_free) = NULL;
+    return;
+  }
+
+  (*argv_free) = (char**) main_malloc(sizeof(char*) * ((size_t) n + 1));
+  if (*argv_free == NULL) {
+    main_free1 (NULL, *env_free);
+    (*env_free) = NULL;
+    (*argc_out) = argc;
+    (*argv_out) = argv;
+    (*argv_free) = NULL;
+    return;
+  }
   (*argv_out) = (*argv_free);
   (*argv_out)[0] = argv[0];
   (*argv_out)[n] = NULL;

@@ -360,6 +360,15 @@ static inline int xd3_emit_offset (xd3_stream *stream, xd3_output **output, xoff
 #define USIZE_T_OVERFLOW(a,b) ((USIZE_T_MAX - (usize_t) (a)) < (usize_t) (b))
 #define XOFF_T_OVERFLOW(a,b) ((XOFF_T_MAX - (xoff_t) (a)) < (xoff_t) (b))
 
+/* Multiplication-overflow guard for allocation sizes.  The product is
+ * evaluated in size_t, the type the allocators pass to malloc.  A wrap
+ * here would yield an undersized buffer and a subsequent heap
+ * overflow.  Evaluates to non-zero when items * size would overflow
+ * size_t.  Both operands are evaluated once. */
+#define XD3_MUL_SIZE_OVERFLOW(items,size)				\
+  (((size_t) (size) != 0) &&						\
+   ((size_t) (items) > ((size_t) SIZE_MAX) / (size_t) (size)))
+
 int xd3_size_hashtable (xd3_stream   *stream,
 			usize_t       slots,
 			usize_t       look,
