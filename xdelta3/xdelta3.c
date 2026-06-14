@@ -1040,21 +1040,38 @@ xd3_xoff_roundup (xoff_t x)
 static usize_t
 xd3_round_blksize (usize_t sz, usize_t blksz)
 {
-  usize_t mod = sz & (blksz-1);
+  usize_t mod;
+  usize_t add;
 
   XD3_ASSERT (xd3_check_pow2 (blksz, NULL) == 0);
+
+  /* A zero blocksize would underflow the mask below; leave sz
+   * unchanged rather than corrupt the arithmetic. */
+  if (blksz == 0)
+    {
+      return sz;
+    }
+
+  mod = sz & (blksz-1);
 
   if (mod == 0)
     {
       return sz;
     }
 
-  if (sz > USIZE_T_MAXBLKSZ)
+  add = blksz - mod;
+
+  /* Rounding up must never wrap past USIZE_T_MAX.  A wrapped result
+   * would be smaller than sz and cause the caller to under-allocate.
+   * When the rounded value would overflow, return sz, which is itself
+   * a valid size and the largest we can guarantee is not smaller than
+   * requested. */
+  if (USIZE_T_OVERFLOW (sz, add))
     {
-      return USIZE_T_MAXBLKSZ;
+      return sz;
     }
 
-  return sz + (blksz - mod);
+  return sz + add;
 }
 
 /***********************************************************************
@@ -1392,6 +1409,10 @@ xd3_decode_address (xd3_stream *stream, usize_t here,
 static void*
 __xd3_alloc_func (void* opaque, size_t items, usize_t size)
 {
+  if (XD3_MUL_SIZE_OVERFLOW (items, size))
+    {
+      return NULL;
+    }
   return malloc (items * (size_t) size);
 }
 

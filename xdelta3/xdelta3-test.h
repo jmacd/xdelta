@@ -718,6 +718,68 @@ test_usize_t_overflow (xd3_stream *stream, int unused)
 }
 
 static int
+test_alloc_overflow (xd3_stream *stream, int unused)
+{
+  void *p;
+  usize_t r;
+
+  /* Macro boundary behavior: a zero operand never overflows, a unit
+   * operand never overflows, and the product is rejected exactly when
+   * it would exceed SIZE_MAX. */
+  if (XD3_MUL_SIZE_OVERFLOW (0, SIZE_MAX)) { goto fail; }
+  if (XD3_MUL_SIZE_OVERFLOW (SIZE_MAX, 0)) { goto fail; }
+  if (XD3_MUL_SIZE_OVERFLOW (1, SIZE_MAX)) { goto fail; }
+  if (XD3_MUL_SIZE_OVERFLOW (SIZE_MAX, 1)) { goto fail; }
+  if (XD3_MUL_SIZE_OVERFLOW (SIZE_MAX / 2, 2)) { goto fail; }
+  if (! XD3_MUL_SIZE_OVERFLOW (SIZE_MAX, 2)) { goto fail; }
+  if (! XD3_MUL_SIZE_OVERFLOW (2, SIZE_MAX)) { goto fail; }
+  if (! XD3_MUL_SIZE_OVERFLOW ((SIZE_MAX / 2) + 1, 2)) { goto fail; }
+
+  /* The core allocator must refuse an overflowing request without
+   * calling malloc.  These operands wrap to a small product when the
+   * guard is absent, so an unguarded malloc would succeed and return a
+   * dangerously undersized buffer; the guard must return NULL instead.
+   * A valid request must still be satisfied. */
+  if (__xd3_alloc_func (NULL, (SIZE_MAX / 2) + 2, 2) != NULL) { goto fail; }
+  p = __xd3_alloc_func (NULL, 16, 4);
+  if (p == NULL) { goto fail; }
+  free (p);
+
+#if XD3_MAIN
+  /* The CLI allocator shares the same guard. */
+  if (main_alloc (NULL, (SIZE_MAX / 2) + 2, 2) != NULL) { goto fail; }
+  p = main_alloc (NULL, 16, 4);
+  if (p == NULL) { goto fail; }
+  main_free1 (NULL, p);
+#endif
+
+  /* xd3_round_blksize must never return a value smaller than the
+   * requested size, including at the top of the usize_t range where
+   * rounding up would otherwise wrap. */
+  if (xd3_round_blksize (0, XD3_ALLOCSIZE) != 0) { goto fail; }
+  if (xd3_round_blksize (XD3_ALLOCSIZE, XD3_ALLOCSIZE) != XD3_ALLOCSIZE)
+    { goto fail; }
+  if (xd3_round_blksize (1, XD3_ALLOCSIZE) != XD3_ALLOCSIZE) { goto fail; }
+  if (xd3_round_blksize (XD3_ALLOCSIZE + 1, XD3_ALLOCSIZE) !=
+      2 * XD3_ALLOCSIZE) { goto fail; }
+
+  r = xd3_round_blksize (USIZE_T_MAX, XD3_ALLOCSIZE);
+  if (r < USIZE_T_MAX) { goto fail; }
+
+  r = xd3_round_blksize (USIZE_T_MAX - 1, XD3_ALLOCSIZE);
+  if (r < USIZE_T_MAX - 1) { goto fail; }
+
+  /* A zero blocksize must not corrupt the arithmetic. */
+  if (xd3_round_blksize (123, 0) != 123) { goto fail; }
+
+  return 0;
+
+ fail:
+  stream->msg = "alloc overflow guard failed";
+  return XD3_INTERNAL;
+}
+
+static int
 test_forward_match (xd3_stream *stream, int unused)
 {
   usize_t i;
@@ -2996,6 +3058,7 @@ int xd3_selftest (void)
   DO_TEST (encode_decode_uint32_t, 0, 0);
   DO_TEST (encode_decode_uint64_t, 0, 0);
   DO_TEST (usize_t_overflow, 0, 0);
+  DO_TEST (alloc_overflow, 0, 0);
   DO_TEST (checksum_step, 0, 0);
   DO_TEST (forward_match, 0, 0);
   DO_TEST (address_cache, 0, 0);
