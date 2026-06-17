@@ -796,7 +796,8 @@ xd3_decode_emit (xd3_stream *stream)
 
       if (a32 != stream->dec_adler32)
 	{
-	  stream->msg = "target window checksum mismatch";
+	  stream->msg = "target window checksum mismatch: the supplied "
+	    "source likely does not match the one used to create this patch";
 	  return XD3_INVALID_INPUT;
 	}
     }

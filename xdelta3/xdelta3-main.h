@@ -277,6 +277,7 @@ static char*           program_name = NULL;
 static uint8_t*        appheader_used = NULL;
 static uint8_t*        main_bdata = NULL;
 static usize_t         main_bsize = 0;
+static int             main_warned_no_checksum = 0;
 
 /* Hacks for VCDIFF tools, recode command. */
 static int allow_fake_source = 0;
@@ -418,6 +419,7 @@ reset_defaults(void)
   appheader_used = NULL;
   main_bdata = NULL;
   main_bsize = 0;
+  main_warned_no_checksum = 0;
   allow_fake_source = 0;
   option_smatch_config = NULL;
 
@@ -3381,6 +3383,19 @@ main_input (xd3_cmd     cmd,
 
 	case XD3_WINFINISH:
 	  {
+	    /* Warn loudly, once, if a delta being decoded carries no
+	       integrity checksum, since a wrong source can then silently
+	       produce corrupt output. */
+	    if (cmd == CMD_DECODE && option_use_checksum &&
+		! option_quiet && ! main_warned_no_checksum &&
+		(stream.dec_win_ind & VCD_ADLER32) == 0)
+	      {
+		main_warned_no_checksum = 1;
+		XPR(NT "WARNING: this delta has no integrity checksum; "
+		    "the decoded output cannot be verified and a wrong "
+		    "source may silently produce corrupt output\n");
+	      }
+
 	    if (IS_ENCODE (cmd) || cmd == CMD_DECODE || cmd == CMD_RECODE)
 	      {
 		if (! option_quiet && IS_ENCODE (cmd) &&
