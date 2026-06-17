@@ -3411,6 +3411,9 @@ xd3_process_memory (int            is_encode,
 
   if (is_encode)
     {
+      /* The convenience encoder always emits a per-window checksum so
+	 decoders can detect a wrong source or a corrupt delta. */
+      config.flags |= XD3_ADLER32;
       config.winsize = xd3_min(input_size, (usize_t) XD3_DEFAULT_WINSIZE);
       config.sprevsz = xd3_pow2_roundup (config.winsize);
     }
