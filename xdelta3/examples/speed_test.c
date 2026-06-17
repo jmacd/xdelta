@@ -17,12 +17,11 @@
 #include "test.h"
 
 usize_t bench_speed(const uint8_t *from_buf, const size_t from_len,
-		 const uint8_t *to_buf, const size_t to_len,
-		 uint8_t *delta_buf, const size_t delta_alloc,
-		 int flags) {
+                    const uint8_t *to_buf, const size_t to_len,
+                    uint8_t *delta_buf, const size_t delta_alloc, int flags) {
   usize_t delta_size;
-  int ret = xd3_encode_memory(to_buf, to_len, from_buf, from_len,
-			      delta_buf, &delta_size, delta_alloc, flags);
+  int ret = xd3_encode_memory(to_buf, to_len, from_buf, from_len, delta_buf,
+                              &delta_size, delta_alloc, flags);
   if (ret != 0) {
     fprintf(stderr, "encode failure: %d: %s\n", ret, xd3_strerror(ret));
     abort();
@@ -63,15 +62,16 @@ int main(int argc, char **argv) {
   start = get_millisecs_now();
 
   for (i = 0; i < repeat; ++i) {
-    delta_size = bench_speed(from_buf, from_len,
-			     to_buf, to_len, delta_buf, delta_alloc, flags);
+    delta_size = bench_speed(from_buf, from_len, to_buf, to_len, delta_buf,
+                             delta_alloc, flags);
   }
 
   finish = get_millisecs_now();
 
   fprintf(stderr,
-	  "STAT: encode %3.2f ms from %s to %s repeat %d %zdbit delta %zd\n",
-	  (double)(finish - start) / repeat, from, to, repeat, sizeof (xoff_t) * 8, delta_size);
+          "STAT: encode %3.2f ms from %s to %s repeat %d %zdbit delta %zd\n",
+          (double)(finish - start) / repeat, from, to, repeat,
+          sizeof(xoff_t) * 8, delta_size);
 
   ret = 0;
 
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
   exit:
     ret = 1;
   }
-    
+
   main_free(to_buf);
   main_free(from_buf);
   main_free(delta_buf);

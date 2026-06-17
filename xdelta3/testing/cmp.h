@@ -15,7 +15,7 @@
 */
 static size_t CmpDifferentBlockBytes(const Block &a, const Block &b) {
   size_t total = 0;
-  size_t i = 0; 
+  size_t i = 0;
   size_t m = min(a.Size(), b.Size());
 
   for (; i < m; i++) {
@@ -54,8 +54,8 @@ static xoff_t CmpDifferentBytes(const FileSpec &a, const FileSpec &b) {
 }
 
 static size_t CmpDifferentBlockBytesAtOffset(const Block &a,
-					     const FileSpec &b_spec,
-					     xoff_t offset) {
+                                             const FileSpec &b_spec,
+                                             xoff_t offset) {
   Block b;
   size_t size = a.Size();
   CHECK_LE(offset, b_spec.Size());

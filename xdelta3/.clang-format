@@ -1,0 +1,6 @@
+# xdelta3 formats its own C/C++ sources with the LLVM style.
+Language: Cpp
+BasedOnStyle: LLVM
+# These headers are not self-contained and rely on a specific include
+# order, so leave include ordering untouched.
+SortIncludes: Never

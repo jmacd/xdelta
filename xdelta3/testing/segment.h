@@ -15,34 +15,23 @@
 */
 
 class Segment {
- public:
+public:
   Segment(size_t size, MTRandom *rand)
-    : size_(size),
-      seed_(rand->Rand32()),
-      seed_offset_(0),
-      data_(NULL) {
+      : size_(size), seed_(rand->Rand32()), seed_offset_(0), data_(NULL) {
     CHECK_GT(size_, 0);
   }
 
   Segment(size_t size, uint32_t seed)
-    : size_(size),
-      seed_(seed),
-      seed_offset_(0),
-      data_(NULL) {
+      : size_(size), seed_(seed), seed_offset_(0), data_(NULL) {
     CHECK_GT(size_, 0);
   }
 
   Segment(size_t size, uint8_t *data)
-    : size_(size),
-      seed_(0),
-      seed_offset_(0),
-      data_(data) {
+      : size_(size), seed_(0), seed_offset_(0), data_(data) {
     CHECK_GT(size_, 0);
   }
 
-  size_t Size() const {
-    return size_;
-  }
+  size_t Size() const { return size_; }
 
   Segment Subseg(size_t start, size_t size) const {
     CHECK_LE(start + size, size_);
@@ -62,10 +51,10 @@ class Segment {
       MTRandom gen(seed_);
       MTRandom8 gen8(&gen);
       while (skip--) {
-	gen8.Rand8();
+        gen8.Rand8();
       }
       for (size_t i = 0; i < size; i++) {
-	data[i] = gen8.Rand8();
+        data[i] = gen8.Rand8();
       }
     }
   }
@@ -74,9 +63,9 @@ class Segment {
     string r;
     if (data_) {
       for (size_t i = 0; i < size_; i++) {
-	char buf[10];
-	sprintf(buf, "%02x ", data_[i]);
-	r.append(buf);
+        char buf[10];
+        sprintf(buf, "%02x ", data_[i]);
+        r.append(buf);
       }
     } else {
       char buf[256];
@@ -89,19 +78,16 @@ class Segment {
 private:
   // Used by Subseg()
   Segment(size_t size, uint32_t seed, size_t seed_offset)
-    : size_(size),
-      seed_(seed),
-      seed_offset_(seed_offset),
-      data_(NULL) {
+      : size_(size), seed_(seed), seed_offset_(seed_offset), data_(NULL) {
     CHECK_GT(size_, 0);
   }
 
-  size_t size_;  // Size of this segment
+  size_t size_; // Size of this segment
 
   // For random segments
-  uint32_t seed_;  // Seed used for generating byte sequence
-  size_t seed_offset_;  // Seed positions the sequence this many bytes
-                        // before its beginning.
+  uint32_t seed_;      // Seed used for generating byte sequence
+  size_t seed_offset_; // Seed positions the sequence this many bytes
+                       // before its beginning.
 
   // For literal segments (data is not owned)
   uint8_t *data_;

@@ -14,15 +14,11 @@
    limitations under the License.
 */
 
-template <typename T, typename U>
-class SizeIterator {
- public:
+template <typename T, typename U> class SizeIterator {
+public:
   SizeIterator(MTRandom *rand, size_t howmany)
-    : rand_(rand),
-      count_(0),
-      fixed_(U::sizes),
-      fixed_size_(SIZEOF_ARRAY(U::sizes)),
-      howmany_(howmany) { }
+      : rand_(rand), count_(0), fixed_(U::sizes),
+        fixed_size_(SIZEOF_ARRAY(U::sizes)), howmany_(howmany) {}
 
   T Get() {
     if (count_ < fixed_size_) {
@@ -31,18 +27,14 @@ class SizeIterator {
     return rand_->Rand<T>() % U::max_value;
   }
 
-  bool Done() {
-    return count_ >= fixed_size_ && count_ >= howmany_;
-  }
+  bool Done() { return count_ >= fixed_size_ && count_ >= howmany_; }
 
-  void Next() {
-    count_++;
-  }
+  void Next() { count_++; }
 
- private:
+private:
   MTRandom *rand_;
   size_t count_;
-  T* fixed_;
+  T *fixed_;
   size_t fixed_size_;
   size_t howmany_;
 };
@@ -55,13 +47,16 @@ public:
 };
 
 size_t SmallSizes::sizes[] = {
-  0, 1, 128 / 4, 3333, 
-  128 - (128 / 3),
-  128,
-  128 + (128 / 3),
-  2 * 128 - (128 / 3),
-  2 * 128,
-  2 * 128 + (128 / 3),
+    0,
+    1,
+    128 / 4,
+    3333,
+    128 - (128 / 3),
+    128,
+    128 + (128 / 3),
+    2 * 128 - (128 / 3),
+    2 * 128,
+    2 * 128 + (128 / 3),
 };
 
 size_t SmallSizes::max_value = 128 * 3;
@@ -74,12 +69,12 @@ public:
 };
 
 size_t LargeSizes::sizes[] = {
-  1 << 20,
-  1 << 18,
-  1 << 16,
+    1 << 20,
+    1 << 18,
+    1 << 16,
 };
 
-size_t LargeSizes::max_value = 1<<20;
+size_t LargeSizes::max_value = 1 << 20;
 
 // Base constants
 struct BaseConstants {
@@ -95,8 +90,8 @@ struct SmallBlock : public BaseConstants {
   typedef SmallSizes Sizes;
 };
 
-const xoff_t SmallBlock::BLOCK_SIZE = 1<<7;
-const size_t SmallBlock::WINDOW_SIZE = 1<<7;
+const xoff_t SmallBlock::BLOCK_SIZE = 1 << 7;
+const size_t SmallBlock::WINDOW_SIZE = 1 << 7;
 
 struct LargeBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
@@ -113,8 +108,8 @@ struct MixedBlock : public BaseConstants {
   typedef SmallSizes Sizes;
 };
 
-const xoff_t MixedBlock::BLOCK_SIZE = 1<<7;
-const size_t MixedBlock::WINDOW_SIZE = 1<<8;
+const xoff_t MixedBlock::BLOCK_SIZE = 1 << 7;
+const size_t MixedBlock::WINDOW_SIZE = 1 << 8;
 
 struct OversizeBlock : public BaseConstants {
   static const xoff_t BLOCK_SIZE;
@@ -122,5 +117,5 @@ struct OversizeBlock : public BaseConstants {
   typedef SmallSizes Sizes;
 };
 
-const xoff_t OversizeBlock::BLOCK_SIZE = 1<<8;
-const size_t OversizeBlock::WINDOW_SIZE = 1<<7;
+const xoff_t OversizeBlock::BLOCK_SIZE = 1 << 8;
+const size_t OversizeBlock::WINDOW_SIZE = 1 << 7;
