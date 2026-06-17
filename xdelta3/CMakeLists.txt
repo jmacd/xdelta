@@ -109,10 +109,10 @@ if(WIN32)
 endif()
 
 # Warnings-as-errors flags, applied only to the core targets (the C++ test
-# harness and vendored cpp-btree have their own pre-existing warnings).  GCC
-# is intentionally excluded: it emits many additional, largely false-positive
-# diagnostics (implicit-fallthrough, format-truncation, stringop-overflow)
-# that are out of scope here.
+# harness has its own pre-existing warnings).  GCC is intentionally
+# excluded: it emits many additional, largely false-positive diagnostics
+# (implicit-fallthrough, format-truncation, stringop-overflow) that are
+# out of scope here.
 set(XD3_WERROR_FLAGS "")
 if(XD3_WERROR)
   if(MSVC)
@@ -185,8 +185,6 @@ if(XD3_BUILD_TESTS)
       testing/checksum_test.cc
       testing/checksum_test_c.c)
     xd3_configure_target(xdelta3checksum)
-    target_include_directories(xdelta3checksum PRIVATE
-      ${CMAKE_CURRENT_SOURCE_DIR}/cpp-btree)
     target_compile_definitions(xdelta3checksum PRIVATE
       REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
       XD3_MAIN=1 NOT_MAIN=1

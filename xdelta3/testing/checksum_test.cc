@@ -19,8 +19,7 @@
 #include <list>
 #include <vector>
 #include <algorithm>
-
-#include "../cpp-btree/btree_map.h"
+#include <map>
 
 extern "C" {
 uint32_t xd3_large32_cksum_old(xd3_hash_cfg *cfg, const uint8_t *base,
@@ -34,7 +33,6 @@ uint64_t xd3_large64_cksum_update_old(xd3_hash_cfg *cfg, uint64_t cksum,
                                       const uint8_t *base, const usize_t look);
 }
 
-using btree::btree_map;
 using std::list;
 using std::vector;
 
@@ -229,7 +227,7 @@ struct large_cksum_old : public with_stream<SELF> {
 template <typename Word> struct file_stats {
   typedef const uint8_t *ptr_type;
   typedef Word word_type;
-  typedef btree::btree_multimap<word_type, ptr_type> table_type;
+  typedef std::multimap<word_type, ptr_type> table_type;
   typedef typename table_type::iterator table_iterator;
 
   usize_t cksum_size;
@@ -251,13 +249,12 @@ template <typename Word> struct file_stats {
   }
 
   void update(word_type word, ptr_type ptr) {
-    table_iterator t_i = table.find(word);
+    std::pair<table_iterator, table_iterator> range = table.equal_range(word);
 
     count++;
-    if (t_i != table.end()) {
+    if (range.first != range.second) {
       int collisions = 0;
-      for (table_iterator p_i = t_i; p_i != table.end() && p_i->first == word;
-           ++p_i) {
+      for (table_iterator p_i = range.first; p_i != range.second; ++p_i) {
         if (memcmp(p_i->second, ptr, cksum_size) == 0) {
           return;
         }

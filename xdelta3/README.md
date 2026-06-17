@@ -57,8 +57,7 @@ Formatting
 ----------
 
 C/C++ sources are formatted with clang-format (version 20) using the
-LLVM style in `.clang-format`.  The vendored `cpp-btree/` library
-and the Objective-C iOS example are excluded.
+LLVM style in `.clang-format`.  The Objective-C iOS example is excluded.
 
   ./format.sh            # reformat sources in place
   ./format.sh --check    # verify formatting (used by CI)
