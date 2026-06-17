@@ -1,4 +1,0 @@
-# Vendored third-party code (Google cpp-btree): keep byte-identical to
-# upstream so it can be diffed and updated easily.  Do not reformat.
-DisableFormat: true
-SortIncludes: Never

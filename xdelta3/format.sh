@@ -7,8 +7,7 @@
 #   ./format.sh --check    Report files that are not formatted; non-zero exit
 #                          if any differ.  Does not modify files.
 #
-# The vendored cpp-btree library and the Objective-C iOS example are
-# intentionally excluded.
+# The Objective-C iOS example is intentionally excluded.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -34,7 +33,7 @@ while IFS= read -r f; do
   FILES+=("$f")
 done < <(
   git ls-files '*.c' '*.h' '*.cc' '*.cpp' '*.hpp' \
-    | grep -vE '^cpp-btree/|^examples/iOS/'
+    | grep -vE '^examples/iOS/'
 )
 
 if [[ "${1:-}" == "--check" ]]; then
