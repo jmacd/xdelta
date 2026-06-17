@@ -53,6 +53,19 @@ See `go run . -h` in the `go/` directory for its flags (including the
 optional `-dataset`/`-compare` comparison test).
 
 
+Formatting
+----------
+
+C/C++ sources are formatted with clang-format (version 20) using the
+LLVM style in `.clang-format`.  The vendored `cpp-btree/` library
+and the Objective-C iOS example are excluded.
+
+  ./format.sh            # reformat sources in place
+  ./format.sh --check    # verify formatting (used by CI)
+
+Set `CLANG_FORMAT` to select a specific clang-format binary.
+
+
 Sample commands (like gzip, -e means encode, -d means decode)
 
   xdelta3 -9 -S lzma -e -f -s OLD_FILE NEW_FILE DELTA_FILE

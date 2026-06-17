@@ -19,9 +19,8 @@
 #include "xdelta3.h"
 #include "xdelta3.c"
 
-static int read_whole_file(const char *name,
-			   uint8_t **buf_ptr,
-			   size_t *buf_len) {
+static int read_whole_file(const char *name, uint8_t **buf_ptr,
+                           size_t *buf_len) {
   main_file file;
   int ret;
   xoff_t len;
@@ -38,19 +37,17 @@ static int read_whole_file(const char *name,
     fprintf(stderr, "stat failed\n");
     goto exit;
   }
-  
+
   (*buf_len) = (size_t)len;
-  (*buf_ptr) = (uint8_t*) main_malloc(*buf_len);
-  ret = main_file_read(&file, *buf_ptr, *buf_len, &nread,
-		       "read failed");
+  (*buf_ptr) = (uint8_t *)main_malloc(*buf_len);
+  ret = main_file_read(&file, *buf_ptr, *buf_len, &nread, "read failed");
   if (ret == 0 && *buf_len == nread) {
     ret = 0;
   } else {
     fprintf(stderr, "invalid read\n");
     ret = XD3_INTERNAL;
   }
- exit:
+exit:
   main_file_cleanup(&file);
   return ret;
 }
-

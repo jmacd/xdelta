@@ -17,51 +17,44 @@
 #undef MT_LEN
 #undef MT_IA
 class MTRandom {
- public:
-  enum Constants { 
-    MT_LEN = 624,
-    MT_IA = 397
-  };
+public:
+  enum Constants { MT_LEN = 624, MT_IA = 397 };
 
   static const uint32_t TEST_SEED1;
   static const uint32_t UPPER_MASK;
   static const uint32_t LOWER_MASK;
   static const uint32_t MATRIX_A;
 
-  MTRandom() {
-    Init(TEST_SEED1);
-  }
+  MTRandom() { Init(TEST_SEED1); }
 
-  explicit MTRandom(uint32_t seed) {
-    Init(seed);
-  }
+  explicit MTRandom(uint32_t seed) { Init(seed); }
 
   /* This Mersenne Twister code is attributed to Michael Brundage. Thanks!
    * http://www.qbrundage.com/michaelb/pubs/essays/random_number_generation.html
    */
-  uint32_t Rand32 () {
+  uint32_t Rand32() {
     uint32_t y;
-    static unsigned long mag01[2] = { 
-      0 , MATRIX_A
-    };
+    static unsigned long mag01[2] = {0, MATRIX_A};
 
     if (mt_index_ >= MT_LEN) {
       int kk;
 
       for (kk = 0; kk < MT_LEN - MT_IA; kk++) {
-	y = (mt_buffer_[kk] & UPPER_MASK) | (mt_buffer_[kk + 1] & LOWER_MASK);
-	mt_buffer_[kk] = mt_buffer_[kk + MT_IA] ^ (y >> 1) ^ mag01[y & 0x1UL];
+        y = (mt_buffer_[kk] & UPPER_MASK) | (mt_buffer_[kk + 1] & LOWER_MASK);
+        mt_buffer_[kk] = mt_buffer_[kk + MT_IA] ^ (y >> 1) ^ mag01[y & 0x1UL];
       }
-      for (;kk < MT_LEN - 1; kk++) {
-	y = (mt_buffer_[kk] & UPPER_MASK) | (mt_buffer_[kk + 1] & LOWER_MASK);
-	mt_buffer_[kk] = mt_buffer_[kk + (MT_IA - MT_LEN)] ^ (y >> 1) ^ mag01[y & 0x1UL];
+      for (; kk < MT_LEN - 1; kk++) {
+        y = (mt_buffer_[kk] & UPPER_MASK) | (mt_buffer_[kk + 1] & LOWER_MASK);
+        mt_buffer_[kk] =
+            mt_buffer_[kk + (MT_IA - MT_LEN)] ^ (y >> 1) ^ mag01[y & 0x1UL];
       }
       y = (mt_buffer_[MT_LEN - 1] & UPPER_MASK) | (mt_buffer_[0] & LOWER_MASK);
-      mt_buffer_[MT_LEN - 1] = mt_buffer_[MT_IA - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
+      mt_buffer_[MT_LEN - 1] =
+          mt_buffer_[MT_IA - 1] ^ (y >> 1) ^ mag01[y & 0x1UL];
 
       mt_index_ = 0;
     }
-  
+
     y = mt_buffer_[mt_index_++];
 
     y ^= (y >> 11);
@@ -74,24 +67,21 @@ class MTRandom {
 
   uint32_t ExpRand32(uint32_t mean) {
     double mean_d = mean;
-    double erand  = log (1.0 / (Rand32() / (double)UINT32_MAX));
-    uint32_t x = (uint32_t) (mean_d * erand + 0.5);
+    double erand = log(1.0 / (Rand32() / (double)UINT32_MAX));
+    uint32_t x = (uint32_t)(mean_d * erand + 0.5);
     return x;
   }
 
-  uint64_t Rand64() {
-    return ((uint64_t)Rand32() << 32) | Rand32();
-  }
+  uint64_t Rand64() { return ((uint64_t)Rand32() << 32) | Rand32(); }
 
   uint64_t ExpRand64(uint64_t mean) {
     double mean_d = mean;
-    double erand  = log (1.0 / (Rand64() / (double)UINT32_MAX));
-    uint64_t x = (uint64_t) (mean_d * erand + 0.5);
+    double erand = log(1.0 / (Rand64() / (double)UINT32_MAX));
+    uint64_t x = (uint64_t)(mean_d * erand + 0.5);
     return x;
   }
 
-  template <typename T>
-  T Rand() {
+  template <typename T> T Rand() {
     switch (sizeof(T)) {
     case sizeof(uint32_t):
       return Rand32();
@@ -103,8 +93,7 @@ class MTRandom {
     }
   }
 
-  template <typename T>
-  T ExpRand(T mean) {
+  template <typename T> T ExpRand(T mean) {
     switch (sizeof(T)) {
     case sizeof(uint32_t):
       return ExpRand32(mean);
@@ -116,7 +105,7 @@ class MTRandom {
     }
   }
 
- private:
+private:
   void Init(uint32_t seed) {
     mt_buffer_[0] = seed;
     mt_index_ = MT_LEN;
@@ -125,8 +114,8 @@ class MTRandom {
       /* In the previous versions, MSBs of the seed affect   */
       /* only MSBs of the array mt[].                        */
       /* 2002/01/09 modified by Makoto Matsumoto             */
-      mt_buffer_[i] = 
-	(1812433253UL * (mt_buffer_[i-1] ^ (mt_buffer_[i-1] >> 30)) + i);
+      mt_buffer_[i] =
+          (1812433253UL * (mt_buffer_[i - 1] ^ (mt_buffer_[i - 1] >> 30)) + i);
     }
   }
 
@@ -141,9 +130,7 @@ const uint32_t MTRandom::MATRIX_A = 0x9908B0DF;
 
 class MTRandom8 {
 public:
-  MTRandom8(MTRandom *rand)
-    : rand_(rand) {
-  }
+  MTRandom8(MTRandom *rand) : rand_(rand) {}
 
   uint8_t Rand8() {
     uint32_t r = rand_->Rand32();

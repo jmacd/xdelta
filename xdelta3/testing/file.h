@@ -19,27 +19,22 @@ class TmpFile;
 
 class Block {
 public:
-  Block()
-    : data_(NULL),
-      data_size_(0),
-      size_(0) { }
+  Block() : data_(NULL), data_size_(0), size_(0) {}
 
   ~Block() {
     if (data_) {
-      delete [] data_;
+      delete[] data_;
     }
   }
 
-  size_t Size() const {
-    return size_;
-  }
+  size_t Size() const { return size_; }
 
   uint8_t operator[](size_t i) const {
     CHECK_LT(i, size_);
     return data_[i];
   }
 
-  uint8_t* Data() const {
+  uint8_t *Data() const {
     if (data_ == NULL) {
       CHECK_EQ(0, size_);
       data_size_ = 1;
@@ -60,11 +55,11 @@ public:
     if (size_ + size > data_size_) {
       uint8_t *tmp = data_;
       while (size_ + size > data_size_) {
-	data_size_ *= 2;
+        data_size_ *= 2;
       }
       data_ = new uint8_t[data_size_];
       memcpy(data_, tmp, size_);
-      delete [] tmp;
+      delete[] tmp;
     }
 
     memcpy(data_ + size_, data, size);
@@ -72,9 +67,7 @@ public:
   }
 
   // For cleaing a block
-  void Reset() {
-    size_ = 0;
-  }
+  void Reset() { size_ = 0; }
 
   // Note: This does not benefit from -Wformat= checking, due to the
   // enclosing template. Further, it was not used.
@@ -93,15 +86,13 @@ public:
   //   DP(RINT "\n");
   // }
 
-  void WriteTmpFile(TmpFile *f) const {
-    f->Append(this);
-  }
+  void WriteTmpFile(TmpFile *f) const { f->Append(this); }
 
   void SetSize(size_t size) {
     uint8_t *t = NULL;
     if (data_size_ < size) {
       if (data_) {
-	t = data_;
+        t = data_;
       }
       data_ = new uint8_t[size];
       data_size_ = size;
@@ -109,7 +100,7 @@ public:
     if (t && size < size_) {
       memcpy(data_, t, size);
     }
-    delete [] t;
+    delete[] t;
     size_ = size;
   }
 
@@ -122,16 +113,14 @@ private:
 };
 
 class FileSpec {
- public:
-  FileSpec(MTRandom *rand)
-    : rand_(rand) {
-  }
+public:
+  FileSpec(MTRandom *rand) : rand_(rand) {}
 
   // Generates a file with a known size
   void GenerateFixedSize(xoff_t size) {
     Reset();
 
-    for (xoff_t p = 0; p < size; ) {
+    for (xoff_t p = 0; p < size;) {
       xoff_t t = min(Constants::BLOCK_SIZE, size - p);
       table_.insert(make_pair(p, Segment(t, rand_)));
       p += t;
@@ -161,40 +150,33 @@ class FileSpec {
   }
 
   // Returns the number of segments
-  xoff_t Segments() const {
-    return table_.size();
-  }
+  xoff_t Segments() const { return table_.size(); }
 
   // Create a mutation according to "what".
-  void ModifyTo(const Mutator &mutator,
-		FileSpec *modify) const {
+  void ModifyTo(const Mutator &mutator, FileSpec *modify) const {
     modify->Reset();
     mutator.Mutate(&modify->table_, &table_, rand_);
     modify->CheckSegments();
   }
 
   void CheckSegments() const {
-    for (ConstSegmentMapIterator iter(table_.begin());
-	 iter != table_.end(); ) {
+    for (ConstSegmentMapIterator iter(table_.begin()); iter != table_.end();) {
       ConstSegmentMapIterator iter0(iter++);
       if (iter == table_.end()) {
-	break;
+        break;
       }
       CHECK_EQ(iter0->first + iter0->second.Size(), iter->first);
     }
   }
 
-  void Reset() {
-    table_.clear();
-  }
+  void Reset() { table_.clear(); }
 
   void Print() const {
-    for (ConstSegmentMapIterator iter(table_.begin());
-	 iter != table_.end();
-	 ++iter) {
+    for (ConstSegmentMapIterator iter(table_.begin()); iter != table_.end();
+         ++iter) {
       const Segment &seg = iter->second;
-      cerr << "Segment at " << iter->first
-	   << " (" << seg.ToString() << ")" << endl;
+      cerr << "Segment at " << iter->first << " (" << seg.ToString() << ")"
+           << endl;
     }
   }
 
@@ -235,8 +217,7 @@ class FileSpec {
       // and then the position of the data may be offset from the seeding
       // position.
       size_t seg_offset = offset - pos->first;
-      size_t advance = min(seg.Size() - seg_offset,
-			   size - got);
+      size_t advance = min(seg.Size() - seg_offset, size - got);
 
       seg.Fill(seg_offset, advance, block->Data() + got);
 
@@ -248,7 +229,7 @@ class FileSpec {
 
   typedef BlockIterator iterator;
 
- private:
+private:
   friend class BlockIterator;
 
   MTRandom *rand_;
@@ -257,36 +238,21 @@ class FileSpec {
 
 class BlockIterator {
 public:
-  explicit BlockIterator(const FileSpec& spec)
-    : spec_(spec),
-      blkno_(0),
-      blksize_(Constants::BLOCK_SIZE) { }
+  explicit BlockIterator(const FileSpec &spec)
+      : spec_(spec), blkno_(0), blksize_(Constants::BLOCK_SIZE) {}
 
-  BlockIterator(const FileSpec& spec,
-		size_t blksize)
-    : spec_(spec),
-      blkno_(0),
-      blksize_(blksize) { }
+  BlockIterator(const FileSpec &spec, size_t blksize)
+      : spec_(spec), blkno_(0), blksize_(blksize) {}
 
-  bool Done() const {
-    return blkno_ >= spec_.Blocks(blksize_);
-  }
+  bool Done() const { return blkno_ >= spec_.Blocks(blksize_); }
 
-  void Next() {
-    blkno_++;
-  }
+  void Next() { blkno_++; }
 
-  xoff_t Blkno() const {
-    return blkno_;
-  }
+  xoff_t Blkno() const { return blkno_; }
 
-  xoff_t Blocks() const {
-    return spec_.Blocks(blksize_);
-  }
+  xoff_t Blocks() const { return spec_.Blocks(blksize_); }
 
-  xoff_t Offset() const {
-    return blkno_ * blksize_;
-  }
+  xoff_t Offset() const { return blkno_ * blksize_; }
 
   void SetBlock(xoff_t blkno) {
     CHECK_LE(blkno, Blocks());
@@ -301,8 +267,7 @@ public:
     xoff_t blocks = spec_.Blocks(blksize_);
     xoff_t size = spec_.Size();
 
-    DCHECK((blkno_ < blocks) ||
-	   (blkno_ == blocks && size % blksize_ == 0));
+    DCHECK((blkno_ < blocks) || (blkno_ == blocks && size % blksize_ == 0));
 
     if (blkno_ == blocks) {
       return 0;
@@ -313,12 +278,10 @@ public:
     return blksize_;
   }
 
-  size_t BlockSize() const {
-    return blksize_;
-  }
+  size_t BlockSize() const { return blksize_; }
 
 private:
-  const FileSpec& spec_;
+  const FileSpec &spec_;
   xoff_t blkno_;
   size_t blksize_;
 };
@@ -335,13 +298,9 @@ public:
     unlink(filename_.c_str());
   }
 
-  ~ExtFile() {
-    unlink(filename_.c_str());
-  }
+  ~ExtFile() { unlink(filename_.c_str()); }
 
-  const char* Name() const {
-    return filename_.c_str();
-  }
+  const char *Name() const { return filename_.c_str(); }
 
   // Check whether a real file matches a file spec.
   bool EqualsSpec(const FileSpec &spec) const {
@@ -355,9 +314,8 @@ public:
       iter.Get(&sblock);
       tblock.SetSize(sblock.Size());
       size_t tread;
-      CHECK_EQ(0, main_file_read(&t,
-				 tblock.Data(),
-				 tblock.Size(), &tread, "read failed"));
+      CHECK_EQ(0, main_file_read(&t, tblock.Data(), tblock.Size(), &tread,
+                                 "read failed"));
       CHECK_EQ(0, CmpDifferentBlockBytes(tblock, sblock));
     }
 
@@ -377,17 +335,14 @@ public:
     CHECK_EQ(0, main_file_open(&file_, Name(), XO_WRITE));
   }
 
-  ~TmpFile() {
-    main_file_cleanup(&file_);
-  }
+  ~TmpFile() { main_file_cleanup(&file_); }
 
   void Append(const Block *block) {
-    CHECK_EQ(0, main_file_write(&file_,
-				block->Data(), block->Size(),
-				"tmpfile write failed"));
+    CHECK_EQ(0, main_file_write(&file_, block->Data(), block->Size(),
+                                "tmpfile write failed"));
   }
 
-  const char* Name() const {
+  const char *Name() const {
     if (main_file_isopen(&file_)) {
       CHECK_EQ(0, main_file_close(&file_));
     }

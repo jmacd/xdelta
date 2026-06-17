@@ -7,6 +7,21 @@ on:
   workflow_dispatch:
 
 jobs:
+  clang-format:
+    name: clang-format check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format-20
+
+      - name: Check formatting
+        run: CLANG_FORMAT=clang-format-20 ./format.sh --check
+
   cmake:
     name: ${{ matrix.os }} / lzma=${{ matrix.lzma }}
     runs-on: ${{ matrix.os }}

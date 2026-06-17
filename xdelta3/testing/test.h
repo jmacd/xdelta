@@ -23,29 +23,33 @@ extern "C" {
 #include <math.h>
 #include <string>
 
-#define CHECK_EQ(x,y) CHECK_OP(x,y,==)
-#define CHECK_NE(x,y) CHECK_OP(x,y,!=)
-#define CHECK_LT(x,y) CHECK_OP(x,y,<)
-#define CHECK_GT(x,y) CHECK_OP(x,y,>)
-#define CHECK_LE(x,y) CHECK_OP(x,y,<=)
-#define CHECK_GE(x,y) CHECK_OP(x,y,>=)
+#define CHECK_EQ(x, y) CHECK_OP(x, y, ==)
+#define CHECK_NE(x, y) CHECK_OP(x, y, !=)
+#define CHECK_LT(x, y) CHECK_OP(x, y, <)
+#define CHECK_GT(x, y) CHECK_OP(x, y, >)
+#define CHECK_LE(x, y) CHECK_OP(x, y, <=)
+#define CHECK_GE(x, y) CHECK_OP(x, y, >=)
 
-#define CHECK_OP(x,y,OP) \
-  do { \
-    __typeof__(x) _x(x); \
-    __typeof__(x) _y(y); \
-    if (!(_x OP _y)) { \
-      cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x " " #OP " " #y << endl; \
-      cerr << __FILE__ << ":" << __LINE__ << " {0} " << _x << endl; \
-      cerr << __FILE__ << ":" << __LINE__ << " {1} " << _y << endl; \
-    abort(); \
-    } } while (false)
+#define CHECK_OP(x, y, OP)                                                     \
+  do {                                                                         \
+    __typeof__(x) _x(x);                                                       \
+    __typeof__(x) _y(y);                                                       \
+    if (!(_x OP _y)) {                                                         \
+      cerr << __FILE__ << ":" << __LINE__                                      \
+           << " Check failed: " << #x " " #OP " " #y << endl;                  \
+      cerr << __FILE__ << ":" << __LINE__ << " {0} " << _x << endl;            \
+      cerr << __FILE__ << ":" << __LINE__ << " {1} " << _y << endl;            \
+      abort();                                                                 \
+    }                                                                          \
+  } while (false)
 #undef CHECK
-#define CHECK(x) \
-  do {if (!(x)) {				       \
-  cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x << endl; \
-  abort(); \
-    } } while (false)
+#define CHECK(x)                                                               \
+  do {                                                                         \
+    if (!(x)) {                                                                \
+      cerr << __FILE__ << ":" << __LINE__ << " Check failed: " << #x << endl;  \
+      abort();                                                                 \
+    }                                                                          \
+  } while (false)
 
 #define DCHECK(x)
 
@@ -54,7 +58,7 @@ using std::string;
 #include <vector>
 using std::vector;
 
-inline string CommandToString(const vector<const char*> &v) {
+inline string CommandToString(const vector<const char *> &v) {
   string s(v[0]);
   for (size_t i = 1; i < v.size() && v[i] != NULL; i++) {
     s.append(" ");
@@ -68,17 +72,16 @@ using std::cerr;
 using std::endl;
 using std::ostream;
 
-#include <map> 
+#include <map>
 using std::map;
 using std::pair;
 
 #include <list>
 using std::list;
 
-template <typename T, typename U>
-pair<T, U> make_pair(const T& t, const U& u) {
+template <typename T, typename U> pair<T, U> make_pair(const T &t, const U &u) {
   return pair<T, U>(t, u);
 }
 
-using std::min;
 using std::max;
+using std::min;
