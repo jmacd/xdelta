@@ -2647,6 +2647,18 @@ static int test_armor(xd3_stream *stream, int ignore) {
     return ret;
   }
 
+  /* -a must still strip the digest from app-header default filenames: decode
+   * with -a and no -s relies on the embedded source name, which must resolve
+   * to the real file ("source") and not "source#<hash>". */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -a -d %s %s", program_name,
+                TEST_DELTA_FILE, TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
   /* -a encode produces a legacy app-header with no digest. */
   snprintf_func(buf, TESTBUFSIZE, "%s -q -f -a -e -s %s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);

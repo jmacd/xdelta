@@ -2987,10 +2987,11 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
     parsed[place++] = start;
 
 #if XD3_ARMOR
-    /* Strip armored "name#<64hex>" digests from the name fields and remember
-     * them for verification.  Done before the params are consumed so default
-     * filenames do not include the digest. */
-    if (!option_no_armor) {
+    /* Strip armored "name#<64hex>" digests from the name fields so default
+     * filenames never include the digest.  This is done even under -a
+     * (option_no_armor): -a means "do not verify", not "treat the delta as
+     * legacy".  Only record the digests for verification when armor is on. */
+    {
       const char *th = NULL;
       const char *sh = NULL;
       if (place == 2 || place == 4) {
@@ -2999,13 +3000,15 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
       if (place == 4) {
         sh = main_armor_split(parsed[2]);
       }
-      if (th != NULL) {
-        strcpy(armor_expect_target, th);
-        armor_have_target = 1;
-      }
-      if (sh != NULL) {
-        strcpy(armor_expect_source, sh);
-        armor_have_source = 1;
+      if (!option_no_armor) {
+        if (th != NULL) {
+          strcpy(armor_expect_target, th);
+          armor_have_target = 1;
+        }
+        if (sh != NULL) {
+          strcpy(armor_expect_source, sh);
+          armor_have_source = 1;
+        }
       }
     }
 #endif
