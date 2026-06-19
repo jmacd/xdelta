@@ -2145,13 +2145,13 @@ static int test_externally_compressed_io(xd3_stream *stream, int ignore) {
       continue;
     }
 
-    if ((ret = test_compressed_pipe(stream, ext, buf, "-cfq", "-dcfq", 1,
+    if ((ret = test_compressed_pipe(stream, ext, buf, "-cfqa", "-dcfqa", 1,
                                     "compression failed: identity pipe")) ||
         (ret = test_compressed_pipe(
-             stream, ext, buf, "-cfq", "-Rdcfq", 0,
+             stream, ext, buf, "-cfqa", "-Rdcfqa", 0,
              "compression failed: without recompression")) ||
         (ret = test_compressed_pipe(
-             stream, ext, buf, "-Dcfq", "-Rdcfq", 1,
+             stream, ext, buf, "-Dcfqa", "-Rdcfqa", 1,
              "compression failed: without decompression"))) {
       return ret;
     }
@@ -2211,7 +2211,7 @@ static int test_source_decompression(xd3_stream *stream, int ignore) {
 
   /* Now the two identical files are compressed.  Delta-encode the target,
    * with decompression. */
-  snprintf_func(buf, TESTBUFSIZE, "%s -e -vfq -s%s %s %s", program_name,
+  snprintf_func(buf, TESTBUFSIZE, "%s -a -e -vfq -s%s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd(stream, buf))) {
     return ret;
@@ -2231,7 +2231,7 @@ static int test_source_decompression(xd3_stream *stream, int ignore) {
 
   /* Decode the delta file with recompression disabled, should get an
    * uncompressed file out. */
-  snprintf_func(buf, TESTBUFSIZE, "%s -v -dq -R -s%s %s %s", program_name,
+  snprintf_func(buf, TESTBUFSIZE, "%s -a -v -dq -R -s%s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd(stream, buf))) {
     return ret;
@@ -2242,7 +2242,7 @@ static int test_source_decompression(xd3_stream *stream, int ignore) {
 
   /* Decode the delta file with recompression, should get a compressed file
    * out.  But we can't compare compressed files directly. */
-  snprintf_func(buf, TESTBUFSIZE, "%s -v -dqf -s%s %s %s", program_name,
+  snprintf_func(buf, TESTBUFSIZE, "%s -a -v -dqf -s%s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd(stream, buf))) {
     return ret;
@@ -2257,7 +2257,7 @@ static int test_source_decompression(xd3_stream *stream, int ignore) {
   }
 
   /* Encode with decompression disabled */
-  snprintf_func(buf, TESTBUFSIZE, "%s -e -D -vfq -s%s %s %s", program_name,
+  snprintf_func(buf, TESTBUFSIZE, "%s -a -e -D -vfq -s%s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
   if ((ret = do_cmd(stream, buf))) {
     return ret;
@@ -2265,7 +2265,7 @@ static int test_source_decompression(xd3_stream *stream, int ignore) {
 
   /* Decode the delta file with decompression disabled, should get the
    * identical compressed file out. */
-  snprintf_func(buf, TESTBUFSIZE, "%s -d -D -vfq -s%s %s %s", program_name,
+  snprintf_func(buf, TESTBUFSIZE, "%s -a -d -D -vfq -s%s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd(stream, buf))) {
     return ret;
@@ -2494,10 +2494,296 @@ static int test_appheader(xd3_stream *stream, int ignore) {
   return 0;
 }
 
+#if XD3_ARMOR
+/* BLAKE3 known-answer test against the official test vectors (default 32-byte
+ * output).  The input is the repeating byte sequence 0,1,...,250,0,1,...  This
+ * pins the digest values independently of xdelta3's own encode/decode. */
+static int test_armor_blake3_kat(xd3_stream *stream, int ignore) {
+  static const struct {
+    usize_t len;
+    const char *hex;
+  } kats[] = {
+      {0, "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"},
+      {1, "2d3adedff11b61f14c886e35afa036736dcd87a74d27b5c1510225d0f592e213"},
+      {1024,
+       "42214739f095a406f3fc83deb889744ac00df831c10daa55189b5d121c855af7"},
+      {2048,
+       "e776b6028c7cd22a4d0ba182a8bf62205d2ef576467e838ed6f2529b85fba24a"},
+      {3072,
+       "b98cb0ff3623be03326b373de6b9095218513e64f1ee2edd2525c7ad1e5cffd2"},
+  };
+  const usize_t inlen = 3072;
+  uint8_t *inbuf;
+  usize_t i;
+  usize_t k;
+
+  if ((inbuf = (uint8_t *)main_malloc(inlen)) == NULL) {
+    return ENOMEM;
+  }
+  for (i = 0; i < inlen; i += 1) {
+    inbuf[i] = (uint8_t)(i % 251);
+  }
+
+  for (k = 0; k < SIZEOF_ARRAY(kats); k += 1) {
+    blake3_hasher h;
+    uint8_t digest[BLAKE3_OUT_LEN];
+    char got[XD3_BLAKE3_HEXBUF];
+
+    blake3_hasher_init(&h);
+    blake3_hasher_update(&h, inbuf, kats[k].len);
+    blake3_hasher_finalize(&h, digest, sizeof(digest));
+    main_armor_hex(digest, got);
+
+    if (strcmp(got, kats[k].hex) != 0) {
+      XPR(NT "BLAKE3 KAT mismatch at len %u:\n  expected %s\n  actual   %s\n",
+          (unsigned)kats[k].len, kats[k].hex, got);
+      stream->msg = "BLAKE3 known-answer test failed";
+      main_free(inbuf);
+      return XD3_INTERNAL;
+    }
+  }
+
+  main_free(inbuf);
+  return 0;
+}
+
+/* Tests armor mode (BLAKE3 whole-file verification): armored round-trip,
+ * fast failure on a wrong source, the -a opt-out / legacy header, and
+ * armored merge-chain verification including a broken chain. */
+static int test_armor(xd3_stream *stream, int ignore) {
+  int ret;
+  char buf[TESTBUFSIZE];
+  char d1[TESTFILESIZE];
+  char d2[TESTFILESIZE];
+  char v3[TESTFILESIZE];
+  char merged[TESTFILESIZE];
+  char wrong[TESTFILESIZE];
+  char warnf[TESTFILESIZE];
+  xoff_t ssize, tsize;
+
+  test_setup();
+  if ((ret = test_make_inputs(stream, &ssize, &tsize))) {
+    return ret;
+  }
+
+  /* Armored encode (default) of SOURCE -> TARGET. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -e -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+
+  /* The armored delta carries '#' digests in its app-header. */
+  snprintf_func(buf, TESTBUFSIZE,
+                "%s printhdr %s | grep -i 'application header' | grep -q '#'",
+                program_name, TEST_DELTA_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "armor: expected digest in app-header";
+    return ret;
+  }
+
+  /* Decode with the correct source verifies and round-trips. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  /* Decode with an unrelated source must fail the armor pre-check (exit 1). */
+  snprintf_func(wrong, sizeof(wrong), "%s.wrong", TEST_DELTA_FILE);
+  snprintf_func(buf, TESTBUFSIZE, "cat %s %s > %s", TEST_SOURCE_FILE,
+                TEST_TARGET_FILE, wrong);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
+                wrong, TEST_DELTA_FILE, TEST_RECON_FILE);
+  if ((ret = do_fail(stream, buf))) {
+    return ret;
+  }
+
+  /* Decode with the already-patched source (the target itself) reports
+   * "up to date" with the distinct exit code, not a generic failure. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
+                TEST_TARGET_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  {
+    int st = system(buf);
+    if (!WIFEXITED(st) || WEXITSTATUS(st) != EXIT_ARMOR_UP_TO_DATE) {
+      stream->msg = "armor: expected up-to-date exit code";
+      return XD3_INTERNAL;
+    }
+  }
+
+  /* A streaming (non-seekable) source cannot be verified: armor warns but the
+   * apply still succeeds.  Capture stderr and assert the warning is present. */
+  snprintf_func(warnf, sizeof(warnf), "%s.warn", TEST_DELTA_FILE);
+  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -d -s /dev/stdin %s %s 2>%s",
+                TEST_SOURCE_FILE, program_name, TEST_DELTA_FILE,
+                TEST_RECON_FILE, warnf);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "grep -q 'source is not seekable' %s", warnf);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "armor: expected streaming-source warning";
+    return ret;
+  }
+  test_unlink(warnf);
+  test_unlink(wrong);
+
+  /* -a decode skips armor; with the correct source it still round-trips. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -a -d -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  /* -a encode produces a legacy app-header with no digest. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -a -e -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE,
+                "%s printhdr %s | grep -i 'application header' | grep -q '#'",
+                program_name, TEST_DELTA_FILE);
+  if ((ret = do_fail(stream, buf))) { /* grep finds no '#' -> exit 1 */
+    return ret;
+  }
+
+  /* Armored merge chain: SOURCE(v1) -> TARGET(v2) -> v3. */
+  snprintf_func(d1, sizeof(d1), "%s.d1", TEST_DELTA_FILE);
+  snprintf_func(d2, sizeof(d2), "%s.d2", TEST_DELTA_FILE);
+  snprintf_func(v3, sizeof(v3), "%s.v3", TEST_DELTA_FILE);
+  snprintf_func(merged, sizeof(merged), "%s.merged", TEST_DELTA_FILE);
+
+  snprintf_func(buf, TESTBUFSIZE, "cp %s %s && echo armor-extra-data >> %s",
+                TEST_TARGET_FILE, v3, v3);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -e -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_TARGET_FILE, d1);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -e -s %s %s %s", program_name,
+                TEST_TARGET_FILE, v3, d2);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -f merge -m %s %s %s", program_name, d1,
+                d2, merged);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, merged, TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(v3, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  /* A broken chain (replace d2 with v3 -> v1) must be refused. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -e -s %s %s %s", program_name, v3,
+                TEST_SOURCE_FILE, d2);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -f merge -m %s %s %s", program_name, d1,
+                d2, merged);
+  if ((ret = do_fail(stream, buf))) {
+    return ret;
+  }
+
+  test_unlink(d1);
+  test_unlink(d2);
+  test_unlink(v3);
+  test_unlink(merged);
+
+#if EXTERNAL_COMPRESSION
+  /* Armor verifies the logical (decompressed) content, so it works across
+   * external compression: encode/decode gzip'd inputs and round-trip. */
+  if (main_get_compressor("G") != NULL) {
+    char sgz[TESTFILESIZE];
+    char tgz[TESTFILESIZE];
+    snprintf_func(sgz, sizeof(sgz), "%s.sgz", TEST_DELTA_FILE);
+    snprintf_func(tgz, sizeof(tgz), "%s.tgz", TEST_DELTA_FILE);
+
+    snprintf_func(buf, TESTBUFSIZE, "gzip -1 < %s > %s && gzip -9 < %s > %s",
+                  TEST_SOURCE_FILE, sgz, TEST_TARGET_FILE, tgz);
+    if ((ret = do_cmd(stream, buf))) {
+      return ret;
+    }
+    /* Armored encode auto-decompresses both inputs. */
+    snprintf_func(buf, TESTBUFSIZE, "%s -q -f -e -s %s %s %s", program_name,
+                  sgz, tgz, TEST_DELTA_FILE);
+    if ((ret = do_cmd(stream, buf))) {
+      return ret;
+    }
+    /* Decode with -R (no recompression) yields the logical target content,
+     * which armor also verifies on the fly. */
+    snprintf_func(buf, TESTBUFSIZE, "%s -q -f -R -d -s %s %s %s", program_name,
+                  sgz, TEST_DELTA_FILE, TEST_RECON_FILE);
+    if ((ret = do_cmd(stream, buf))) {
+      return ret;
+    }
+    if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+      return ret;
+    }
+    /* Applying with the already-patched (target) gzip source reports
+     * up-to-date -- the up-to-date detection works across external
+     * compression too. */
+    snprintf_func(buf, TESTBUFSIZE, "%s -q -f -R -d -s %s %s %s", program_name,
+                  tgz, TEST_DELTA_FILE, TEST_RECON_FILE);
+    {
+      int st = system(buf);
+      if (!WIFEXITED(st) || WEXITSTATUS(st) != EXIT_ARMOR_UP_TO_DATE) {
+        stream->msg = "armor: expected up-to-date exit code (gzip)";
+        return XD3_INTERNAL;
+      }
+    }
+
+    test_unlink(sgz);
+    test_unlink(tgz);
+  }
+#endif
+
+  /* Armored encode requires seekable inputs: a streaming (non-seekable) target
+   * or source is rejected.  Both forms feed the streaming input via a pipe (a
+   * "< file" redirect would still be a seekable regular file). */
+  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -e -s %s > %s",
+                TEST_TARGET_FILE, program_name, TEST_SOURCE_FILE,
+                TEST_DELTA_FILE);
+  if ((ret = do_fail(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -e -s /dev/stdin %s %s",
+                TEST_SOURCE_FILE, program_name, TEST_TARGET_FILE,
+                TEST_DELTA_FILE);
+  if ((ret = do_fail(stream, buf))) {
+    return ret;
+  }
+
+  test_cleanup();
+  return 0;
+}
+#endif /* XD3_ARMOR */
+
 /***********************************************************************
  Source identical optimization
  ***********************************************************************/
-
 /* Computing a delta should be fastest when the two inputs are
  * identical, this checks it.  The library is called to compute a
  * delta between a 10000 byte file, 1000 byte winsize, 500 byte source
@@ -2990,12 +3276,19 @@ int xd3_selftest(void) {
   IF_FGK(DO_TEST(decompress_single_bit_error, XD3_SEC_FGK, 3));
   IF_DJW(DO_TEST(decompress_single_bit_error, XD3_SEC_DJW, 8));
 
+#if XD3_ARMOR
+  DO_TEST(armor_blake3_kat, 0, 0);
+#endif
+
 #if SHELL_TESTS
   DO_TEST(force_behavior, 0, 0);
   DO_TEST(stdout_behavior, 0, 0);
   DO_TEST(no_output, 0, 0);
   DO_TEST(appheader, 0, 0);
   DO_TEST(command_line_arguments, 0, 0);
+#if XD3_ARMOR
+  DO_TEST(armor, 0, 0);
+#endif
 
 #if EXTERNAL_COMPRESSION
   DO_TEST(source_decompression, 0, 0);

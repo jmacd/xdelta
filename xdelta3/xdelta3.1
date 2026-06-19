@@ -107,6 +107,30 @@ disable external recompression (decode)
 .BI \-n
 disable checksum (encode/decode)
 .TP
+.BI \-a
+disable armor.
+Armor mode (whole-file BLAKE3 verification) is on by default. When enabled,
+.B xdelta3
+embeds BLAKE3 digests of the source and target into the application header
+using the
+.I name#blake3
+syntax. On encode this requires a seekable source and target; on decode the
+source is verified before applying and the reconstructed target is verified
+afterward. If the source is a stream (not seekable) it cannot be verified, so
+.B xdelta3
+prints a warning and proceeds. If the supplied source already matches the
+delta's target digest -- i.e. the patch is already applied -- decode reports
+"already up to date" and exits with status 2.
+.B \-a
+disables this and restores the legacy application-header format and the
+non-seekable streaming behavior. The
+.B merge
+command verifies an armored chain of deltas when every input is armored.
+Armor verifies the logical (decompressed) content that
+.B xdelta3
+processes, so it composes correctly with external input decompression and
+output recompression.
+.TP
 .BI \-C 
 soft config (encode, undocumented)
 .TP
@@ -118,6 +142,18 @@ disable output (check/compute only)
 .TP
 .BI \-T
 use alternate code table (test)
+
+.SH "EXIT STATUS"
+.TP
+.B 0
+success.
+.TP
+.B 2
+the decoded armored delta's source already matches its target digest; the
+patch is already applied and nothing was done.
+.TP
+.B 1
+any other error.
 
 .SH NOTES
 The 

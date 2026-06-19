@@ -22,6 +22,14 @@ set_property(CACHE XD3_LZMA_MODE PROPERTY STRINGS auto on off)
 
 option(XD3_WERROR "Treat compiler warnings as errors for the core targets" OFF)
 
+# Armor mode: whole-file BLAKE3 verification carried in the VCDIFF app-header.
+# When ON, the official BLAKE3 C library is fetched (pinned tag) and linked into
+# the xdelta3 command-line tool.  When OFF, armor is compiled out and the tool
+# behaves as if -a (disable armor) were always given.
+option(XD3_ARMOR "Enable armor mode (BLAKE3 whole-file verification)" ON)
+set(XD3_BLAKE3_TAG "1.8.5" CACHE STRING
+  "BLAKE3 release tag to fetch for armor mode")
+
 include(CheckTypeSize)
 include(CheckIncludeFile)
 include(CheckCSourceRuns)
@@ -142,6 +150,27 @@ function(xd3_configure_target target)
 endfunction()
 
 # ---------------------------------------------------------------------------
+# BLAKE3 (armor mode).  Fetched from the official repository, pinned to a
+# release tag so upstream security fixes are taken by bumping XD3_BLAKE3_TAG.
+# The C library lives in the repo's c/ subdirectory and exports the `blake3`
+# target.
+# ---------------------------------------------------------------------------
+set(XD3_ARMOR_LIBRARIES "")
+if(XD3_ARMOR)
+  include(FetchContent)
+  FetchContent_Declare(blake3
+    GIT_REPOSITORY https://github.com/BLAKE3-team/BLAKE3.git
+    GIT_TAG ${XD3_BLAKE3_TAG}
+    GIT_SHALLOW TRUE
+    SOURCE_SUBDIR c)
+  FetchContent_MakeAvailable(blake3)
+  set(XD3_ARMOR_LIBRARIES blake3)
+  message(STATUS "xdelta3: armor mode enabled (BLAKE3 ${XD3_BLAKE3_TAG})")
+else()
+  message(STATUS "xdelta3: armor mode disabled")
+endif()
+
+# ---------------------------------------------------------------------------
 # xdelta3 - the command-line tool / library driver
 # ---------------------------------------------------------------------------
 add_executable(xdelta3 xdelta3.c)
@@ -151,6 +180,10 @@ target_compile_definitions(xdelta3 PRIVATE
   ${XD3_PLATFORM_DEFS})
 target_compile_options(xdelta3 PRIVATE ${XD3_WERROR_FLAGS})
 target_link_libraries(xdelta3 PRIVATE ${XD3_LZMA_LIBRARIES})
+if(XD3_ARMOR)
+  target_compile_definitions(xdelta3 PRIVATE XD3_ARMOR=1)
+  target_link_libraries(xdelta3 PRIVATE ${XD3_ARMOR_LIBRARIES})
+endif()
 
 # ---------------------------------------------------------------------------
 # xdelta3decode - minimal decode-only build (no encoder, no secondary comp.)
