@@ -40,6 +40,38 @@ liblzma is autodetected.  Force it on or off with `-DXD3_LZMA_MODE=on`
 or `-DXD3_LZMA_MODE=off`.  On Homebrew systems, point CMake at the
 prefix with `-DCMAKE_PREFIX_PATH="$(brew --prefix)"`.
 
+Armor mode (whole-file verification)
+------------------------------------
+
+By default the `xdelta3` tool builds with armor mode, which embeds BLAKE3
+digests of the source and target files in the VCDIFF application header
+(using a `name#blake3` syntax) and verifies them:
+
+  * Encode reads the source and target in full to compute their digests and
+    therefore requires both to be seekable (regular) files.
+  * Decode verifies the source up front, before applying, and verifies the
+    reconstructed target afterward.  A wrong source fails fast with a clear
+    message instead of a late, ambiguous window-checksum error.
+  * If the supplied source already matches the delta's *target* digest (the
+    patch is already applied), decode reports "already up to date" and exits
+    with status 2.
+  * If the source is a stream (not seekable) it cannot be verified, so decode
+    prints a warning and proceeds.
+  * The digests cover the logical (decompressed) content xdelta3 processes,
+    not the raw on-disk bytes, so armor composes correctly with external
+    input decompression and output recompression.
+  * `merge` verifies an armored chain of deltas when every input is armored.
+
+Pass `-a` to disable armor: this restores the legacy application-header
+format and the non-seekable streaming behavior (e.g. for piped input).
+Legacy xdelta3 builds read the armored names as literal filenames, so they
+must apply such deltas with explicit `-s`/output filenames.
+
+BLAKE3 is fetched at configure time from its official repository, pinned to
+a release tag (`-DXD3_BLAKE3_TAG=...`).  Disable armor entirely at build time
+with `-DXD3_ARMOR=OFF`, which removes the BLAKE3 dependency and makes the
+tool behave as if `-a` were always given.
+
 Testing
 -------
 

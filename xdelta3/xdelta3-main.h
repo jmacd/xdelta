@@ -83,6 +83,26 @@ int xsnprintf_func(char *str, size_t n, const char *fmt, ...) {
 #define EXTERNAL_COMPRESSION 1
 #endif
 
+/* Armor mode: whole-file BLAKE3 verification carried in the app-header.  When
+ * compiled out (XD3_ARMOR=0) the -a/armor machinery is absent and the tool
+ * behaves as if armor were always disabled. */
+#ifndef XD3_ARMOR
+#define XD3_ARMOR 0
+#endif
+
+#if XD3_ARMOR
+#include <blake3.h>
+/* BLAKE3-256 rendered as lowercase hex, plus NUL. */
+#define XD3_BLAKE3_HEXLEN (2 * BLAKE3_OUT_LEN)
+#define XD3_BLAKE3_HEXBUF (XD3_BLAKE3_HEXLEN + 1)
+
+/* Distinct process exit code returned by decode when the supplied source
+ * already matches the delta's target digest, i.e. the patch is already
+ * applied / the source is already up to date.  Distinct from the generic
+ * failure code (1) so scripts can detect this case. */
+#define EXIT_ARMOR_UP_TO_DATE 2
+#endif
+
 #define PRINTHDR_SPECIAL -4378291
 
 /* The number of soft-config variables.  */
@@ -239,6 +259,15 @@ static int option_no_compress = 0;
 static int option_no_output = 0; /* do not write output */
 static const char *option_source_filename = NULL;
 
+/* Armor mode (BLAKE3 whole-file verification) is on by default; -a disables
+ * it.  When armor is compiled out (XD3_ARMOR=0) this is forced on so the rest
+ * of the code takes the no-armor path. */
+#if XD3_ARMOR
+static int option_no_armor = 0;
+#else
+static int option_no_armor = 1;
+#endif
+
 static int option_level = XD3_DEFAULT_LEVEL;
 static usize_t option_iopt_size = XD3_DEFAULT_IOPT_SIZE;
 static usize_t option_winsize = XD3_DEFAULT_WINSIZE;
@@ -280,6 +309,29 @@ static xd3_stream *recode_stream = NULL;
 /* merge_stream is used by merge commands for storing the source encoding */
 static xd3_stream *merge_stream = NULL;
 
+#if XD3_ARMOR
+/* Armor verification state for the current decode/apply operation.  The
+ * expected hashes are parsed from the armored app-header; the target hasher
+ * accumulates the reconstructed output for after-the-fact verification. */
+static char armor_expect_source[XD3_BLAKE3_HEXBUF];
+static char armor_expect_target[XD3_BLAKE3_HEXBUF];
+static int armor_have_source = 0;   /* expected source hash present */
+static int armor_have_target = 0;   /* expected target hash present */
+static int armor_target_active = 0; /* feed output to the target hasher */
+static blake3_hasher armor_target_hasher;
+
+/* Armor merge-chain verification state, accumulated as the chain of deltas is
+ * read in order (the -m arguments first, then the final input). */
+static int armor_merge_count = 0;
+static int armor_merge_all = 1;    /* every link seen so far is armored */
+static int armor_merge_broken = 0; /* a chain-link mismatch was detected */
+static int armor_merge_have_first_source = 0;
+static char armor_merge_first_source[XD3_BLAKE3_HEXBUF];
+static int armor_merge_have_prev_target = 0;
+static char armor_merge_prev_target[XD3_BLAKE3_HEXBUF];
+static int armor_merge_have_last_target = 0;
+static char armor_merge_last_target[XD3_BLAKE3_HEXBUF];
+#endif
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] = {
@@ -406,6 +458,11 @@ static void reset_defaults(void) {
 
   option_use_appheader = 1;
   option_use_checksum = 1;
+#if XD3_ARMOR
+  option_no_armor = 0;
+#else
+  option_no_armor = 1;
+#endif
 #if EXTERNAL_COMPRESSION
   option_force2 = 0;
   option_decompress_inputs = 1;
@@ -1137,6 +1194,15 @@ static int main_write_output(xd3_stream *stream, main_file *ofile) {
   IF_DEBUG1(DP(RINT "[main] write(%s) %" W "u\n bytes", ofile->filename,
                stream->avail_out));
 
+#if XD3_ARMOR
+  /* Accumulate the reconstructed target for armor verification.  Done before
+   * the option_no_output early return so -J still verifies. */
+  if (armor_target_active && stream->avail_out > 0) {
+    blake3_hasher_update(&armor_target_hasher, stream->next_out,
+                         stream->avail_out);
+  }
+#endif
+
   if (option_no_output) {
     return 0;
   }
@@ -1767,6 +1833,34 @@ static int main_merge_output(xd3_stream *stream, main_file *ofile) {
     xd3_set_appheader(recode_stream, option_appheader,
                       (usize_t)strlen((char *)option_appheader));
   }
+#if XD3_ARMOR
+  /* Armored merge-chain verification and re-arming of the merged output. */
+  else if (option_use_appheader != 0 && !option_no_armor) {
+    if (armor_merge_broken) {
+      XPR(NT "armor: refusing to merge a broken armored chain; "
+             "use -a to disable armor\n");
+      return XD3_INVALID_INPUT;
+    }
+    if (armor_merge_count > 0 && armor_merge_all &&
+        armor_merge_have_first_source && armor_merge_have_last_target) {
+      /* Re-arm with the first link's source and the last link's target.  The
+       * merged delta has no associated filenames, so the name fields are just
+       * the digests. */
+      static uint8_t merged_appheader[2 * XD3_BLAKE3_HEXBUF + 8];
+      snprintf_func((char *)merged_appheader, sizeof(merged_appheader),
+                    "-#%s//-#%s/", armor_merge_last_target,
+                    armor_merge_first_source);
+      xd3_set_appheader(recode_stream, merged_appheader,
+                        (usize_t)strlen((char *)merged_appheader));
+      if (option_verbose) {
+        XPR(NT "armor: merged chain verified (%d links)\n", armor_merge_count);
+      }
+    } else if (armor_merge_count > 0 && !option_quiet) {
+      XPR(NT "armor: merged delta is not armored "
+             "(not all inputs carried digests)\n");
+    }
+  }
+#endif
 
   /* Enter the ENC_INPUT state and bypass the next_in == NULL test
    * and (leftover) input buffering logic. */
@@ -2444,6 +2538,254 @@ static const main_extcomp *main_get_compressor(const char *ident) {
  APPLICATION HEADER
  *******************************************************************/
 
+#if XD3_ARMOR
+/* Render a BLAKE3-256 digest as lowercase hex with a trailing NUL. */
+static void main_armor_hex(const uint8_t digest[BLAKE3_OUT_LEN],
+                           char out[XD3_BLAKE3_HEXBUF]) {
+  static const char hexdig[] = "0123456789abcdef";
+  int i;
+  for (i = 0; i < BLAKE3_OUT_LEN; i += 1) {
+    out[2 * i] = hexdig[(digest[i] >> 4) & 0xf];
+    out[2 * i + 1] = hexdig[digest[i] & 0xf];
+  }
+  out[XD3_BLAKE3_HEXLEN] = 0;
+}
+
+/* True iff s is exactly XD3_BLAKE3_HEXLEN lowercase hex digits then NUL. */
+static int main_armor_is_hex(const char *s) {
+  usize_t i;
+  for (i = 0; i < XD3_BLAKE3_HEXLEN; i += 1) {
+    char c = s[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+      return 0;
+    }
+  }
+  return s[XD3_BLAKE3_HEXLEN] == 0;
+}
+
+/* If the app-header name field is in armored "name#<64hex>" form, NUL-
+ * terminate the name at the last '#' and return a pointer to the hash;
+ * otherwise return NULL and leave name unchanged.  Filenames may contain
+ * '#', so the split is on the LAST '#' and the suffix must be valid hex. */
+static const char *main_armor_split(char *name) {
+  char *hash = strrchr(name, '#');
+  if (hash != NULL && main_armor_is_hex(hash + 1)) {
+    *hash = 0;
+    return hash + 1;
+  }
+  return NULL;
+}
+
+/* Compute the BLAKE3-256 over the *logical* bytes of a file, i.e. the bytes
+ * xdelta actually processes after any external decompression.  Hashing the
+ * logical (decompressed) content -- rather than the raw on-disk bytes -- makes
+ * armor independent of the exact compressed representation: decompression is
+ * deterministic, whereas recompression is not, so the decoder can reproduce
+ * this hash from the reconstructed content.  Armor requires a seekable
+ * (regular) file because the delta operation reads the same input a second
+ * time.  "type" names the input for messages.
+ *
+ * If "nonseekable" is non-NULL it receives 1 when the file is a stream
+ * (FIFO/pipe) that cannot be hashed, and the function returns 0 without a
+ * hash -- the caller decides whether to warn or fail.  If "nonseekable" is
+ * NULL, a non-seekable file is a hard error. */
+static int main_armor_hash_file(const char *filename, const char *type,
+                                char out_hex[XD3_BLAKE3_HEXBUF],
+                                int *nonseekable) {
+  main_file f;
+  blake3_hasher hasher;
+  uint8_t digest[BLAKE3_OUT_LEN];
+  uint8_t *buf = NULL;
+  xoff_t fsize = 0;
+  size_t bufsz = XD3_ALLOCSIZE;
+  int ret = 0;
+  int read_ret = 0;
+#if EXTERNAL_COMPRESSION
+  int subprocs_before = num_subprocs;
+  int saved_quiet = option_quiet;
+#endif
+
+  if (nonseekable != NULL) {
+    *nonseekable = 0;
+  }
+
+  main_file_init(&f);
+  /* RD_FIRST (and *not* RD_NONEXTERNAL) so the same external-decompression
+   * detection used by the real read applies here. */
+  f.flags = RD_FIRST;
+
+  if ((ret = main_file_open(&f, filename, XO_READ))) {
+    main_file_cleanup(&f);
+    return ret;
+  }
+
+  if (main_file_stat(&f, &fsize) != 0) {
+    main_file_close(&f);
+    main_file_cleanup(&f);
+    if (nonseekable != NULL) {
+      *nonseekable = 1;
+      return 0;
+    }
+    XPR(NT "armor requires a seekable %s: %s\n", type, filename);
+    return XD3_INVALID_INPUT;
+  }
+
+  if ((buf = (uint8_t *)main_malloc(bufsz)) == NULL) {
+    main_file_close(&f);
+    main_file_cleanup(&f);
+    return ENOMEM;
+  }
+
+  blake3_hasher_init(&hasher);
+
+#if EXTERNAL_COMPRESSION
+  /* Suppress the duplicate "externally compressed input" notice; the real
+   * read of this input prints it. */
+  option_quiet = 1;
+#endif
+
+  for (;;) {
+    size_t nread = 0;
+    if ((read_ret = main_read_primary_input(&f, buf, bufsz, &nread))) {
+      break;
+    }
+    if (nread == 0) {
+      break;
+    }
+    blake3_hasher_update(&hasher, buf, nread);
+  }
+
+#if EXTERNAL_COMPRESSION
+  option_quiet = saved_quiet;
+#endif
+
+  main_free(buf);
+  main_file_close(&f);
+  main_file_cleanup(&f);
+
+#if EXTERNAL_COMPRESSION
+  /* Reap any decompression subprocesses forked by this pass so they do not
+   * accumulate against MAX_SUBPROCS during the real operation. */
+  while (num_subprocs > subprocs_before) {
+    num_subprocs -= 1;
+    if (ext_subprocs[num_subprocs]) {
+      int wret = main_waitpid_check(ext_subprocs[num_subprocs]);
+      if (read_ret == 0 && wret != 0) {
+        read_ret = wret;
+      }
+      ext_subprocs[num_subprocs] = 0;
+    }
+  }
+#endif
+
+  ret = read_ret;
+
+  if (ret != 0) {
+    return ret;
+  }
+
+  blake3_hasher_finalize(&hasher, digest, sizeof(digest));
+  main_armor_hex(digest, out_hex);
+  return 0;
+}
+
+/* Parse a raw (read-only) app-header buffer and extract the armored source and
+ * target digests, if present.  The buffer is copied because parsing is
+ * destructive (it splits on '/' and '#'). */
+static void main_armor_parse_appheader(const uint8_t *apphead, usize_t sz,
+                                       int *have_source, char *source,
+                                       int *have_target, char *target) {
+  char *copy;
+  char *start;
+  char *slash;
+  int place = 0;
+  char *parsed[4];
+
+  *have_source = 0;
+  *have_target = 0;
+
+  if (apphead == NULL || sz == 0) {
+    return;
+  }
+
+  if ((copy = (char *)main_malloc(sz + 1)) == NULL) {
+    return;
+  }
+  memcpy(copy, apphead, sz);
+  copy[sz] = 0;
+
+  memset(parsed, 0, sizeof(parsed));
+  start = copy;
+  while ((slash = strchr(start, '/')) != NULL && place < 3) {
+    *slash = 0;
+    parsed[place++] = start;
+    start = slash + 1;
+  }
+  parsed[place++] = start;
+
+  if (place == 2 || place == 4) {
+    const char *th = main_armor_split(parsed[0]);
+    if (th != NULL) {
+      strcpy(target, th);
+      *have_target = 1;
+    }
+  }
+  if (place == 4) {
+    const char *sh = main_armor_split(parsed[2]);
+    if (sh != NULL) {
+      strcpy(source, sh);
+      *have_source = 1;
+    }
+  }
+
+  main_free(copy);
+}
+
+/* Record one delta of a merge chain (called in chain order) and verify that
+ * its source digest matches the previous link's target digest. */
+static void main_armor_merge_link(const uint8_t *apphead, usize_t sz) {
+  int have_source = 0;
+  int have_target = 0;
+  char source[XD3_BLAKE3_HEXBUF];
+  char target[XD3_BLAKE3_HEXBUF];
+  int idx = armor_merge_count;
+
+  main_armor_parse_appheader(apphead, sz, &have_source, source, &have_target,
+                             target);
+  armor_merge_count += 1;
+
+  if (!have_source || !have_target) {
+    /* A link missing either digest cannot be fully verified or re-armored. */
+    if (idx != 0 || !have_target) {
+      armor_merge_all = 0;
+    }
+  }
+
+  if (idx == 0) {
+    if (have_source) {
+      strcpy(armor_merge_first_source, source);
+      armor_merge_have_first_source = 1;
+    }
+  } else if (armor_merge_have_prev_target && have_source) {
+    if (strcmp(armor_merge_prev_target, source) != 0) {
+      armor_merge_broken = 1;
+      XPR(NT "armor: broken armored chain at merge link %d\n", idx);
+      XPR(NT "  previous target %s\n", armor_merge_prev_target);
+      XPR(NT "  this source     %s\n", source);
+    }
+  }
+
+  if (have_target) {
+    strcpy(armor_merge_prev_target, target);
+    armor_merge_have_prev_target = 1;
+    strcpy(armor_merge_last_target, target);
+    armor_merge_have_last_target = 1;
+  } else {
+    armor_merge_have_prev_target = 0;
+  }
+}
+#endif /* XD3_ARMOR */
+
 #if XD3_ENCODER
 static const char *main_apphead_string(const char *x) {
   const char *y;
@@ -2479,6 +2821,17 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
     const char *sname;
     const char *scomp;
     usize_t len;
+#if XD3_ARMOR
+    /* Armored name fields carry "name#<64hex>".  Computed below when armor
+     * is enabled (the default). */
+    char thash[XD3_BLAKE3_HEXBUF];
+    char shash[XD3_BLAKE3_HEXBUF];
+    const char *tsep = "";
+    const char *thashstr = "";
+    const char *ssep = "";
+    const char *shashstr = "";
+    int armor = !option_no_armor;
+#endif
 
     iname = main_apphead_string(input->filename);
     icomp = (input->compressor == NULL) ? "" : input->compressor->ident;
@@ -2492,11 +2845,51 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
       sname = scomp = "";
     }
 
+#if XD3_ARMOR
+    if (armor) {
+      int ret;
+      /* The target is the encoder input; the source is the -s file.  Both
+       * must be seekable regular files so they can be hashed up front. */
+      if (input->filename == NULL) {
+        XPR(NT "armor requires a seekable target; use -a to disable armor\n");
+        return XD3_INVALID_INPUT;
+      }
+      if ((ret =
+               main_armor_hash_file(input->filename, "target", thash, NULL))) {
+        return ret;
+      }
+      tsep = "#";
+      thashstr = thash;
+      len += (usize_t)(strlen(tsep) + strlen(thashstr));
+
+      if (sfile->filename != NULL) {
+        if ((ret = main_armor_hash_file(sfile->filename, "source", shash,
+                                        NULL))) {
+          return ret;
+        }
+        ssep = "#";
+        shashstr = shash;
+        len += (usize_t)(strlen(ssep) + strlen(shashstr));
+      }
+    }
+#endif
+
     if ((appheader_used = (uint8_t *)main_malloc(len)) == NULL) {
       return ENOMEM;
     }
 
-    if (sfile->filename == NULL) {
+#if XD3_ARMOR
+    if (armor) {
+      if (sfile->filename == NULL) {
+        snprintf_func((char *)appheader_used, len, "%s%s%s/%s", iname, tsep,
+                      thashstr, icomp);
+      } else {
+        snprintf_func((char *)appheader_used, len, "%s%s%s/%s/%s%s%s/%s", iname,
+                      tsep, thashstr, icomp, sname, ssep, shashstr, scomp);
+      }
+    } else
+#endif
+        if (sfile->filename == NULL) {
       snprintf_func((char *)appheader_used, len, "%s/%s", iname, icomp);
     } else {
       snprintf_func((char *)appheader_used, len, "%s/%s/%s/%s", iname, icomp,
@@ -2592,6 +2985,33 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
     }
 
     parsed[place++] = start;
+
+#if XD3_ARMOR
+    /* Strip armored "name#<64hex>" digests from the name fields so default
+     * filenames never include the digest.  This is done even under -a
+     * (option_no_armor): -a means "do not verify", not "treat the delta as
+     * legacy".  Only record the digests for verification when armor is on. */
+    {
+      const char *th = NULL;
+      const char *sh = NULL;
+      if (place == 2 || place == 4) {
+        th = main_armor_split(parsed[0]);
+      }
+      if (place == 4) {
+        sh = main_armor_split(parsed[2]);
+      }
+      if (!option_no_armor) {
+        if (th != NULL) {
+          strcpy(armor_expect_target, th);
+          armor_have_target = 1;
+        }
+        if (sh != NULL) {
+          strcpy(armor_expect_source, sh);
+          armor_have_source = 1;
+        }
+      }
+    }
+#endif
 
     /* First take the output parameters. */
     if (place == 2 || place == 4) {
@@ -2736,6 +3156,13 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
   do_src_fifo = 0;
 
   start_time = get_millisecs_now();
+
+#if XD3_ARMOR
+  /* Reset per-operation armor verification state. */
+  armor_have_source = 0;
+  armor_have_target = 0;
+  armor_target_active = 0;
+#endif
 
   if (option_use_checksum) {
     stream_flags |= XD3_ADLER32;
@@ -2958,7 +3385,75 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
             (ret = main_set_source(&stream, cmd, sfile, &source))) {
           return EXIT_FAILURE;
         }
+
+#if XD3_ARMOR
+        /* Armor: verify the source up front, before applying anything, then
+         * arm the on-the-fly target hasher. */
+        if (armor_have_source) {
+          char got[XD3_BLAKE3_HEXBUF];
+          int nonseekable = 0;
+
+          if (sfile->filename == NULL) {
+            XPR(NT "armor: this delta requires a source but none was given; "
+                   "use -a to skip armor verification\n");
+            return EXIT_FAILURE;
+          }
+          if ((ret = main_armor_hash_file(sfile->filename, "source", got,
+                                          &nonseekable))) {
+            return EXIT_FAILURE;
+          }
+          if (nonseekable) {
+            /* A streaming (non-seekable) source cannot be read a second time
+             * to hash it, so armor cannot verify it.  Warn and proceed; the
+             * target is still verified on the fly. */
+            XPR(NT "WARNING: this delta is armored but the source is not "
+                   "seekable (streaming);\n");
+            XPR(NT "WARNING: the source cannot be verified.  Provide a "
+                   "seekable source file\n");
+            XPR(NT "WARNING: to verify it, or use -a to disable armor.\n");
+          } else if (strcmp(got, armor_expect_source) != 0) {
+            /* The source already matches the *target*: the patch is already
+             * applied / the source is up to date. */
+            if (armor_have_target && strcmp(got, armor_expect_target) == 0) {
+              XPR(NT "the source is already up to date: %s\n", sfile->filename);
+              XPR(NT "it already matches the target of this patch; "
+                     "nothing to do\n");
+              return EXIT_ARMOR_UP_TO_DATE;
+            }
+            XPR(NT "source file BLAKE3 mismatch: %s\n", sfile->filename);
+            XPR(NT "  expected %s\n", armor_expect_source);
+            XPR(NT "  actual   %s\n", got);
+            XPR(NT "the supplied source does not match the one used to build "
+                   "this patch\n");
+            return EXIT_FAILURE;
+          } else if (option_verbose) {
+            XPR(NT "armor: source verified (%s)\n", sfile->filename);
+          }
+        }
+        if (armor_have_target) {
+          blake3_hasher_init(&armor_target_hasher);
+          armor_target_active = 1;
+        }
+#endif
       }
+#if XD3_ARMOR
+      /* Record each delta of a merge chain (in chain order) for armored
+       * chain verification. */
+      if (!option_no_armor && (cmd == CMD_MERGE || cmd == CMD_MERGE_ARG)) {
+        uint8_t *apphead = NULL;
+        usize_t appheadsz = 0;
+        if (xd3_get_appheader(&stream, &apphead, &appheadsz) == 0) {
+          main_armor_merge_link(apphead, appheadsz);
+        } else {
+          main_armor_merge_link(NULL, 0);
+        }
+        if (armor_merge_broken) {
+          XPR(NT "armor: refusing to merge a broken armored chain; "
+                 "use -a to disable armor\n");
+          return EXIT_FAILURE;
+        }
+      }
+#endif
     }
     /* FALLTHROUGH */
     case XD3_WINSTART: {
@@ -3112,6 +3607,31 @@ done:
       return EXIT_FAILURE;
     }
   }
+
+#if XD3_ARMOR
+  /* Armor: verify the reconstructed target now that all output has been
+   * produced. */
+  if (armor_target_active) {
+    uint8_t digest[BLAKE3_OUT_LEN];
+    char got[XD3_BLAKE3_HEXBUF];
+
+    armor_target_active = 0;
+    blake3_hasher_finalize(&armor_target_hasher, digest, sizeof(digest));
+    main_armor_hex(digest, got);
+
+    if (strcmp(got, armor_expect_target) != 0) {
+      const char *oname =
+          (ofile != NULL && ofile->filename != NULL) ? ofile->filename : "-";
+      XPR(NT "target BLAKE3 mismatch after apply: %s\n", oname);
+      XPR(NT "  expected %s\n", armor_expect_target);
+      XPR(NT "  actual   %s\n", got);
+      return EXIT_FAILURE;
+    }
+    if (option_verbose) {
+      XPR(NT "armor: target verified\n");
+    }
+  }
+#endif
 
 #if EXTERNAL_COMPRESSION
   if ((ret = main_external_compression_finish())) {
@@ -3272,7 +3792,7 @@ int main(int argc, char **argv)
 #endif
 {
   static const char *flags =
-      "0123456789cdefhnqvDFJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
+      "0123456789acdefhnqvDFJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
   main_file ifile;
   main_file ofile;
@@ -3497,6 +4017,9 @@ takearg:
     case 'n':
       option_use_checksum = 0;
       break;
+    case 'a':
+      option_no_armor = 1;
+      break;
     case 'N':
       option_no_compress = 1;
       break;
@@ -3638,6 +4161,18 @@ takearg:
   }
 
 #if VCDIFF_TOOLS
+#if XD3_ARMOR
+  /* Reset armor merge-chain state once for the whole merge operation (it must
+   * persist across the per-delta main_input calls). */
+  if (cmd == CMD_MERGE) {
+    armor_merge_count = 0;
+    armor_merge_all = 1;
+    armor_merge_broken = 0;
+    armor_merge_have_first_source = 0;
+    armor_merge_have_prev_target = 0;
+    armor_merge_have_last_target = 0;
+  }
+#endif
   if (cmd == CMD_MERGE && (ret = main_merge_arguments(&merge_order))) {
     goto cleanup;
   }
@@ -3762,6 +4297,10 @@ static int main_help(void) {
   XPR(NTR "   -D           disable external decompression (encode/decode)\n");
   XPR(NTR "   -R           disable external recompression (decode)\n");
   XPR(NTR "   -n           disable checksum (encode/decode)\n");
+#if XD3_ARMOR
+  XPR(NTR "   -a           disable armor (whole-file BLAKE3 verification,\n");
+  XPR(NTR "                on by default; requires a seekable source)\n");
+#endif
   XPR(NTR "   -C           soft config (encode, undocumented)\n");
   XPR(NTR "   -A [apphead] disable/provide application header (encode)\n");
   XPR(NTR "   -J           disable output (check/compute only)\n");

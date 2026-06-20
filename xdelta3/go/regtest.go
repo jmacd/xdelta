@@ -42,11 +42,11 @@ func (c Config) smokeTest(t *xdelta.TestGroup, p xdelta.Program) {
 	target := "Hello world!"
 	source := "Hello world, nice to meet you!"
 
-	enc, err := t.Exec("encode", p, true, []string{"-e"})
+	enc, err := t.Exec("encode", p, true, []string{"-a", "-e"})
 	if err != nil {
 		t.Panic(err)
 	}
-	dec, err := t.Exec("decode", p, true, []string{"-d"})
+	dec, err := t.Exec("decode", p, true, []string{"-a", "-d"})
 	if err != nil {
 		t.Panic(err)
 	}
@@ -176,7 +176,7 @@ func (cfg Config) datasetTest(t *xdelta.TestGroup, p, q xdelta.Program, xdataset
 
 func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 	cfg := pt.Config
-	eargs := []string{"-e", fmt.Sprint("-B", cfg.srcbuf_size), // "-q",
+	eargs := []string{"-a", "-e", fmt.Sprint("-B", cfg.srcbuf_size), // "-q",
 		fmt.Sprint("-W", cfg.window_size), "-s", pt.source,
 		"-I0", "-S", "none", pt.target}
 	enc, err := t.Exec("encode", pt.program, false, eargs)
@@ -184,7 +184,7 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 		t.Panic(err)
 	}
 
-	dargs := []string{"-dc", fmt.Sprint("-B", cfg.srcbuf_size), //"-q",
+	dargs := []string{"-a", "-dc", fmt.Sprint("-B", cfg.srcbuf_size), //"-q",
 		fmt.Sprint("-W", cfg.window_size), "-s", pt.source,
 		"-S", "none"}
 
@@ -214,14 +214,14 @@ func (pt *PairTest) datasetPairTest(t *xdelta.TestGroup, meanSize int64) {
 }
 
 func (cfg Config) offsetTest(t *xdelta.TestGroup, p xdelta.Program, offset, length int64) {
-	eargs := []string{"-e", "-0", fmt.Sprint("-B", cfg.srcbuf_size), "-q",
+	eargs := []string{"-a", "-e", "-0", fmt.Sprint("-B", cfg.srcbuf_size), "-q",
 		fmt.Sprint("-W", cfg.window_size)}
 	enc, err := t.Exec("encode", p, true, eargs)
 	if err != nil {
 		t.Panic(err)
 	}
 	
-	dargs := []string{"-d", fmt.Sprint("-B", cfg.srcbuf_size), "-q",
+	dargs := []string{"-a", "-d", fmt.Sprint("-B", cfg.srcbuf_size), "-q",
 		fmt.Sprint("-W", cfg.window_size)}
 	dec, err := t.Exec("decode", p, true, dargs)
 	if err != nil {
