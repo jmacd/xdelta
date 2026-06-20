@@ -2651,8 +2651,8 @@ static int test_armor(xd3_stream *stream, int ignore) {
     static const char zeros[XD3_BLAKE3_HEXLEN + 1] =
         "0000000000000000000000000000000000000000000000000000000000000000";
 
-    if ((ret = main_armor_hash_file(TEST_SOURCE_FILE, "source", srchash,
-                                    NULL))) {
+    if ((ret =
+             main_armor_hash_file(TEST_SOURCE_FILE, "source", srchash, NULL))) {
       return ret;
     }
     snprintf_func(forged, sizeof(forged), "%s.forged", TEST_DELTA_FILE);
