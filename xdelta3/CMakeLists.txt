@@ -347,6 +347,7 @@ if(XD3_BUILD_LIB)
   xd3_configure_target(xdelta3lib)
   set_target_properties(xdelta3lib PROPERTIES
     OUTPUT_NAME xdelta3
+    EXPORT_NAME xdelta3
     POSITION_INDEPENDENT_CODE ON
     VERSION ${PROJECT_VERSION}
     SOVERSION ${PROJECT_VERSION_MAJOR})
