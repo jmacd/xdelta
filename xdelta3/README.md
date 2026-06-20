@@ -40,6 +40,15 @@ liblzma is autodetected.  Force it on or off with `-DXD3_LZMA_MODE=on`
 or `-DXD3_LZMA_MODE=off`.  On Homebrew systems, point CMake at the
 prefix with `-DCMAKE_PREFIX_PATH="$(brew --prefix)"`.
 
+Alternatively, build a self-contained tool by fetching and statically
+linking liblzma (xz) instead of using a system copy:
+
+  cmake -B build -DCMAKE_BUILD_TYPE=Release -DXD3_LZMA_FETCH=ON
+
+`-DXD3_LZMA_FETCH=ON` overrides `XD3_LZMA_MODE`, requires CMake >= 3.20,
+and pins the xz release with `-DXD3_LZMA_TAG=...`.  This is how the
+release binaries are built, so they need no liblzma at runtime.
+
 Armor mode (whole-file verification)
 ------------------------------------
 

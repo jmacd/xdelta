@@ -1,9 +1,7 @@
-# CMake build directory
+# CMake build directories
 build/
+build_*/
 
 # Compiled objects and editor backups
 *.o
 *~
-
-# Generated configuration header (in case of an in-source build)
-config.h

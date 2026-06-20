@@ -1,0 +1,161 @@
+name: Release
+
+# Publishes a release when a v* tag is pushed (e.g. v3.2.0).  See RELEASING.md
+# for the full procedure.  The workflow verifies that the tag matches the
+# version baked into the sources, builds prebuilt binaries for Linux, macOS,
+# and Windows, assembles a source tarball, and creates the GitHub Release.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)build a release for, e.g. v3.2.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  verify:
+    name: Verify version matches tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Check tag against source version
+        id: check
+        run: |
+          set -euo pipefail
+          tag="${TAG}"
+          version="${tag#v}"
+          cmake_version="$(sed -n 's/^[[:space:]]*VERSION[[:space:]]\([0-9][0-9.]*\).*/\1/p' xdelta3/CMakeLists.txt | head -n1)"
+          if [ "$version" != "$cmake_version" ]; then
+            echo "::error::Tag $tag implies version $version but xdelta3/CMakeLists.txt has $cmake_version"
+            exit 1
+          fi
+          if ! grep -q "Xdelta version ${version}," xdelta3/xdelta3-main.h; then
+            echo "::error::xdelta3/xdelta3-main.h main_version() does not mention version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Verified release version $version for tag $tag"
+
+  source-tarball:
+    name: Source tarball
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Create source tarball
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+          name="xdelta3-${version}"
+          git archive --format=tar.gz --prefix="${name}/" -o "${name}.tar.gz" HEAD
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-tarball
+          path: xdelta3-*.tar.gz
+
+  binaries:
+    name: ${{ matrix.name }} binaries
+    needs: verify
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: macos-latest
+            name: macos-arm64
+          - os: windows-latest
+            name: windows-x86_64
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      # Prebuilt binaries are dependency-free: liblzma (xz) is fetched and
+      # statically linked via XD3_LZMA_FETCH, and armor (BLAKE3) is statically
+      # linked, so the tools need no system libraries at runtime.
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DXD3_LZMA_FETCH=ON -DXD3_BUILD_TESTS=OFF
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Smoke test
+        if: runner.os != 'Windows'
+        run: ./build/xdelta3 test
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+          dir="xdelta3-${version}-${{ matrix.name }}"
+          mkdir "$dir"
+          cp build/xdelta3 build/xdelta3decode "$dir"/
+          cp xdelta3.1 ../README.md "$dir"/
+          tar -czf "${dir}.tar.gz" "$dir"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.verify.outputs.version }}"
+          $dir = "xdelta3-$version-${{ matrix.name }}"
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          Copy-Item build/Release/xdelta3.exe, build/Release/xdelta3decode.exe $dir/
+          Copy-Item ../README.md $dir/
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.name }}
+          path: |
+            xdelta3/xdelta3-*.tar.gz
+            xdelta3/xdelta3-*.zip
+
+  release:
+    name: Publish GitHub Release
+    needs: [ verify, source-tarball, binaries ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+          gh release create "${TAG}" \
+            --title "Xdelta ${version}" \
+            --generate-notes \
+            --verify-tag \
+            dist/*
