@@ -360,6 +360,27 @@ static inline int xd3_emit_offset(xd3_stream *stream, xd3_output **output,
   (((size_t)(size) != 0) &&                                                    \
    ((size_t)(items) > ((size_t)SIZE_MAX) / (size_t)(size)))
 
+/* Checked narrowing of an absolute file offset (xoff_t) into a
+ * window-relative size or address (usize_t).  VCDIFF copy addresses are
+ * window-relative, so the encoder must reduce every xoff_t into a usize_t
+ * before emitting; the scheme is correct only while the value fits.  On the
+ * default build both types are 64-bit and the bound folds away, but on the
+ * XD3_USE_LARGESIZET=0 build usize_t is 32-bit and a bare cast silently
+ * truncates.  This converts that truncation into a clean error.  Stores the
+ * narrowed value through out on success and returns 0; returns
+ * XD3_INVALID_INPUT and leaves out unmodified when v exceeds USIZE_T_MAX.
+ * The SIZEOF guard avoids a tautological comparison when usize_t is already
+ * as wide as xoff_t. */
+static inline int xd3_to_usize(xoff_t v, usize_t *out) {
+#if SIZEOF_USIZE_T < SIZEOF_XOFF_T
+  if (v > (xoff_t)USIZE_T_MAX) {
+    return XD3_INVALID_INPUT;
+  }
+#endif
+  *out = (usize_t)v;
+  return 0;
+}
+
 int xd3_size_hashtable(xd3_stream *stream, usize_t slots, usize_t look,
                        xd3_hash_cfg *cfg);
 

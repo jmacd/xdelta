@@ -1564,6 +1564,15 @@ int xd3_config_stream(xd3_stream *stream, xd3_config *config) {
   stream->winsize = config->winsize ? config->winsize : XD3_DEFAULT_WINSIZE;
   stream->sprevsz = config->sprevsz ? config->sprevsz : XD3_DEFAULT_SPREVSZ;
 
+  /* Enforce the window-size cap in the library, not just the CLI arg
+   * parser.  Window-relative copy addresses are narrowed to usize_t, so a
+   * winsize beyond XD3_MAXSRCWINSZ could overflow on a 32-bit-usize_t build
+   * regardless of how the caller reached this point. */
+  if (stream->winsize > XD3_MAXSRCWINSZ) {
+    stream->msg = "winsize exceeds the maximum source window size";
+    return XD3_INVALID;
+  }
+
   if (config->iopt_size == 0) {
     stream->iopt_size = XD3_ALLOCSIZE / sizeof(xd3_rinst);
     stream->iopt_unlimited = 1;
@@ -1776,6 +1785,15 @@ int xd3_set_source(xd3_stream *stream, xd3_source *src) {
     IF_DEBUG1(DP(RINT "raising src_maxsize to %" W "u\n", src->blksize));
   }
   src->max_winsize = xd3_max(src->max_winsize, XD3_ALLOCSIZE);
+
+  /* Enforce the source-window cap in the library.  srclen and source-copy
+   * addresses are window-relative usize_t values bounded by max_winsize;
+   * a value beyond XD3_MAXSRCWINSZ could overflow on a 32-bit-usize_t
+   * build, so reject it here rather than trusting the CLI arg parser. */
+  if (src->max_winsize > XD3_MAXSRCWINSZ) {
+    stream->msg = "source max_winsize exceeds the maximum";
+    return XD3_INVALID;
+  }
   return 0;
 }
 
@@ -1927,18 +1945,27 @@ static int xd3_iopt_finish_encoding(xd3_stream *stream, xd3_rinst *inst) {
       if (inst->xtra) {
         XD3_ASSERT(inst->addr >= src->srcbase);
         XD3_ASSERT(inst->addr + inst->size <= src->srcbase + src->srclen);
-        addr = inst->addr - src->srcbase;
+        if ((ret = xd3_to_usize(inst->addr - src->srcbase, &addr))) {
+          stream->msg = "source copy address exceeds window size";
+          return ret;
+        }
         stream->n_scpy += 1;
         stream->l_scpy += inst->size;
       } else {
         /* with source window: target copy address is offset
          * by taroff. */
-        addr = stream->taroff + inst->addr;
+        if ((ret = xd3_to_usize((xoff_t)stream->taroff + inst->addr, &addr))) {
+          stream->msg = "target copy address exceeds window size";
+          return ret;
+        }
         stream->n_tcpy += 1;
         stream->l_tcpy += inst->size;
       }
     } else {
-      addr = inst->addr;
+      if ((ret = xd3_to_usize(inst->addr, &addr))) {
+        stream->msg = "copy address exceeds window size";
+        return ret;
+      }
       stream->n_tcpy += 1;
       stream->l_tcpy += inst->size;
     }

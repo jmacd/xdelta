@@ -22,6 +22,13 @@ set_property(CACHE XD3_LZMA_MODE PROPERTY STRINGS auto on off)
 
 option(XD3_WERROR "Treat compiler warnings as errors for the core targets" OFF)
 
+# Window size type width.  ON (default) selects a 64-bit usize_t; OFF selects
+# the historical/embedded 32-bit usize_t (XD3_USE_LARGESIZET=0) where absolute
+# 64-bit xoff_t offsets are narrowed into 32-bit window-relative usize_t
+# values.  The OFF build exercises those narrowing paths so the regression
+# suite covers the mixed-width configuration.
+option(XD3_LARGESIZET "Use a 64-bit window size type (usize_t)" ON)
+
 # Armor mode: whole-file BLAKE3 verification carried in the VCDIFF app-header.
 # When ON, the official BLAKE3 C library is fetched (pinned tag) and linked into
 # the xdelta3 command-line tool.  When OFF, armor is compiled out and the tool
@@ -133,7 +140,8 @@ endif()
 # Helper to apply shared settings to a target.
 function(xd3_configure_target target)
   target_include_directories(${target} PRIVATE ${XD3_INCLUDE_DIRS})
-  target_compile_definitions(${target} PRIVATE HAVE_CONFIG_H=1)
+  target_compile_definitions(${target} PRIVATE HAVE_CONFIG_H=1
+    XD3_USE_LARGESIZET=$<BOOL:${XD3_LARGESIZET}>)
   target_compile_options(${target} PRIVATE ${XD3_WFLAGS})
   set_target_properties(${target} PROPERTIES
     C_STANDARD 99 C_STANDARD_REQUIRED ON

@@ -106,6 +106,18 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
     sfile->size_known = (main_file_stat(sfile, &source_size) == 0);
   }
 
+  /* Clamp the source window to the known source size.  A large -B on a small
+   * source would otherwise reserve the full (rounded-up) window up front --
+   * e.g. an 8 GiB buffer for a 100 KB file -- wasting memory and risking
+   * out-of-memory failures.  Only shrink, never below XD3_MINSRCWINSZ, and only
+   * when the size is known; non-seekable sources keep the full window because
+   * they need it.  For an externally compressed source the known size is the
+   * compressed length, so the window is bounded by that length; this stays
+   * correct because the logical content is read through the block cache. */
+  if (sfile->size_known && source_size < option_srcwinsz) {
+    option_srcwinsz = xd3_max((xoff_t)XD3_MINSRCWINSZ, source_size);
+  }
+
   /* Note: The API requires a power-of-two blocksize and srcwinsz
    * (-B).  The logic here will use a single block if the entire file
    * is known to fit into srcwinsz. */

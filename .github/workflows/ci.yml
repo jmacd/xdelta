@@ -58,6 +58,34 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  cmake-small-usize:
+    name: ${{ matrix.os }} / 32-bit usize_t
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure (XD3_LARGESIZET=OFF)
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LARGESIZET=OFF
+          -DXD3_LZMA_MODE=off
+          -DXD3_WERROR=ON
+          -DCMAKE_PREFIX_PATH="$(brew --prefix 2>/dev/null || echo /usr)"
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
   windows:
     name: windows-latest / lzma=${{ matrix.lzma }}
     runs-on: windows-latest

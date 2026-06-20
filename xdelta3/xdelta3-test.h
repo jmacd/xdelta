@@ -2651,8 +2651,8 @@ static int test_armor(xd3_stream *stream, int ignore) {
     static const char zeros[XD3_BLAKE3_HEXLEN + 1] =
         "0000000000000000000000000000000000000000000000000000000000000000";
 
-    if ((ret = main_armor_hash_file(TEST_SOURCE_FILE, "source", srchash,
-                                    NULL))) {
+    if ((ret =
+             main_armor_hash_file(TEST_SOURCE_FILE, "source", srchash, NULL))) {
       return ret;
     }
     snprintf_func(forged, sizeof(forged), "%s.forged", TEST_DELTA_FILE);
@@ -2857,6 +2857,56 @@ static int test_armor(xd3_stream *stream, int ignore) {
   return 0;
 }
 #endif /* XD3_ARMOR */
+
+#if SHELL_TESTS
+/* Regression test for the source-window (-B) over-allocation behind #273/#251.
+ * A -B much larger than the source must not reserve the full window up front:
+ * encode with a 1 GiB -B over a small (~16 KiB) source, confirm the verbose
+ * source report shows a window clamped to the source size (well under a
+ * gigabyte) rather than the requested 1 GiB, and that the delta still applies
+ * correctly. */
+static int test_srcwin_clamp(xd3_stream *stream, int ignore) {
+  int ret;
+  char buf[TESTBUFSIZE];
+  char vlog[TESTFILESIZE];
+  xoff_t ssize, tsize;
+
+  test_setup();
+  if ((ret = test_make_inputs(stream, &ssize, &tsize))) {
+    return ret;
+  }
+
+  snprintf_func(vlog, sizeof(vlog), "%s.vlog", TEST_DELTA_FILE);
+  snprintf_func(buf, TESTBUFSIZE, "%s -e -v -f -B 1073741824 -s %s %s %s 2>%s",
+                program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE,
+                TEST_DELTA_FILE, vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+
+  /* The window must have been clamped: the verbose report must not claim a
+   * GiB-sized window (pre-fix it printed "window 1.00 GiB"). */
+  snprintf_func(buf, TESTBUFSIZE, "grep -i 'source size' %s | grep -q 'GiB'",
+                vlog);
+  if ((ret = do_fail(stream, buf))) {
+    stream->msg = "srcwin: window not clamped to source size";
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE, "%s -d -f -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  test_unlink(vlog);
+  test_cleanup();
+  return 0;
+}
+#endif /* SHELL_TESTS */
 
 /***********************************************************************
  Source identical optimization
@@ -3298,6 +3348,65 @@ static int test_in_memory(xd3_stream *stream, int ignore) {
   return 0;
 }
 
+/* Regression for the usize_t / xoff_t mixed-width narrowing.  On the
+ * XD3_USE_LARGESIZET=0 build usize_t is 32-bit while xoff_t stays 64-bit, so
+ * window-relative quantities must be range-checked before they are narrowed.
+ * This verifies the checked-narrowing primitive and the library-level
+ * window-size caps reject out-of-range values with a clean error instead of
+ * silently truncating. */
+static int test_usize_narrowing(xd3_stream *stream, int ignore) {
+  usize_t out = 0;
+  xd3_stream s;
+  xd3_config c;
+  xd3_source src;
+  int ret;
+
+  /* In-range offsets narrow cleanly, including the maximum. */
+  if (xd3_to_usize(0, &out) != 0 || out != 0 ||
+      xd3_to_usize((xoff_t)USIZE_T_MAX, &out) != 0 || out != USIZE_T_MAX) {
+    stream->msg = "xd3_to_usize rejected an in-range value";
+    return XD3_INTERNAL;
+  }
+
+#if SIZEOF_USIZE_T < SIZEOF_XOFF_T
+  /* An offset beyond USIZE_T_MAX is rejected, not truncated. */
+  if (xd3_to_usize((xoff_t)USIZE_T_MAX + 1, &out) != XD3_INVALID_INPUT) {
+    stream->msg = "xd3_to_usize failed to reject an overflowing value";
+    return XD3_INTERNAL;
+  }
+#endif
+
+  /* xd3_config_stream rejects a winsize beyond the source-window cap. */
+  xd3_init_config(&c, 0);
+  c.winsize = (usize_t)(XD3_MAXSRCWINSZ + 1);
+  ret = xd3_config_stream(&s, &c);
+  if (ret != XD3_INVALID) {
+    if (ret == 0) {
+      xd3_free_stream(&s);
+    }
+    stream->msg = "config_stream accepted an oversized winsize";
+    return XD3_INTERNAL;
+  }
+
+  /* xd3_set_source rejects a max_winsize beyond the source-window cap. */
+  xd3_init_config(&c, 0);
+  if ((ret = xd3_config_stream(&s, &c)) != 0) {
+    return ret;
+  }
+  memset(&src, 0, sizeof(src));
+  src.blksize = XD3_ALLOCSIZE;
+  src.max_winsize = (xoff_t)XD3_MAXSRCWINSZ + 1;
+  src.name = "";
+  ret = xd3_set_source(&s, &src);
+  xd3_free_stream(&s);
+  if (ret != XD3_INVALID) {
+    stream->msg = "set_source accepted an oversized max_winsize";
+    return XD3_INTERNAL;
+  }
+
+  return 0;
+}
+
 /***********************************************************************
  TEST MAIN
  ***********************************************************************/
@@ -3331,6 +3440,7 @@ int xd3_selftest(void) {
   DO_TEST(encode_decode_uint32_t, 0, 0);
   DO_TEST(encode_decode_uint64_t, 0, 0);
   DO_TEST(usize_t_overflow, 0, 0);
+  DO_TEST(usize_narrowing, 0, 0);
   DO_TEST(alloc_overflow, 0, 0);
   DO_TEST(checksum_step, 0, 0);
   DO_TEST(forward_match, 0, 0);
@@ -3363,6 +3473,7 @@ int xd3_selftest(void) {
   DO_TEST(no_output, 0, 0);
   DO_TEST(appheader, 0, 0);
   DO_TEST(command_line_arguments, 0, 0);
+  DO_TEST(srcwin_clamp, 0, 0);
 #if XD3_ARMOR
   DO_TEST(armor, 0, 0);
 #endif
