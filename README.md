@@ -50,9 +50,15 @@ The original GPL licensed Xdelta lives at http://github.com/jmacd/xdelta-gpl.
 
 # Documentation
 
-See the [command-line usage](https://github.com/jmacd/xdelta/blob/wiki/CommandLineSyntax.md).  See [wiki directory](https://github.com/jmacd/xdelta/tree/wiki).
-The wiki content is being migrated to a GitHub Pages site; this section will
-be updated to point there once it is published.
+Full documentation is published at **<https://jmacd.github.io/xdelta/>**,
+including the [command-line syntax](https://jmacd.github.io/xdelta/commandline/),
+[armor mode](https://jmacd.github.io/xdelta/armor/), and the
+[programming guide](https://jmacd.github.io/xdelta/programming-guide/).
+
+The site sources live in [`site/`](site) (MkDocs + Material) and are built and
+deployed by [`.github/workflows/site.yml`](.github/workflows/site.yml).  These
+pages were migrated and updated from the project's legacy
+[`wiki` branch](https://github.com/jmacd/xdelta/tree/wiki).
 
 
 

@@ -1,0 +1,2 @@
+# Pinned for reproducible site builds (CI and local).
+mkdocs-material==9.5.39

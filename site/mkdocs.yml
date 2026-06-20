@@ -1,0 +1,63 @@
+site_name: Xdelta
+site_description: VCDIFF (RFC 3284) delta compression library and command-line tool
+site_url: https://jmacd.github.io/xdelta/
+repo_url: https://github.com/jmacd/xdelta
+repo_name: jmacd/xdelta
+edit_uri: edit/main/site/docs/
+copyright: Licensed under the Apache License, Version 2.0.
+
+# MkDocs builds into ./_site so it does not collide with the ./site source dir.
+site_dir: _site
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - tables
+
+nav:
+  - Home: index.md
+  - Using xdelta3:
+      - Command-line syntax: commandline.md
+      - Armor mode: armor.md
+      - External compression: external-compression.md
+      - Non-seekable source files: non-seekable-source.md
+      - Tuning the memory budget: tuning-memory.md
+      - "Better compression (secondary)": better-compression.md
+      - "\"Target window checksum mismatch\" explained": checksum-mismatch.md
+  - Developing with xdelta3:
+      - Programming guide: programming-guide.md
+      - Language interfaces: language-interface.md
+  - Project:
+      - Licensing: licensing.md
+      - Projects using Xdelta3: projects.md
