@@ -3348,6 +3348,65 @@ static int test_in_memory(xd3_stream *stream, int ignore) {
   return 0;
 }
 
+/* Regression for the usize_t / xoff_t mixed-width narrowing.  On the
+ * XD3_USE_LARGESIZET=0 build usize_t is 32-bit while xoff_t stays 64-bit, so
+ * window-relative quantities must be range-checked before they are narrowed.
+ * This verifies the checked-narrowing primitive and the library-level
+ * window-size caps reject out-of-range values with a clean error instead of
+ * silently truncating. */
+static int test_usize_narrowing(xd3_stream *stream, int ignore) {
+  usize_t out = 0;
+  xd3_stream s;
+  xd3_config c;
+  xd3_source src;
+  int ret;
+
+  /* In-range offsets narrow cleanly, including the maximum. */
+  if (xd3_to_usize(0, &out) != 0 || out != 0 ||
+      xd3_to_usize((xoff_t)USIZE_T_MAX, &out) != 0 || out != USIZE_T_MAX) {
+    stream->msg = "xd3_to_usize rejected an in-range value";
+    return XD3_INTERNAL;
+  }
+
+#if SIZEOF_USIZE_T < SIZEOF_XOFF_T
+  /* An offset beyond USIZE_T_MAX is rejected, not truncated. */
+  if (xd3_to_usize((xoff_t)USIZE_T_MAX + 1, &out) != XD3_INVALID_INPUT) {
+    stream->msg = "xd3_to_usize failed to reject an overflowing value";
+    return XD3_INTERNAL;
+  }
+#endif
+
+  /* xd3_config_stream rejects a winsize beyond the source-window cap. */
+  xd3_init_config(&c, 0);
+  c.winsize = (usize_t)(XD3_MAXSRCWINSZ + 1);
+  ret = xd3_config_stream(&s, &c);
+  if (ret != XD3_INVALID) {
+    if (ret == 0) {
+      xd3_free_stream(&s);
+    }
+    stream->msg = "config_stream accepted an oversized winsize";
+    return XD3_INTERNAL;
+  }
+
+  /* xd3_set_source rejects a max_winsize beyond the source-window cap. */
+  xd3_init_config(&c, 0);
+  if ((ret = xd3_config_stream(&s, &c)) != 0) {
+    return ret;
+  }
+  memset(&src, 0, sizeof(src));
+  src.blksize = XD3_ALLOCSIZE;
+  src.max_winsize = (xoff_t)XD3_MAXSRCWINSZ + 1;
+  src.name = "";
+  ret = xd3_set_source(&s, &src);
+  xd3_free_stream(&s);
+  if (ret != XD3_INVALID) {
+    stream->msg = "set_source accepted an oversized max_winsize";
+    return XD3_INTERNAL;
+  }
+
+  return 0;
+}
+
 /***********************************************************************
  TEST MAIN
  ***********************************************************************/
@@ -3381,6 +3440,7 @@ int xd3_selftest(void) {
   DO_TEST(encode_decode_uint32_t, 0, 0);
   DO_TEST(encode_decode_uint64_t, 0, 0);
   DO_TEST(usize_t_overflow, 0, 0);
+  DO_TEST(usize_narrowing, 0, 0);
   DO_TEST(alloc_overflow, 0, 0);
   DO_TEST(checksum_step, 0, 0);
   DO_TEST(forward_match, 0, 0);
