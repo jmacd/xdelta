@@ -2559,6 +2559,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
   char merged[TESTFILESIZE];
   char wrong[TESTFILESIZE];
   char warnf[TESTFILESIZE];
+  char forged[TESTFILESIZE];
   xoff_t ssize, tsize;
 
   test_setup();
@@ -2637,6 +2638,39 @@ static int test_armor(xd3_stream *stream, int ignore) {
   test_unlink(warnf);
   test_unlink(wrong);
 
+  /* Target verification after apply: forge a delta whose embedded source
+   * digest is correct but whose target digest is wrong, then confirm decode
+   * passes the up-front source check yet fails the after-apply target check
+   * (exit 1).  This exercises the on-the-fly target hasher mismatch path that
+   * the success round-trips above never reach.  The delta is re-armored with
+   * recode -A; the source name and output name are arbitrary because -s and
+   * the explicit output path override them on decode. */
+  {
+    char srchash[XD3_BLAKE3_HEXBUF];
+    char header[TESTBUFSIZE];
+    static const char zeros[XD3_BLAKE3_HEXLEN + 1] =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    if ((ret = main_armor_hash_file(TEST_SOURCE_FILE, "source", srchash,
+                                    NULL))) {
+      return ret;
+    }
+    snprintf_func(forged, sizeof(forged), "%s.forged", TEST_DELTA_FILE);
+    snprintf_func(header, sizeof(header), "x#%s//x#%s/", zeros, srchash);
+    snprintf_func(buf, TESTBUFSIZE, "%s -f recode -A \"%s\" %s %s",
+                  program_name, header, TEST_DELTA_FILE, forged);
+    if ((ret = do_cmd(stream, buf))) {
+      return ret;
+    }
+    snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
+                  TEST_SOURCE_FILE, forged, TEST_RECON_FILE);
+    if ((ret = do_fail(stream, buf))) {
+      stream->msg = "armor: expected target mismatch after apply";
+      return ret;
+    }
+    test_unlink(forged);
+  }
+
   /* -a decode skips armor; with the correct source it still round-trips. */
   snprintf_func(buf, TESTBUFSIZE, "%s -q -f -a -d -s %s %s %s", program_name,
                 TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
@@ -2698,6 +2732,37 @@ static int test_armor(xd3_stream *stream, int ignore) {
   if ((ret = do_cmd(stream, buf))) {
     return ret;
   }
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, merged, TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(v3, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  /* A partially-armored chain (one legacy link) merges successfully but the
+   * merged delta is not re-armored: it carries no digest and applies without
+   * armor verification.  Re-encode the second link with -a so it is legacy. */
+  snprintf_func(buf, TESTBUFSIZE, "%s -q -f -a -e -s %s %s %s", program_name,
+                TEST_TARGET_FILE, v3, d2);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  snprintf_func(buf, TESTBUFSIZE, "%s -f merge -m %s %s %s", program_name, d1,
+                d2, merged);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  /* The merged delta carries no '#' digest (grep finds none -> exit 1). */
+  snprintf_func(buf, TESTBUFSIZE,
+                "%s printhdr %s | grep -i 'application header' | grep -q '#'",
+                program_name, merged);
+  if ((ret = do_fail(stream, buf))) {
+    stream->msg = "armor: partially-armored merge should not be re-armored";
+    return ret;
+  }
+  /* It still applies and round-trips to v3. */
   snprintf_func(buf, TESTBUFSIZE, "%s -q -f -d -s %s %s %s", program_name,
                 TEST_SOURCE_FILE, merged, TEST_RECON_FILE);
   if ((ret = do_cmd(stream, buf))) {
