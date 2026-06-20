@@ -49,6 +49,39 @@ linking liblzma (xz) instead of using a system copy:
 and pins the xz release with `-DXD3_LZMA_TAG=...`.  This is how the
 release binaries are built, so they need no liblzma at runtime.
 
+Using xdelta3 as a library
+--------------------------
+
+The build also produces a reusable core library (`libxdelta3`) so the
+VCDIFF codec can be embedded in other applications via the public
+`xd3_*` API declared in `xdelta3.h`.  It is the unity-build `xdelta3.c`
+compiled with `XD3_MAIN=0` (encoder + decoder + DJW secondary
+compression; the command-line tool, block cache, and armor mode are not
+part of the library).  It is built and installed by default; disable it
+with `-DXD3_BUILD_LIB=OFF`.
+
+  cmake -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  cmake --install build --prefix /your/prefix
+
+The install provides the static `libxdelta3` archive, `xdelta3.h`, a
+CMake package (`find_package(xdelta3)`), and a pkg-config file
+(`pkg-config xdelta3`).  Downstream CMake projects consume it as:
+
+  find_package(xdelta3 REQUIRED)
+  target_link_libraries(app PRIVATE xdelta3::xdelta3)
+
+By default the library is dependency-free.  Compile liblzma secondary
+compression into it (and propagate the dependency to consumers) with
+`-DXD3_LIB_LZMA=ON`.  Build a shared library by adding
+`-DBUILD_SHARED_LIBS=ON`.
+
+The public header sizes the `usize_t` window type from the build's
+configuration, so the library's ABI depends on `-DXD3_LARGESIZET`
+(64-bit `usize_t` by default; `OFF` selects the 32-bit variant).  The
+installed CMake/pkg-config files carry the matching definitions, so
+consumers stay ABI-compatible without needing `config.h`.
+
 Armor mode (whole-file verification)
 ------------------------------------
 

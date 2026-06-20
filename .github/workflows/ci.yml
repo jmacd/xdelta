@@ -143,6 +143,53 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
+  library-consumer:
+    name: ${{ matrix.os }} / library install + consumer
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure and build the library
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LZMA_MODE=off
+          -DXD3_WERROR=ON
+          &&
+          cmake --build build --config Release -j
+
+      - name: Install to a staging prefix
+        run: cmake --install build --prefix "$GITHUB_WORKSPACE/stage"
+
+      - name: Build a find_package() consumer
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cp testing/lib_smoke.c "$RUNNER_TEMP/consumer/main.c"
+          cat > "$RUNNER_TEMP/consumer/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.13)
+          project(consumer C)
+          find_package(xdelta3 REQUIRED)
+          add_executable(app main.c)
+          target_link_libraries(app PRIVATE xdelta3::xdelta3)
+          EOF
+          cmake -S "$RUNNER_TEMP/consumer" -B "$RUNNER_TEMP/consumer/build" \
+            -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/stage"
+          cmake --build "$RUNNER_TEMP/consumer/build"
+          "$RUNNER_TEMP/consumer/build/app"
+
+      - name: Build a pkg-config consumer
+        run: |
+          export PKG_CONFIG_PATH="$GITHUB_WORKSPACE/stage/lib/pkgconfig"
+          cc "$RUNNER_TEMP/consumer/main.c" $(pkg-config --cflags --libs xdelta3) -o "$RUNNER_TEMP/app_pc"
+          "$RUNNER_TEMP/app_pc"
+
   blockdev-test:
     name: ${{ matrix.os }} / block-device source
     runs-on: ${{ matrix.os }}
