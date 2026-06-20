@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(xdelta3
-  VERSION 3.1.1
+  VERSION 3.2.0
   DESCRIPTION "VCDIFF (RFC 3284) delta compression library and tool"
   HOMEPAGE_URL "https://github.com/jmacd/xdelta"
   LANGUAGES C CXX)
@@ -19,6 +19,15 @@ option(XD3_BUILD_TESTS "Build the regression-test executables" ON)
 set(XD3_LZMA_MODE "auto" CACHE STRING
   "liblzma secondary compression: auto, on, or off")
 set_property(CACHE XD3_LZMA_MODE PROPERTY STRINGS auto on off)
+
+# When ON, liblzma (xz) is fetched and built as a static library via
+# FetchContent (pinned to XD3_LZMA_TAG) and linked into xdelta3, instead of
+# using a system liblzma.  This yields a dependency-free binary with liblzma
+# secondary compression and is what the release workflow uses.  It overrides
+# XD3_LZMA_MODE and requires CMake >= 3.20 (the minimum xz's build needs).
+option(XD3_LZMA_FETCH "Fetch and statically link liblzma (xz) via FetchContent" OFF)
+set(XD3_LZMA_TAG "v5.8.3" CACHE STRING
+  "xz/liblzma release tag to fetch when XD3_LZMA_FETCH=ON")
 
 option(XD3_WERROR "Treat compiler warnings as errors for the core targets" OFF)
 
@@ -52,7 +61,36 @@ check_type_size("unsigned long long" SIZEOF_UNSIGNED_LONG_LONG)
 # liblzma (secondary compression).
 set(HAVE_LZMA_H OFF)
 set(XD3_LZMA_LIBRARIES "")
-if(NOT XD3_LZMA_MODE STREQUAL "off")
+if(XD3_LZMA_FETCH)
+  if(CMAKE_VERSION VERSION_LESS 3.20)
+    message(FATAL_ERROR
+      "XD3_LZMA_FETCH=ON requires CMake >= 3.20 (xz's build); "
+      "use a system liblzma via XD3_LZMA_MODE instead.")
+  endif()
+  # Build a minimal static liblzma: no CLI tools, docs, or translations.
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+  set(XZ_NLS OFF CACHE BOOL "" FORCE)
+  set(XZ_DOC OFF CACHE BOOL "" FORCE)
+  set(XZ_TOOL_XZ OFF CACHE BOOL "" FORCE)
+  set(XZ_TOOL_XZDEC OFF CACHE BOOL "" FORCE)
+  set(XZ_TOOL_LZMADEC OFF CACHE BOOL "" FORCE)
+  set(XZ_TOOL_LZMAINFO OFF CACHE BOOL "" FORCE)
+  set(XZ_TOOL_SCRIPTS OFF CACHE BOOL "" FORCE)
+  set(XZ_TOOL_SYMLINKS OFF CACHE BOOL "" FORCE)
+  include(FetchContent)
+  FetchContent_Declare(liblzma
+    GIT_REPOSITORY https://github.com/tukaani-project/xz.git
+    GIT_TAG ${XD3_LZMA_TAG}
+    GIT_SHALLOW TRUE)
+  FetchContent_MakeAvailable(liblzma)
+  # xz marks the public api/ directory PRIVATE on its in-tree target, so expose
+  # it (and the LZMA_API_STATIC define it sets) to consumers ourselves.
+  target_include_directories(liblzma INTERFACE
+    "$<BUILD_INTERFACE:${liblzma_SOURCE_DIR}/src/liblzma/api>")
+  set(HAVE_LZMA_H ON)
+  set(XD3_LZMA_LIBRARIES liblzma)
+  message(STATUS "xdelta3: liblzma fetched and statically linked (xz ${XD3_LZMA_TAG})")
+elseif(NOT XD3_LZMA_MODE STREQUAL "off")
   find_package(LibLZMA)
   if(LibLZMA_FOUND)
     set(HAVE_LZMA_H ON)
