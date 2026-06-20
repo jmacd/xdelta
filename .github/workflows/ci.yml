@@ -161,6 +161,7 @@ jobs:
           cmake -B build
           -DCMAKE_BUILD_TYPE=Release
           -DXD3_LZMA_MODE=off
+          -DXD3_ARMOR=OFF
           -DXD3_WERROR=ON
           &&
           cmake --build build --config Release -j

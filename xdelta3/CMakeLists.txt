@@ -68,6 +68,18 @@ include(CheckTypeSize)
 include(CheckIncludeFile)
 include(CheckCSourceRuns)
 
+# FetchContent dependencies (liblzma, BLAKE3) are statically linked into
+# xdelta3 but must not contribute their own install rules to `cmake --install`
+# -- BLAKE3 in particular installs a libblake3.pc generated in the wrong
+# directory under FetchContent, which aborts the install.  EXCLUDE_FROM_ALL on
+# FetchContent_Declare drops a dependency's targets and install rules; it is
+# only honored from CMake 3.28, so guard it and fall back to nothing on older
+# versions.
+set(XD3_FETCHCONTENT_EXCLUDE "")
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
+  set(XD3_FETCHCONTENT_EXCLUDE EXCLUDE_FROM_ALL)
+endif()
+
 # ---------------------------------------------------------------------------
 # Feature / size detection -> config.h
 # ---------------------------------------------------------------------------
@@ -99,7 +111,8 @@ if(XD3_LZMA_FETCH)
   FetchContent_Declare(liblzma
     GIT_REPOSITORY https://github.com/tukaani-project/xz.git
     GIT_TAG ${XD3_LZMA_TAG}
-    GIT_SHALLOW TRUE)
+    GIT_SHALLOW TRUE
+    ${XD3_FETCHCONTENT_EXCLUDE})
   FetchContent_MakeAvailable(liblzma)
   # xz marks the public api/ directory PRIVATE on its in-tree target, so expose
   # it (and the LZMA_API_STATIC define it sets) to consumers ourselves.
@@ -226,7 +239,8 @@ if(XD3_ARMOR)
     GIT_REPOSITORY https://github.com/BLAKE3-team/BLAKE3.git
     GIT_TAG ${XD3_BLAKE3_TAG}
     GIT_SHALLOW TRUE
-    SOURCE_SUBDIR c)
+    SOURCE_SUBDIR c
+    ${XD3_FETCHCONTENT_EXCLUDE})
   FetchContent_MakeAvailable(blake3)
   set(XD3_ARMOR_LIBRARIES blake3)
   message(STATUS "xdelta3: armor mode enabled (BLAKE3 ${XD3_BLAKE3_TAG})")
