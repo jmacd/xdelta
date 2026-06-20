@@ -5,8 +5,7 @@
 Xdelta version 3 is a C library and command-line tool for delta
 compression using VCDIFF/RFC 3284 streams.
 
-The current release series is **3.2.x**, developed on the `main` branch.
-The 2016-era **3.0.x** and **3.1.x** series are legacy.
+The current release series is **3.2.x**.
 
 # Building
 
