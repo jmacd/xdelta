@@ -68,13 +68,15 @@ include(CheckTypeSize)
 include(CheckIncludeFile)
 include(CheckCSourceRuns)
 
-# FetchContent dependencies (liblzma, BLAKE3) are statically linked into
-# xdelta3 but must not contribute their own install rules to `cmake --install`
-# -- BLAKE3 in particular installs a libblake3.pc generated in the wrong
-# directory under FetchContent, which aborts the install.  EXCLUDE_FROM_ALL on
+# FetchContent dependencies are statically linked into xdelta3 but should not
+# contribute their own install rules to `cmake --install`.  BLAKE3 in
+# particular installs a libblake3.pc generated in the wrong directory under
+# FetchContent, which aborts the install.  EXCLUDE_FROM_ALL on
 # FetchContent_Declare drops a dependency's targets and install rules; it is
 # only honored from CMake 3.28, so guard it and fall back to nothing on older
-# versions.
+# versions.  It is applied only to BLAKE3: xz (liblzma) registers its own
+# CTest tests, and excluding it from `all` would leave those test binaries
+# unbuilt yet still registered, breaking the XD3_LZMA_FETCH test run.
 set(XD3_FETCHCONTENT_EXCLUDE "")
 if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.28)
   set(XD3_FETCHCONTENT_EXCLUDE EXCLUDE_FROM_ALL)
@@ -111,8 +113,7 @@ if(XD3_LZMA_FETCH)
   FetchContent_Declare(liblzma
     GIT_REPOSITORY https://github.com/tukaani-project/xz.git
     GIT_TAG ${XD3_LZMA_TAG}
-    GIT_SHALLOW TRUE
-    ${XD3_FETCHCONTENT_EXCLUDE})
+    GIT_SHALLOW TRUE)
   FetchContent_MakeAvailable(liblzma)
   # xz marks the public api/ directory PRIVATE on its in-tree target, so expose
   # it (and the LZMA_API_STATIC define it sets) to consumers ourselves.
