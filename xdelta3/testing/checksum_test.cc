@@ -404,17 +404,17 @@ template <typename Checksum> struct test_result : public test_result_base {
 
   void print() {
     if (fstats.count != count()) {
-      fprintf(stderr, "internal error: %" W "d != %" W "d\n", fstats.count,
-              count());
+      fprintf(stderr, "internal error: %" XD3_W "d != %" XD3_W "d\n",
+              fstats.count, count());
       abort();
     }
     print_header();
-    printf("%-32s%d/%d 2^%" W "u\t%" W "u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
-           "%" W "u\t%" W "u\n",
-           test_name, Checksum::cksum_size, Checksum::cksum_skip, h_bits,
-           count(), uniqueness(), fullness(), coverage(), collisions(),
-           0.001 * accum_iters * test_size / accum_millis, accum_iters,
-           colls());
+    printf(
+        "%-32s%d/%d 2^%" XD3_W "u\t%" XD3_W "u\t%0.4f\t%.4f\t%.4f\t%.1e\t%.2f\t"
+        "%" XD3_W "u\t%" XD3_W "u\n",
+        test_name, Checksum::cksum_size, Checksum::cksum_skip, h_bits, count(),
+        uniqueness(), fullness(), coverage(), collisions(),
+        0.001 * accum_iters * test_size / accum_millis, accum_iters, colls());
   }
 
   usize_t size_log2(usize_t slots) {

@@ -99,8 +99,8 @@ public:
     bool done = false;
     bool done_after_input = false;
 
-    IF_DEBUG1(XPR(NTR "source %" Q "u[%" Z "u] target %" Q "u winsize %" Z
-                      "u\n",
+    IF_DEBUG1(XPR(NTR "source %" XD3_Q "u[%" XD3_Z "u] target %" XD3_Q
+                      "u winsize %" XD3_Z "u\n",
                   source_file.Size(), options.block_size, target_file.Size(),
                   Constants::WINDOW_SIZE));
 
@@ -109,11 +109,11 @@ public:
 
       xoff_t blks = target_iterator.Blocks();
 
-      IF_DEBUG2(XPR(NTR "target in %s: %" Q "u[%" Z "u] %" Q "u(%" Q "u) "
-                        "verified %" Q "u\n",
-                    encoding ? "encoding" : "decoding",
-                    target_iterator.Offset(), target_block.Size(),
-                    target_iterator.Blkno(), blks, verified_bytes));
+      IF_DEBUG2(XPR(
+          NTR "target in %s: %" XD3_Q "u[%" XD3_Z "u] %" XD3_Q "u(%" XD3_Q "u) "
+              "verified %" XD3_Q "u\n",
+          encoding ? "encoding" : "decoding", target_iterator.Offset(),
+          target_block.Size(), target_iterator.Blkno(), blks, verified_bytes));
 
       if (blks == 0 || target_iterator.Blkno() == (blks - 1)) {
         xd3_set_flags(&encode_stream, XD3_FLUSH | encode_stream.flags);
@@ -156,8 +156,8 @@ public:
         xd3_source *src = (encoding ? &encode_source : &decode_source);
         Block *block = (encoding ? &encode_source_block : &decode_source_block);
         if (encoding) {
-          IF_DEBUG2(XPR(NTR "[srcblock] %" Q "u last srcpos %" Q "u "
-                            "encodepos %" Q "u\n",
+          IF_DEBUG2(XPR(NTR "[srcblock] %" XD3_Q "u last srcpos %" XD3_Q "u "
+                            "encodepos %" XD3_Q "u\n",
                         encode_source.getblkno, encode_stream.match_last_srcpos,
                         encode_stream.input_position + encode_stream.total_in));
         }
@@ -229,7 +229,7 @@ public:
                         ExtFile *coded_data, const Options &options) {
     vector<const char *> ecmd;
     char bbuf[16];
-    snprintf(bbuf, sizeof(bbuf), "-B%" Q "u", options.encode_srcwin_maxsz);
+    snprintf(bbuf, sizeof(bbuf), "-B%" XD3_Q "u", options.encode_srcwin_maxsz);
     ecmd.push_back("xdelta3");
     ecmd.push_back(bbuf);
     ecmd.push_back("-s");
@@ -341,7 +341,7 @@ public:
   void TestPrintf() {
     char buf[64];
     xoff_t x = XOFF_T_MAX;
-    snprintf_func(buf, sizeof(buf), "%" Q "u", x);
+    snprintf_func(buf, sizeof(buf), "%" XD3_Q "u", x);
     const char *expect =
         XD3_USE_LARGEFILE64 ? "18446744073709551615" : "4294967295";
     XD3_ASSERT(strcmp(buf, expect) == 0);
@@ -784,7 +784,7 @@ public:
       InMemoryEncodeDecode(spec0, spec1, &block, options);
       Delta delta(block);
 
-      IF_DEBUG1(DP(RINT "[stride=%d] changes=%" W "u adds=%" Q "u\n", s,
+      IF_DEBUG1(DP(RINT "[stride=%d] changes=%" XD3_W "u adds=%" XD3_Q "u\n", s,
                    changes, delta.AddedBytes()));
       double allowance = Constants::BLOCK_SIZE < 8192 || s < 30 ? 3.0 : 1.1;
       CHECK_GE(allowance * changes, (double)delta.AddedBytes());
@@ -1217,7 +1217,7 @@ template <class T> void UnitTest() {
 
 // These are Xdelta tests.
 template <class T> void MainTest() {
-  XPR(NT "Blocksize %" Q "u windowsize %" Z "u\n", T::BLOCK_SIZE,
+  XPR(NT "Blocksize %" XD3_Q "u windowsize %" XD3_Z "u\n", T::BLOCK_SIZE,
       T::WINDOW_SIZE);
   Regtest<T> regtest;
   TEST(TestEmptyInMemory);
