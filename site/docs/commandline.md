@@ -76,6 +76,8 @@ compression options:
    -N           disable small string-matching compression
    -D           disable external decompression (encode/decode)
    -R           disable external recompression (decode)
+   -G           omit detected compression level from app-header
+                (encode; emits a legacy header older versions read)
    -n           disable checksum (encode/decode)
    -a           disable armor (whole-file BLAKE3 verification,
                 on by default; requires a seekable source)
@@ -105,6 +107,14 @@ verifies them, so applying a patch against the wrong source fails immediately
 with a clear message. It is **on by default** and requires a seekable
 (regular) source file. Pass `-a` to disable it and restore the legacy
 streaming behavior. See [Armor mode](armor.md).
+
+### `-G` compression level in the application header
+
+When xdelta3 auto-decompresses an externally compressed input, it records the
+detected compression level in the application header so decode can recompress
+the output to the same level. Pass `-G` to omit the level and emit a legacy
+header that older xdelta3 versions can still recompress. See
+[External compression](external-compression.md).
 
 ### `-A` application header
 

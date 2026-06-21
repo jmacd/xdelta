@@ -222,6 +222,11 @@ struct _main_extcomp {
   const char *magic;
   usize_t magic_size;
   int flags;
+
+  /* Optionally recover the compression level (0..9) from the first bytes of a
+   * compressed stream, returning -1 when it cannot be determined.  NULL when
+   * the format carries no recoverable level. */
+  int (*detect_level)(const uint8_t *data, usize_t len);
 };
 
 /* Merge state: */
@@ -283,6 +288,10 @@ static int num_subprocs = 0;
 static int option_force2 = 0;
 static int option_decompress_inputs = 1;
 static int option_recompress_outputs = 1;
+/* Embed the detected external-compression level in the app-header so the
+ * decoder reproduces it (on by default).  -G disables it to emit a legacy
+ * app-header that older xdelta3 versions can still recompress. */
+static int option_use_comp_level = 1;
 #endif
 
 /* This is for comparing "printdelta" output without attention to
@@ -332,15 +341,86 @@ static char armor_merge_prev_target[XD3_BLAKE3_HEXBUF];
 static int armor_merge_have_last_target = 0;
 static char armor_merge_last_target[XD3_BLAKE3_HEXBUF];
 #endif
+/* Recover the bzip2 block-size level (1..9) from the "BZh<n>" header.  This is
+ * exact: the digit is part of the magic and maps directly to the -N flag. */
+static int main_detect_level_bzip2(const uint8_t *data, usize_t len) {
+  if (len < 4) {
+    return -1;
+  }
+  if (data[3] >= '1' && data[3] <= '9') {
+    return data[3] - '0';
+  }
+  return -1;
+}
+
+/* Best-effort recovery of the gzip level from the XFL byte (RFC 1952
+ * sec 2.3.1). Only the extremes are encoded: 2 == best, 4 == fastest.  Any
+ * other value maps to the default (6), which is correct for the common case but
+ * cannot recover intermediate levels exactly. */
+static int main_detect_level_gzip(const uint8_t *data, usize_t len) {
+  if (len < 9) {
+    return -1;
+  }
+  switch (data[8]) {
+  case 2:
+    return 9;
+  case 4:
+    return 1;
+  default:
+    return 6;
+  }
+}
+
+/* Best-effort recovery of the xz preset from the LZMA2 dictionary-size byte in
+ * the filter-flags.  The dictionary size maps to a preset only approximately:
+ * a couple of sizes are shared by two presets, in which case the more common
+ * (default-ish) preset is chosen.  Returns -1 when no LZMA2 filter is found in
+ * the expected header range. */
+static int main_detect_level_xz(const uint8_t *data, usize_t len) {
+  usize_t offs;
+  /* The LZMA2 filter flags follow the stream and block headers; their position
+   * varies with optional fields, so scan a small window for the filter ID. */
+  for (offs = 14; offs + 2 < len && offs < 26; offs += 1) {
+    if (data[offs] != 0x21 || data[offs + 1] != 0x01) {
+      continue; /* not the LZMA2 filter (ID 0x21, props size 1) */
+    }
+    switch (data[offs + 2]) {
+    case 12:
+      return 0;
+    case 16:
+      return 1;
+    case 18:
+      return 2;
+    case 20:
+      return 3; /* shared with preset 4 */
+    case 22:
+      return 6; /* shared with preset 5; 6 is the default */
+    case 24:
+      return 7;
+    case 26:
+      return 8;
+    case 28:
+      return 9;
+    default:
+      return -1;
+    }
+  }
+  return -1;
+}
+
 /* This array of compressor types is compiled even if EXTERNAL_COMPRESSION is
  * false just so the program knows the mapping of IDENT->NAME. */
 static main_extcomp extcomp_types[] = {
-    {"bzip2", "-c", "bzip2", "-dc", "B", "BZh", 3, 0},
-    {"gzip", "-c", "gzip", "-dc", "G", "\037\213", 2, 0},
-    {"compress", "-c", "uncompress", "-c", "Z", "\037\235", 2, 0},
+    {"bzip2", "-c", "bzip2", "-dc", "B", "BZh", 3, 0, main_detect_level_bzip2},
+    /* gzip -n suppresses the stored name/mtime so recompression is
+     * reproducible byte-for-byte. */
+    {"gzip", "-cn", "gzip", "-dc", "G", "\037\213", 2, 0,
+     main_detect_level_gzip},
+    {"compress", "-c", "uncompress", "-c", "Z", "\037\235", 2, 0, NULL},
 
     /* Xz is lzma with a magic number http://tukaani.org/xz/format.html */
-    {"xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0},
+    {"xz", "-c", "xz", "-dc", "Y", "\xfd\x37\x7a\x58\x5a\x00", 2, 0,
+     main_detect_level_xz},
 };
 
 static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
@@ -467,6 +547,7 @@ static void reset_defaults(void) {
   option_force2 = 0;
   option_decompress_inputs = 1;
   option_recompress_outputs = 1;
+  option_use_comp_level = 1;
   num_subprocs = 0;
 #endif
 #if VCDIFF_TOOLS
@@ -794,6 +875,8 @@ static int main_atou(const char *arg, usize_t *uo, usize_t low, usize_t high,
 
 void main_file_init(main_file *xfile) {
   memset(xfile, 0, sizeof(*xfile));
+
+  xfile->compression_level = -1;
 
 #if XD3_POSIX
   xfile->file = -1;
@@ -2374,6 +2457,11 @@ static int main_secondary_decompress_check(main_file *file, uint8_t *input_buf,
   }
 
   if (decompressor != NULL) {
+    if (decompressor->detect_level != NULL) {
+      file->compression_level =
+          decompressor->detect_level(check_buf, (usize_t)check_nread);
+    }
+
     if (!option_quiet) {
       XPR(NT "externally compressed input: %s %s%s < %s\n",
           decompressor->decomp_cmdname, decompressor->decomp_options,
@@ -2445,6 +2533,22 @@ static int main_recompress_output(main_file *ofile) {
 
   /* The child runs the recompression process: */
   if (recomp_id == 0) {
+    char level_arg[8];
+    const char *argv[5];
+    int argi = 0;
+
+    argv[argi++] = recomp->recomp_cmdname;
+    argv[argi++] = recomp->recomp_options;
+    if (ofile->compression_level >= 0 && ofile->compression_level <= 9) {
+      snprintf_func(level_arg, sizeof(level_arg), "-%d",
+                    ofile->compression_level);
+      argv[argi++] = level_arg;
+    }
+    if (option_force2) {
+      argv[argi++] = "-f";
+    }
+    argv[argi] = NULL;
+
     if (option_verbose > 2) {
       XPR(NT "external recompression pid %d\n", getpid());
     }
@@ -2453,8 +2557,7 @@ static int main_recompress_output(main_file *ofile) {
     if (dup2(XFNO(ofile), STDOUT_FILENO) < 0 ||
         dup2(pipefd[PIPE_READ_FD], STDIN_FILENO) < 0 ||
         close(pipefd[PIPE_READ_FD]) || close(pipefd[PIPE_WRITE_FD]) ||
-        execlp(recomp->recomp_cmdname, recomp->recomp_cmdname,
-               recomp->recomp_options, option_force2 ? "-f" : NULL, NULL)) {
+        execvp(recomp->recomp_cmdname, (char *const *)argv)) {
       XPR(NT "child process %s failed to execute: %s\n", recomp->recomp_cmdname,
           xd3_mainerror(get_errno()));
     }
@@ -2803,6 +2906,25 @@ static const char *main_apphead_string(const char *x) {
   return (y = strrchr(x, '/')) == NULL ? x : y + 1;
 }
 
+/* Format the appheader compressor field as "<ident>" or "<ident><level>" (e.g.
+ * "B9") so the decoder can reproduce the original compression level.  Returns a
+ * pointer into buf, or the bare ident / "" when no level is known. */
+static const char *main_apphead_comp(const main_extcomp *comp, int level,
+                                     char *buf, size_t bufsize) {
+  if (comp == NULL) {
+    return "";
+  }
+  if (level >= 0 && level <= 9
+#if EXTERNAL_COMPRESSION
+      && option_use_comp_level
+#endif
+  ) {
+    snprintf_func(buf, bufsize, "%s%d", comp->ident, level);
+    return buf;
+  }
+  return comp->ident;
+}
+
 static int main_set_appheader(xd3_stream *stream, main_file *input,
                               main_file *sfile) {
   /* The user may disable the application header.  Once the appheader
@@ -2820,6 +2942,8 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
     const char *icomp;
     const char *sname;
     const char *scomp;
+    char icomp_buf[8];
+    char scomp_buf[8];
     usize_t len;
 #if XD3_ARMOR
     /* Armored name fields carry "name#<64hex>".  Computed below when armor
@@ -2834,12 +2958,14 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
 #endif
 
     iname = main_apphead_string(input->filename);
-    icomp = (input->compressor == NULL) ? "" : input->compressor->ident;
+    icomp = main_apphead_comp(input->compressor, input->compression_level,
+                              icomp_buf, sizeof(icomp_buf));
     len = (usize_t)strlen(iname) + (usize_t)strlen(icomp) + 2;
 
     if (sfile->filename != NULL) {
       sname = main_apphead_string(sfile->filename);
-      scomp = (sfile->compressor == NULL) ? "" : sfile->compressor->ident;
+      scomp = main_apphead_comp(sfile->compressor, sfile->compression_level,
+                                scomp_buf, sizeof(scomp_buf));
       len += (usize_t)strlen(sname) + (usize_t)strlen(scomp) + 2;
     } else {
       sname = scomp = "";
@@ -2943,10 +3069,27 @@ static void main_get_appheader_params(main_file *file, char **parsed,
     }
   }
 
-  /* Set the compressor, initiate de/recompression later. */
+  /* Set the compressor, initiate de/recompression later.  The compressor field
+   * is "<ident>" or "<ident><level>" (e.g. "B9"); split the trailing decimal
+   * level, if present, so recompression can reproduce the original level. */
   if (file->compressor == NULL && *parsed[1] != 0) {
+    char ident[8];
+    const char *comp = parsed[1];
+    usize_t n = 0;
+
+    while (comp[n] != 0 && !(comp[n] >= '0' && comp[n] <= '9') &&
+           n + 1 < sizeof(ident)) {
+      ident[n] = comp[n];
+      n += 1;
+    }
+    ident[n] = 0;
+
+    if (comp[n] >= '0' && comp[n] <= '9') {
+      file->compression_level = comp[n] - '0';
+    }
+
     file->flags |= RD_DECOMPSET;
-    file->compressor = main_get_compressor(parsed[1]);
+    file->compressor = main_get_compressor(ident);
   }
 }
 
@@ -3086,9 +3229,15 @@ static int main_open_output(xd3_stream *stream, main_file *ofile) {
   /* Do output recompression. */
   if (ofile->compressor != NULL && option_recompress_outputs == 1) {
     if (!option_quiet) {
-      XPR(NT "externally compressed output: %s %s%s > %s\n",
+      char level_str[8];
+      level_str[0] = 0;
+      if (ofile->compression_level >= 0 && ofile->compression_level <= 9) {
+        snprintf_func(level_str, sizeof(level_str), " -%d",
+                      ofile->compression_level);
+      }
+      XPR(NT "externally compressed output: %s %s%s%s > %s\n",
           ofile->compressor->recomp_cmdname, ofile->compressor->recomp_options,
-          (option_force2 ? " -f" : ""), ofile->filename);
+          level_str, (option_force2 ? " -f" : ""), ofile->filename);
     }
 
     if ((ret = main_recompress_output(ofile))) {
@@ -3792,7 +3941,7 @@ int main(int argc, char **argv)
 #endif
 {
   static const char *flags =
-      "0123456789acdefhnqvDFJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
+      "0123456789acdefhnqvDFGJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
   main_file ifile;
   main_file ofile;
@@ -4090,6 +4239,16 @@ takearg:
       option_recompress_outputs = 0;
 #endif
       break;
+    case 'G':
+#if EXTERNAL_COMPRESSION == 0
+      if (option_verbose > 0) {
+        XPR(NT "warning: -G option ignored, "
+               "external compression support was not compiled\n");
+      }
+#else
+      option_use_comp_level = 0;
+#endif
+      break;
     case 's':
       if (sfilename != NULL) {
         XPR(NT "specify only one source file\n");
@@ -4296,6 +4455,9 @@ static int main_help(void) {
   XPR(NTR "   -N           disable small string-matching compression\n");
   XPR(NTR "   -D           disable external decompression (encode/decode)\n");
   XPR(NTR "   -R           disable external recompression (decode)\n");
+  XPR(NTR "   -G           omit detected compression level from app-header\n");
+  XPR(NTR
+      "                (encode; emits a legacy header older versions read)\n");
   XPR(NTR "   -n           disable checksum (encode/decode)\n");
 #if XD3_ARMOR
   XPR(NTR "   -a           disable armor (whole-file BLAKE3 verification,\n");

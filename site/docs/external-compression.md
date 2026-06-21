@@ -15,13 +15,37 @@ external compression to the output.
 Xdelta decompresses the inputs by piping them through the external compression
 program. Recognition of externally-compressed inputs can be disabled with `-D`.
 
-External compression has a well-known pitfall: xdelta3 does not know the
-original compression settings, so when re-applying the external compression it
-uses default settings, which may produce different compressed bytes and break
-checksum verification of the compressed data. External recompression of the
-output can be disabled with `-R`. If you know the settings needed to reproduce
-the exact output (for example `gzip -9`), set the corresponding environment
-variable to control the external command (for example `export GZIP=-9`).
+External compression has a well-known pitfall: the *exact* compressed bytes
+depend on the compression program, its version, and its settings, so
+recompressing the decoded output may not reproduce the original file byte for
+byte. To narrow this gap, xdelta3 detects the original compression **level**
+from the input's header at encode time and records it in the application header,
+then passes it back to the compressor on decode:
+
+- **bzip2** — the block-size level (`1`–`9`) is recovered exactly.
+- **gzip** and **xz** — the level is a best-effort guess from the stream header
+  and may fall back to the format default when it cannot be determined exactly.
+
+The level is stored by appending a digit to the single-character compressor
+identifier in the application header (for example `B` becomes `B9`); view it with
+`xdelta3 printhdr`. Detection only narrows the level, not other version- or
+program-specific differences, so byte-identical recompression is reliable for
+bzip2 and best-effort for gzip/xz.
+
+External recompression of the output can be disabled entirely with `-R`. If you
+know the settings needed to reproduce the exact output (for example `gzip -9`),
+you can also set the corresponding environment variable to control the external
+command (for example `export GZIP=-9`).
+
+## Compatibility: `-G`
+
+Recording the level changes the application-header compressor field (`B` →
+`B9`). Older xdelta3 versions match the compressor identifier exactly and do not
+recognize the trailing level digit, so they decline to recompress such a delta's
+output (it is left decompressed, with a warning). Decoding the patch data itself
+is unaffected. Pass `-G` at encode time to emit a legacy application header
+(the bare identifier, no level) that older versions can still recompress. Deltas
+produced by older versions decode unchanged.
 
 ```sh
 gzip release-1.tar
