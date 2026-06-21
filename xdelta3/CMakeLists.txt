@@ -321,6 +321,18 @@ if(XD3_BUILD_TESTS)
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
 
+  # External-compression level detection round-trip.  Only meaningful where the
+  # POSIX external-compression path is compiled (i.e. not the Windows
+  # decode-only target); the script itself SKIPs when bzip2 is unavailable.
+  if(NOT WIN32)
+    add_test(NAME xdelta3_recompress_level_test
+      COMMAND ${CMAKE_COMMAND} -E env
+        sh ${CMAKE_CURRENT_SOURCE_DIR}/testing/recompress_level_test.sh
+        $<TARGET_FILE:xdelta3>)
+    set_tests_properties(xdelta3_recompress_level_test
+      PROPERTIES TIMEOUT 120)
+  endif()
+
   # Consumer smoke test: links the core library via its public API and runs a
   # real encode/decode round-trip, verifying the library is usable as built.
   if(XD3_BUILD_LIB)

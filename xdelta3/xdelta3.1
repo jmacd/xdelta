@@ -104,6 +104,16 @@ disable external decompression (encode/decode)
 .BI \-R
 disable external recompression (decode)
 .TP
+.BI \-G
+omit the detected external-compression level from the application header
+(encode).  By default
+.B xdelta3
+records the level so decode recompresses the output to byte-identical bytes;
+.B \-G
+emits a legacy application header that older
+.B xdelta3
+versions can still recompress.
+.TP
 .BI \-n
 disable checksum (encode/decode)
 .TP
@@ -156,7 +166,30 @@ patch is already applied and nothing was done.
 any other error.
 
 .SH NOTES
-The 
+When
+.B xdelta3
+automatically decompresses an externally compressed input (bzip2, gzip, xz, or
+compress) it records the detected compression level in the application header
+and passes it to the recompressor on decode, so the recompressed output
+reproduces the original compression level.  The bzip2 block-size level is
+recovered exactly; the gzip and xz levels are best-effort guesses from the
+stream header and may select the format default when the exact level cannot be
+determined.  This makes the application-header compressor field
+.RB ( B ,
+.BR G ,
+.BR Z ,
+.BR Y )
+optionally carry a trailing level digit, e.g.\&
+.IR B9 .
+Use
+.B \-R
+to disable recompression,
+.B \-D
+to disable decompression entirely, or
+.B \-G
+to omit the level from the header for compatibility with older versions.
+.PP
+The
 .B XDELTA
 environment variable may contain extra args:
 

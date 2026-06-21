@@ -107,6 +107,10 @@ struct _main_file {
   const char *realname;           /* File name or /dev/stdin,
                                    * /dev/stdout, /dev/stderr. */
   const main_extcomp *compressor; /* External compression struct. */
+  int compression_level;          /* Detected external compression level
+                                   * (0..9), or -1 if unknown.  Carried in the
+                                   * appheader so recompression reproduces the
+                                   * original bytes. */
   int flags;                      /* RD_FIRST, RD_NONEXTERNAL, ... */
   xoff_t nread;                   /* for input position */
   xoff_t nwrite;                  /* for output position */
