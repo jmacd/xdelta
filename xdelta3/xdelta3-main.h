@@ -353,10 +353,10 @@ static int main_detect_level_bzip2(const uint8_t *data, usize_t len) {
   return -1;
 }
 
-/* Best-effort recovery of the gzip level from the XFL byte (RFC 1952 sec 2.3.1).
- * Only the extremes are encoded: 2 == best, 4 == fastest.  Any other value maps
- * to the default (6), which is correct for the common case but cannot recover
- * intermediate levels exactly. */
+/* Best-effort recovery of the gzip level from the XFL byte (RFC 1952
+ * sec 2.3.1). Only the extremes are encoded: 2 == best, 4 == fastest.  Any
+ * other value maps to the default (6), which is correct for the common case but
+ * cannot recover intermediate levels exactly. */
 static int main_detect_level_gzip(const uint8_t *data, usize_t len) {
   if (len < 9) {
     return -1;
@@ -4456,7 +4456,8 @@ static int main_help(void) {
   XPR(NTR "   -D           disable external decompression (encode/decode)\n");
   XPR(NTR "   -R           disable external recompression (decode)\n");
   XPR(NTR "   -G           omit detected compression level from app-header\n");
-  XPR(NTR "                (encode; emits a legacy header older versions read)\n");
+  XPR(NTR
+      "                (encode; emits a legacy header older versions read)\n");
   XPR(NTR "   -n           disable checksum (encode/decode)\n");
 #if XD3_ARMOR
   XPR(NTR "   -a           disable armor (whole-file BLAKE3 verification,\n");
