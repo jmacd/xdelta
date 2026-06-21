@@ -187,20 +187,20 @@ XD3_STATIC_ASSERT(SIZEOF_SIZE_T == sizeof(size_t),
 XD3_STATIC_ASSERT(SIZEOF_UNSIGNED_LONG_LONG == sizeof(unsigned long long),
                   "SIZEOF_UNSIGNED_LONG_LONG not correctly set");
 
-/* Set a xoff_t typedef and the "Q" printf insert. */
+/* Set a xoff_t typedef and the "XD3_Q" printf insert. */
 #if defined(_WIN32)
 typedef uint64_t xoff_t;
-#define Q "I64"
+#define XD3_Q "I64"
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long xoff_t;
-#define Q "l"
+#define XD3_Q "l"
 #elif SIZEOF_SIZE_T == 8
 typedef size_t xoff_t;
-#define Q "z"
+#define XD3_Q "z"
 #elif SIZEOF_UNSIGNED_LONG_LONG == 8
 typedef unsigned long long xoff_t;
-#define Q "ll"
-#endif /* typedef and #define Q */
+#define XD3_Q "ll"
+#endif /* typedef and #define XD3_Q */
 
 #define SIZEOF_XOFF_T 8
 
@@ -215,26 +215,26 @@ typedef uint32_t xoff_t;
 #endif /* xoff_t is 32 bits */
 
 #define SIZEOF_XOFF_T 4
-#define Q
+#define XD3_Q
 #endif /* 64 vs 32 bit xoff_t */
 
 /* Settings based on the size of usize_t (32 and 64 bit window size) */
 #if XD3_USE_LARGESIZET
 
-/* Set a usize_ttypedef and the "W" printf insert. */
+/* Set a usize_ttypedef and the "XD3_W" printf insert. */
 #if defined(_WIN32)
 typedef uint64_t usize_t;
-#define W "I64"
+#define XD3_W "I64"
 #elif SIZEOF_UNSIGNED_LONG == 8
 typedef unsigned long usize_t;
-#define W "l"
+#define XD3_W "l"
 #elif SIZEOF_SIZE_T == 8
 typedef size_t usize_t;
-#define W "z"
+#define XD3_W "z"
 #elif SIZEOF_UNSIGNED_LONG_LONG == 8
 typedef unsigned long long usize_t;
-#define W "ll"
-#endif /* typedef and #define W */
+#define XD3_W "ll"
+#endif /* typedef and #define XD3_W */
 
 #define SIZEOF_USIZE_T 8
 
@@ -249,19 +249,19 @@ typedef uint32_t usize_t;
 #endif /* usize_t is 32 bits */
 
 #define SIZEOF_USIZE_T 4
-#define W
+#define XD3_W
 
 #endif /* 64 vs 32 bit usize_t */
 
 /* Settings based on the size of size_t (the system-provided,
  * usually-but-maybe-not an unsigned type) */
 #if SIZEOF_SIZE_T == 4
-#define Z "z"
+#define XD3_Z "z"
 #elif SIZEOF_SIZE_T == 8
 #ifdef _WIN32
-#define Z "I64"
+#define XD3_Z "I64"
 #else /* !_WIN32 */
-#define Z "z"
+#define XD3_Z "z"
 #endif /* Windows or not */
 #else
 #error Bad configure script

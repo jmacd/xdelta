@@ -700,7 +700,7 @@ static const char *main_format_bcnt(xoff_t r, shortbuf *buf) {
     }
 
     if (r >= 100 && r < 1000) {
-      short_sprintf(*buf, "%" Q "u %s", r, fmts[i]);
+      short_sprintf(*buf, "%" XD3_Q "u %s", r, fmts[i]);
       return buf->buf;
     }
 
@@ -788,11 +788,11 @@ static int main_atoux(const char *arg, xoff_t *xo, xoff_t low, xoff_t high,
   }
 
   if (x < low) {
-    XPR(NT "-%c: minimum value: %" Q "u\n", which, low);
+    XPR(NT "-%c: minimum value: %" XD3_Q "u\n", which, low);
     return EXIT_FAILURE;
   }
   if (high != 0 && x > high) {
-    XPR(NT "-%c: maximum value: %" Q "u\n", which, high);
+    XPR(NT "-%c: maximum value: %" XD3_Q "u\n", which, high);
     return EXIT_FAILURE;
   }
   (*xo) = x;
@@ -1169,7 +1169,8 @@ static int xd3_win32_io(HANDLE file, uint8_t *buf, size_t size, int is_read,
 int main_file_read(main_file *ifile, uint8_t *buf, size_t size, size_t *nread,
                    const char *msg) {
   int ret = 0;
-  IF_DEBUG1(DP(RINT "[main] read %s up to %" Z "u\n", ifile->filename, size));
+  IF_DEBUG1(
+      DP(RINT "[main] read %s up to %" XD3_Z "u\n", ifile->filename, size));
 
 #if XD3_STDIO
   size_t result;
@@ -1192,7 +1193,7 @@ int main_file_read(main_file *ifile, uint8_t *buf, size_t size, size_t *nread,
     XPR(NT "%s: %s: %s\n", msg, ifile->filename, xd3_mainerror(ret));
   } else {
     if (option_verbose > 4) {
-      XPR(NT "read %s: %" Z "u bytes\n", ifile->filename, (*nread));
+      XPR(NT "read %s: %" XD3_Z "u bytes\n", ifile->filename, (*nread));
     }
     ifile->nread += (*nread);
   }
@@ -1204,7 +1205,7 @@ int main_file_write(main_file *ofile, uint8_t *buf, usize_t size,
                     const char *msg) {
   int ret = 0;
 
-  IF_DEBUG1(DP(RINT "[main] write %" W "u\n bytes", size));
+  IF_DEBUG1(DP(RINT "[main] write %" XD3_W "u\n bytes", size));
 
 #if XD3_STDIO
   usize_t result;
@@ -1227,7 +1228,7 @@ int main_file_write(main_file *ofile, uint8_t *buf, usize_t size,
     XPR(NT "%s: %s: %s\n", msg, ofile->filename, xd3_mainerror(ret));
   } else {
     if (option_verbose > 5) {
-      XPR(NT "write %s: %" W "u bytes\n", ofile->filename, size);
+      XPR(NT "write %s: %" XD3_W "u bytes\n", ofile->filename, size);
     }
     ofile->nwrite += size;
   }
@@ -1274,7 +1275,7 @@ static int main_file_seek(main_file *xfile, xoff_t pos) {
 static int main_write_output(xd3_stream *stream, main_file *ofile) {
   int ret;
 
-  IF_DEBUG1(DP(RINT "[main] write(%s) %" W "u\n bytes", ofile->filename,
+  IF_DEBUG1(DP(RINT "[main] write(%s) %" XD3_W "u\n bytes", ofile->filename,
                stream->avail_out));
 
 #if XD3_ARMOR
@@ -1427,7 +1428,7 @@ static int main_print_window(xd3_stream *stream, main_file *xfile) {
     usize_t size_before = size;
 
     if ((ret = xd3_decode_instruction(stream))) {
-      XPR(NT "instruction decode error at %" Q "u: %s\n",
+      XPR(NT "instruction decode error at %" XD3_Q "u: %s\n",
           stream->dec_winstart + size, stream->msg);
       return ret;
     }
@@ -1435,8 +1436,8 @@ static int main_print_window(xd3_stream *stream, main_file *xfile) {
     addr_bytes = (usize_t)(stream->addr_sect.buf - addr_before);
     inst_bytes = (usize_t)(stream->inst_sect.buf - inst_before);
 
-    VC(UT "  %06" Q "u %03" W "u  %s %6" W "u", stream->dec_winstart + size,
-       option_print_cpymode ? code : 0,
+    VC(UT "  %06" XD3_Q "u %03" XD3_W "u  %s %6" XD3_W "u",
+       stream->dec_winstart + size, option_print_cpymode ? code : 0,
        xd3_rtype_to_string((xd3_rtype)stream->dec_current1.type,
                            option_print_cpymode),
        stream->dec_current1.size)
@@ -1445,10 +1446,12 @@ static int main_print_window(xd3_stream *stream, main_file *xfile) {
     if (stream->dec_current1.type != XD3_NOOP) {
       if (stream->dec_current1.type >= XD3_CPY) {
         if (stream->dec_current1.addr >= stream->dec_cpylen) {
-          VC(UT " T@%-6" W "u", stream->dec_current1.addr - stream->dec_cpylen)
+          VC(UT " T@%-6" XD3_W "u",
+             stream->dec_current1.addr - stream->dec_cpylen)
           VE;
         } else {
-          VC(UT " S@%-6" Q "u", stream->dec_cpyoff + stream->dec_current1.addr)
+          VC(UT " S@%-6" XD3_Q "u",
+             stream->dec_cpyoff + stream->dec_current1.addr)
           VE;
         }
       } else {
@@ -1459,7 +1462,7 @@ static int main_print_window(xd3_stream *stream, main_file *xfile) {
     }
 
     if (stream->dec_current2.type != XD3_NOOP) {
-      VC(UT "  %s %6" W "u",
+      VC(UT "  %s %6" XD3_W "u",
          xd3_rtype_to_string((xd3_rtype)stream->dec_current2.type,
                              option_print_cpymode),
          stream->dec_current2.size)
@@ -1467,10 +1470,12 @@ static int main_print_window(xd3_stream *stream, main_file *xfile) {
 
       if (stream->dec_current2.type >= XD3_CPY) {
         if (stream->dec_current2.addr >= stream->dec_cpylen) {
-          VC(UT " T@%-6" W "u", stream->dec_current2.addr - stream->dec_cpylen)
+          VC(UT " T@%-6" XD3_W "u",
+             stream->dec_current2.addr - stream->dec_cpylen)
           VE;
         } else {
-          VC(UT " S@%-6" Q "u", stream->dec_cpyoff + stream->dec_current2.addr)
+          VC(UT " S@%-6" XD3_Q "u",
+             stream->dec_cpyoff + stream->dec_current2.addr)
           VE;
         }
       }
@@ -1483,7 +1488,8 @@ static int main_print_window(xd3_stream *stream, main_file *xfile) {
     if (option_verbose && addr_bytes + inst_bytes >= (size - size_before) &&
         (stream->dec_current1.type >= XD3_CPY ||
          stream->dec_current2.type >= XD3_CPY)) {
-      VC(UT "  %06" Q "u (inefficiency) %" W "u encoded as %" W "u bytes\n",
+      VC(UT "  %06" XD3_Q "u (inefficiency) %" XD3_W "u encoded as %" XD3_W
+            "u bytes\n",
          stream->dec_winstart + size_before, size - size_before,
          addr_bytes + inst_bytes)
       VE;
@@ -1539,7 +1545,7 @@ static int main_print_func(xd3_stream *stream, main_file *xfile) {
 
   if (stream->dec_winstart == 0) {
     VC(UT "VCDIFF version:               0\n") VE;
-    VC(UT "VCDIFF header size:           %" W "u\n", stream->dec_hdrsize)
+    VC(UT "VCDIFF header size:           %" XD3_W "u\n", stream->dec_hdrsize)
     VE;
     VC(UT "VCDIFF header indicator:      ") VE;
     if ((stream->dec_hdr_ind & VCD_SECONDARY) != 0)
@@ -1592,7 +1598,8 @@ static int main_print_func(xd3_stream *stream, main_file *xfile) {
     VC(UT "\n") VE;
   }
 
-  VC(UT "VCDIFF window number:         %" Q "u\n", stream->current_window) VE;
+  VC(UT "VCDIFF window number:         %" XD3_Q "u\n", stream->current_window)
+  VE;
   VC(UT "VCDIFF window indicator:      ") VE;
   if ((stream->dec_win_ind & VCD_SOURCE) != 0)
     VC(UT "VCD_SOURCE ") VE;
@@ -1622,27 +1629,29 @@ static int main_print_func(xd3_stream *stream, main_file *xfile) {
   }
 
   if (stream->dec_winstart != 0) {
-    VC(UT "VCDIFF window at offset:      %" Q "u\n", stream->dec_winstart)
+    VC(UT "VCDIFF window at offset:      %" XD3_Q "u\n", stream->dec_winstart)
     VE;
   }
 
   if (SRCORTGT(stream->dec_win_ind)) {
-    VC(UT "VCDIFF copy window length:    %" W "u\n", stream->dec_cpylen) VE;
-    VC(UT "VCDIFF copy window offset:    %" Q "u\n", stream->dec_cpyoff) VE;
+    VC(UT "VCDIFF copy window length:    %" XD3_W "u\n", stream->dec_cpylen) VE;
+    VC(UT "VCDIFF copy window offset:    %" XD3_Q "u\n", stream->dec_cpyoff) VE;
   }
 
-  VC(UT "VCDIFF delta encoding length: %" W "u\n", (usize_t)stream->dec_enclen)
+  VC(UT "VCDIFF delta encoding length: %" XD3_W "u\n",
+     (usize_t)stream->dec_enclen)
   VE;
-  VC(UT "VCDIFF target window length:  %" W "u\n", (usize_t)stream->dec_tgtlen)
+  VC(UT "VCDIFF target window length:  %" XD3_W "u\n",
+     (usize_t)stream->dec_tgtlen)
   VE;
 
-  VC(UT "VCDIFF data section length:   %" W "u\n",
+  VC(UT "VCDIFF data section length:   %" XD3_W "u\n",
      (usize_t)stream->data_sect.size)
   VE;
-  VC(UT "VCDIFF inst section length:   %" W "u\n",
+  VC(UT "VCDIFF inst section length:   %" XD3_W "u\n",
      (usize_t)stream->inst_sect.size)
   VE;
-  VC(UT "VCDIFF addr section length:   %" W "u\n",
+  VC(UT "VCDIFF addr section length:   %" XD3_W "u\n",
      (usize_t)stream->addr_sect.size)
   VE;
 
@@ -2039,8 +2048,8 @@ static int main_merge_output(xd3_stream *stream, main_file *ofile) {
           addr = inst->addr - window_start;
         }
         IF_DEBUG2({
-          XPR(NTR "[merge copy] winpos %" W "u take %" W "u "
-                  "addr %" Q "u mode %u\n",
+          XPR(NTR "[merge copy] winpos %" XD3_W "u take %" XD3_W "u "
+                  "addr %" XD3_Q "u mode %u\n",
               window_pos, take, addr, inst->mode);
         });
         if ((ret = xd3_found_match(recode_stream, window_pos, take, addr,
@@ -2279,7 +2288,7 @@ static int main_pipe_copier(uint8_t *pipe_buf, usize_t pipe_bufsize,
   }
 
   if (option_verbose && skipped != 0) {
-    XPR(NT "skipping %" Q "u bytes in %s\n", skipped, ifile->filename);
+    XPR(NT "skipping %" XD3_Q "u bytes in %s\n", skipped, ifile->filename);
   }
   return 0;
 }
@@ -3654,7 +3663,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
         if (!option_quiet && IS_ENCODE(cmd) && main_file_isopen(sfile)) {
           /* Warn when no source copies are found */
           if (option_verbose && !xd3_encoder_used_source(&stream)) {
-            XPR(NT "warning: input window %" Q "u..%" Q "u has "
+            XPR(NT "warning: input window %" XD3_Q "u..%" XD3_Q "u has "
                    "no source copies\n",
                 stream.current_window * winsize,
                 (stream.current_window + 1) * winsize);
@@ -3665,8 +3674,8 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
            * when the sourcewin is decided early. */
           if (option_verbose > 1 && stream.srcwin_decided_early &&
               stream.i_slots_used > stream.iopt_size) {
-            XPR(NT "warning: input position %" Q "u overflowed "
-                   "instruction buffer, needed %" W "u (vs. %" W "u), "
+            XPR(NT "warning: input position %" XD3_Q "u overflowed "
+                   "instruction buffer, needed %" XD3_W "u (vs. %" XD3_W "u), "
                    "consider changing -I\n",
                 stream.current_window * winsize, stream.i_slots_used,
                 stream.iopt_size);
@@ -3685,7 +3694,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
           last_total_out = stream.total_out;
 
           if (option_verbose > 1) {
-            XPR(NT "%" Q "u: in %s (%s): out %s (%s): "
+            XPR(NT "%" XD3_Q "u: in %s (%s): out %s (%s): "
                    "total in %s: out %s: %s: srcpos %s\n",
                 stream.current_window, main_format_bcnt(this_read, &rdb),
                 main_format_rate(this_read, millis, &rrateavg),
@@ -3696,7 +3705,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
                 main_format_millis(millis, &tm),
                 main_format_bcnt(stream.srcwin_cksum_pos, &srcpos));
           } else {
-            XPR(NT "%" Q "u: in %s: out %s: total in %s: "
+            XPR(NT "%" XD3_Q "u: in %s: out %s: total in %s: "
                    "out %s: %s\n",
                 stream.current_window, main_format_bcnt(this_read, &rdb),
                 main_format_bcnt(this_write, &wdb),
@@ -3797,19 +3806,21 @@ done:
 #if XD3_ENCODER
   if (option_verbose > 1 && cmd == CMD_ENCODE) {
     XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
-    XPR(NT "target hash table size: %" W "u\n", stream.small_hash.size);
+    XPR(NT "target hash table size: %" XD3_W "u\n", stream.small_hash.size);
     if (sfile != NULL && sfile->filename != NULL) {
-      XPR(NT "source hash table size: %" W "u\n", stream.large_hash.size);
+      XPR(NT "source hash table size: %" XD3_W "u\n", stream.large_hash.size);
     }
   }
 
   if (option_verbose > 2 && cmd == CMD_ENCODE) {
-    XPR(NT "source copies: %" Q "u (%" Q "u bytes)\n", stream.n_scpy,
+    XPR(NT "source copies: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_scpy,
         stream.l_scpy);
-    XPR(NT "target copies: %" Q "u (%" Q "u bytes)\n", stream.n_tcpy,
+    XPR(NT "target copies: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_tcpy,
         stream.l_tcpy);
-    XPR(NT "adds: %" Q "u (%" Q "u bytes)\n", stream.n_add, stream.l_add);
-    XPR(NT "runs: %" Q "u (%" Q "u bytes)\n", stream.n_run, stream.l_run);
+    XPR(NT "adds: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_add,
+        stream.l_add);
+    XPR(NT "runs: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_run,
+        stream.l_run);
   }
 #endif
 
@@ -3820,7 +3831,8 @@ done:
     long end_time = get_millisecs_now();
     xoff_t nwrite = ofile != NULL ? ofile->nwrite : 0;
 
-    XPR(NT "finished in %s; input %" Q "u output %" Q "u bytes (%0.2f%%)\n",
+    XPR(NT "finished in %s; input %" XD3_Q "u output %" XD3_Q
+           "u bytes (%0.2f%%)\n",
         main_format_millis(end_time - start_time, &tm), ifile->nread, nwrite,
         100.0 * nwrite / ifile->nread);
   }

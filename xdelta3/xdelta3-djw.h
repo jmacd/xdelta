@@ -284,7 +284,7 @@ static void heap_check(usize_t *heap, djw_heapen *ents, usize_t heap_last) {
     /* Heap property: child not less than parent */
     XD3_ASSERT(!heap_less(&ents[heap[i]], &ents[heap[i / 2]]));
 
-    IF_DEBUG2(DP(RINT "heap[%" W "u] = %u\n", i, ents[heap[i]].freq));
+    IF_DEBUG2(DP(RINT "heap[%" XD3_W "u] = %u\n", i, ents[heap[i]].freq));
   }
 }
 #endif
@@ -360,8 +360,8 @@ static usize_t djw_build_prefix(const djw_weight *freq, uint8_t *clen,
   /* Insert real symbol frequences. */
   for (i = 0; i < asize; i += 1) {
     ents[i + 1].freq = freq[i];
-    IF_DEBUG2(
-        DP(RINT "ents[%" W "i] = freq[%" W "u] = %d\n", i + 1, i, freq[i]));
+    IF_DEBUG2(DP(RINT "ents[%" XD3_W "i] = freq[%" XD3_W "u] = %d\n", i + 1, i,
+                 freq[i]));
   }
 
 again:
@@ -437,7 +437,7 @@ again:
     }
 
     /* clen is 0-origin, unlike ents. */
-    IF_DEBUG2(DP(RINT "clen[%" W "u] = %" W "u\n", i - 1, b));
+    IF_DEBUG2(DP(RINT "clen[%" XD3_W "u] = %" XD3_W "u\n", i - 1, b));
     clen[i - 1] = (uint8_t)b;
   }
 
@@ -445,7 +445,7 @@ again:
 
   if (!overflow) {
     IF_DEBUG2(if (first_bits != total_bits) {
-      DP(RINT "code length overflow changed %" W "u bits\n",
+      DP(RINT "code length overflow changed %" XD3_W "u bits\n",
          total_bits - first_bits);
     });
     return total_bits;
@@ -491,7 +491,7 @@ static void djw_build_codes(usize_t *codes, const uint8_t *clen, usize_t asize,
 
   IF_DEBUG2({
     for (i = 0; i < asize; i += 1) {
-      DP(RINT "code[%" W "u] = %" W "u\n", i, codes[i]);
+      DP(RINT "code[%" XD3_W "u] = %" XD3_W "u\n", i, codes[i]);
     }
   });
 }
@@ -942,7 +942,8 @@ static int xd3_encode_huff(xd3_stream *stream, djw_stream *h, xd3_output *input,
        * case subtract one group and try again.  If (inefficient), we're
        * testing group behavior, so don't mess things up. */
       if (goal == 0 && !cfg->inefficient) {
-        IF_DEBUG2(DP(RINT "too many groups (%" W "u), dropping one\n", groups));
+        IF_DEBUG2(
+            DP(RINT "too many groups (%" XD3_W "u), dropping one\n", groups));
         groups -= 1;
         goto regroup;
       }
@@ -954,9 +955,9 @@ static int xd3_encode_huff(xd3_stream *stream, djw_stream *h, xd3_output *input,
         sum += real_freq[sym2++];
       }
 
-      IF_DEBUG2(DP(RINT "group %" W "u has symbols %" W "u..%" W "u (%" W
-                        "u non-zero) "
-                        "(%u/%" W "u = %.3f)\n",
+      IF_DEBUG2(DP(RINT "group %" XD3_W "u has symbols %" XD3_W "u..%" XD3_W
+                        "u (%" XD3_W "u non-zero) "
+                        "(%u/%" XD3_W "u = %.3f)\n",
                    gp, sym1, sym2, nz, sum, input_bytes,
                    sum / (double)input_bytes););
 
@@ -1075,21 +1076,22 @@ static int xd3_encode_huff(xd3_stream *stream, djw_stream *h, xd3_output *input,
           }
         }
 
-        IF_DEBUG2(DP(RINT "evolve_zero reduced %" W "u bits in group %" W "u\n",
+        IF_DEBUG2(DP(RINT "evolve_zero reduced %" XD3_W
+                          "u bits in group %" XD3_W "u\n",
                      save_total - output_bits, gp));
       }
     }
 
-    IF_DEBUG2(DP(RINT "pass %" W "u total bits: %" W "u group uses: ", niter,
-                 output_bits);
+    IF_DEBUG2(DP(RINT "pass %" XD3_W "u total bits: %" XD3_W "u group uses: ",
+                 niter, output_bits);
               for (gp = 0; gp < groups; gp += 1) {
-                DP(RINT "%" W "u ", gcount[gp]);
+                DP(RINT "%" XD3_W "u ", gcount[gp]);
               } DP(RINT "\n"););
 
     /* End iteration. */
 
     IF_DEBUG2(if (niter > 1 && best_bits < output_bits) {
-      DP(RINT "iteration lost %" W "u bits\n", output_bits - best_bits);
+      DP(RINT "iteration lost %" XD3_W "u bits\n", output_bits - best_bits);
     });
 
     if (niter == 1 || (niter < DJW_MAX_ITER &&
@@ -1103,7 +1105,7 @@ static int xd3_encode_huff(xd3_stream *stream, djw_stream *h, xd3_output *input,
       goto nosecond;
     }
 
-    IF_DEBUG2(DP(RINT "djw compression: %" W "u -> %0.3f\n", input_bytes,
+    IF_DEBUG2(DP(RINT "djw compression: %" XD3_W "u -> %0.3f\n", input_bytes,
                  output_bits / 8.0));
 
     /* Encode: prefix */
@@ -1358,7 +1360,7 @@ done:
     usize_t offset = code - base[bits];
 
     if (offset <= max_sym) {
-      IF_DEBUG2(DP(RINT "(j) %" W "u ", code));
+      IF_DEBUG2(DP(RINT "(j) %" XD3_W "u ", code));
       *sym = inorder[offset];
       return 0;
     }

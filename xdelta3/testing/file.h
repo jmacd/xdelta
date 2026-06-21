@@ -75,7 +75,7 @@ public:
   //   xoff_t pos = 0;
   //   for (size_t i = 0; i < Size(); i++) {
   //     if (pos % 16 == 0) {
-  // 	DP(RINT "%5" Q "x: ", pos);
+  // 	DP(RINT "%5" XD3_Q "x: ", pos);
   //     }
   //     DP(RINT "%02x ", (*this)[i]);
   //     if (pos % 16 == 15) {
@@ -293,7 +293,7 @@ public:
     pid_t pid = getpid();
     char buf[64];
     xoff_t xpid = pid;
-    snprintf(buf, 64, "/tmp/regtest.%" Q "u.%d", xpid, static_counter++);
+    snprintf(buf, 64, "/tmp/regtest.%" XD3_Q "u.%d", xpid, static_counter++);
     filename_.append(buf);
     unlink(filename_.c_str());
   }

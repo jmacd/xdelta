@@ -63,13 +63,13 @@ public:
   //       xd3_winst &winst = stream_.whole_target.inst[i];
   //       switch (winst.type) {
   //       case XD3_RUN:
-  // 	DP(RINT, "%" Q "u run %" W "u\n", winst.position, winst.size);
+  // 	DP(RINT, "%" XD3_Q "u run %" XD3_W "u\n", winst.position, winst.size);
   // 	break;
   //       case XD3_ADD:
-  // 	DP(RINT "%" Q "u add %" W "u\n", winst.position, winst.size);
+  // 	DP(RINT "%" XD3_Q "u add %" XD3_W "u\n", winst.position, winst.size);
   // 	break;
   //       default:
-  // 	DP(RINT "%" Q "u copy %" W "u @ %" Q "u (mode %u)\n",
+  // 	DP(RINT "%" XD3_Q "u copy %" XD3_W "u @ %" XD3_Q "u (mode %u)\n",
   // 	   winst.position, winst.size, winst.addr, winst.mode);
   // 	break;
   //       }
