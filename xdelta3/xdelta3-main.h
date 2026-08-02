@@ -244,6 +244,24 @@ struct _main_merge {
 
 XD3_MAKELIST(main_merge_list, main_merge, link);
 
+/* Source/Target pairs */
+typedef struct {
+  const char *src_filename;
+  const char *tgt_filename;
+  xoff_t tgt_size;
+  uint32_t end_window;
+#if XD3_ARMOR
+  char src_hash[XD3_BLAKE3_HEXBUF];
+  char tgt_hash[XD3_BLAKE3_HEXBUF];
+#endif
+} main_file_pair;
+
+typedef struct {
+  const char *patch_filename;
+  main_file_pair *pairs;
+  uint32_t pair_count;
+} main_file_job;
+
 /* TODO: really need to put options in a struct so that internal
  * callers can easily reset state. */
 
@@ -262,7 +280,6 @@ static int option_use_checksum = 1;
 static const char *option_smatch_config = NULL;
 static int option_no_compress = 0;
 static int option_no_output = 0; /* do not write output */
-static const char *option_source_filename = NULL;
 
 /* Armor mode (BLAKE3 whole-file verification) is on by default; -a disables
  * it.  When armor is compiled out (XD3_ARMOR=0) this is forced on so the rest
@@ -305,6 +322,7 @@ IF_DEBUG(static int main_mallocs = 0;)
 
 static char *program_name = NULL;
 static uint8_t *appheader_used = NULL;
+static uint8_t *multiheader_used = NULL;
 static uint8_t *main_bdata = NULL;
 static usize_t main_bsize = 0;
 static int main_warned_no_checksum = 0;
@@ -525,9 +543,9 @@ static void reset_defaults(void) {
   option_smatch_config = NULL;
   option_no_compress = 0;
   option_no_output = 0;
-  option_source_filename = NULL;
   program_name = NULL;
   appheader_used = NULL;
+  multiheader_used = NULL;
   main_bdata = NULL;
   main_bsize = 0;
   main_warned_no_checksum = 0;
@@ -1077,6 +1095,31 @@ int main_file_stat(main_file *xfile, xoff_t *size) {
     return ESPIPE;
   }
 #endif
+  return ret;
+}
+
+static int main_filename_size(const char *filename, xoff_t *size) {
+  main_file file;
+  xoff_t file_size;
+  int ret;
+
+  main_file_init(&file);
+
+  ret = main_file_open(&file, filename, XO_READ);
+  if (ret != 0) {
+    main_file_cleanup(&file);
+    return ret;
+  }
+
+  ret = main_file_stat(&file, &file_size);
+  if (ret == 0) {
+    *size = file_size;
+  } else {
+    ret = XD3_INVALID_INPUT;
+  }
+
+  main_file_cleanup(&file);
+
   return ret;
 }
 
@@ -2703,7 +2746,7 @@ static const char *main_armor_split(char *name) {
  * NULL, a non-seekable file is a hard error. */
 static int main_armor_hash_file(const char *filename, const char *type,
                                 char out_hex[XD3_BLAKE3_HEXBUF],
-                                int *nonseekable) {
+                                int *nonseekable, int extra_flags) {
   main_file f;
   blake3_hasher hasher;
   uint8_t digest[BLAKE3_OUT_LEN];
@@ -2722,8 +2765,10 @@ static int main_armor_hash_file(const char *filename, const char *type,
   }
 
   main_file_init(&f);
-  /* RD_FIRST (and *not* RD_NONEXTERNAL) so the same external-decompression
-   * detection used by the real read applies here. */
+
+  /* Ordinary armor hashes logical bytes after external decompression.
+   * Multifile mode passes RD_NONEXTERNAL because it processes raw
+   * file bytes.*/
   f.flags = RD_FIRST;
 
   if ((ret = main_file_open(&f, filename, XO_READ))) {
@@ -2907,7 +2952,8 @@ static const char *main_apphead_string(const char *x) {
   }
 
   if (strcmp(x, "/dev/stdin") == 0 || strcmp(x, "/dev/stdout") == 0 ||
-      strcmp(x, "/dev/stderr") == 0) {
+      strcmp(x, "/dev/stderr") == 0 || strcmp(x, "(stdin)") == 0 ||
+      strcmp(x, "(stdout)") == 0 || strcmp(x, "(stderr)") == 0) {
     return "-";
   }
 
@@ -2989,8 +3035,8 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
         XPR(NT "armor requires a seekable target; use -a to disable armor\n");
         return XD3_INVALID_INPUT;
       }
-      if ((ret =
-               main_armor_hash_file(input->filename, "target", thash, NULL))) {
+      if ((ret = main_armor_hash_file(input->filename, "target", thash, NULL,
+                                      0))) {
         return ret;
       }
       tsep = "#";
@@ -2998,8 +3044,8 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
       len += (usize_t)(strlen(tsep) + strlen(thashstr));
 
       if (sfile->filename != NULL) {
-        if ((ret = main_armor_hash_file(sfile->filename, "source", shash,
-                                        NULL))) {
+        if ((ret = main_armor_hash_file(sfile->filename, "source", shash, NULL,
+                                        0))) {
           return ret;
         }
         ssep = "#";
@@ -3037,7 +3083,215 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
 
   return 0;
 }
+
+static int main_set_multifile_appheader(xd3_stream *stream,
+                                        main_file_job *job) {
+  /* The user may disable the application header.  Once the appheader
+   * is set, this disables setting it again. */
+  if (appheader_used || !option_use_appheader) {
+    return 0;
+  }
+
+  /* The user may specify the application header, otherwise format the
+     default header. */
+  if (option_appheader) {
+    appheader_used = option_appheader;
+  } else {
+
+    usize_t str_off = 0;
+    usize_t len = 0;
+    uint32_t pair_idx;
+    for (pair_idx = 0; pair_idx < job->pair_count; pair_idx++) {
+      const char *iname;
+      const char *sname;
+#if XD3_ARMOR
+      /* Armored name fields carry "name#<64hex>".  Computed below when armor
+       * is enabled (the default). */
+      char thash[XD3_BLAKE3_HEXBUF];
+      char shash[XD3_BLAKE3_HEXBUF];
+      const char *tsep = "";
+      const char *thashstr = "";
+      const char *ssep = "";
+      const char *shashstr = "";
+      int armor = !option_no_armor;
 #endif
+
+      iname = main_apphead_string(job->pairs[pair_idx].tgt_filename);
+      len += (usize_t)strlen(iname) + 2;
+
+      sname = main_apphead_string(job->pairs[pair_idx].src_filename);
+      len += (usize_t)strlen(sname) + 2;
+
+#if XD3_ARMOR
+      if (armor) {
+        int ret;
+        if ((ret =
+                 main_armor_hash_file(job->pairs[pair_idx].tgt_filename,
+                                      "target", thash, NULL, RD_NONEXTERNAL))) {
+          return ret;
+        }
+        tsep = "#";
+        thashstr = thash;
+        len += (usize_t)(strlen(tsep) + strlen(thashstr));
+
+        if ((ret =
+                 main_armor_hash_file(job->pairs[pair_idx].src_filename,
+                                      "source", shash, NULL, RD_NONEXTERNAL))) {
+          return ret;
+        }
+        ssep = "#";
+        shashstr = shash;
+        len += (usize_t)(strlen(ssep) + strlen(shashstr));
+      }
+#endif
+
+      uint8_t *new_appheader = (uint8_t *)realloc(appheader_used, len + 1);
+      if (new_appheader == NULL) {
+        return ENOMEM;
+      }
+      appheader_used = new_appheader;
+
+#if XD3_ARMOR
+      if (armor) {
+        str_off += snprintf_func((char *)(appheader_used + str_off),
+                                 len + 1 - str_off, "%s%s%s//%s%s%s//", iname,
+                                 tsep, thashstr, sname, ssep, shashstr);
+      } else
+#endif
+      {
+        str_off += snprintf_func((char *)(appheader_used + str_off),
+                                 len + 1 - str_off, "%s//%s//", iname, sname);
+      }
+    }
+
+    /* remove trailing slash */
+    XD3_ASSERT(str_off != 0);
+    appheader_used[str_off - 1] = '\0';
+  }
+
+  xd3_set_appheader(stream, appheader_used,
+                    (usize_t)strlen((char *)appheader_used));
+
+  return 0;
+}
+
+static void main_put_uint32le(uint8_t *out, uint32_t val) {
+  out[0] = (uint8_t)(val);
+  out[1] = (uint8_t)(val >> 8);
+  out[2] = (uint8_t)(val >> 16);
+  out[3] = (uint8_t)(val >> 24);
+}
+
+static int main_set_multiheader(xd3_stream *stream, main_file_job *job) {
+
+  /* Multifile metadata format:
+   *  [Number of file pairs]
+   *  [Target 0 end window]
+   *  [Target 1 end window]
+   *  ...
+   *  [Target N-1 end window]
+   */
+
+  usize_t multihead_sz = ((usize_t)job->pair_count + 1) * sizeof(uint32_t);
+
+  multiheader_used = (uint8_t *)main_malloc(multihead_sz);
+  if (multiheader_used == NULL) {
+    return ENOMEM;
+  }
+
+  uint8_t *multihead_ptr = multiheader_used;
+
+  main_put_uint32le(multihead_ptr, job->pair_count);
+  multihead_ptr += 4;
+
+  usize_t winsize = xd3_max(option_winsize, XD3_ALLOCSIZE);
+  uint64_t pair_windows;
+  uint64_t cur_end_window = 0;
+
+  uint32_t i = 0;
+  for (i = 0; i < job->pair_count; i++) {
+    pair_windows = job->pairs[i].tgt_size / winsize;
+    if (job->pairs[i].tgt_size % winsize != 0) {
+      pair_windows++;
+    }
+
+    cur_end_window += pair_windows;
+    if (cur_end_window > UINT32_MAX) {
+      main_free(multiheader_used);
+      multiheader_used = NULL;
+      return XD3_INVALID_INPUT;
+    }
+
+    job->pairs[i].end_window = (uint32_t)cur_end_window;
+    main_put_uint32le(multihead_ptr, (uint32_t)cur_end_window);
+    multihead_ptr += 4;
+  }
+
+  xd3_set_multifile_header(stream, multiheader_used, multihead_sz);
+
+  return 0;
+}
+#endif
+
+static uint32_t main_get_uint32le(uint8_t *in) {
+  return (uint32_t)in[0] | (uint32_t)in[1] << 8 | (uint32_t)in[2] << 16 |
+         (uint32_t)in[3] << 24;
+}
+
+static int main_get_multiheader(xd3_stream *stream, main_file_job *job) {
+  uint8_t *multihead_ptr;
+  usize_t multihead_sz;
+  int ret;
+
+  if ((ret = xd3_get_multifile_header(stream, &multihead_ptr, &multihead_sz)) !=
+      0) {
+    return ret;
+  }
+
+  if (multihead_sz < sizeof(uint32_t)) {
+    XPR(NT "multifile header is too short\n");
+    return XD3_INVALID_INPUT;
+  }
+
+  uint32_t expected_num_pairs = main_get_uint32le(multihead_ptr);
+  multihead_ptr += sizeof(uint32_t);
+  if (expected_num_pairs != job->pair_count) {
+    XPR(NT "expected %u source/target pairs but %u were given\n",
+        expected_num_pairs, job->pair_count);
+    return XD3_INVALID_INPUT;
+  }
+
+  usize_t needed_sz = ((usize_t)job->pair_count + 1) * 4;
+  if (multihead_sz != needed_sz) {
+    XPR(NT "unexpected multifile header size: %" XD3_W "u\n", multihead_sz);
+    return XD3_INVALID_INPUT;
+  }
+
+  uint32_t end_window;
+  uint32_t last_end_window = 0;
+  uint32_t i;
+  for (i = 0; i < job->pair_count; i++) {
+    end_window = main_get_uint32le(multihead_ptr);
+    if (end_window == last_end_window) {
+      XPR(NT "patch format error: pair %u has an empty target; "
+             "empty targets are not supported in multifile mode\n",
+          (unsigned)i);
+      return XD3_INVALID_INPUT;
+    }
+    if (end_window < last_end_window) {
+      XPR(NT "patch format error: pair %d\'s end window (%u) is"
+             "smaller than pair %d's end window (%u)\n",
+          i, end_window, i - 1, last_end_window);
+      return XD3_INVALID_INPUT;
+    }
+
+    last_end_window = end_window;
+    job->pairs[i].end_window = end_window;
+    multihead_ptr += sizeof(uint32_t);
+  }
+
+  return 0;
+}
 
 static void main_get_appheader_params(main_file *file, char **parsed,
                                       int output, const char *type,
@@ -3180,6 +3434,173 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
   return;
 }
 
+static int main_get_multifile_appheader(xd3_stream *stream,
+                                        main_file_job *job) {
+  uint8_t *apphead;
+  usize_t appheadsz;
+  int ret;
+
+  /* The user may disable the application header.  Once the appheader
+   * is set, this disables setting it again. */
+  if (!option_use_appheader) {
+    return 0;
+  }
+
+#if XD3_ARMOR
+  uint32_t i;
+  for (i = 0; i < job->pair_count; i++) {
+    job->pairs[i].src_hash[0] = '\0';
+    job->pairs[i].tgt_hash[0] = '\0';
+  }
+#endif
+
+  if ((ret = xd3_get_appheader(stream, &apphead, &appheadsz)) != 0) {
+    return ret;
+  }
+
+  if (appheadsz > 0) {
+    char *tok;
+    char **parsed = NULL;
+    uint32_t num_fields = 0;
+
+    tok = strtok((char *)apphead, "/");
+    while (tok != NULL) {
+      char **new_parsed;
+
+      new_parsed = (char **)realloc(parsed, (num_fields + 1) * sizeof(*parsed));
+      if (new_parsed == NULL) {
+        free(parsed);
+        return ENOMEM;
+      }
+
+      parsed = new_parsed;
+      parsed[num_fields++] = tok;
+      tok = strtok(NULL, "/");
+    }
+
+    if (num_fields != job->pair_count * 2) {
+      free(parsed);
+      option_use_appheader = 0;
+
+      /* Unrecognized custom app header: no armor information.
+        Don\'t emit an error here, the user could have supplied
+        a custom appheader with -A */
+      return 0;
+    }
+
+#if XD3_ARMOR
+    /* Strip armored "name#<64hex>" digests from the name fields so default
+     * filenames never include the digest.  This is done even under -a
+     * (option_no_armor): -a means "do not verify", not "treat the delta as
+     * legacy".  Only record the digests for verification when armor is on. */
+    const char *th = NULL;
+    const char *sh = NULL;
+    for (i = 0; i < job->pair_count; i++) {
+      th = main_armor_split(parsed[i * 2]);
+      sh = main_armor_split(parsed[i * 2 + 1]);
+
+      if (!option_no_armor) {
+        if (th != NULL) {
+          strcpy(job->pairs[i].tgt_hash, th);
+        }
+        if (sh != NULL) {
+          strcpy(job->pairs[i].src_hash, sh);
+        }
+      }
+    }
+
+#endif
+    free(parsed);
+  }
+
+  option_use_appheader = 0;
+  return 0;
+}
+
+#if XD3_ARMOR
+static int main_verify_multifile_sources(main_file_job *job) {
+
+  if (option_no_armor) {
+    return 0;
+  }
+
+  armor_target_active = 0;
+  uint32_t targets_up_to_date = 0;
+  int nonseekable = 0;
+
+  uint32_t i;
+  for (i = 0; i < job->pair_count; i++) {
+
+    if (job->pairs[i].src_hash[0] == '\0') {
+      continue;
+    }
+
+    if (job->pairs[i].src_filename == NULL) {
+      XPR(NT "armor: this delta requires a source but none was given; "
+             "use -a to skip armor verification\n");
+      return EXIT_FAILURE;
+    }
+
+    char got[XD3_BLAKE3_HEXBUF];
+    if (main_armor_hash_file(job->pairs[i].src_filename, "source", got,
+                             &nonseekable, RD_NONEXTERNAL) != 0) {
+      return EXIT_FAILURE;
+    }
+
+    if (nonseekable) {
+
+      /* A streaming (non-seekable) source cannot be read a second time
+       * to hash it, so armor cannot verify it.  Warn and proceed; the
+       * target is still verified on the fly. */
+      XPR(NT "WARNING: this delta is armored but the source\n"
+             "WARNING: (%s) is not seekable (streaming);\n",
+          job->pairs[i].src_filename);
+      XPR(NT "WARNING: the source cannot be verified.  Provide a "
+             "seekable source file\n");
+      XPR(NT "WARNING: to verify it, or use -a to disable armor.\n");
+
+    } else if (strcmp(got, job->pairs[i].src_hash) != 0) {
+
+      /* The source already matches the *target*: the patch is already
+       * applied / the source is up to date. */
+      if (job->pairs[i].tgt_hash[0] != '\0' &&
+          strcmp(got, job->pairs[i].tgt_hash) == 0) {
+        XPR(NT "the source is already up to date: %s\n",
+            job->pairs[i].src_filename);
+        XPR(NT "it already matches the target of this patch; "
+               "nothing to do\n");
+
+        targets_up_to_date++;
+        continue;
+      }
+
+      XPR(NT "source file BLAKE3 mismatch: %s\n", job->pairs[i].src_filename);
+      XPR(NT "  expected %s\n", job->pairs[i].src_hash);
+      XPR(NT "  actual   %s\n", got);
+      XPR(NT "the supplied source does not match the one used to build "
+             "this patch\n");
+
+      return EXIT_FAILURE;
+    } else if (option_verbose) {
+      XPR(NT "armor: source verified (%s)\n", job->pairs[i].src_filename);
+    }
+  }
+
+  if (targets_up_to_date == job->pair_count) {
+    /* all target files already patched */
+    return EXIT_ARMOR_UP_TO_DATE;
+  }
+
+  if (targets_up_to_date != 0) {
+    XPR(NT "some, but not all, multifile sources already match their "
+           "targets; can\'t apply patch\n");
+    return EXIT_FAILURE;
+  }
+
+  return 0;
+}
+#endif
+
 /*********************************************************************
  Main I/O routines
  **********************************************************************/
@@ -3277,6 +3698,136 @@ static usize_t main_get_winsize(main_file *ifile) {
   return size;
 }
 
+static void main_report_window_finish(xd3_cmd cmd, xd3_stream *stream,
+                                      main_file *sfile, usize_t winsize,
+                                      xoff_t *last_total_in,
+                                      xoff_t *last_total_out) {
+  /* Warn loudly, once, if a delta being decoded carries no
+         integrity checksum, since a wrong source can then silently
+         produce corrupt output. */
+  if (cmd == CMD_DECODE && option_use_checksum && !option_quiet &&
+      !main_warned_no_checksum && (stream->dec_win_ind & VCD_ADLER32) == 0) {
+    main_warned_no_checksum = 1;
+    XPR(NT "WARNING: this delta has no integrity checksum; "
+           "the decoded output cannot be verified and a wrong "
+           "source may silently produce corrupt output\n");
+  }
+
+  if (IS_ENCODE(cmd) || cmd == CMD_DECODE || cmd == CMD_RECODE) {
+    if (!option_quiet && IS_ENCODE(cmd) && main_file_isopen(sfile)) {
+      /* Warn when no source copies are found */
+      if (option_verbose && !xd3_encoder_used_source(stream)) {
+        XPR(NT "warning: input window %" XD3_Q "u..%" XD3_Q "u has "
+               "no source copies\n",
+            stream->current_window * winsize,
+            (stream->current_window + 1) * winsize);
+        XD3_ASSERT(stream->src != NULL);
+      }
+
+      /* Limited i-buffer size affects source copies
+       * when the sourcewin is decided early. */
+      if (option_verbose > 1 && stream->srcwin_decided_early &&
+          stream->i_slots_used > stream->iopt_size) {
+        XPR(NT "warning: input position %" XD3_Q "u overflowed "
+               "instruction buffer, needed %" XD3_W "u (vs. %" XD3_W "u), "
+               "consider changing -I\n",
+            stream->current_window * winsize, stream->i_slots_used,
+            stream->iopt_size);
+      }
+    }
+
+    if (option_verbose) {
+      shortbuf rrateavg, wrateavg, tm;
+      shortbuf rdb, wdb;
+      shortbuf trdb, twdb;
+      shortbuf srcpos;
+      long millis = get_millisecs_since();
+      usize_t this_read = (usize_t)(stream->total_in - *last_total_in);
+      usize_t this_write = (usize_t)(stream->total_out - *last_total_out);
+      *last_total_in = stream->total_in;
+      *last_total_out = stream->total_out;
+
+      if (option_verbose > 1) {
+        XPR(NT "%" XD3_Q "u: in %s (%s): out %s (%s): "
+               "total in %s: out %s: %s: srcpos %s\n",
+            stream->current_window, main_format_bcnt(this_read, &rdb),
+            main_format_rate(this_read, millis, &rrateavg),
+            main_format_bcnt(this_write, &wdb),
+            main_format_rate(this_write, millis, &wrateavg),
+            main_format_bcnt(stream->total_in, &trdb),
+            main_format_bcnt(stream->total_out, &twdb),
+            main_format_millis(millis, &tm),
+            main_format_bcnt(stream->srcwin_cksum_pos, &srcpos));
+      } else {
+        XPR(NT "%" XD3_Q "u: in %s: out %s: total in %s: "
+               "out %s: %s\n",
+            stream->current_window, main_format_bcnt(this_read, &rdb),
+            main_format_bcnt(this_write, &wdb),
+            main_format_bcnt(stream->total_in, &trdb),
+            main_format_bcnt(stream->total_out, &twdb),
+            main_format_millis(millis, &tm));
+      }
+    }
+  }
+}
+
+#if XD3_ENCODER
+static int main_set_encoder_config(xd3_config *config, int *stream_flags) {
+  if (option_no_compress) {
+    *stream_flags |= XD3_NOCOMPRESS;
+  }
+  if (option_smatch_config) {
+    const char *s = option_smatch_config;
+    char *e;
+    long values[XD3_SOFTCFG_VARCNT];
+    int got;
+
+    config->smatch_cfg = XD3_SMATCH_SOFT;
+
+    for (got = 0; got < XD3_SOFTCFG_VARCNT; got += 1, s = e + 1) {
+      values[got] = strtol(s, &e, 10);
+
+      if ((values[got] < 0) || (e == s) ||
+          (got < XD3_SOFTCFG_VARCNT - 1 && *e == 0) ||
+          (got == XD3_SOFTCFG_VARCNT - 1 && *e != 0)) {
+        XPR(NT "invalid string match specifier (-C) %d: %s\n", got, s);
+        return EXIT_FAILURE;
+      }
+    }
+
+    config->smatcher_soft.large_look = values[0];
+    config->smatcher_soft.large_step = values[1];
+    config->smatcher_soft.small_look = values[2];
+    config->smatcher_soft.small_chain = values[3];
+    config->smatcher_soft.small_lchain = values[4];
+    config->smatcher_soft.max_lazy = values[5];
+    config->smatcher_soft.long_enough = values[6];
+
+    return 0;
+  }
+
+  if (option_verbose > 2) {
+    XPR(NT "compression level: %d\n", option_level);
+  }
+  if (option_level == 0) {
+    *stream_flags |= XD3_NOCOMPRESS;
+    config->smatch_cfg = XD3_SMATCH_FASTEST;
+  } else if (option_level == 1) {
+    config->smatch_cfg = XD3_SMATCH_FASTEST;
+  } else if (option_level == 2) {
+    config->smatch_cfg = XD3_SMATCH_FASTER;
+  } else if (option_level <= 5) {
+    config->smatch_cfg = XD3_SMATCH_FAST;
+  } else if (option_level == 6) {
+    config->smatch_cfg = XD3_SMATCH_DEFAULT;
+  } else {
+    config->smatch_cfg = XD3_SMATCH_SLOW;
+  }
+
+  return 0;
+}
+#endif
+
 /*********************************************************************
  Main routines
  ********************************************************************/
@@ -3372,54 +3923,10 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     input_func = xd3_encode_input;
     output_func = main_write_output;
 
-    if (option_no_compress) {
-      stream_flags |= XD3_NOCOMPRESS;
+    if ((ret = main_set_encoder_config(&config, &stream_flags)) != 0) {
+      return ret;
     }
-    if (option_smatch_config) {
-      const char *s = option_smatch_config;
-      char *e;
-      long values[XD3_SOFTCFG_VARCNT];
-      int got;
 
-      config.smatch_cfg = XD3_SMATCH_SOFT;
-
-      for (got = 0; got < XD3_SOFTCFG_VARCNT; got += 1, s = e + 1) {
-        values[got] = strtol(s, &e, 10);
-
-        if ((values[got] < 0) || (e == s) ||
-            (got < XD3_SOFTCFG_VARCNT - 1 && *e == 0) ||
-            (got == XD3_SOFTCFG_VARCNT - 1 && *e != 0)) {
-          XPR(NT "invalid string match specifier (-C) %d: %s\n", got, s);
-          return EXIT_FAILURE;
-        }
-      }
-
-      config.smatcher_soft.large_look = values[0];
-      config.smatcher_soft.large_step = values[1];
-      config.smatcher_soft.small_look = values[2];
-      config.smatcher_soft.small_chain = values[3];
-      config.smatcher_soft.small_lchain = values[4];
-      config.smatcher_soft.max_lazy = values[5];
-      config.smatcher_soft.long_enough = values[6];
-    } else {
-      if (option_verbose > 2) {
-        XPR(NT "compression level: %d\n", option_level);
-      }
-      if (option_level == 0) {
-        stream_flags |= XD3_NOCOMPRESS;
-        config.smatch_cfg = XD3_SMATCH_FASTEST;
-      } else if (option_level == 1) {
-        config.smatch_cfg = XD3_SMATCH_FASTEST;
-      } else if (option_level == 2) {
-        config.smatch_cfg = XD3_SMATCH_FASTER;
-      } else if (option_level <= 5) {
-        config.smatch_cfg = XD3_SMATCH_FAST;
-      } else if (option_level == 6) {
-        config.smatch_cfg = XD3_SMATCH_DEFAULT;
-      } else {
-        config.smatch_cfg = XD3_SMATCH_SLOW;
-      }
-    }
     break;
 #endif
   case CMD_DECODE:
@@ -3530,11 +4037,31 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     case XD3_GOTHEADER: {
       XD3_ASSERT(stream.current_window == 0);
 
+#if VCDIFF_TOOLS
+      if ((cmd == CMD_MERGE || cmd == CMD_MERGE_ARG) &&
+          (stream.dec_hdr_ind & VCD_MULTIFILE) != 0) {
+        XPR(NT "multifile patches are not supported by merge\n");
+        return EXIT_FAILURE;
+      }
+#endif
+#if XD3_ENCODER
+      if (cmd == CMD_RECODE && (stream.dec_hdr_ind & VCD_MULTIFILE) != 0) {
+        XPR(NT "multifile patches are not supported by recode\n");
+        return EXIT_FAILURE;
+      }
+#endif
+
       /* Need to process the appheader as soon as possible.  It may
        * contain a suggested default filename/decompression routine for
        * the ofile, and it may contain default/decompression routine for
        * the sources. */
       if (cmd == CMD_DECODE) {
+        if (stream.dec_hdr_ind & VCD_MULTIFILE) {
+          XPR(NT "input is a multifile patch; specify all source/target "
+                 "pairs with repeated -s/-t options\n");
+          return EXIT_FAILURE;
+        }
+
         /* May need to set the sfile->filename if none was given. */
         main_get_appheader(&stream, ifile, ofile, sfile);
 
@@ -3557,7 +4084,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
             return EXIT_FAILURE;
           }
           if ((ret = main_armor_hash_file(sfile->filename, "source", got,
-                                          &nonseekable))) {
+                                          &nonseekable, 0))) {
             return EXIT_FAILURE;
           }
           if (nonseekable) {
@@ -3648,73 +4175,8 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     }
 
     case XD3_WINFINISH: {
-      /* Warn loudly, once, if a delta being decoded carries no
-         integrity checksum, since a wrong source can then silently
-         produce corrupt output. */
-      if (cmd == CMD_DECODE && option_use_checksum && !option_quiet &&
-          !main_warned_no_checksum && (stream.dec_win_ind & VCD_ADLER32) == 0) {
-        main_warned_no_checksum = 1;
-        XPR(NT "WARNING: this delta has no integrity checksum; "
-               "the decoded output cannot be verified and a wrong "
-               "source may silently produce corrupt output\n");
-      }
-
-      if (IS_ENCODE(cmd) || cmd == CMD_DECODE || cmd == CMD_RECODE) {
-        if (!option_quiet && IS_ENCODE(cmd) && main_file_isopen(sfile)) {
-          /* Warn when no source copies are found */
-          if (option_verbose && !xd3_encoder_used_source(&stream)) {
-            XPR(NT "warning: input window %" XD3_Q "u..%" XD3_Q "u has "
-                   "no source copies\n",
-                stream.current_window * winsize,
-                (stream.current_window + 1) * winsize);
-            XD3_ASSERT(stream.src != NULL);
-          }
-
-          /* Limited i-buffer size affects source copies
-           * when the sourcewin is decided early. */
-          if (option_verbose > 1 && stream.srcwin_decided_early &&
-              stream.i_slots_used > stream.iopt_size) {
-            XPR(NT "warning: input position %" XD3_Q "u overflowed "
-                   "instruction buffer, needed %" XD3_W "u (vs. %" XD3_W "u), "
-                   "consider changing -I\n",
-                stream.current_window * winsize, stream.i_slots_used,
-                stream.iopt_size);
-          }
-        }
-
-        if (option_verbose) {
-          shortbuf rrateavg, wrateavg, tm;
-          shortbuf rdb, wdb;
-          shortbuf trdb, twdb;
-          shortbuf srcpos;
-          long millis = get_millisecs_since();
-          usize_t this_read = (usize_t)(stream.total_in - last_total_in);
-          usize_t this_write = (usize_t)(stream.total_out - last_total_out);
-          last_total_in = stream.total_in;
-          last_total_out = stream.total_out;
-
-          if (option_verbose > 1) {
-            XPR(NT "%" XD3_Q "u: in %s (%s): out %s (%s): "
-                   "total in %s: out %s: %s: srcpos %s\n",
-                stream.current_window, main_format_bcnt(this_read, &rdb),
-                main_format_rate(this_read, millis, &rrateavg),
-                main_format_bcnt(this_write, &wdb),
-                main_format_rate(this_write, millis, &wrateavg),
-                main_format_bcnt(stream.total_in, &trdb),
-                main_format_bcnt(stream.total_out, &twdb),
-                main_format_millis(millis, &tm),
-                main_format_bcnt(stream.srcwin_cksum_pos, &srcpos));
-          } else {
-            XPR(NT "%" XD3_Q "u: in %s: out %s: total in %s: "
-                   "out %s: %s\n",
-                stream.current_window, main_format_bcnt(this_read, &rdb),
-                main_format_bcnt(this_write, &wdb),
-                main_format_bcnt(stream.total_in, &trdb),
-                main_format_bcnt(stream.total_out, &twdb),
-                main_format_millis(millis, &tm));
-          }
-        }
-      }
+      main_report_window_finish(cmd, &stream, sfile, winsize, &last_total_in,
+                                &last_total_out);
       goto again;
     }
 
@@ -3840,11 +4302,791 @@ done:
   return EXIT_SUCCESS;
 }
 
+static int begin_decode_pair(xd3_stream *stream, main_file_job *job,
+                             uint32_t pair_idx, main_file *sfile,
+                             main_file *ofile, xd3_source *source) {
+
+  XD3_ASSERT(stream->src == NULL);
+  XD3_ASSERT(pair_idx < job->pair_count);
+
+  main_file_init(sfile);
+  sfile->filename = job->pairs[pair_idx].src_filename;
+  sfile->flags = RD_FIRST | RD_NONEXTERNAL;
+
+  main_file_init(ofile);
+  ofile->filename = job->pairs[pair_idx].tgt_filename;
+
+  memset(source, 0, sizeof(*source));
+
+  int ret;
+  if ((ret = main_set_source(stream, CMD_DECODE, sfile, source)) != 0) {
+    main_file_cleanup(sfile);
+    return ret;
+  }
+
+#if XD3_ARMOR
+  armor_target_active = 0;
+
+  if (job->pairs[pair_idx].tgt_hash[0] != '\0') {
+    blake3_hasher_init(&armor_target_hasher);
+    armor_target_active = 1;
+  }
+#endif
+
+  return 0;
+}
+
+static int end_decode_pair(xd3_stream *stream, main_file_job *job,
+                           uint32_t pair_idx, main_file *sfile,
+                           main_file *ofile) {
+
+  int result = 0;
+
+#if XD3_ARMOR
+  /* Armor: verify the reconstructed target */
+  if (armor_target_active) {
+    uint8_t digest[BLAKE3_OUT_LEN];
+    char got[XD3_BLAKE3_HEXBUF];
+
+    armor_target_active = 0;
+    blake3_hasher_finalize(&armor_target_hasher, digest, sizeof(digest));
+    main_armor_hex(digest, got);
+
+    if (strcmp(got, job->pairs[pair_idx].tgt_hash) != 0) {
+      XPR(NT "target BLAKE3 mismatch after apply: %s\n",
+          ofile->filename != NULL ? ofile->filename : "-");
+      XPR(NT "  expected %s\n", job->pairs[pair_idx].tgt_hash);
+      XPR(NT "  actual   %s\n", got);
+      result = EXIT_FAILURE;
+    } else if (option_verbose) {
+      XPR(NT "armor: target verified(%s)\n",
+          ofile->filename != NULL ? ofile->filename : "-");
+    }
+  }
+#endif
+
+  stream->src = NULL;
+
+  main_lru_cleanup();
+  main_lru_reset();
+
+  if (main_file_close(ofile) != 0) {
+    result = EXIT_FAILURE;
+  }
+  main_file_cleanup(ofile);
+  main_file_cleanup(sfile);
+
+  return result;
+}
+
+static int same_filename(const char *a, const char *b) {
+  return a != NULL && b != NULL && strcmp(a, b) == 0;
+}
+
+static int main_validate_multifile_paths(xd3_cmd cmd, main_file_job *job) {
+  uint32_t i, j;
+
+  if (job->pair_count <= 1) {
+    return 0;
+  }
+
+#if XD3_ENCODER
+  if (cmd == CMD_ENCODE) {
+    /* The patch is the only output during encoding.  It must not
+     * overwrite any source or target input, including an input belonging
+     * to a later pair. */
+    for (i = 0; i < job->pair_count; i++) {
+      if (same_filename(job->patch_filename, job->pairs[i].src_filename) ||
+          same_filename(job->patch_filename, job->pairs[i].tgt_filename)) {
+        XPR(NT "multifile patch output conflicts with input file: %s\n",
+            job->patch_filename);
+        return EXIT_FAILURE;
+      }
+    }
+
+    return 0;
+  }
+#endif
+
+  XD3_ASSERT(cmd == CMD_DECODE);
+  for (i = 0; i < job->pair_count; i++) {
+    const char *target = job->pairs[i].tgt_filename;
+
+    /* Do not overwrite the patch while it is still being decoded. */
+    if (same_filename(target, job->patch_filename)) {
+      XPR(NT "multifile target conflicts with patch input: %s\n", target);
+      return EXIT_FAILURE;
+    }
+
+    /* No target may overwrite any source, including a source used by a
+     * later pair. */
+    for (j = 0; j < job->pair_count; j++) {
+      if (same_filename(target, job->pairs[j].src_filename)) {
+        XPR(NT "multifile target conflicts with source file: %s\n", target);
+        return EXIT_FAILURE;
+      }
+    }
+
+    /* Two pairs must not write to the same target filename. */
+    for (j = 0; j < i; j++) {
+      if (same_filename(target, job->pairs[j].tgt_filename)) {
+        XPR(NT "duplicate multifile target filename: %s\n", target);
+        return EXIT_FAILURE;
+      }
+    }
+  }
+
+  return 0;
+}
+
+#if XD3_ENCODER
+static int main_input_multifile_encode(main_file_job *job) {
+  int ret;
+  size_t nread = 0;
+  usize_t winsize;
+  xoff_t next_window = 0;
+  int stream_flags = 0;
+  int stream_configured = 0;
+  xd3_config config;
+  xoff_t last_total_in = 0;
+  xoff_t last_total_out = 0;
+  long start_time;
+  main_file _ifile, _ofile, _sfile;
+  main_file *ifile = &_ifile;
+  main_file *ofile = &_ofile;
+  main_file *sfile = &_sfile;
+
+  memset(&config, 0, sizeof(config));
+
+  main_file_init(ofile);
+  ofile->filename = job->patch_filename;
+
+  config.alloc = main_alloc;
+  config.freef = main_free1;
+
+  config.iopt_size = option_iopt_size;
+  config.sprevsz = option_sprevsz;
+
+  do_src_fifo = 0;
+
+  start_time = get_millisecs_now();
+
+#if XD3_ARMOR
+  /* Reset per-operation armor verification state. */
+  armor_have_source = 0;
+  armor_have_target = 0;
+  armor_target_active = 0;
+#endif
+
+  if (option_use_checksum) {
+    stream_flags |= XD3_ADLER32;
+  }
+
+  /* main_input setup. */
+  do_src_fifo = 1;
+
+  if ((ret = main_set_encoder_config(&config, &stream_flags)) != 0) {
+    return ret;
+  }
+
+  main_bsize = winsize = xd3_max(option_winsize, XD3_ALLOCSIZE);
+
+  if ((main_bdata = (uint8_t *)main_bufalloc(winsize)) == NULL) {
+    return EXIT_FAILURE;
+  }
+
+  config.winsize = winsize;
+  config.getblk = main_getblk_func;
+  config.flags = stream_flags;
+
+  if ((ret = main_set_secondary_flags(&config)) != 0) {
+    XPR(NT "%s\n", xd3_strerror(ret));
+    return EXIT_FAILURE;
+  }
+
+  xd3_stream stream;
+  xd3_source source;
+
+  uint32_t i;
+  for (i = 0u; i < job->pair_count; i++) {
+
+    nread = 0;
+    last_total_in = 0;
+    last_total_out = 0;
+    stream_configured = 0;
+
+    memset(&stream, 0, sizeof(stream));
+    memset(&source, 0, sizeof(source));
+
+    main_file_init(ifile);
+    main_file_init(sfile);
+
+    sfile->filename = job->pairs[i].src_filename;
+    sfile->flags = RD_FIRST | RD_NONEXTERNAL;
+
+    ifile->filename = job->pairs[i].tgt_filename;
+    ifile->flags = RD_FIRST | RD_MAININPUT | RD_NONEXTERNAL;
+    if (ifile->filename != NULL) {
+      if ((ret = main_file_open(ifile, ifile->filename, XO_READ)) != 0) {
+        goto encode_fail;
+      }
+    } else {
+      XSTDIN_XF(ifile);
+    }
+
+    if ((ret = xd3_config_stream(&stream, &config)) != 0) {
+      XPR(NT XD3_LIB_ERRMSG(&stream, ret));
+      xd3_free_stream(&stream);
+      goto encode_fail;
+    }
+    stream_configured = 1;
+
+    /* Pair zero writes the VCDIFF file header.  Subsequent streams
+     * append windows without writing another file header. */
+    stream.current_window = next_window;
+
+    if (i == 0) {
+      if ((ret = main_set_multifile_appheader(&stream, job)) != 0) {
+        goto encode_fail;
+      }
+
+      if ((ret = main_set_multiheader(&stream, job)) != 0) {
+        XPR(NT "could not build multifile header: %s\n", xd3_strerror(ret));
+        goto encode_fail;
+      }
+    }
+
+    if (sfile->filename != NULL) {
+      if ((ret = main_set_source(&stream, CMD_ENCODE, sfile, &source))) {
+        goto encode_fail;
+      }
+
+      XD3_ASSERT(stream.src != NULL);
+    }
+
+    /* This times each window. */
+    get_millisecs_since();
+
+    /* Main input loop. */
+    do {
+      xoff_t input_offset;
+      xoff_t input_remain;
+      usize_t try_read;
+
+      input_offset = ifile->nread;
+      input_remain = XOFF_T_MAX - input_offset;
+      try_read = (usize_t)xd3_min((xoff_t)config.winsize, input_remain);
+
+      if ((ret =
+               main_read_primary_input(ifile, main_bdata, try_read, &nread))) {
+        goto encode_fail;
+      }
+
+      /* If we've reached EOF tell the stream to flush. */
+      if (nread < try_read) {
+        stream.flags |= XD3_FLUSH;
+      }
+
+      xd3_avail_input(&stream, main_bdata, nread);
+
+      /* If we read zero bytes after encoding at least one window... */
+      if (nread == 0 && stream.current_window > 0) {
+        break;
+      }
+
+    again:
+      ret = xd3_encode_input(&stream);
+
+      switch (ret) {
+      case XD3_INPUT:
+        continue;
+
+      case XD3_GOTHEADER: {
+        XD3_ASSERT(stream.current_window == 0);
+      }
+      /* FALLTHROUGH */
+      case XD3_WINSTART: {
+        /* e.g., set or unset XD3_SKIP_WINDOW. */
+        goto again;
+      }
+
+      case XD3_OUTPUT: {
+        /* Defer opening the output file until the stream produces its
+         * first output for both encoder and decoder, this way we
+         * delay long enough for the decoder to receive the
+         * application header.  (Or longer if there are skipped
+         * windows, but I can't think of any reason not to delay
+         * open.) */
+        if (ofile != NULL && !main_file_isopen(ofile) &&
+            (ret = main_open_output(&stream, ofile)) != 0) {
+          goto encode_fail;
+        }
+
+        if ((ret = main_write_output(&stream, ofile)) &&
+            (ret != PRINTHDR_SPECIAL)) {
+          goto encode_fail;
+        }
+
+        if (ret == PRINTHDR_SPECIAL) {
+          xd3_abort_stream(&stream);
+          ret = EXIT_SUCCESS;
+          goto done;
+        }
+
+        ret = 0;
+
+        xd3_consume_output(&stream);
+        goto again;
+      }
+
+      case XD3_WINFINISH: {
+        main_report_window_finish(CMD_ENCODE, &stream, sfile, winsize,
+                                  &last_total_in, &last_total_out);
+
+        goto again;
+      }
+
+      default:
+        /* input_func() error */
+        XPR(NT XD3_LIB_ERRMSG(&stream, ret));
+        if (!option_quiet && ret == XD3_INVALID_INPUT && sfile != NULL &&
+            sfile->filename != NULL) {
+          XPR(NT "normally this indicates that the source file is "
+                 "incorrect\n");
+          XPR(NT "please verify the source file with sha1sum or "
+                 "equivalent\n");
+        }
+        goto encode_fail;
+      }
+    } while (nread == config.winsize);
+  done:
+
+#if XD3_ENCODER
+    if (option_verbose > 1) {
+      XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
+      XPR(NT "target hash table size: %" XD3_W "u\n", stream.small_hash.size);
+      if (sfile != NULL && sfile->filename != NULL) {
+        XPR(NT "source hash table size: %" XD3_W "u\n", stream.large_hash.size);
+      }
+    }
+
+    if (option_verbose > 2) {
+      XPR(NT "source copies: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_scpy,
+          stream.l_scpy);
+      XPR(NT "target copies: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_tcpy,
+          stream.l_tcpy);
+      XPR(NT "adds: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_add,
+          stream.l_add);
+      XPR(NT "runs: %" XD3_Q "u (%" XD3_Q "u bytes)\n", stream.n_run,
+          stream.l_run);
+    }
+#endif
+
+    if (option_verbose) {
+      shortbuf tm;
+      long end_time = get_millisecs_now();
+      xoff_t nwrite = ofile != NULL ? ofile->nwrite : 0;
+
+      XPR(NT "finished in %s; input %" XD3_Q "u output %" XD3_Q
+             "u bytes (%0.2f%%)\n",
+          main_format_millis(end_time - start_time, &tm), ifile->nread, nwrite,
+          100.0 * nwrite / ifile->nread);
+    }
+
+    if ((ret = xd3_close_stream(&stream))) {
+      XPR(NT XD3_LIB_ERRMSG(&stream, ret));
+      goto encode_fail;
+    }
+
+    if (stream.current_window != (xoff_t)job->pairs[i].end_window) {
+      XPR(NT "target window count changed while multifile patch was "
+             "being encoded: %s\n",
+          job->pairs[i].tgt_filename);
+      goto encode_fail;
+    }
+
+    next_window = stream.current_window;
+    xd3_free_stream(&stream);
+    stream_configured = 0;
+
+    main_lru_cleanup();
+    main_lru_reset();
+
+    main_file_cleanup(ifile);
+    main_file_cleanup(sfile);
+  } /* pair loop */
+
+  if (main_file_close(ofile) != 0) {
+    goto encode_fail;
+  }
+  main_file_cleanup(ofile);
+
+  return EXIT_SUCCESS;
+
+encode_fail:
+  if (stream_configured) {
+    xd3_free_stream(&stream);
+  }
+
+  main_lru_cleanup();
+  main_lru_reset();
+
+  main_file_cleanup(ifile);
+  main_file_cleanup(sfile);
+  main_file_cleanup(ofile);
+
+  return EXIT_FAILURE;
+}
+#endif
+
+static int main_input_multifile_decode(main_file_job *job) {
+  int ret;
+  size_t nread = 0;
+  usize_t winsize;
+  int stream_flags = 0;
+  int stream_configured = 0;
+  int result = EXIT_FAILURE;
+  xd3_config config;
+  xoff_t last_total_in = 0;
+  xoff_t last_total_out = 0;
+  long start_time;
+  main_file _ifile, _ofile, _sfile;
+  main_file *ifile = &_ifile;
+  main_file *ofile = &_ofile;
+  main_file *sfile = &_sfile;
+  xd3_stream stream;
+  xd3_source source;
+
+  memset(&config, 0, sizeof(config));
+  memset(&stream, 0, sizeof(stream));
+  memset(&source, 0, sizeof(source));
+
+  main_file_init(ifile);
+  main_file_init(ofile);
+  main_file_init(sfile);
+
+  ifile->filename = job->patch_filename;
+  ifile->flags = RD_FIRST | RD_MAININPUT;
+  if (ifile->filename != NULL) {
+    if ((ret = main_file_open(ifile, ifile->filename, XO_READ)) != 0) {
+      goto decode_fail;
+    }
+  } else {
+    XSTDIN_XF(ifile);
+  }
+
+  config.alloc = main_alloc;
+  config.freef = main_free1;
+
+  config.iopt_size = option_iopt_size;
+  config.sprevsz = option_sprevsz;
+
+  do_src_fifo = 0;
+
+  start_time = get_millisecs_now();
+
+#if XD3_ARMOR
+  /* Reset per-operation armor verification state. */
+  armor_have_source = 0;
+  armor_have_target = 0;
+  armor_target_active = 0;
+#endif
+
+  if (option_use_checksum) {
+    stream_flags |= XD3_ADLER32;
+  } else {
+    stream_flags |= XD3_ADLER32_NOVER;
+  }
+  ifile->flags |= RD_NONEXTERNAL;
+
+  main_bsize = winsize = xd3_max(option_winsize, XD3_ALLOCSIZE);
+
+  if ((main_bdata = (uint8_t *)main_bufalloc(winsize)) == NULL) {
+    goto decode_fail;
+  }
+
+  config.winsize = winsize;
+  config.getblk = main_getblk_func;
+  config.flags = stream_flags;
+
+  if ((ret = main_set_secondary_flags(&config)) != 0) {
+    XPR(NT "%s\n", xd3_strerror(ret));
+    goto decode_fail;
+  }
+
+  int pair_active = 0;
+  nread = 0;
+  last_total_in = 0;
+  last_total_out = 0;
+
+  if ((ret = xd3_config_stream(&stream, &config)) != 0) {
+    XPR(NT XD3_LIB_ERRMSG(&stream, ret));
+    /* xd3_config_stream() may have partially initialized the stream.
+     * Free it here, but leave stream_configured false so decode_fail
+     * does not free it twice. */
+    xd3_free_stream(&stream);
+    goto decode_fail;
+  }
+  stream_configured = 1;
+
+  /* This times each window. */
+  get_millisecs_since();
+
+  uint32_t pair_idx = 0;
+  /* Main input loop. */
+  do {
+    xoff_t input_offset;
+    xoff_t input_remain;
+    usize_t try_read;
+
+    input_offset = ifile->nread;
+
+    input_remain = XOFF_T_MAX - input_offset;
+
+    try_read = (usize_t)xd3_min((xoff_t)config.winsize, input_remain);
+
+    if ((ret = main_read_primary_input(ifile, main_bdata, try_read, &nread))) {
+      goto decode_fail;
+    }
+
+    /* If we've reached EOF tell the stream to flush. */
+    if (nread < try_read) {
+      stream.flags |= XD3_FLUSH;
+    }
+
+    xd3_avail_input(&stream, main_bdata, nread);
+
+    /* If we read zero bytes after encoding at least one window... */
+    if (nread == 0 && stream.current_window > 0) {
+      break;
+    }
+
+  again:
+    ret = xd3_decode_input(&stream);
+
+    switch (ret) {
+    case XD3_INPUT:
+      continue;
+
+    case XD3_GOTHEADER: {
+      XD3_ASSERT(stream.current_window == 0);
+      XD3_ASSERT(stream.dec_window_count == 0);
+
+      /* Need to process the appheader as soon as possible.  It may
+       * contain a suggested default filename/decompression routine for
+       * the ofile, and it may contain default/decompression routine for
+       * the sources. */
+      if ((stream.dec_hdr_ind & VCD_MULTIFILE) == 0) {
+        XPR(NT "input is not a multifile patch; "
+               "decode it with a single source/target pair\n");
+        goto decode_fail;
+      }
+      if ((ret = main_get_multiheader(&stream, job)) != 0) {
+        XPR(NT "problem reading multifile header: %s\n",
+            stream.msg != NULL ? stream.msg : xd3_strerror(ret));
+        goto decode_fail;
+      }
+
+      if (main_get_multifile_appheader(&stream, job) != 0) {
+        goto decode_fail;
+      }
+
+#if XD3_ARMOR
+      if ((ret = main_verify_multifile_sources(job)) != 0) {
+        result = ret;
+        goto decode_fail;
+      }
+#endif
+
+      pair_idx = 0;
+
+      if (job->pair_count == 0 || job->pairs[0].end_window == 0) {
+        XPR(NT "invalid multifile patch: empty target or no file pairs\n");
+        goto decode_fail;
+      }
+
+      if ((ret = begin_decode_pair(&stream, job, pair_idx, sfile, ofile,
+                                   &source)) != 0) {
+        goto decode_fail;
+      }
+
+      pair_active = 1;
+    }
+    /* FALLTHROUGH */
+    case XD3_WINSTART: {
+      if (!pair_active || pair_idx >= job->pair_count) {
+        XPR(NT "multifile patch contains windows after the final target\n");
+        goto decode_fail;
+      }
+
+      if (stream.dec_tgtlen == 0) {
+        XPR(NT "multifile patch contains a zero-length target window\n");
+        goto decode_fail;
+      }
+
+      goto again;
+    }
+
+    case XD3_OUTPUT: {
+      /* Defer opening the output file until the stream produces its
+       * first output for both encoder and decoder, this way we
+       * delay long enough for the decoder to receive the
+       * application header.  (Or longer if there are skipped
+       * windows, but I can't think of any reason not to delay
+       * open.) */
+      if (ofile != NULL && !main_file_isopen(ofile) &&
+          (ret = main_open_output(&stream, ofile)) != 0) {
+        goto decode_fail;
+      }
+
+      if ((ret = main_write_output(&stream, ofile)) &&
+          (ret != PRINTHDR_SPECIAL)) {
+        goto decode_fail;
+      }
+
+      if (ret == PRINTHDR_SPECIAL) {
+        xd3_abort_stream(&stream);
+        ret = EXIT_SUCCESS;
+        goto done;
+      }
+
+      ret = 0;
+
+      xd3_consume_output(&stream);
+      goto again;
+    }
+
+    case XD3_WINFINISH: {
+      main_report_window_finish(CMD_DECODE, &stream, sfile, winsize,
+                                &last_total_in, &last_total_out);
+
+      if (pair_idx >= job->pair_count || !pair_active) {
+        XPR(NT "multifile patch contains a window after the final target\n");
+        goto decode_fail;
+      }
+      if (stream.dec_window_count > (xoff_t)job->pairs[pair_idx].end_window) {
+        XPR(NT "multifile patch crossed target %u's end-window boundary\n",
+            (unsigned)pair_idx);
+        goto decode_fail;
+      }
+
+      if ((usize_t)stream.dec_window_count == job->pairs[pair_idx].end_window) {
+        if ((ret = end_decode_pair(&stream, job, pair_idx, sfile, ofile)) !=
+            0) {
+          goto decode_fail;
+        }
+
+        pair_active = 0;
+        pair_idx++;
+
+        if (pair_idx < job->pair_count) {
+          if ((ret = begin_decode_pair(&stream, job, pair_idx, sfile, ofile,
+                                       &source)) != 0) {
+            goto decode_fail;
+          }
+
+          pair_active = 1;
+        }
+      }
+
+      goto again;
+    }
+
+    default:
+      /* input_func() error */
+      XPR(NT XD3_LIB_ERRMSG(&stream, ret));
+      if (!option_quiet && ret == XD3_INVALID_INPUT && sfile != NULL &&
+          sfile->filename != NULL) {
+        XPR(NT "normally this indicates that the source file is "
+               "incorrect\n");
+        XPR(NT "please verify the source file with sha1sum or "
+               "equivalent\n");
+      }
+      goto decode_fail;
+    }
+  } while (nread == config.winsize);
+done:
+
+  if (pair_active || pair_idx != job->pair_count) {
+    XPR(NT "multifile patch ended before all target boundaries were "
+           "reached\n");
+    goto decode_fail;
+  }
+
+  if (stream.dec_window_count !=
+      (xoff_t)job->pairs[job->pair_count - 1].end_window) {
+    XPR(NT "multifile patch window count does not match its metadata\n");
+    goto decode_fail;
+  }
+
+  if (option_verbose) {
+    shortbuf tm;
+    long end_time = get_millisecs_now();
+    xoff_t nwrite = stream.total_out;
+
+    XPR(NT "finished in %s; input %" XD3_Q "u output %" XD3_Q
+           "u bytes (%0.2f%%)\n",
+        main_format_millis(end_time - start_time, &tm), ifile->nread, nwrite,
+        100.0 * nwrite / ifile->nread);
+  }
+
+  if ((ret = xd3_close_stream(&stream))) {
+    XPR(NT XD3_LIB_ERRMSG(&stream, ret));
+    goto decode_fail;
+  }
+
+  xd3_free_stream(&stream);
+  stream_configured = 0;
+
+  main_file_cleanup(sfile);
+  main_file_cleanup(ofile);
+  main_file_cleanup(ifile);
+
+  return EXIT_SUCCESS;
+
+decode_fail:
+#if XD3_ARMOR
+  armor_target_active = 0;
+#endif
+
+  stream.src = NULL;
+
+  main_lru_cleanup();
+  main_lru_reset();
+
+  main_file_cleanup(sfile);
+  main_file_cleanup(ofile);
+  main_file_cleanup(ifile);
+
+  if (stream_configured) {
+    xd3_free_stream(&stream);
+    stream_configured = 0;
+  }
+
+  return result;
+}
+
+static int main_input_multifile(xd3_cmd cmd, main_file_job *job) {
+#if XD3_ENCODER
+  if (cmd == CMD_ENCODE) {
+    return main_input_multifile_encode(job);
+  }
+#endif
+
+  XD3_ASSERT(cmd == CMD_DECODE);
+  return main_input_multifile_decode(job);
+}
+
 /* free memory before exit, reset single-use variables. */
 static void main_cleanup(void) {
   if (appheader_used != NULL && appheader_used != option_appheader) {
     main_free(appheader_used);
     appheader_used = NULL;
+  }
+
+  if (multiheader_used != NULL) {
+    main_free(multiheader_used);
+    multiheader_used = NULL;
   }
 
   main_buffree(main_bdata);
@@ -3953,17 +5195,22 @@ int main(int argc, char **argv)
 #endif
 {
   static const char *flags =
-      "0123456789acdefhnqvDFGJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
+      "0123456789acdefhnqvDFGJNORVs:t:m:B:C:E:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
   main_file ifile;
   main_file ofile;
   main_file sfile;
+  main_file_job job;
   main_merge_list merge_order;
   main_merge *merge;
   int my_optind;
   const char *my_optarg;
   const char *my_optstr;
   const char *sfilename;
+  main_file_pair *pairs;
+  uint32_t num_pairs;
+  uint32_t pair_idx;
+  int file_job_cmd;
   int env_argc;
   char **env_argv;
   char **free_argv; /* malloc() in setup_environment() */
@@ -3978,6 +5225,9 @@ int main(int argc, char **argv)
   main_file_init(&ifile);
   main_file_init(&ofile);
   main_file_init(&sfile);
+
+  memset(&job, 0, sizeof(job));
+
   main_merge_list_init(&merge_order);
 
   reset_defaults();
@@ -3987,6 +5237,9 @@ int main(int argc, char **argv)
   setup_environment(argc, argv, &env_argc, &env_argv, &free_argv, &free_value);
   cmd = CMD_NONE;
   sfilename = NULL;
+  pairs = NULL;
+  num_pairs = 0;
+  file_job_cmd = 0;
   my_optind = 1;
   argv = env_argv;
   argc = env_argc;
@@ -4263,12 +5516,39 @@ takearg:
       break;
     case 's':
       if (sfilename != NULL) {
-        XPR(NT "specify only one source file\n");
+        XPR(NT "missing -t for previous -s\n");
         goto cleanup;
       }
 
       sfilename = my_optarg;
       break;
+    case 't': {
+      if (sfilename == NULL) {
+        XPR(NT "-t requires a preceding -s\n");
+        goto cleanup;
+      }
+
+      if (num_pairs == UINT32_MAX) {
+        XPR(NT "too many source/target pairs\n");
+        goto cleanup;
+      }
+
+      main_file_pair *new_pairs;
+      new_pairs = (main_file_pair *)realloc(pairs, ((size_t)num_pairs + 1) *
+                                                       sizeof(*pairs));
+      if (new_pairs == NULL) {
+        XPR(NT "realloc: %s\n", xd3_mainerror(ENOMEM));
+        goto cleanup;
+      }
+
+      pairs = new_pairs;
+      pairs[num_pairs].src_filename = sfilename;
+      pairs[num_pairs].tgt_filename = my_optarg;
+
+      num_pairs++;
+      sfilename = NULL;
+      break;
+    }
     case 'm':
       if ((merge = (main_merge *)main_malloc(sizeof(main_merge))) == NULL) {
         goto cleanup;
@@ -4285,8 +5565,6 @@ takearg:
     }
   }
 
-  option_source_filename = sfilename;
-
   /* In case there were no arguments, set the default command. */
   if (cmd == CMD_NONE) {
     cmd = CMD_DEFAULT;
@@ -4295,39 +5573,212 @@ takearg:
   argc -= my_optind;
   argv += my_optind;
 
-  /* There may be up to two more arguments. */
-  if (argc > 2) {
-    XPR(NT "too many filenames: %s ...\n", argv[2]);
+  /* Encode and decode use main_file_job. Other commands continue
+   * using the original ifile/ofile/sfile objects. */
+  file_job_cmd = (cmd == CMD_DECODE);
+
+#if XD3_ENCODER
+  if (cmd == CMD_ENCODE) {
+    file_job_cmd = 1;
+  }
+#endif
+
+  if (num_pairs != 0 && !file_job_cmd) {
+    XPR(NT "-t is only valid with encode or decode\n");
     goto cleanup;
   }
 
-  ifile.flags = RD_FIRST | RD_MAININPUT;
-  sfile.flags = RD_FIRST;
-  sfile.filename = option_source_filename;
-
-  /* The infile takes the next argument, if there is one.  But if not, infile
-   * is set to stdin. */
-  if (argc > 0) {
-    ifile.filename = argv[0];
-
-    if ((ret = main_file_open(&ifile, ifile.filename, XO_READ))) {
-      goto cleanup;
-    }
-  } else {
-    XSTDIN_XF(&ifile);
+  if (num_pairs != 0 && sfilename != NULL) {
+    XPR(NT "missing -t for final -s\n");
+    goto cleanup;
   }
 
-  /* The ofile takes the following argument, if there is one.  But if not, it
-   * is left NULL until the application header is processed.  It will be set
-   * in main_open_output. */
-  if (argc > 1) {
-    /* Check for conflicting arguments. */
-    if (option_stdout && !option_quiet) {
-      XPR(NT "warning: -c option overrides output filename: %s\n", argv[1]);
+  if (file_job_cmd) {
+    if (num_pairs == 0) {
+      /* Standard command format:
+       * encode: -s source target patch
+       * decode: -s source patch target
+       */
+      if (argc > 2) {
+        XPR(NT "too many filenames: %s ...\n", argv[2]);
+        goto cleanup;
+      }
+
+      job.pair_count = 1;
+      job.pairs = (main_file_pair *)main_malloc(sizeof(*job.pairs));
+      if (job.pairs == NULL) {
+        goto cleanup;
+      }
+
+      job.pairs[0].src_filename = sfilename;
+
+#if XD3_ENCODER
+      if (cmd == CMD_ENCODE) {
+        job.pairs[0].tgt_filename = argc > 0 ? argv[0] : NULL;
+        job.patch_filename = argc > 1 ? argv[1] : NULL;
+      } else
+#endif
+      {
+        XD3_ASSERT(cmd == CMD_DECODE);
+
+        job.patch_filename = argc > 0 ? argv[0] : NULL;
+        job.pairs[0].tgt_filename = argc > 1 ? argv[1] : NULL;
+      }
+    } else {
+      /* Multifile command format:
+       * encode/decode:
+       *   -s source1 -t target1 [-s source2 -t target2 ...] patch
+       */
+      if (argc == 0) {
+        XPR(NT "missing patch filename\n");
+        goto cleanup;
+      }
+
+      if (argc > 1) {
+        XPR(NT "too many filenames: %s ...\n", argv[1]);
+        goto cleanup;
+      }
+
+      if (option_stdout) {
+        XPR(NT "-c option unsupported in multifile mode\n");
+        goto cleanup;
+      }
+#if EXTERNAL_COMPRESSION
+      if (num_pairs > 1 && option_force2) {
+        XPR(NT "-F is not supported with multifile patches\n");
+        goto cleanup;
+      }
+#endif
+
+      job.pair_count = num_pairs;
+      job.pairs =
+          (main_file_pair *)main_malloc(job.pair_count * sizeof(*job.pairs));
+      if (job.pairs == NULL) {
+        goto cleanup;
+      }
+
+      memset(job.pairs, 0, (usize_t)job.pair_count * sizeof(*job.pairs));
+
+      for (pair_idx = 0; pair_idx < job.pair_count; pair_idx++) {
+        job.pairs[pair_idx].src_filename = pairs[pair_idx].src_filename;
+        job.pairs[pair_idx].tgt_filename = pairs[pair_idx].tgt_filename;
+      }
+
+      job.patch_filename = argv[0];
+
+      if ((ret = main_validate_multifile_paths(cmd, &job)) != 0) {
+        goto cleanup;
+      }
+
+      if (job.pair_count > 1) {
+        for (pair_idx = 0; pair_idx < job.pair_count; pair_idx++) {
+          xoff_t src_size;
+
+          ret = main_filename_size(job.pairs[pair_idx].src_filename, &src_size);
+          if (ret != 0) {
+            goto cleanup;
+          }
+
+          if (src_size == 0) {
+            XPR(NT "empty source files are not supported in "
+                   "multifile mode: %s\n",
+                job.pairs[pair_idx].src_filename);
+            goto cleanup;
+          }
+
+#if XD3_ENCODER
+          if (cmd == CMD_ENCODE) {
+            ret = main_filename_size(job.pairs[pair_idx].tgt_filename,
+                                     &job.pairs[pair_idx].tgt_size);
+            if (ret != 0) {
+              goto cleanup;
+            }
+
+            if (job.pairs[pair_idx].tgt_size == 0) {
+              XPR(NT "empty target files are not supported in multifile mode: "
+                     "%s\n",
+                  job.pairs[pair_idx].tgt_filename);
+              goto cleanup;
+            }
+          }
+#endif
+        }
+      }
     }
 
-    if (!option_stdout) {
-      ofile.filename = argv[1];
+    if (job.pair_count == 1) {
+
+      sfile.filename = job.pairs[0].src_filename;
+      sfile.flags = RD_FIRST;
+
+#if XD3_ENCODER
+      if (cmd == CMD_ENCODE) {
+        ifile.filename = job.pairs[0].tgt_filename;
+        ofile.filename = job.patch_filename;
+      } else
+#endif
+      {
+        XD3_ASSERT(cmd == CMD_DECODE);
+
+        ifile.filename = job.patch_filename;
+        ofile.filename = job.pairs[0].tgt_filename;
+      }
+
+      ifile.flags = RD_FIRST | RD_MAININPUT;
+
+      if (ifile.filename != NULL) {
+        if ((ret = main_file_open(&ifile, ifile.filename, XO_READ)) != 0) {
+          goto cleanup;
+        }
+      } else {
+        XSTDIN_XF(&ifile);
+      }
+
+      if (option_stdout) {
+        if (ofile.filename != NULL && !option_quiet) {
+          XPR(NT "warning: -c option overrides output filename: %s\n",
+              ofile.filename);
+        }
+
+        ofile.filename = NULL;
+      }
+    }
+  } else {
+
+    /* There may be up to two more arguments. */
+    if (argc > 2) {
+      XPR(NT "too many filenames: %s ...\n", argv[2]);
+      goto cleanup;
+    }
+
+    ifile.flags = RD_FIRST | RD_MAININPUT;
+    sfile.flags = RD_FIRST;
+    sfile.filename = sfilename;
+
+    /* The infile takes the next argument, if there is one.  But if not, infile
+     * is set to stdin. */
+    if (argc > 0) {
+      ifile.filename = argv[0];
+
+      if ((ret = main_file_open(&ifile, ifile.filename, XO_READ))) {
+        goto cleanup;
+      }
+    } else {
+      XSTDIN_XF(&ifile);
+    }
+
+    /* The ofile takes the following argument, if there is one.  But if not, it
+     * is left NULL until the application header is processed.  It will be set
+     * in main_open_output. */
+    if (argc > 1) {
+      /* Check for conflicting arguments. */
+      if (option_stdout && !option_quiet) {
+        XPR(NT "warning: -c option overrides output filename: %s\n", argv[1]);
+      }
+
+      if (!option_stdout) {
+        ofile.filename = argv[1];
+      }
     }
   }
 
@@ -4354,12 +5805,21 @@ takearg:
   case CMD_PRINTHDRS:
   case CMD_PRINTDELTA:
 #if XD3_ENCODER
-  case CMD_ENCODE:
   case CMD_RECODE:
   case CMD_MERGE:
 #endif
-  case CMD_DECODE:
     ret = main_input(cmd, &ifile, &ofile, &sfile);
+    break;
+
+#if XD3_ENCODER
+  case CMD_ENCODE:
+#endif
+  case CMD_DECODE:
+    if (job.pair_count > 1) {
+      ret = main_input_multifile(cmd, &job);
+    } else {
+      ret = main_input(cmd, &ifile, &ofile, &sfile);
+    }
     break;
 
 #if REGRESSION_TEST
@@ -4393,6 +5853,9 @@ takearg:
   main_file_cleanup(&ofile);
   main_file_cleanup(&sfile);
 
+  main_free(job.pairs);
+  free(pairs);
+
   while (!main_merge_list_empty(&merge_order)) {
     merge = main_merge_list_pop_front(&merge_order);
     main_free(merge);
@@ -4400,6 +5863,14 @@ takearg:
 
   main_free(free_argv);
   main_free(free_value);
+
+  if (job.pair_count > 1 && appheader_used != NULL &&
+      appheader_used != option_appheader) {
+    /* appheader_used was allocated with realloc();
+       use regular free() */
+    free(appheader_used);
+    appheader_used = NULL;
+  }
 
   main_cleanup();
 
@@ -4441,6 +5912,12 @@ static int main_help(void) {
   XPR(NTR "\n");
   XPR(NTR "  xdelta3 merge -m 1.vcdiff -m 2.vcdiff 3.vcdiff merged.vcdiff\n");
   XPR(NTR "\n");
+  XPR(NTR "multifile patches:\n");
+  XPR(NTR
+      "  make:  xdelta3.exe -e -s old1 -t new1 -s old2 -t new2 delta_file\n");
+  XPR(NTR
+      "  apply: xdelta3.exe -d -s old1 -t new1 -s old2 -t new2 delta_file\n");
+  XPR(NTR "\n");
   XPR(NTR "standard options:\n");
   XPR(NTR "   -0 .. -9     compression level\n");
   XPR(NTR "   -c           use stdout\n");
@@ -4463,6 +5940,7 @@ static int main_help(void) {
 
   XPR(NTR "compression options:\n");
   XPR(NTR "   -s source    source file to copy from (if any)\n");
+  XPR(NTR "   -t target    target file paired with the preceding -s source\n");
   XPR(NTR "   -S [lzma|djw] enable/disable secondary compression\n");
   XPR(NTR "   -N           disable small string-matching compression\n");
   XPR(NTR "   -D           disable external decompression (encode/decode)\n");

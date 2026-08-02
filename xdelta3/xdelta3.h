@@ -587,11 +587,11 @@ typedef enum {
  * XD3_INPUT, if the application reads EOF it should call
  * xd3_stream_close().
  *
- * 0-8:   the VCDIFF header
- * 9-18:  the VCDIFF window header
- * 19-21: the three primary sections: data, inst, addr
- * 22:    producing output: returns XD3_OUTPUT, possibly XD3_GETSRCBLK,
- * 23:    return XD3_WINFINISH, set state=9 to decode more input
+ * 0-10:   the VCDIFF header
+ * 11-20:  the VCDIFF window header
+ * 21-23: the three primary sections: data, inst, addr
+ * 24:    producing output: returns XD3_OUTPUT, possibly XD3_GETSRCBLK,
+ * 25:    return XD3_WINFINISH, set state=DEC_WININD  to decode more input
  */
 typedef enum {
 
@@ -608,30 +608,33 @@ typedef enum {
   DEC_APPLEN = 7, /* application data length */
   DEC_APPDAT = 8, /* application data */
 
-  DEC_WININD = 9, /* window indicator */
+  DEC_MFLEN = 9,   /* length of multifile data */
+  DEC_MFDATA = 10, /* multifile data section */
 
-  DEC_CPYLEN = 10, /* copy window length */
-  DEC_CPYOFF = 11, /* copy window offset */
+  DEC_WININD = 11, /* window indicator */
 
-  DEC_ENCLEN = 12, /* length of delta encoding */
-  DEC_TGTLEN = 13, /* length of target window */
-  DEC_DELIND = 14, /* delta indicator */
+  DEC_CPYLEN = 12, /* copy window length */
+  DEC_CPYOFF = 13, /* copy window offset */
 
-  DEC_DATALEN = 15, /* length of ADD+RUN data */
-  DEC_INSTLEN = 16, /* length of instruction data */
-  DEC_ADDRLEN = 17, /* length of address data */
+  DEC_ENCLEN = 14, /* length of delta encoding */
+  DEC_TGTLEN = 15, /* length of target window */
+  DEC_DELIND = 16, /* delta indicator */
 
-  DEC_CKSUM = 18, /* window checksum */
+  DEC_DATALEN = 17, /* length of ADD+RUN data */
+  DEC_INSTLEN = 18, /* length of instruction data */
+  DEC_ADDRLEN = 19, /* length of address data */
 
-  DEC_DATA = 19, /* data section */
-  DEC_INST = 20, /* instruction section */
-  DEC_ADDR = 21, /* address section */
+  DEC_CKSUM = 20, /* window checksum */
 
-  DEC_EMIT = 22, /* producing data */
+  DEC_DATA = 21, /* data section */
+  DEC_INST = 22, /* instruction section */
+  DEC_ADDR = 23, /* address section */
 
-  DEC_FINISH = 23, /* window finished */
+  DEC_EMIT = 24, /* producing data */
 
-  DEC_ABORTED = 24 /* xd3_abort_stream */
+  DEC_FINISH = 25, /* window finished */
+
+  DEC_ABORTED = 26, /* xd3_abort_stream */
 } xd3_decode_state;
 
 /************************************************************
@@ -985,6 +988,9 @@ struct _xd3_stream {
   const uint8_t *enc_appheader; /* application header to encode */
   usize_t enc_appheadsz;        /* application header size */
 
+  const uint8_t *enc_multifile; /* multifile header to encode */
+  usize_t enc_multifile_size;   /* multifile header size */
+
   /* decoder stuff */
   xd3_decode_state dec_state; /* current DEC_XXX value */
   usize_t dec_hdr_ind;        /* VCDIFF header indicator */
@@ -1006,6 +1012,13 @@ struct _xd3_stream {
                                storage */
   usize_t dec_appheadbytes; /* Optional application header:
                                position. */
+
+  usize_t dec_multiheadsz;  /* Optional multifile header:
+                               size. */
+  uint8_t *dec_multiheader; /* Optional multifile header:
+                               storage */
+  usize_t dec_multibytes;   /* Optional multifile header:
+                               position */
 
   usize_t dec_cksumbytes; /* Optional checksum: position. */
   uint8_t dec_cksum[4];   /* Optional checksum: storage. */
@@ -1031,7 +1044,8 @@ struct _xd3_stream {
                               DEC_FINISH */
   usize_t dec_winbytes;    /* bytes of the three sections
                               so far consumed */
-  usize_t dec_hdrsize;     /* VCDIFF + app header size */
+  usize_t dec_hdrsize;     /* VCDIFF + app header size
+                              + multifile header size */
 
   const uint8_t *dec_tgtaddrbase; /* Base of decoded target
                                      addresses (addr >=
@@ -1275,11 +1289,19 @@ int xd3_set_source_and_size(xd3_stream *stream, xd3_source *source,
  * to include application-specific data in the VCDIFF header. */
 void xd3_set_appheader(xd3_stream *stream, const uint8_t *data, usize_t size);
 
+/* This should be called before the first call to xd3_encode_input()
+ * to include multifile data in the VCDIFF header. */
+void xd3_set_multifile_header(xd3_stream *stream, const uint8_t *data,
+                              usize_t size);
+
 /* xd3_get_appheader may be called in the decoder after XD3_GOTHEADER.
  * For convenience, the decoder always adds a single byte padding to
  * the end of the application header, which is set to zero in case the
  * application header is a string. */
 int xd3_get_appheader(xd3_stream *stream, uint8_t **data, usize_t *size);
+
+/* xd3_get_multifile_header may be called in the decoder after XD3_GOTHEADER. */
+int xd3_get_multifile_header(xd3_stream *stream, uint8_t **data, usize_t *size);
 
 /* To generate a VCDIFF encoded delta with xd3_encode_init() from
  * another format, use:

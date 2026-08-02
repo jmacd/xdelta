@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"time"
+	"bytes"
 
 	"github.com/jmacd/xdelta/xdelta3/go/xdelta"
 )
@@ -67,6 +68,109 @@ func (c Config) smokeTest(t *xdelta.TestGroup, p xdelta.Program) {
 		t.Panic(fmt.Errorf("It's not working! %s\n!=\n%s\n", do, target))
 	}
 	t.Wait(enc, dec)
+}
+
+func (c Config) smokeTestMultifile(t *xdelta.TestGroup, p xdelta.Program) {
+
+	/* This test forces the first pair to occupy two 16 KiB
+	 * VCDIFF windows, and the second pair to occupy one window
+	 * and use visibly different source data. This verifies
+	 * that the decoder uses the right source window, and the
+	 * large buffer ensures the encoder uses COPY instructions */
+	source1 := bytes.Repeat([]byte{0x55}, (1<<14)+1)
+	target1 := append([]byte(nil), source1...)
+	target1[0] = 0xFF
+	source2 := bytes.Repeat([]byte{0xAA}, 1024)
+	target2 := append([]byte(nil), source2...)
+	target2[len(target2)-1] = 0x00
+
+	src1Path := path.Join(t.Runner.Testdir, "src-1.bin")
+	tgt1Path := path.Join(t.Runner.Testdir, "tgt-1.bin")
+	src2Path := path.Join(t.Runner.Testdir, "src-2.bin")
+	tgt2Path := path.Join(t.Runner.Testdir, "tgt-2.bin")
+
+	out1Path := path.Join(t.Runner.Testdir, "out-1.bin")
+	out2Path := path.Join(t.Runner.Testdir, "out-2.bin")
+	patchPath := path.Join(t.Runner.Testdir, "multifile.xdelta")
+
+	files := []struct {
+		name string
+		data []byte
+	}{
+		{src1Path, source1},
+		{tgt1Path, target1},
+		{src2Path, source2},
+		{tgt2Path, target2},
+	}
+
+	for _, file := range files {
+		if err := os.WriteFile(file.name, file.data, 0600); err != nil {
+			t.Panic(err)
+		}
+	}
+
+	enc, err := t.Exec("multifile.encode", p, false, []string{
+		"-f",
+		"-e",
+		"-W", "16384",
+		"-s", src1Path,
+		"-t", tgt1Path,
+		"-s", src2Path,
+		"-t", tgt2Path,
+		patchPath,
+	})
+	if err != nil {
+		t.Panic(err)
+	}
+
+	t.Empty(enc.Stdout, "multifile.encode.stdout")
+	t.Empty(enc.Stderr, "multifile.encode.stderr")
+	enc.Stdin.Close()
+	t.Wait(enc)
+
+	dec, err := t.Exec("multifile.decode", p, false, []string{
+		"-f",
+		"-d",
+		"-s", src1Path,
+		"-t", out1Path,
+		"-s", src2Path,
+		"-t", out2Path,
+		patchPath,
+	})
+	if err != nil {
+		t.Panic(err)
+	}
+
+	t.Empty(dec.Stdout, "multifile.decode.stdout")
+	t.Empty(dec.Stderr, "multifile.decode.stderr")
+	dec.Stdin.Close()
+	t.Wait(dec)
+
+	got1, err := os.ReadFile(out1Path)
+	if err != nil {
+		t.Panic(err)
+	}
+
+	got2, err := os.ReadFile(out2Path)
+	if err != nil {
+		t.Panic(err)
+	}
+
+	if !bytes.Equal(got1, target1) {
+		t.Panic(fmt.Errorf(
+			"first decoded target differs:\ngot:  %x\target: %x",
+			got1,
+			target1,
+		))
+	}
+
+	if !bytes.Equal(got2, target2) {
+		t.Panic(fmt.Errorf(
+			"second decoded target differs:\ngot:  %x\ntarget: %x",
+			got2,
+			target2,
+		))
+	}
 }
 
 type PairTest struct {
@@ -272,6 +376,7 @@ func main() {
 	prog := xdelta.Program{Path: *flagXdelta3}
 
 	r.RunTest("smoketest", func(t *xdelta.TestGroup) { cfg.smokeTest(t, prog) })
+	r.RunTest("smoketest-multifile", func(t *xdelta.TestGroup) { cfg.smokeTestMultifile(t, prog) })
 
 	for i := *flagMinOffset; i <= *flagMaxOffset; i += 1 {
 		// The arguments to offsetTest are offset, source

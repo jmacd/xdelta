@@ -296,7 +296,8 @@
 #define VCD_SECONDARY (1U << 0) /* uses secondary compressor */
 #define VCD_CODETABLE (1U << 1) /* supplies code table data */
 #define VCD_APPHEADER (1U << 2) /* supplies application data */
-#define VCD_INVHDR (~0x7U)
+#define VCD_MULTIFILE (1U << 3) /* supplies multifile data */
+#define VCD_INVHDR (~0xFU)
 
 /* window indicator bits */
 #define VCD_SOURCE (1U << 0)  /* copy window in source file */
@@ -1554,6 +1555,7 @@ void xd3_free_stream(xd3_stream *stream) {
 
   xd3_free(stream, stream->buf_in);
   xd3_free(stream, stream->dec_appheader);
+  xd3_free(stream, stream->dec_multiheader);
   xd3_free(stream, stream->dec_codetbl);
   xd3_free(stream, stream->code_table_alloc);
 
@@ -1950,6 +1952,22 @@ int xd3_get_appheader(xd3_stream *stream, uint8_t **data, usize_t *size) {
   return 0;
 }
 
+/**************************************************************
+ Multifile header
+ ****************************************************************/
+
+int xd3_get_multifile_header(xd3_stream *stream, uint8_t **data,
+                             usize_t *size) {
+  if (stream->dec_state < DEC_WININD) {
+    stream->msg = "multifile header not available";
+    return XD3_INTERNAL;
+  }
+
+  (*data) = stream->dec_multiheader;
+  (*size) = stream->dec_multiheadsz;
+  return 0;
+}
+
 /**********************************************************
  Decoder stuff
  *************************************************/
@@ -1964,6 +1982,12 @@ int xd3_get_appheader(xd3_stream *stream, uint8_t **data, usize_t *size) {
 void xd3_set_appheader(xd3_stream *stream, const uint8_t *data, usize_t size) {
   stream->enc_appheader = data;
   stream->enc_appheadsz = size;
+}
+
+void xd3_set_multifile_header(xd3_stream *stream, const uint8_t *data,
+                              usize_t size) {
+  stream->enc_multifile = data;
+  stream->enc_multifile_size = size;
 }
 
 #if XD3_DEBUG
@@ -2534,12 +2558,16 @@ static int xd3_emit_hdr(xd3_stream *stream) {
   if (stream->current_window == 0) {
     uint8_t hdr_ind = 0;
     int use_appheader = stream->enc_appheader != NULL;
+    int use_multifile = stream->enc_multifile != NULL;
 
     if (use_secondary) {
       hdr_ind |= VCD_SECONDARY;
     }
     if (use_appheader) {
       hdr_ind |= VCD_APPHEADER;
+    }
+    if (use_multifile) {
+      hdr_ind |= VCD_MULTIFILE;
     }
 
     if ((ret = xd3_emit_byte(stream, &HDR_TAIL(stream), VCDIFF_MAGIC1)) != 0 ||
@@ -2565,6 +2593,17 @@ static int xd3_emit_hdr(xd3_stream *stream) {
           (ret =
                xd3_emit_bytes(stream, &HDR_TAIL(stream), stream->enc_appheader,
                               stream->enc_appheadsz))) {
+        return ret;
+      }
+    }
+
+    /* Multifile header */
+    if (use_multifile) {
+      if ((ret = xd3_emit_size(stream, &HDR_TAIL(stream),
+                               stream->enc_multifile_size)) ||
+          (ret =
+               xd3_emit_bytes(stream, &HDR_TAIL(stream), stream->enc_multifile,
+                              stream->enc_multifile_size))) {
         return ret;
       }
     }

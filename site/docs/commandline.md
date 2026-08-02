@@ -24,6 +24,31 @@ xdelta3 -d -s SOURCE OUT TARGET
 xdelta3 -d -s SOURCE < OUT > TARGET
 ```
 
+## Multifile examples
+
+Repeat `-s SOURCE -t TARGET` for each file pair.
+
+Create one patch for two files:
+
+```sh
+xdelta3 -e \
+    -s SOURCE-1 -t TARGET-1 \
+    -s SOURCE-2 -t TARGET-2 \
+    OUT
+```
+
+Apply the patch:
+
+```sh
+xdelta3 -d \
+    -s SOURCE-1 -t TARGET-1 \
+    -s SOURCE-2 -t TARGET-2 \
+    IN
+```
+
+The file pairs are ordered and must be supplied in the same order when decoding. One `-s/-t` pair produces or accepts a standard patch; two or more pairs use the multifile format.
+
+
 ## Usage summary
 
 The following reflects the built-in help (`xdelta3 -h`) for the current
@@ -72,6 +97,7 @@ memory options:
    -I size      instruction buffer size (0 = unlimited)
 compression options:
    -s source    source file to copy from (if any)
+   -t target    target file paired with the preceding -s source
    -S [lzma|djw|fgk] enable/disable secondary compression
    -N           disable small string-matching compression
    -D           disable external decompression (encode/decode)

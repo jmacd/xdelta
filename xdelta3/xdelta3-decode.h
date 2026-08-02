@@ -855,6 +855,34 @@ int xd3_decode_input(xd3_stream *stream) {
       }
     }
 
+    stream->dec_state = DEC_MFLEN;
+
+  case DEC_MFLEN:
+    SIZE_CASE((stream->dec_hdr_ind & VCD_MULTIFILE) != 0,
+              stream->dec_multiheadsz, DEC_MFDATA);
+
+  case DEC_MFDATA:
+    if (stream->dec_hdr_ind & VCD_MULTIFILE) {
+      if (USIZE_T_OVERFLOW(stream->dec_multiheadsz, 1)) {
+        stream->msg = "exceptional multifile header size";
+        return XD3_INVALID_INPUT;
+      }
+
+      if (stream->dec_multiheader == NULL &&
+          (stream->dec_multiheader = (uint8_t *)xd3_alloc(
+               stream, stream->dec_multiheadsz + 1, 1)) == NULL) {
+        return ENOMEM;
+      }
+
+      stream->dec_multiheader[stream->dec_multiheadsz] = 0;
+
+      if ((ret = xd3_decode_bytes(stream, stream->dec_multiheader,
+                                  &stream->dec_multibytes,
+                                  stream->dec_multiheadsz))) {
+        return ret;
+      }
+    }
+
     /* xoff_t -> usize_t is safe because this is the first block. */
     stream->dec_hdrsize = (usize_t)stream->total_in;
     stream->dec_state = DEC_WININD;
