@@ -171,7 +171,6 @@ struct _XdFileHandle
   GPtrArray *lru_table;
   LRU       *lru_head;  /* most recently used. */
   LRU       *lru_tail;  /* least recently used. */
-  GMemChunk *lru_chunk;
   guint      lru_count;
   guint      lru_outstanding_refs;
 
@@ -193,7 +192,7 @@ struct _XdFileHandle
 };
 
 /* $Format: "static const char xdelta_version[] = \"$ReleaseVersion$\"; " $ */
-static const char xdelta_version[] = "1.1.4"; 
+static const char xdelta_version[] = "1.1.5";
 
 typedef struct _Command Command;
 
@@ -243,7 +242,7 @@ usage ()
 {
   xd_error ("usage: %s COMMAND [OPTIONS] [ARG1 ...]\n", program_name);
   xd_error ("use --help for more help\n");
-  exit (2);
+  exit (0);
 }
 
 static void
@@ -271,7 +270,7 @@ static void
 version ()
 {
   xd_error ("version %s\n", xdelta_version);
-  exit (2);
+  exit (0);
 }
 
 static FILE* xd_error_file = NULL;
@@ -539,7 +538,6 @@ static void
 init_table (XdFileHandle* fh)
 {
   fh->lru_table = g_ptr_array_new ();
-  fh->lru_chunk = g_mem_chunk_create(LRU, 1<<9, G_ALLOC_ONLY);
   fh->lru_head = NULL;
   fh->lru_tail = NULL;
 }
@@ -1247,7 +1245,7 @@ xd_handle_map_page (XdFileHandle *fh, guint pgno, const guint8** mem)
 
   if (! lru)
     {
-      lru = g_chunk_new0 (LRU, fh->lru_chunk);
+      lru = g_new0 (LRU, 1);
       fh->lru_table->pdata[pgno] = lru;
       lru->page = pgno;
     }
@@ -1626,7 +1624,7 @@ delta_command (gint argc, gchar** argv)
 
   xdp_generator_free (gen);
 
-  return control_offset != header_offset;
+  return 0;
 }
 
 static XdeltaPatch*

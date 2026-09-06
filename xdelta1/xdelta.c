@@ -37,7 +37,7 @@ const guint xdelta_major_version = 1;
 /* $Format: "const guint xdelta_minor_version = $ReleaseMinorVersion$;" $ */
 const guint xdelta_minor_version = 1;
 /* $Format: "const guint xdelta_micro_version = $ReleaseMicroVersion$;" $ */
-const guint xdelta_micro_version = 4;
+const guint xdelta_micro_version = 5;
 
 /* Control functions.
  */
