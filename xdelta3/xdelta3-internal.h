@@ -60,7 +60,7 @@ int xd3_process_stream(int is_encode, xd3_stream *stream,
                        uint8_t *output, usize_t *output_size,
                        usize_t output_size_max);
 
-#if PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
+#if PYTHON_MODULE || SWIG_MODULE || XD3_INCLUDE_MAIN
 int xd3_main_cmdline(int argc, char **argv);
 #endif
 
@@ -82,6 +82,9 @@ typedef enum { XO_READ = 0, XO_WRITE = 1 } main_file_modes;
 #endif
 #ifndef NOT_MAIN
 #define NOT_MAIN 0
+#endif
+#ifndef XD3_INCLUDE_MAIN
+#define XD3_INCLUDE_MAIN NOT_MAIN
 #endif
 
 /* If none are set, default to posix. */
