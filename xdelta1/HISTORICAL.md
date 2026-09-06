@@ -9,4 +9,4 @@ The archive's SHA-256 digest is:
 345503b60432812840991ea1d79cb10db5f34bfaba9499bd0e7d5c57ac5d5c6d
 ```
 
-This tree is retained as the baseline for a modernized 1.1.5 release.
+This tree is retained as the baseline for a modernized 1.2.0 release.

@@ -35,9 +35,9 @@
 /* $Format: "const guint xdelta_major_version = $ReleaseMajorVersion$;" $ */
 const guint xdelta_major_version = 1;
 /* $Format: "const guint xdelta_minor_version = $ReleaseMinorVersion$;" $ */
-const guint xdelta_minor_version = 1;
+const guint xdelta_minor_version = 2;
 /* $Format: "const guint xdelta_micro_version = $ReleaseMicroVersion$;" $ */
-const guint xdelta_micro_version = 5;
+const guint xdelta_micro_version = 0;
 
 /* Control functions.
  */
@@ -228,7 +228,7 @@ generate_checksums (XdeltaStream    *stream,
 }
 
 /* $Format: "#define XDELTA_REQUIRED_VERSION \"$ReleaseMajorVersion$.$ReleaseMinorVersion$.\"" $ */
-#define XDELTA_REQUIRED_VERSION "1.1."
+#define XDELTA_REQUIRED_VERSION "1.2."
 
 XdeltaGenerator*
 __xdp_generator_new (const char* version)

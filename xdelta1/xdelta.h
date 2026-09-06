@@ -47,16 +47,16 @@ typedef FileHandle XdeltaOutStream;
  */
 
 /* $Format: "#define XDELTA_VERSION \"$ReleaseVersion$\"" $ */
-#define XDELTA_VERSION "1.1.5"
+#define XDELTA_VERSION "1.2.0"
 
 /* $Format: "#define XDELTA_MAJOR_VERSION $ReleaseMajorVersion$" $ */
 #define XDELTA_MAJOR_VERSION 1
 
 /* $Format: "#define XDELTA_MINOR_VERSION $ReleaseMinorVersion$" $ */
-#define XDELTA_MINOR_VERSION 1
+#define XDELTA_MINOR_VERSION 2
 
 /* $Format: "#define XDELTA_MICRO_VERSION $ReleaseMicroVersion$" $ */
-#define XDELTA_MICRO_VERSION 5
+#define XDELTA_MICRO_VERSION 0
 
 extern const guint xdelta_major_version;
 extern const guint xdelta_minor_version;

@@ -6,12 +6,14 @@ Please send bug reports to xdelta-bugs@XCF.Berkeley.EDU.  See the file
 `README' for a description of how to report bugs.
 
 
-** Changes in version 1.1.5
+** Changes in version 1.2.0
 
 * Add a CMake build for current C toolchains, GLib 2, and zlib.
 
 * Replace GLib 1-only memory-chunk and queue compatibility code with
   supported GLib 2 APIs.
+
+* Remove the obsolete Autotools build system.
 
 
 ** Changes since version 1.1.3

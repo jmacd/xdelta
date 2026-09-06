@@ -1,6 +1,6 @@
-# Building Xdelta 1.1.5
+# Building Xdelta 1.2.0
 
-Xdelta 1.1.5 uses CMake and requires a C compiler, CMake 3.20 or later,
+Xdelta 1.2.0 uses CMake and requires a C compiler, CMake 3.20 or later,
 pkg-config, GLib 2, and zlib.
 
 ```sh
@@ -9,5 +9,4 @@ cmake --build build --parallel
 cmake --install build
 ```
 
-The historical Autotools files remain for preservation, but require GLib 1
-and are not supported for the 1.1.5 release.
+Autotools is not supported. CMake is the only supported build system.
