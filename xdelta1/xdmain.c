@@ -177,7 +177,8 @@ struct _XdFileHandle
   guint    narrow_low;
   guint    narrow_high;
   guint    current_pos;
-  FILE*    in;
+  /* Either a FILE* or a gzFile, selected by in_read/in_close below. */
+  void*    in;
   gboolean (* in_read) (XdFileHandle* handle, void* buf, gint nbyte);
   gboolean (* in_close) (XdFileHandle* handle);
   gboolean in_compressed;

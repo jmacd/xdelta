@@ -15,6 +15,10 @@ Please send bug reports to xdelta-bugs@XCF.Berkeley.EDU.  See the file
 
 * Remove the obsolete Autotools build system.
 
+* Store the read handle as a void pointer, since it holds either a
+  FILE* or a gzFile.  The mismatch was a warning under older compilers
+  but is an error under GCC 14 and later.
+
 
 ** Changes since version 1.1.3
 
