@@ -315,8 +315,15 @@ typedef uint32_t usize_t;
 #define SWIG_MODULE 0
 #endif
 
+/* XD3_INCLUDE_MAIN=1 causes xdelta3-main.h to be included.
+ *
+ * NOT_MAIN is deprecated, it's the opposite of XD3_INCLUDE_MAIN. */
 #ifndef NOT_MAIN
 #define NOT_MAIN 0
+#endif
+
+#ifndef XD3_INCLUDE_MAIN
+#define XD3_INCLUDE_MAIN NOT_MAIN
 #endif
 
 /* There are three string matching functions supplied: one fast, one

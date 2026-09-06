@@ -690,7 +690,7 @@ const xd3_sec_type lzma_sec_type = {
                         xd3_output *, xd3_sec_cfg *))xd3_encode_lzma)};
 #endif
 
-#if XD3_MAIN || PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
+#if XD3_MAIN || PYTHON_MODULE || SWIG_MODULE || XD3_INCLUDE_MAIN
 #include "xdelta3-main.h"
 #endif
 

@@ -60,6 +60,9 @@
 #ifndef NOT_MAIN
 #define NOT_MAIN 0
 #endif
+#ifndef XD3_INCLUDE_MAIN
+#define XD3_INCLUDE_MAIN NOT_MAIN
+#endif
 
 /* Combines xd3_strerror() and strerror() */
 const char *xd3_mainerror(int err_num);
@@ -3946,7 +3949,7 @@ static void setup_environment(int argc, char **argv, int *argc_out,
   }
 }
 
-#if PYTHON_MODULE || SWIG_MODULE || NOT_MAIN
+#if PYTHON_MODULE || SWIG_MODULE || XD3_INCLUDE_MAIN
 int xd3_main_cmdline(int argc, char **argv)
 #else
 int main(int argc, char **argv)
