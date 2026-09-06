@@ -14,22 +14,34 @@ on both binary and text files.
 Xdelta 1.2.0 is built with CMake. You need a C compiler, CMake 3.20 or
 newer, pkg-config, GLib 2 development files, and zlib development files.
 
-From this directory, run:
+On macOS with Homebrew these are `brew install cmake pkg-config glib`;
+zlib comes with the system.  On Debian or Ubuntu they are
+`apt install build-essential cmake pkg-config libglib2.0-dev zlib1g-dev`.
+
+Run all three commands, in order, from this `xdelta1` directory.  The
+first configures the build, the second compiles it, and the third
+installs it; the later steps fail if an earlier one was skipped.
 
 ```sh
-rm -rf build
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 cmake --install build
 ```
 
-The first command removes an incomplete or stale build directory. The
-executable is `build/xdelta`. To install somewhere you have write
-access without using administrator privileges, choose a prefix:
+The executable is `build/xdelta`, and you can run it from there without
+installing at all.  The final step installs system-wide and may need
+`sudo`.  To install into your home directory instead, pass a prefix:
 
 ```sh
 cmake --install build --prefix "$HOME/.local"
 ```
+
+That puts the program at `$HOME/.local/bin/xdelta`, which must be on
+your `PATH` to run it by name.
+
+If configuring fails, CMake reports the missing dependency; install it
+and re-run the three commands.  If a build directory is left in a bad
+state, delete it with `rm -rf build` and start again.
 
 For example, create and apply a delta:
 
