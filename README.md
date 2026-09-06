@@ -22,6 +22,12 @@ ctest --test-dir build
 See [`xdelta3/README.md`](xdelta3/README.md) for more detail, including
 liblzma options and the Go regression-test harness.
 
+# Historical Xdelta 1
+
+The modernized historical Xdelta 1 release lives in
+[`xdelta1/`](xdelta1). It is currently **1.2.0** and uses CMake; follow
+its [build and install instructions](xdelta1/README).
+
 # Releases
 
 Prebuilt binaries for Linux, macOS, and Windows, plus a source tarball, are
@@ -59,7 +65,6 @@ The site sources live in [`site/`](site) (MkDocs + Material) and are built and
 deployed by [`.github/workflows/site.yml`](.github/workflows/site.yml).  These
 pages were migrated and updated from the project's legacy
 [`wiki` branch](https://github.com/jmacd/xdelta/tree/wiki).
-
 
 
 

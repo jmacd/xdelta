@@ -213,6 +213,82 @@ jobs:
       - name: Block-device source test
         run: ./testing/blockdev_test.sh ./build/xdelta3
 
+  xdelta1:
+    name: ${{ matrix.os }} / xdelta1 (v1 line)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    defaults:
+      run:
+        working-directory: xdelta1
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install GLib and zlib (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libglib2.0-dev zlib1g-dev
+
+      - name: Install GLib (macOS)
+        if: runner.os == 'macOS'
+        run: brew install glib pkg-config
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Install to a staging prefix
+        run: cmake --install build --prefix "$GITHUB_WORKSPACE/stage1"
+
+      - name: Check the installed program reports its version
+        run: |
+          test -x "$GITHUB_WORKSPACE/stage1/bin/xdelta"
+          "$GITHUB_WORKSPACE/stage1/bin/xdelta" --version
+
+      - name: Delta and patch round trip
+        run: |
+          set -e
+          work="$RUNNER_TEMP/xdelta1-roundtrip"
+          rm -rf "$work" && mkdir -p "$work"
+          # A source large enough that the delta finds matching blocks.
+          seq 1 5000 > "$work/original"
+          cp "$work/original" "$work/updated"
+          echo "an appended line that did not exist before" >> "$work/updated"
+          xdelta="$GITHUB_WORKSPACE/stage1/bin/xdelta"
+          "$xdelta" delta "$work/original" "$work/updated" "$work/change.xdelta"
+          "$xdelta" patch "$work/change.xdelta" "$work/original" "$work/reconstructed"
+          cmp "$work/updated" "$work/reconstructed"
+          # The delta must be much smaller than the file it reconstructs.
+          test "$(wc -c < "$work/change.xdelta")" -lt "$(wc -c < "$work/updated")"
+
+      - name: Delta and patch round trip on gzip input
+        run: |
+          set -e
+          work="$RUNNER_TEMP/xdelta1-gzip"
+          rm -rf "$work" && mkdir -p "$work"
+          seq 1 5000 > "$work/original"
+          cp "$work/original" "$work/updated"
+          echo "an appended line that did not exist before" >> "$work/updated"
+          gzip "$work/original" && gzip "$work/updated"
+          xdelta="$GITHUB_WORKSPACE/stage1/bin/xdelta"
+          # Exercises the transparent gzip decompression path.
+          "$xdelta" delta "$work/original.gz" "$work/updated.gz" "$work/change.xdelta"
+          "$xdelta" patch "$work/change.xdelta" "$work/original.gz" "$work/reconstructed.gz"
+          gunzip -c "$work/updated.gz" > "$work/updated"
+          gunzip -c "$work/reconstructed.gz" > "$work/reconstructed"
+          cmp "$work/updated" "$work/reconstructed"
+
+      - name: Confirm the Autotools build system is gone
+        run: |
+          if find . -name 'configure' -o -name 'Makefile.am' -o -name 'Makefile.in' \
+                 -o -name 'aclocal.m4' -o -name 'ltmain.sh' | grep .; then
+            echo "obsolete Autotools files are present" >&2
+            exit 1
+          fi
+
   go-regtest:
     name: go regression harness
     runs-on: ubuntu-latest
