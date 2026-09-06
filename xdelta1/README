@@ -1,8 +1,6 @@
- -*- Text -*-
+# Xdelta 1.2.0 -- A binary delta generator
 
-	       Xdelta -- A binary delta generator
-
-Announcing version 1.1.2 of Xdelta.  Xdelta is an application program
+Xdelta is an application program
 designed to compute changes between files.  These changes (deltas) are
 similar to the output of the "diff" program in that they may be used
 to store and transmit only the changes between files.  However, unlike
@@ -11,23 +9,43 @@ format--Xdelta can also also apply these deltas to a copy of the
 original file.  Xdelta uses a fast, linear algorithm and performs well
 on both binary and text files.
 
-Xdelta 1.1.2 is a stable, maintenence release.  New, ongoing work on
-Xdelta has focused on a new storage system with features similar to
-the RCS command set.  For more information on new development, see the
-Xdelta-2.0 release series at http://xdelta.sourceforge.net.
+## Build and install
+
+Xdelta 1.2.0 is built with CMake. You need a C compiler, CMake 3.20 or
+newer, pkg-config, GLib 2 development files, and zlib development files.
+
+From this directory, run:
+
+```sh
+rm -rf build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+cmake --install build
+```
+
+The first command removes an incomplete or stale build directory. The
+executable is `build/xdelta`. To install somewhere you have write
+access without using administrator privileges, choose a prefix:
+
+```sh
+cmake --install build --prefix "$HOME/.local"
+```
+
+For example, create and apply a delta:
+
+```sh
+build/xdelta delta original-file updated-file change.xdelta
+build/xdelta patch change.xdelta original-file reconstructed-file
+```
+
+The historical 1.1.4 release was restored as the baseline for this
+modernized 1.2.0 release. See `HISTORICAL.md` for its provenance and
+`BUILDING.md` for the concise build reference.
 
 Xdelta was designed and implemented by Joshua MacDonald.  The delta
 algorithm is based on the Rsync algorithm, though implementation and
 interface considerations leave the two programs quite distinct.  The
 Rsync algorithm is due to Andrew Tridgell and Paul Mackerras.
-
-To compile and install Xdelta, read the instructions in the INSTALL
-file.  Once you have done this, you should at least read the first few
-sections of the documentation.  It is available in info format.  All
-documentation is located in the doc/ subdirectory.
-
-This release, version 1.1.2, and future releases of Xdelta can be
-found at http://xdelta.sourceforge.net.
 
 Xdelta is released under the GNU Library Public License (GPL), see the
 file COPYING for details.
