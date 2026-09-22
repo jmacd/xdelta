@@ -1,16 +1,16 @@
-name: Release
+name: Release Xdelta 3
 
-# Publishes a release when a v* tag is pushed (e.g. v3.2.0).  See RELEASING.md
+# Publishes a release when a v3.* tag is pushed (e.g. v3.2.0). See RELEASING.md
 # for the full procedure.  The workflow verifies that the tag matches the
 # version baked into the sources, builds prebuilt binaries for Linux, macOS,
 # and Windows, assembles a source tarball, and creates the GitHub Release.
 on:
   push:
-    tags: [ 'v*' ]
+    tags: [ 'v3.*' ]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing tag to (re)build a release for, e.g. v3.2.0'
+        description: 'Existing v3.x tag to (re)build, e.g. v3.2.0'
         required: true
 
 permissions:
@@ -62,7 +62,11 @@ jobs:
           set -euo pipefail
           version="${{ needs.verify.outputs.version }}"
           name="xdelta3-${version}"
-          git archive --format=tar.gz --prefix="${name}/" -o "${name}.tar.gz" HEAD
+          git archive \
+            --format=tar.gz \
+            --prefix="${name}/" \
+            --output="${name}.tar.gz" \
+            HEAD:xdelta3
 
       - uses: actions/upload-artifact@v4
         with:
