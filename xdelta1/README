@@ -62,18 +62,9 @@ Rsync algorithm is due to Andrew Tridgell and Paul Mackerras.
 Xdelta is released under the GNU Library Public License (GPL), see the
 file COPYING for details.
 
-There is mailing list for announcements:
-
-   xdelta-announce@lists.sourceforge.net
-
-you can subscribe to the mailing list or file bug reports through
-Sourceforge at:
-
-   http://sourceforge.net/projects/xdelta/
-
 Comments about Xdelta can be addressed to the following addresses:
 
-   jmacd@cs.berkeley.edu
+   https://github.com/jmacd/xdelta/issues
 
 The man page describes how to use Xdelta in more detail:
 
@@ -208,3 +199,16 @@ DESCRIPTION
               Disable  the  automatic  decompression of gzipped
               inputs,  to prevent unexpected differences in the
               re-compressed content.
+
+# Historical Xdelta 1.1.4 source release
+
+This directory preserves the historical Xdelta 1.1.4 source
+distribution.  It was restored from `xdelta-1.1.4.tar.gz`.
+
+The archive's SHA-256 digest is:
+
+```text
+345503b60432812840991ea1d79cb10db5f34bfaba9499bd0e7d5c57ac5d5c6d
+```
+
+This tree is retained as the baseline for the modern 1.2.x release.

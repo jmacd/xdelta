@@ -1,6 +1,6 @@
 name: Release Xdelta 3
 
-# Publishes a release when a v3.* tag is pushed (e.g. v3.2.0). See RELEASING.md
+# Publishes an Xdelta 3 release when a v3.* tag is pushed. See RELEASING.md
 # for the full procedure.  The workflow verifies that the tag matches the
 # version baked into the sources, builds prebuilt binaries for Linux, macOS,
 # and Windows, assembles a source tarball, and creates the GitHub Release.

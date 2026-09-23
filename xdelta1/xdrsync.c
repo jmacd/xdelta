@@ -38,7 +38,6 @@ init_long_checksum (const guint8 *buf, guint len, XdeltaChecksum *cksum)
   guint16 low  = cksum->low;
   guint16 high = cksum->high;
 
-  /* @@@ unroll me? */
   for (; len > 0; len -= 1)
     {
       low  += CHEW(*buf++);

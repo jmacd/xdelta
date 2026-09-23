@@ -1,6 +1,6 @@
 # Releasing Xdelta
 
-All releases are made from `main`. There are no release branches.
+All releases are made from `main`. Currently there are no release branches.
 
 - A `v1.*` tag releases the code in `xdelta1/`.
 - A `v3.*` tag releases the code in `xdelta3/`.
@@ -17,6 +17,8 @@ For an **Xdelta 1** release, update the version in:
 - `xdelta1/CMakeLists.txt`
 - `xdelta1/xdelta.h`
 - `xdelta1/xdmain.c`
+- `xdelta1/NEWS`
+- `xdelta1/README`
 
 Also add the release notes to `xdelta1/NEWS`.
 
@@ -81,7 +83,7 @@ the workflow again for the existing tag:
 gh workflow run release-v1.yml -f tag=v1.2.0
 
 # Xdelta 3
-gh workflow run release.yml -f tag=v3.2.1
+gh workflow run release-v3.yml -f tag=v3.2.1
 ```
 
 If a partial GitHub Release was created, delete only the partial release before

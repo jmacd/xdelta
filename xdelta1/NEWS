@@ -1,9 +1,7 @@
 XDelta NEWS -- history of user-visible changes. -*- Text -*-
-$Date: Sun, 24 Feb 2002 11:31:12 -0800 $
-$ReleaseVersion: 1.1.4 $
 
-Please send bug reports to xdelta-bugs@XCF.Berkeley.EDU.  See the file
-`README' for a description of how to report bugs.
+Please file bug reports at https://github.com/jmacd/xdelta/issues.
+See the file `README' for a description of how to report bugs.
 
 
 ** Changes in version 1.2.0
@@ -25,7 +23,7 @@ Please send bug reports to xdelta-bugs@XCF.Berkeley.EDU.  See the file
 * Add an implementation of xdp_generator_free() for users of the
   libxdelta API.  Previously there were no such users of the 1.x API,
   but Elliot Lee <sopwith@redhat.com> has written a program for
-  providing delta operations on RPM files.  See http://@@@
+  providing delta operations on RPM files.
 
 * The man page now documents return values.
 
