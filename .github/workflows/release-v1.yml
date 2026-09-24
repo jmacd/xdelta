@@ -61,6 +61,10 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel
 
+      - name: Test historical compatibility
+        working-directory: xdelta1
+        run: ctest --test-dir build --output-on-failure
+
       - name: Test round trip
         working-directory: xdelta1
         run: |

@@ -240,6 +240,9 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
       - name: Install to a staging prefix
         run: cmake --install build --prefix "$GITHUB_WORKSPACE/stage1"
 
@@ -312,4 +315,3 @@ jobs:
       - name: Run harness (smoke + small offset tests)
         working-directory: xdelta3/go
         run: go run . -xdelta3 "$GITHUB_WORKSPACE/xdelta3/build/xdelta3" -min-offset 20 -max-offset 22
-
