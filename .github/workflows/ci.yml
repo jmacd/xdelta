@@ -235,7 +235,7 @@ jobs:
         run: brew install glib pkg-config
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXD1_WERROR=ON
 
       - name: Build
         run: cmake --build build --parallel

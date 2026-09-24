@@ -327,7 +327,7 @@ edsio_time_to_iso8601 (SerialGenericTime *tp)
 }
 
 gchar*
-edsio_time_t_to_iso8601 (GTime t0)
+edsio_time_t_to_iso8601 (guint32 t0)
 {
   static char timebuf[64];
   time_t t = t0;
@@ -999,8 +999,10 @@ edsio_property_unset (const char* ph, const char* t, guint32 code, gpointer obj)
 }
 
 static gboolean
-edsio_false ()
+edsio_false (gpointer obj, EdsioProperty* prop, ...)
 {
+  (void) obj;
+  (void) prop;
   return FALSE;
 }
 

@@ -81,7 +81,7 @@ int xdp_set_query_size_pow (int size_pow)
 }
 
 int
-xdp_blocksize ()
+xdp_blocksize (void)
 {
   if (QUERY_SIZE == 0)
     {

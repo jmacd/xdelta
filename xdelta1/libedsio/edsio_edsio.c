@@ -82,10 +82,10 @@ edsio_edsio_init (void)
   serializeio_initialize_type ("ST_EdsioBytes", ST_EdsioBytes, &unserialize_edsiobytes_internal, &serialize_edsiobytes_obj_internal, &serializeio_count_edsiobytes_obj, &serializeio_print_edsiobytes_obj);
   serializeio_initialize_type ("ST_EdsioUint", ST_EdsioUint, &unserialize_edsiouint_internal, &serialize_edsiouint_obj_internal, &serializeio_count_edsiouint_obj, &serializeio_print_edsiouint_obj);
   edsio_initialize_host_type ("PropTest", (PropertyTableFunc) & edsio_proptest_property_table, (PersistSourceFunc) & edsio_persist_proptest_source, (PersistSinkFunc) & edsio_persist_proptest_sink, (PersistIssetFunc) & edsio_persist_proptest_isset, (PersistUnsetFunc) & edsio_persist_proptest_unset);
-  edsio_initialize_property_type ("EdsioUint", & edsio_property_vptr_free, & edsio_property_vptr_getter, & edsio_property_vptr_setter, serialize_edsiouint_obj, unserialize_edsiouint);
-  edsio_initialize_property_type ("string", & edsio_property_string_free, & edsio_property_string_getter, & edsio_property_string_setter, serialize_string_obj, unserialize_string);
-  edsio_initialize_property_type ("bytes", & edsio_property_bytes_free, & edsio_property_bytes_getter, & edsio_property_bytes_setter, serialize_bytes_obj, unserialize_bytes);
-  edsio_initialize_property_type ("uint", & edsio_property_uint_free, & edsio_property_uint_getter, & edsio_property_uint_setter, serialize_uint_obj, unserialize_uint);
+  edsio_initialize_property_type ("EdsioUint", & edsio_property_vptr_free, (PropGSFunc) & edsio_property_vptr_getter, (PropGSFunc) & edsio_property_vptr_setter, (PropSerialize) serialize_edsiouint_obj, (PropUnserialize) unserialize_edsiouint);
+  edsio_initialize_property_type ("string", & edsio_property_string_free, (PropGSFunc) & edsio_property_string_getter, (PropGSFunc) & edsio_property_string_setter, (PropSerialize) serialize_string_obj, (PropUnserialize) unserialize_string);
+  edsio_initialize_property_type ("bytes", & edsio_property_bytes_free, (PropGSFunc) & edsio_property_bytes_getter, (PropGSFunc) & edsio_property_bytes_setter, (PropSerialize) serialize_bytes_obj, (PropUnserialize) unserialize_bytes);
+  edsio_initialize_property_type ("uint", & edsio_property_uint_free, (PropGSFunc) & edsio_property_uint_getter, (PropGSFunc) & edsio_property_uint_setter, (PropSerialize) serialize_uint_obj, (PropUnserialize) unserialize_uint);
   edsio_library_register (6, "edsio");
   result = TRUE;
   return TRUE;
@@ -866,4 +866,3 @@ const EdsioStringEventCode EC_EdsioMD5StringLong = { EC_EdsioMD5StringLongValue 
 const EdsioIntEventCode EC_EdsioUnregisteredLibrary = { EC_EdsioUnregisteredLibraryValue };
 
 const EdsioStringStringEventCode EC_EdsioGModuleError = { EC_EdsioGModuleErrorValue };
-

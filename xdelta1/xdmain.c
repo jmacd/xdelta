@@ -141,7 +141,7 @@ typedef struct {
   gint16         to_name_len;
 
   guint32        header_space[HEADER_WORDS];
-  guint8         magic_buf[XDELTA_PREFIX_LEN];
+  char           magic_buf[XDELTA_PREFIX_LEN];
 
   XdFileHandle      *patch_in;
 
@@ -196,6 +196,19 @@ struct _XdFileHandle
 static const char xdelta_version[] = "1.2.0";
 
 typedef struct _Command Command;
+
+static const char*
+xd_basename (const char *path)
+{
+  const char *slash = strrchr (path, '/');
+  const char *backslash = strrchr (path, '\\');
+  const char *separator = slash;
+
+  if (backslash && (! separator || backslash > separator))
+    separator = backslash;
+
+  return separator ? separator + 1 : path;
+}
 
 struct _Command {
   gchar* name;
@@ -355,10 +368,10 @@ main (gint argc, gchar** argv)
     p = strrchr (strip_ext, '.');
     if ((p != NULL) && (strncasecmp (p + 1, "exe", 3) == 0))
       *p = '\0';
-    program_name = g_basename (strip_ext);
+    program_name = g_strdup (xd_basename (strip_ext));
   }
 #else /* !__DJGPP__ */
-  program_name = g_basename (argv[0]);
+  program_name = xd_basename (argv[0]);
 #endif /* __DJGPP__ */  
 
   g_log_set_handler (G_LOG_DOMAIN,
@@ -418,9 +431,9 @@ main (gint argc, gchar** argv)
 	    gchar* end = NULL;
 	    glong l = strtol (optarg, &end, 0);
 
-	    if (end && g_strcasecmp (end, "M") == 0)
+	    if (end && g_ascii_strcasecmp (end, "M") == 0)
 	      l <<= 20;
-	    else if (end && g_strcasecmp (end, "K") == 0)
+	    else if (end && g_ascii_strcasecmp (end, "K") == 0)
 	      l <<= 10;
 	    else if (end || l < 0)
 	      {
@@ -624,7 +637,7 @@ xd_tmpname (void)
        * (richdawe@bigfoot.com): Limit temporary filenames to
        * the MS-DOS 8+3 convention for DJGPP.
        */
-      g_string_sprintf (s, "%s/xd-%05d.%03d", tmpdir, x, seq++);
+      g_string_printf (s, "%s/xd-%05d.%03d", tmpdir, x, seq++);
     }
   while (lstat (s->str, &buf) == 0);
 
@@ -970,7 +983,7 @@ xd_handle_checksum_md5 (XdFileHandle *fh)
 	}
     }
 
-  return g_memdup (fh->md5, 16);
+  return g_memdup2 (fh->md5, 16);
 }
 
 static gboolean
@@ -1055,7 +1068,7 @@ xd_handle_name (XdFileHandle *fh)
 }
 
 static gssize
-xd_handle_read (XdFileHandle *fh, guint8 *buf, gsize nbyte)
+xd_handle_read (XdFileHandle *fh, void *buf, gsize nbyte)
 {
   if (nbyte == 0)
     return 0;
@@ -1075,7 +1088,7 @@ xd_handle_read (XdFileHandle *fh, guint8 *buf, gsize nbyte)
 }
 
 static gboolean
-xd_handle_write (XdFileHandle *fh, const guint8 *buf, gsize nbyte)
+xd_handle_write (XdFileHandle *fh, const void *buf, gsize nbyte)
 {
   g_assert (fh->type == WRITE_TYPE);
 
@@ -1541,8 +1554,8 @@ delta_command (gint argc, gchar** argv)
   patch_out_fd = fd;
   patch_out_name = argv[2];
 
-  from_name = g_basename (argv[0]);
-  to_name = g_basename (argv[1]);
+  from_name = xd_basename (argv[0]);
+  to_name = xd_basename (argv[1]);
 
   if (! (out = open_write_handle (patch_out_fd, patch_out_name)))
     return 2;
@@ -1716,7 +1729,7 @@ process_patch (const char* name)
 
   if (patch->has_trailer)
     {
-      guint8 trailer_buf[XDELTA_PREFIX_LEN];
+      char trailer_buf[XDELTA_PREFIX_LEN];
 
       if (xd_handle_read (patch->patch_in, trailer_buf, XDELTA_PREFIX_LEN) != XDELTA_PREFIX_LEN)
 	return NULL;

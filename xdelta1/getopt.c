@@ -39,6 +39,7 @@
 #endif
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* Comment out all this code if we are using the GNU C Library, and are not
@@ -168,12 +169,8 @@ static char *posixly_correct;
 /* Avoid depending on library functions or files
    whose names are inconsistent.  */
 
-char *getenv ();
-
 static char *
-my_index (str, chr)
-     const char *str;
-     int chr;
+my_index (const char *str, int chr)
 {
   while (*str)
     {
@@ -217,8 +214,7 @@ static int last_nonopt;
    the new indices of the non-options in ARGV after they are moved.  */
 
 static void
-exchange (argv)
-     char **argv;
+exchange (char **argv)
 {
   int bottom = first_nonopt;
   int middle = last_nonopt;
@@ -275,8 +271,7 @@ exchange (argv)
 /* Initialize the internal data when the first call is made.  */
 
 static const char *
-_getopt_initialize (optstring)
-     const char *optstring;
+_getopt_initialize (const char *optstring)
 {
   /* Start processing options with ARGV-element 1 (since ARGV-element 0
      is the program name); the sequence of previously skipped
@@ -365,13 +360,8 @@ _getopt_initialize (optstring)
    long-named options.  */
 
 int
-_getopt_internal (argc, argv, optstring, longopts, longind, long_only)
-     int argc;
-     char *const *argv;
-     const char *optstring;
-     const struct option *longopts;
-     int *longind;
-     int long_only;
+_getopt_internal (int argc, char *const *argv, const char *optstring,
+		  const struct option *longopts, int *longind, int long_only)
 {
   optarg = NULL;
 
@@ -663,10 +653,7 @@ _getopt_internal (argc, argv, optstring, longopts, longind, long_only)
 }
 
 int
-getopt (argc, argv, optstring)
-     int argc;
-     char *const *argv;
-     const char *optstring;
+getopt (int argc, char *const *argv, const char *optstring)
 {
   return _getopt_internal (argc, argv, optstring,
 			   (const struct option *) 0,

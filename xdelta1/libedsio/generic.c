@@ -124,7 +124,8 @@ serializeio_unserialize_generic_internal (SerialSource *source,
 
   if (ent)
     {
-      res = ent->unserialize_func (source, object);
+      res = ((gboolean (*) (SerialSource*, void**)) ent->unserialize_func)
+	(source, object);
     }
 
   return res;
@@ -161,7 +162,8 @@ serializeio_serialize_generic_internal (SerialSink    *sink,
   ent = serializeio_find_entry (object_type);
 
   if (ent)
-    res = ent->serialize_func (sink, object);
+    res = ((gboolean (*) (SerialSink*, void*)) ent->serialize_func)
+      (sink, object);
 
   return res;
 }
@@ -190,7 +192,7 @@ serializeio_generic_count (SerialType     object_type,
   ent = serializeio_find_entry (object_type);
 
   if (ent)
-    res = ent->count_func (object);
+    res = ((guint (*) (void*)) ent->count_func) (object);
 
   return res;
 }
@@ -203,7 +205,7 @@ serializeio_generic_print (SerialType type, void* object, guint indent_spaces)
   ent = serializeio_find_entry (type);
 
   if (ent)
-    ent->print_func (object, indent_spaces);
+    ((void (*) (void*, guint)) ent->print_func) (object, indent_spaces);
   else
     {
       int i = 0;

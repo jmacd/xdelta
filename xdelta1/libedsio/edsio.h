@@ -376,7 +376,7 @@ gboolean       edsio_base64_encode_region_into      (const guint8* data, guint d
 gboolean       edsio_base64_decode_region_into      (const guint8* data, guint data_len, guint8* out, guint *out_len);
 
 gchar*   edsio_time_to_iso8601   (SerialGenericTime* time);
-gchar*   edsio_time_t_to_iso8601 (GTime time);
+gchar*   edsio_time_t_to_iso8601 (guint32 time);
 gboolean edsio_time_of_day       (SerialGenericTime* time);
 
 enum _SimpleBufferFlags {
@@ -413,9 +413,9 @@ typedef union _EdsioPropertyEntry EdsioPropertyEntry;
 typedef struct _EdsioGenericProperty EdsioGenericProperty;
 
 typedef void     (* PropFreeFunc) (gpointer obj);
-typedef gboolean (* PropGSFunc) (/*gpointer obj, GHashTable** obj_table, EdsioProperty* prop, ... */);
-typedef gboolean (* PropSerialize) (/*SerialSink* sink, ... */);
-typedef gboolean (* PropUnserialize) (/*SerialSource* source, ... */);
+typedef gboolean (* PropGSFunc) (gpointer obj, EdsioProperty* prop, ...);
+typedef gboolean (* PropSerialize) (SerialSink* sink, EdsioPropertyEntry* value);
+typedef gboolean (* PropUnserialize) (SerialSource* source, EdsioPropertyEntry** value);
 
 typedef GHashTable**  (* PropertyTableFunc) (gpointer obj);
 typedef SerialSource* (* PersistSourceFunc) (gpointer obj, const char* prop_name);
