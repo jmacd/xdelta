@@ -10,11 +10,6 @@ if ! command -v "$emacs_bin" >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! command -v git >/dev/null 2>&1; then
-  echo "error: git is required so Emacs can safely update generated files" >&2
-  exit 1
-fi
-
 (
   cd "$srcdir/libedsio"
   "$emacs_bin" --batch -Q -l edsio.el \

@@ -1,17 +1,8 @@
 ;; -*- Emacs-Lisp -*-
 
-(require 'cl)
-(require 'pp)
-
 (eval-and-compile (setq load-path (cons ".." (cons "." load-path))))
 (provide 'edsio)
 (eval-and-compile (setq load-path (cdr (cdr load-path))))
-
-;; Turn of assertions in compiled code.
-(eval-and-compile
-  (setq cl-optimize-speed 3)
-  (setq cl-optimize-safety 1)
-  )
 
 ;; Begin
 
@@ -205,7 +196,7 @@ the definition file.")
 
 		      )
 	  )
-    (mapcar
+    (mapc
      (function
       (lambda (x)
 	(setq exprs (cons (list 'defmacro
@@ -386,9 +377,9 @@ the definition file.")
 
 ;	(message "source file:\n%s" (buffer-string))
 
-	(mapcar (function (lambda (x) (output-finish-file x))) *output-files*)
+	(mapc (function (lambda (x) (output-finish-file x))) *output-files*)
 	)
-    (mapcar (function (lambda (x) (kill-buffer (cadr x)))) *output-files*)
+    (mapc (function (lambda (x) (kill-buffer (cadr x)))) *output-files*)
     )
   )
 
@@ -534,49 +525,31 @@ the definition file.")
 (defun string-replace-regexp (str regexp to-string)
   "Result of replacing all occurrences in STR of REGEXP by TO-STRING.  The
 replacement is as for replace-regexp."
-  (let ((work (get-buffer-create "*string-tmp*")))
-    (save-excursion
-      (set-buffer work)
-      (erase-buffer)
-      (insert str)
-      (beginning-of-buffer)
-      (while (re-search-forward regexp nil t)
-	(replace-match to-string nil nil))
-      (buffer-string))))
+  (with-temp-buffer
+    (insert str)
+    (goto-char (point-min))
+    (while (re-search-forward regexp nil t)
+      (replace-match to-string nil nil))
+    (buffer-string)))
 
 (defun write-file-if-different (buf filename)
-  (save-excursion
-    (set-buffer buf)
+  (with-current-buffer buf
     (goto-char (point-max))
     (skip-chars-backward "\n")
     (delete-region (point) (point-max))
-    (insert "\n")
-    (if (not (file-exists-p filename))
-	(write-file filename)
-      (set-buffer buf)
-      (let ((old (get-buffer-create (generate-new-buffer-name filename)))
-	    (bmin (point-min))
-	    (bmax (point-max)))
-	(unwind-protect
-	    (progn
-	      (set-buffer old)
-	      (insert-file filename)
-	      (let ((omin (point-min))
-		    (omax (point-max))
-		    (case-fold-search nil))
-		(if (= 0 (compare-buffer-substrings old omin omax buf bmin bmax))
-		    (message "Output file %s is unchanged." filename)
-		  (set-buffer buf)
-		  (write-file filename)
-		  )
-		)
-	      )
-	  (kill-buffer old)
-	  )
-	)
-      )
-    )
-  )
+    (insert "\n"))
+  (if (and (file-exists-p filename)
+	   (with-temp-buffer
+	     (insert-file-contents filename)
+	     (let ((case-fold-search nil))
+	       (= 0 (compare-buffer-substrings
+		     (current-buffer) (point-min) (point-max)
+		     buf
+		     (with-current-buffer buf (point-min))
+		     (with-current-buffer buf (point-max)))))))
+      (message "Output file %s is unchanged." filename)
+    (with-current-buffer buf
+      (write-region (point-min) (point-max) filename nil 'silent))))
 
 
 (defun format-comlist (func l)
@@ -618,47 +591,21 @@ replacement is as for replace-regexp."
   )
 
 (defun capitalize1(s)
-  (let ((work (get-buffer-create "*string-tmp*")))
-    (save-excursion
-      (set-buffer work)
-      (erase-buffer)
-      (insert (format "%s" s))
-      (upcase-region (point-min) (+ (point-min) 1))
-      (buffer-substring-no-properties (point-min) (point-max))
-      )
-    )
-  )
+  (let ((str (format "%s" s)))
+    (concat (upcase (substring str 0 1)) (substring str 1))))
 
 (defun upcase-string (s)
-  (let ((work (get-buffer-create "*string-tmp*")))
-    (save-excursion
-      (set-buffer work)
-      (erase-buffer)
-      (insert (format "%s" s))
-      (upcase-region (point-min) (point-max))
-      (buffer-substring-no-properties (point-min) (point-max))
-      )
-    )
-  )
+  (upcase (format "%s" s)))
 
 (defun downcase-string (s)
-  (let ((work (get-buffer-create "*string-tmp*")))
-    (save-excursion
-      (set-buffer work)
-      (erase-buffer)
-      (insert (format "%s" s))
-      (downcase-region (point-min) (point-max))
-      (buffer-substring-no-properties (point-min) (point-max))
-      )
-    )
-  )
+  (downcase (format "%s" s)))
 
 ;; HERE IT IS
 
 (defun generate-code ()
 
   (let ((all-codes nil))
-    (mapcar
+    (mapc
      (function
       (lambda (st)
 	(let ((x (sertype-number-get st)))
@@ -693,7 +640,7 @@ replacement is as for replace-regexp."
     (insert "static void print_spaces (guint n) { guint i; for (i = 0; i < n; i += 1) g_print (\" \"); }\n\n")
     )
 
-  (mapcar (function generate-code-entry) *sertype-defs*)
+  (mapc (function generate-code-entry) *sertype-defs*)
 
   )
 
@@ -1208,7 +1155,6 @@ replacement is as for replace-regexp."
 		 (downcase-string (cadr field))
 		 (if is-param "" "& ")
 		 name
-		 (cadr field)
  		 )
 	 )
 	((and (equal (car (cadr field)) 'ptr)
@@ -1252,7 +1198,7 @@ replacement is as for replace-regexp."
 	 ((member (cadr field) (mapcar (lambda (x) (sertype-name-get x)) *all-sertype-defs*))
 	  (concat
 	   (if is-param (format "%sg_print (\"{\\n\");\n" prefix) "")
-	   (format "%sserializeio_print_%s_obj (& %s, indent_spaces + 2);\n" prefix (downcase-string (cadr field)) name name)
+	   (format "%sserializeio_print_%s_obj (& %s, indent_spaces + 2);\n" prefix (downcase-string (cadr field)) name)
 	   (format "%sprint_spaces (indent_spaces);\n;\n" prefix)
 	   (if is-param (format "%sg_print (\"}\\n\");\n" prefix) "")
 	   )
@@ -1262,7 +1208,7 @@ replacement is as for replace-regexp."
 	  (concat
 	   (if is-param (format "%sg_print (\"{\\n\");\n" prefix) "")
 	   (format "%sserializeio_print_%s_obj (%s, indent_spaces + 2);\n"
-		  prefix (downcase-string (cadr (cadr field))) name name)
+		  prefix (downcase-string (cadr (cadr field))) name)
 	   (format "%sprint_spaces (indent_spaces);\n;\n" prefix)
 	   (if is-param (format "%sg_print (\"}\\n\");\n" prefix) "")
 	   )
@@ -1521,12 +1467,9 @@ replacement is as for replace-regexp."
   )
 
 (defun fixup-oneline (event oneline)
-  (let ((work (get-buffer-create "*string-tmp2*")))
-    (save-excursion
-      (set-buffer work)
-      (erase-buffer)
-      (insert oneline)
-      (beginning-of-buffer)
+  (with-temp-buffer
+    (insert oneline)
+    (goto-char (point-min))
 
       (while (re-search-forward "${\\(\\w+\\)}" nil t)
 
@@ -1563,10 +1506,7 @@ replacement is as for replace-regexp."
  	  )
  	)
 
-      (buffer-string)
-      )
-    )
-  )
+    (buffer-string)))
 
 ;; Properties
 
@@ -1581,7 +1521,7 @@ replacement is as for replace-regexp."
 
     (output-source-file "_edsio")
 
-    (mapcar
+    (mapc
      (function
       (lambda (pht)
 	(let ((type (prophosttype-type-get pht)))
@@ -1610,7 +1550,7 @@ replacement is as for replace-regexp."
 
     ;; Host reg
 
-    (mapcar
+    (mapc
      (function
       (lambda (prophost)
 	(save-excursion
@@ -1631,11 +1571,11 @@ replacement is as for replace-regexp."
 
     ;; Compute each distinct (host type) x (prop type)
 
-    (mapcar
+    (mapc
      (function
       (lambda (prophost)
 
-	(mapcar
+	(mapc
 	 (function
 	  (lambda (prophosttype)
 
@@ -1650,7 +1590,7 @@ replacement is as for replace-regexp."
 
 	;; Output the get/set functions for each property type
 
-	(mapcar
+	(mapc
 	 (function
 	  (lambda (type)
 
@@ -1751,7 +1691,6 @@ replacement is as for replace-regexp."
 	      (insert (format "  return edsio_property_unset (\"%s\", \"%s\", prop.code, obj);\n"
 			      (prophost-name-get prophost)
 			      type
-			      ""
 			      ))
 
 	      (insert (format "}\n\n"))
