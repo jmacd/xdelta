@@ -141,7 +141,7 @@ typedef struct {
   gint16         to_name_len;
 
   guint32        header_space[HEADER_WORDS];
-  guint8         magic_buf[XDELTA_PREFIX_LEN];
+  char           magic_buf[XDELTA_PREFIX_LEN];
 
   XdFileHandle      *patch_in;
 
@@ -188,7 +188,7 @@ struct _XdFileHandle
   gboolean md5_good;
   gboolean reset_length_next_write;
 
-  gint md5_page;
+  guint md5_page;
   gint fd;
 };
 
@@ -196,6 +196,19 @@ struct _XdFileHandle
 static const char xdelta_version[] = "1.2.0";
 
 typedef struct _Command Command;
+
+static const char*
+xd_basename (const char *path)
+{
+  const char *slash = strrchr (path, '/');
+  const char *backslash = strrchr (path, '\\');
+  const char *separator = slash;
+
+  if (backslash && (! separator || backslash > separator))
+    separator = backslash;
+
+  return separator ? separator + 1 : path;
+}
 
 struct _Command {
   gchar* name;
@@ -239,7 +252,7 @@ static gint         quiet = FALSE;
 #define xd_error g_warning
 
 static void
-usage ()
+usage (void)
 {
   xd_error ("usage: %s COMMAND [OPTIONS] [ARG1 ...]\n", program_name);
   xd_error ("use --help for more help\n");
@@ -247,7 +260,7 @@ usage ()
 }
 
 static void
-help ()
+help (void)
 {
   xd_error ("usage: %s COMMAND [OPTIONS] [ARG1 ...]\n", program_name);
   xd_error ("COMMAND is one of:\n");
@@ -268,7 +281,7 @@ help ()
 }
 
 static void
-version ()
+version (void)
 {
   xd_error ("version %s\n", xdelta_version);
   exit (0);
@@ -282,6 +295,10 @@ xd_error_func (const gchar   *log_domain,
 	       const gchar   *message,
 	       gpointer	user_data)
 {
+  (void) log_domain;
+  (void) log_level;
+  (void) user_data;
+
   if (! xd_error_file)
     xd_error_file = stderr;
 
@@ -355,10 +372,10 @@ main (gint argc, gchar** argv)
     p = strrchr (strip_ext, '.');
     if ((p != NULL) && (strncasecmp (p + 1, "exe", 3) == 0))
       *p = '\0';
-    program_name = g_basename (strip_ext);
+    program_name = g_strdup (xd_basename (strip_ext));
   }
 #else /* !__DJGPP__ */
-  program_name = g_basename (argv[0]);
+  program_name = xd_basename (argv[0]);
 #endif /* __DJGPP__ */  
 
   g_log_set_handler (G_LOG_DOMAIN,
@@ -418,9 +435,9 @@ main (gint argc, gchar** argv)
 	    gchar* end = NULL;
 	    glong l = strtol (optarg, &end, 0);
 
-	    if (end && g_strcasecmp (end, "M") == 0)
+	    if (end && g_ascii_strcasecmp (end, "M") == 0)
 	      l <<= 20;
-	    else if (end && g_strcasecmp (end, "K") == 0)
+	    else if (end && g_ascii_strcasecmp (end, "K") == 0)
 	      l <<= 10;
 	    else if (end || l < 0)
 	      {
@@ -624,7 +641,7 @@ xd_tmpname (void)
        * (richdawe@bigfoot.com): Limit temporary filenames to
        * the MS-DOS 8+3 convention for DJGPP.
        */
-      g_string_sprintf (s, "%s/xd-%05d.%03d", tmpdir, x, seq++);
+      g_string_printf (s, "%s/xd-%05d.%03d", tmpdir, x, seq++);
     }
   while (lstat (s->str, &buf) == 0);
 
@@ -911,6 +928,8 @@ on_page (XdFileHandle* fh, guint pgno)
 static gboolean
 xd_handle_close (XdFileHandle *fh, gint ignore)
 {
+  (void) ignore;
+
   /* this is really a reset for writable files */
 
   if (fh->type == WRITE_TYPE)
@@ -950,7 +969,7 @@ xd_handle_checksum_md5 (XdFileHandle *fh)
 
       while (fh->md5_page <= xd_handle_pages (fh))
 	{
-	  gint pgno = fh->md5_page;
+	  guint pgno = fh->md5_page;
 	  gint onpage;
 
 	  if ((onpage = xd_handle_map_page (fh, pgno, &page)) < 0)
@@ -970,7 +989,7 @@ xd_handle_checksum_md5 (XdFileHandle *fh)
 	}
     }
 
-  return g_memdup (fh->md5, 16);
+  return g_memdup2 (fh->md5, 16);
 }
 
 static gboolean
@@ -1055,7 +1074,7 @@ xd_handle_name (XdFileHandle *fh)
 }
 
 static gssize
-xd_handle_read (XdFileHandle *fh, guint8 *buf, gsize nbyte)
+xd_handle_read (XdFileHandle *fh, void *buf, gsize nbyte)
 {
   if (nbyte == 0)
     return 0;
@@ -1075,7 +1094,7 @@ xd_handle_read (XdFileHandle *fh, guint8 *buf, gsize nbyte)
 }
 
 static gboolean
-xd_handle_write (XdFileHandle *fh, const guint8 *buf, gsize nbyte)
+xd_handle_write (XdFileHandle *fh, const void *buf, gsize nbyte)
 {
   g_assert (fh->type == WRITE_TYPE);
 
@@ -1207,13 +1226,13 @@ print_lru (XdFileHandle* fh)
 static gboolean
 make_lru_room (XdFileHandle* fh)
 {
-  if (fh->lru_count == max_mapped_pages)
+  if (fh->lru_count == (guint) max_mapped_pages)
     {
       if (! really_free_one_page (fh))
 	return FALSE;
     }
 
-  g_assert (fh->lru_count < max_mapped_pages);
+  g_assert (fh->lru_count < (guint) max_mapped_pages);
 
   return TRUE;
 }
@@ -1224,7 +1243,7 @@ static gssize
 xd_handle_map_page (XdFileHandle *fh, guint pgno, const guint8** mem)
 {
   LRU* lru;
-  guint to_map;
+  gint to_map;
 
 #ifdef DEBUG_MAP
   g_print ("map %p:%d\n", fh, pgno);
@@ -1234,7 +1253,7 @@ xd_handle_map_page (XdFileHandle *fh, guint pgno, const guint8** mem)
 
   if (fh->lru_table->len < (pgno + 1))
     {
-      gint olen = fh->lru_table->len;
+      guint olen = fh->lru_table->len;
 
       g_ptr_array_set_size (fh->lru_table, pgno + 1);
 
@@ -1503,7 +1522,7 @@ delta_command (gint argc, gchar** argv)
   XdeltaSource* src;
   XdeltaControl* cont;
   gboolean from_is_compressed = FALSE, to_is_compressed = FALSE;
-  guint32 control_offset, header_offset;
+  gint control_offset, header_offset;
   const char* from_name, *to_name;
   guint32 header_space[HEADER_WORDS];
   int fd;
@@ -1541,8 +1560,8 @@ delta_command (gint argc, gchar** argv)
   patch_out_fd = fd;
   patch_out_name = argv[2];
 
-  from_name = g_basename (argv[0]);
-  to_name = g_basename (argv[1]);
+  from_name = xd_basename (argv[0]);
+  to_name = xd_basename (argv[1]);
 
   if (! (out = open_write_handle (patch_out_fd, patch_out_name)))
     return 2;
@@ -1593,7 +1612,7 @@ delta_command (gint argc, gchar** argv)
   serializeio_print_xdeltacontrol_obj (cont, 0);
 #endif
 
-  if (cont->has_data && cont->has_data == cont->source_info_len)
+  if (cont->has_data && cont->source_info_len == 1)
     {
       if (! quiet)
 	xd_error ("warning: no matches found in from file, patch will apply without it\n");
@@ -1716,7 +1735,7 @@ process_patch (const char* name)
 
   if (patch->has_trailer)
     {
-      guint8 trailer_buf[XDELTA_PREFIX_LEN];
+      char trailer_buf[XDELTA_PREFIX_LEN];
 
       if (xd_handle_read (patch->patch_in, trailer_buf, XDELTA_PREFIX_LEN) != XDELTA_PREFIX_LEN)
 	return NULL;
@@ -1784,8 +1803,10 @@ info_command (gint argc, gchar** argv)
 {
   XdeltaPatch* patch;
   char buf[33];
-  int i;
+  guint32 i;
   XdeltaSourceInfo* si;
+
+  (void) argc;
 
   if (! (patch = process_patch (argv[0])))
     return 2;

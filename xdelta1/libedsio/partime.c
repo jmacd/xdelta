@@ -65,6 +65,12 @@
 #define ISUPPER(c)	(CTYPE_DOMAIN (c) && isupper (c))
 #define ISDIGIT(c)	((unsigned) (c) - '0' <= 9)
 
+#if defined(__GNUC__) || defined(__clang__)
+# define FALLTHROUGH __attribute__((fallthrough))
+#else
+# define FALLTHROUGH ((void) 0)
+#endif
+
 #include <partime.h>
 
 char const partimeId[] =
@@ -77,7 +83,7 @@ char const partimeId[] =
 
 struct name_val
   {
-    char name[NAME_LENGTH_MAXIMUM];
+    char name[NAME_LENGTH_MAXIMUM + 1];
     int val;
   };
 
@@ -182,9 +188,7 @@ static struct name_val const zone_names[] =
 
 /* Look for a prefix of S in TABLE, returning val for first matching entry.  */
 static int
-lookup (s, table)
-     char const *s;
-     struct name_val const table[];
+lookup (char const *s, struct name_val const table[])
 {
   int j;
   char buf[NAME_LENGTH_MAXIMUM];
@@ -211,8 +215,7 @@ lookup (s, table)
 
 /* Set *T to ``undefined'' values.  */
 static void
-undefine (t)
-     struct partime *t;
+undefine (struct partime *t)
 {
   t->tm.tm_sec = t->tm.tm_min = t->tm.tm_hour = t->tm.tm_mday = t->tm.tm_mon
     = t->tm.tm_year = t->tm.tm_wday = t->tm.tm_yday
@@ -254,10 +257,7 @@ static char const *const patterns[] =
    Set *PI to -1 if we know there are no more patterns to try;
    if *PI is initially negative, give up immediately.  */
 static char const *
-parse_prefix (str, t, pi)
-     char const *str;
-     struct partime *t;
-     int *pi;
+parse_prefix (char const *str, struct partime *t, int *pi)
 {
   int i = *pi;
   char const *pat;
@@ -301,9 +301,7 @@ parse_prefix (str, t, pi)
    Store the parsed number into *RES.
    Return the first character after the prefix, or 0 if it wasn't parsed.  */
 static char const *
-parse_fixed (s, digits, res)
-     char const *s;
-     int digits, *res;
+parse_fixed (char const *s, int digits, int *res)
 {
   int n = 0;
   char const *lim = s + digits;
@@ -323,9 +321,7 @@ parse_fixed (s, digits, res)
    Store the parsed number into *RES.
    Return the first character after the prefix, or 0 if it wasn't parsed.  */
 static char const *
-parse_ranged (s, digits, lo, hi, res)
-     char const *s;
-     int digits, lo, hi, *res;
+parse_ranged (char const *s, int digits, int lo, int hi, int *res)
 {
   s = parse_fixed (s, digits, res);
   return s && lo <= *res && *res <= hi ? s : 0;
@@ -338,9 +334,8 @@ parse_ranged (s, digits, lo, hi, res)
    rounded to the nearest integer, into *FRES.
    Return the first character after the prefix, or 0 if it wasn't parsed.  */
 static char const *
-parse_decimal (s, digits, lo, hi, resolution, res, fres)
-     char const *s;
-     int digits, lo, hi, resolution, *res, *fres;
+parse_decimal (char const *s, int digits, int lo, int hi, int resolution,
+	       int *res, int *fres)
 {
   s = parse_fixed (s, digits, res);
   if (s && lo <= *res && *res <= hi)
@@ -375,9 +370,7 @@ parse_decimal (s, digits, lo, hi, resolution, res, fres)
    or to TM_LOCAL_ZONE if it is the local time zone.
    Return the first character after the prefix, or 0 if it wasn't parsed.  */
 char *
-parzone (s, zone)
-     char const *s;
-     long *zone;
+parzone (char const *s, long *zone)
 {
   char sign;
   int hh, mm, ss;
@@ -470,10 +463,7 @@ parzone (s, zone)
    Set *T accordingly.
    Return the first character after the prefix, or 0 if it wasn't parsed.  */
 static char const *
-parse_pattern_letter (s, c, t)
-     char const *s;
-     int c;
-     struct partime *t;
+parse_pattern_letter (char const *s, int c, struct partime *t)
 {
   switch (c)
     {
@@ -644,7 +634,7 @@ parse_pattern_letter (s, c, t)
     case 'y': /* either R or Y */
       if (ISDIGIT (s[0]) && ISDIGIT (s[1]) && ! ISDIGIT (s[2]))
 	goto case_R;
-      /* fall into */
+      FALLTHROUGH;
     case 'Y': /* year in full [4 or more digits] */
       {
 	int len = 0;
@@ -675,9 +665,7 @@ parse_pattern_letter (s, c, t)
 /* If there is no conflict, merge into *T the additional information in *U
    and return 0.  Otherwise do nothing and return -1.  */
 static int
-merge_partime (t, u)
-     struct partime *t;
-     struct partime const *u;
+merge_partime (struct partime *t, struct partime const *u)
 {
 # define conflict(a,b) ((a) != (b)  &&  TM_DEFINED (a)  &&  TM_DEFINED (b))
   if (conflict (t->tm.tm_sec, u->tm.tm_sec)
@@ -715,9 +703,7 @@ merge_partime (t, u)
    The prefix may contain no useful information;
    in that case, *T will contain only undefined values.  */
 char *
-partime (s, t)
-     char const *s;
-     struct partime *t;
+partime (char const *s, struct partime *t)
 {
   struct partime p;
 

@@ -85,7 +85,7 @@ sink_next_bool (SerialSink* sink, gboolean val)
 static gboolean
 sink_next_string (SerialSink* sink, const char   *ptr)
 {
-  return sink->next_bytes (sink, ptr, strlen (ptr));
+  return sink->next_bytes (sink, (const guint8*) ptr, strlen (ptr));
 }
 
 static gboolean
@@ -254,7 +254,7 @@ source_next_string (SerialSource* source, const char **ptr)
 
   buf[len] = 0;
 
-  (*ptr) = buf;
+  (*ptr) = (const char*) buf;
 
   return source->source_read (source, buf, len);
 }

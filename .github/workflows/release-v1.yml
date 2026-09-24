@@ -58,7 +58,7 @@ jobs:
       - name: Configure and build
         working-directory: xdelta1
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXD1_WERROR=ON
           cmake --build build --parallel
 
       - name: Test historical compatibility

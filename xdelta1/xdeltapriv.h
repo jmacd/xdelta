@@ -109,7 +109,7 @@ struct _XdeltaSource
   XdeltaStream    *index_in;
   XdeltaOutStream *index_out;
 
-  gint             source_index;
+  guint32          source_index;
   gboolean         used;
   gboolean         sequential;
   guint32          position;

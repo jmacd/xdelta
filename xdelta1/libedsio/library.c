@@ -20,19 +20,19 @@ struct _Library {
 };
 
 static Library known_libraries[] = {
-  { "xd",      "xdelta",  3 },
-  { "edsio",   "edsio",   6 },
+  { "xd",      "xdelta",  3, FALSE },
+  { "edsio",   "edsio",   6, FALSE },
 };
 
 static GHashTable* loaded_libraries;
 
 static void
-edsio_library_init ()
+edsio_library_init (void)
 {
   if (! loaded_libraries)
     {
       gint i;
-      gint n = sizeof (known_libraries) / sizeof (Library);;
+      gint n = sizeof (known_libraries) / sizeof (Library);
 
       loaded_libraries = g_hash_table_new (g_int_hash, g_int_equal);
 

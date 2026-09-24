@@ -398,4 +398,3 @@ extern const XdStringEventCode EC_XdBackwardCompatibilityMode;
 #endif
 
 #endif /* _XD_EDSIO_H_ */
-

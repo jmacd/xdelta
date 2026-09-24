@@ -55,6 +55,7 @@ int QUERY_SIZE_MASK = 0;
 int xdp_set_query_size_pow (int size_pow)
 {
 #ifdef XDELTA_HARDCODE_SIZE
+  (void) size_pow;
   return XDP_QUERY_HARDCODED;
 #else
 
@@ -81,7 +82,7 @@ int xdp_set_query_size_pow (int size_pow)
 }
 
 int
-xdp_blocksize ()
+xdp_blocksize (void)
 {
   if (QUERY_SIZE == 0)
     {
@@ -176,7 +177,7 @@ generate_checksums (XdeltaStream    *stream,
   XdeltaChecksum cksum;
   XdeltaChecksum *result;
   const guint8* segment = NULL, *segment_pointer;
-  gint   segment_len, orig_segment_len;
+  gint   segment_len;
   guint  segment_page = 0;
   guint pages;
 
@@ -199,8 +200,6 @@ generate_checksums (XdeltaStream    *stream,
 
       if (segment_len < 0)
 	return FALSE;
-
-      orig_segment_len = segment_len;
 
       segment_len >>= QUERY_SIZE;
 
@@ -253,7 +252,7 @@ __xdp_generator_new (const char* version)
 void
 xdp_generator_free (XdeltaGenerator *gen)
 {
-  int i;
+  guint i;
 
   for (i = 0; i < gen->sources->len; i += 1)
     xdp_source_free (gen->sources->pdata[i]);
@@ -566,7 +565,7 @@ try_match (XdeltaGenerator *gen,
   match_backward_max = MIN (src_offset, to_offset - gen->to_output_pos);
 
   /* Don't allow backward paging */
-  match_backward_max = MIN (match_backward_max, xpos.off);
+  match_backward_max = MIN (match_backward_max, (gint) xpos.off);
 
   /* We're testing against the negative below. */
   match_backward_max = - match_backward_max;
@@ -628,7 +627,7 @@ doneback:
       rem = MIN (match_forward_max - match_forward, rem);
 
       /* Do a int-wise comparison if the regions are aligned. */
-      if (rem > (4*sizeof(int)) && (xpos.off % sizeof (int)) == (ypos.off % sizeof(int)))
+      if (rem > (4 * (gint) sizeof (int)) && (xpos.off % sizeof (int)) == (ypos.off % sizeof(int)))
 	{
 	  gint is;
 	  const int *xi, *yi;
@@ -952,9 +951,13 @@ xdp_generate_delta_int (XdeltaGenerator *gen,
 			XdeltaOutStream *control_out,
 			XdeltaOutStream *data_out)
 {
-  gint i, j, total_from_ck_count = 0, prime = 0, index = 0;
+  guint i;
+  gint j, total_from_ck_count = 0, prime = 0, index = 0;
   gint total_from_len = 0;
   guint32* table = NULL;
+
+  (void) control_out;
+  (void) data_out;
 
   if (QUERY_SIZE == 0)
     {
@@ -1069,7 +1072,7 @@ xdp_generate_delta (XdeltaGenerator *gen,
 		    XdeltaOutStream *control_out,
 		    XdeltaOutStream *data_out)
 {
-  gint i;
+  guint i;
   const guint8* in_md5;
   const guint8* data_out_md5;
 
@@ -1145,8 +1148,8 @@ control_new (void)
 static void
 control_reindex (XdeltaControl* cont, XdeltaSource* src)
 {
-  gint i;
-  gint new_index = cont->source_info_array->len;
+  guint32 i;
+  guint32 new_index = cont->source_info_array->len;
 
   for (i = 0; i < cont->inst_len; i += 1)
     {
@@ -1251,7 +1254,7 @@ print_inst (XdeltaInstruction* i)
 static void
 xdp_print_control (XdeltaControl *cont)
 {
-  gint i;
+  guint32 i;
 
   g_print ("*** control\n");
 
@@ -1275,7 +1278,7 @@ xdp_print_control (XdeltaControl *cont)
 void
 check_control (XdeltaControl* cont)
 {
-  gint i;
+  guint32 i;
 
   for (i = 0; i < cont->inst_len; i += 1)
     {
@@ -1293,7 +1296,7 @@ check_control (XdeltaControl* cont)
 static gboolean
 unpack_instructions (XdeltaControl* cont)
 {
-  gint i;
+  guint32 i;
   guint output_pos = 0;
 
   for (i = 0; i < cont->source_info_len; i += 1)
@@ -1337,7 +1340,7 @@ unpack_instructions (XdeltaControl* cont)
 static gboolean
 pack_instructions (XdeltaControl* cont)
 {
-  gint i;
+  guint32 i;
 
   for (i = 0; i < cont->source_info_len; i += 1)
     {
@@ -1446,7 +1449,7 @@ XdeltaControl*
 control_version_0 (SerialVersion0Control* ocont)
 {
   XdeltaControl* cont = g_new0 (XdeltaControl, 1);
-  gint i;
+  guint32 i;
   XdeltaSourceInfo* dinfo;
 
   g_assert (! ocont->normalized);

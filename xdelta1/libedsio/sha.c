@@ -79,7 +79,7 @@
 
 static void sha_transform(EdsioSHACtx *ctx)
 {
-    int i;
+    guint i;
     guint32 T, A, B, C, D, E, W[80], *WP;
 
     for (i = 0; i < 16; ++i) {
@@ -139,9 +139,9 @@ static void sha_transform(EdsioSHACtx *ctx)
 
 /* change endianness of data */
 
-static void maybe_byte_reverse(guint32 *buffer, int count)
+static void maybe_byte_reverse(guint32 *buffer, guint count)
 {
-    int i;
+    guint i;
     guint32 in;
 
     count /= sizeof(guint32);
@@ -176,7 +176,7 @@ void edsio_sha_init(EdsioSHACtx *ctx)
 
 void edsio_sha_update(EdsioSHACtx *ctx, const guint8 *buffer, guint count)
 {
-    int i;
+    guint i;
 
     if ((ctx->count_lo + ((guint32) count << 3)) < ctx->count_lo) {
         ++ctx->count_hi;

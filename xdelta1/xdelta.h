@@ -99,7 +99,7 @@ extern int QUERY_SIZE_MASK;
 
 /* Returns  if query size is hard coded. */
 int xdp_set_query_size_pow (int size_pow);
-int xdp_blocksize          ();
+int xdp_blocksize          (void);
 
 /* An xdelta consists of two pieces of information, the control and
  * data segments.  The control segment consists of instructions,

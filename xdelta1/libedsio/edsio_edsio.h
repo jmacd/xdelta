@@ -376,4 +376,3 @@ extern const EdsioStringStringEventCode EC_EdsioGModuleError;
 #endif
 
 #endif /* _EDSIO_EDSIO_H_ */
-

@@ -61,7 +61,7 @@ edsio_base64_encode_region (const guint8* data, guint len)
 gboolean
 edsio_base64_encode_region_into (const guint8* data, guint len, guint8* out, guint *out_len)
 {
-  gint i;
+  guint i;
   guint32 word = 0, count = 0;
 
   if ((*out_len) < (len + 2) * 4/3)

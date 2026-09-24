@@ -13,6 +13,28 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED IMPORTED_TARGET glib-2.0 gmodule-2.0)
 find_package(ZLIB REQUIRED)
 
+option(XD1_WERROR "Treat compiler warnings as errors" OFF)
+
+set(XD1_WERROR_FLAGS "")
+if(XD1_WERROR)
+  if(MSVC)
+    set(XD1_WERROR_FLAGS /WX)
+  elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    set(XD1_WERROR_FLAGS
+      -Werror
+      -Wall
+      -Wextra
+      -Wformat=2
+      -Wimplicit-fallthrough
+      -Wmissing-prototypes
+      -Wpointer-arith
+      -Wpedantic
+      -Wshadow
+      -Wvla
+    )
+  endif()
+endif()
+
 configure_file(cmake/config.h.in config.h)
 
 set(EDSIO_SOURCES
@@ -31,6 +53,7 @@ set(EDSIO_SOURCES
 )
 
 add_library(edsio STATIC ${EDSIO_SOURCES})
+target_compile_options(edsio PRIVATE ${XD1_WERROR_FLAGS})
 target_include_directories(edsio
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libedsio>
@@ -41,6 +64,7 @@ target_link_libraries(edsio PUBLIC PkgConfig::GLIB)
 
 add_library(xdelta_lib xdelta.c xdapply.c xd_edsio.c)
 set_target_properties(xdelta_lib PROPERTIES OUTPUT_NAME xdelta)
+target_compile_options(xdelta_lib PRIVATE ${XD1_WERROR_FLAGS})
 target_include_directories(xdelta_lib
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -51,6 +75,7 @@ target_include_directories(xdelta_lib
 target_link_libraries(xdelta_lib PUBLIC edsio)
 
 add_executable(xdelta xdmain.c getopt.c getopt1.c)
+target_compile_options(xdelta PRIVATE ${XD1_WERROR_FLAGS})
 target_link_libraries(xdelta PRIVATE xdelta_lib ZLIB::ZLIB)
 
 if(BUILD_TESTING)

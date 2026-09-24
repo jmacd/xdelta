@@ -267,10 +267,7 @@ static void MD5Transform (guint32 state[4], const guint8 block[64])
 /* Encodes input (guint32) into output (unsigned char). Assumes len is
    a multiple of 4.
    */
-static void Encode (output, input, len)
-    unsigned char *output;
-    guint32 *input;
-    unsigned int len;
+static void Encode (unsigned char *output, guint32 *input, unsigned int len)
 {
     unsigned int i, j;
 
@@ -285,10 +282,7 @@ static void Encode (output, input, len)
 /* Decodes input (unsigned char) into output (guint32). Assumes len is
    a multiple of 4.
    */
-static void Decode (output, input, len)
-    guint32 *output;
-    unsigned const char *input;
-    unsigned int len;
+static void Decode (guint32 *output, unsigned const char *input, unsigned int len)
 {
     unsigned int i, j;
 

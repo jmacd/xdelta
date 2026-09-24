@@ -37,7 +37,6 @@ xdp_copy_delta_region    (XdeltaControl     *cont,
 			  XdeltaOutStream   *output_stream)
 {
   gint i, l = cont->inst_len;
-  guint save_written = 0;
 
   for (i = 0; i < l; i += 1)
     {
@@ -55,7 +54,6 @@ xdp_copy_delta_region    (XdeltaControl     *cont,
       if (! handle_copy (info->in, output_stream, inst->offset, inst->length))
 	return FALSE;
 
-      save_written += inst->length;
     }
 
   return TRUE;
@@ -73,7 +71,7 @@ xdp_apply_delta (XdeltaControl     *cont,
 
   if (! check_stream_integrity (res, cont->to_md5, cont->to_len))
     {
-      int i;
+      guint32 i;
 
       /* to better report errors, check if the inputs were invalid now
        */
