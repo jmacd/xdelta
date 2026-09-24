@@ -373,7 +373,7 @@ the definition file.")
 	(insert (format "  edsio_library_register (%d, \"%s\");\n" *library-id* *output-prefix*))
 	(insert "  result = TRUE;\n")
 	(insert "  return TRUE;\n")
-	(insert "};\n\n")
+	(insert "}\n\n")
 
  	(if *prophosttype-defs*
  	    (generate-properties))
@@ -546,6 +546,11 @@ replacement is as for replace-regexp."
 
 (defun write-file-if-different (buf filename)
   (save-excursion
+    (set-buffer buf)
+    (goto-char (point-max))
+    (skip-chars-backward "\n")
+    (delete-region (point) (point-max))
+    (insert "\n")
     (if (not (file-exists-p filename))
 	(write-file filename)
       (set-buffer buf)
@@ -685,7 +690,7 @@ replacement is as for replace-regexp."
   (save-excursion
     (goto-char *source-top-marker*)
 
-    (insert "static void print_spaces (guint n) { int i; for (i = 0; i < n; i += 1) g_print (\" \"); }\n\n")
+    (insert "static void print_spaces (guint n) { guint i; for (i = 0; i < n; i += 1) g_print (\" \"); }\n\n")
     )
 
   (mapcar (function generate-code-entry) *sertype-defs*)
@@ -738,11 +743,25 @@ replacement is as for replace-regexp."
 
     (output-source-file "_edsio")
 
+    ;; Type-safe adapters for the generic serialization registry.
+
+    (save-excursion
+      (goto-char *source-top-marker*)
+      (insert (format "static gboolean\nunserialize_%s_generic (SerialSource* source, void** object)\n{\n  Serial%s* result = NULL;\n  if (! unserialize_%s_internal (source, &result)) return FALSE;\n  *object = result;\n  return TRUE;\n}\n\n"
+		      ent-downcase ent-upcase ent-downcase))
+      (insert (format "static gboolean\nserialize_%s_generic (SerialSink* sink, void* object)\n{\n  return serialize_%s_obj_internal (sink, object);\n}\n\n"
+		      ent-downcase ent-downcase))
+      (insert (format "static guint\nserializeio_count_%s_generic (const void* object)\n{\n  return serializeio_count_%s_obj (object);\n}\n\n"
+		      ent-downcase ent-downcase))
+      (insert (format "static void\nserializeio_print_%s_generic (void* object, guint indent_spaces)\n{\n  serializeio_print_%s_obj (object, indent_spaces);\n}\n\n"
+		      ent-downcase ent-downcase))
+      )
+
     ;; The init entry
 
     (save-excursion
       (goto-char *source-init-marker*)
-      (insert (format "  serializeio_initialize_type (\"ST_%s\", ST_%s, &unserialize_%s_internal, &serialize_%s_obj_internal, &serializeio_count_%s_obj, &serializeio_print_%s_obj);\n" ent-upcase ent-upcase ent-downcase ent-downcase ent-downcase ent-downcase))
+      (insert (format "  serializeio_initialize_type (\"ST_%s\", ST_%s, &unserialize_%s_generic, &serialize_%s_generic, &serializeio_count_%s_generic, &serializeio_print_%s_generic);\n" ent-upcase ent-upcase ent-downcase ent-downcase ent-downcase ent-downcase))
       )
 
     ;; Count code
@@ -751,6 +770,9 @@ replacement is as for replace-regexp."
 
     (insert (format "guint\nserializeio_count_%s (%s) {\n" ent-downcase (entry-arglist nil entry)))
     (insert (format "  guint size = sizeof (Serial%s);\n" ent-upcase))
+    (apply (function insert)
+	   (mapcar (function (lambda (x) (format "  (void) %s;\n" x)))
+		   (entry-param-names "" entry nil)))
     (apply (function insert)
 	   (mapcar (function (lambda (x) (concat
 					  (format "  ALIGN_8 (size);\n")
@@ -1015,7 +1037,7 @@ replacement is as for replace-regexp."
 	 (format "%sif (! (* source->next_bytes_known) (source, %s, %d)) goto bail;\n" prefix name (cadr (cadr field))))
 	((equal (car (cadr field)) 'array)
 	 (format "%s{
-%s  gint i;
+%s  guint32 i;
 %s  if (! (* source->next_uint) (source, &%s_len)) goto bail;
 %s  if (! (%s = serializeio_source_alloc (source, sizeof (%s) * %s_len))) goto bail;
 %s  for (i = 0; i < %s_len; i += 1)
@@ -1068,7 +1090,7 @@ replacement is as for replace-regexp."
 	 (format "%sif (! (* sink->next_bytes_known) (sink, %s, %d)) goto bail;\n" prefix name (cadr (cadr field))))
 	((equal (car (cadr field)) 'array)
 	 (format "%s{
-%s  gint i;
+%s  guint32 i;
 %s  if (! (* sink->next_uint) (sink, %s_len)) goto bail;
 %s  for (i = 0; i < %s_len; i += 1)
 %s    {
@@ -1140,7 +1162,7 @@ replacement is as for replace-regexp."
 	 )
 	((equal (car (cadr field)) 'array)
 	 (format "%s{
-%s  gint i;
+%s  guint32 i;
 %s  for (i = 0; i < %s_len; i += 1)
 %s    {
 %s%s      }
@@ -1251,7 +1273,7 @@ replacement is as for replace-regexp."
 	  (concat
 	   (if is-param (format "%sg_print (\"{\\n\");\n" prefix) "")
 	   (format "%s{
-%s  gint i;
+%s  guint32 i;
 %s  for (i = 0; i < %s_len; i += 1)
 %s    {
 %s      print_spaces (indent_spaces);
@@ -1836,17 +1858,18 @@ replacement is as for replace-regexp."
   (downcase-string type))
 
 (defun type-serialize-func (type)
-  (format "serialize_%s_obj" (downcase-string type))
+  (format "(PropSerialize) serialize_%s_obj" (downcase-string type))
   )
 
 (defun type-unserialize-func (type)
-  (format "unserialize_%s" (downcase-string type))
+  (format "(PropUnserialize) unserialize_%s" (downcase-string type))
   )
 
 (defun type-gs-func (type name)
-  (if (member type (mapcar (lambda (x) (sertype-name-get x)) *all-sertype-defs*))
-      (format "& edsio_property_vptr_%s" name)
-    (format "& edsio_property_%s_%s" type name)))
+  (concat "(PropGSFunc) "
+	  (if (member type (mapcar (lambda (x) (sertype-name-get x)) *all-sertype-defs*))
+	      (format "& edsio_property_vptr_%s" name)
+	    (format "& edsio_property_%s_%s" type name))))
 
 (defun type-free-func (type)
   (if (member type (mapcar (lambda (x) (sertype-name-get x)) *all-sertype-defs*))

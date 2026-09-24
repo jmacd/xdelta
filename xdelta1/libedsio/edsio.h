@@ -128,12 +128,17 @@ struct _SerialSink {
   gboolean   (* next_string)        (SerialSink* sink, const char   *ptr);
 };
 
+typedef gboolean (* SerializeioUnserializeFunc) (SerialSource* source, void** object);
+typedef gboolean (* SerializeioSerializeFunc) (SerialSink* sink, void* object);
+typedef guint    (* SerializeioCountFunc) (const void* object);
+typedef void     (* SerializeioPrintFunc) (void* object, guint indent_spaces);
+
 void           serializeio_initialize_type                (const char* name,
 							   guint32     val,
-							   gboolean  (*unserialize_func) (),
-							   gboolean  (*serialize_func) (),
-							   guint     (*count_func) (),
-							   void      (*print_func) ());
+							   SerializeioUnserializeFunc unserialize_func,
+							   SerializeioSerializeFunc serialize_func,
+							   SerializeioCountFunc count_func,
+							   SerializeioPrintFunc print_func);
 
 const char*    serializeio_generic_type_to_string         (SerialType type);
 void           serializeio_generic_print                  (SerialType type, void* object, guint indent_spaces);

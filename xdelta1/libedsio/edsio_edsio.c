@@ -35,7 +35,115 @@ static const char* Edsio_StringString_event_field_to_string (GenericEvent* ev, g
 static const char* Edsio_Source_event_field_to_string (GenericEvent* ev, gint field);
 static const char* Edsio_IntInt_event_field_to_string (GenericEvent* ev, gint field);
 static const char* Edsio_Errno_event_field_to_string (GenericEvent* ev, gint field);
-static void print_spaces (guint n) { int i; for (i = 0; i < n; i += 1) g_print (" "); }
+static gboolean
+unserialize_generictime_generic (SerialSource* source, void** object)
+{
+  SerialGenericTime* result = NULL;
+  if (! unserialize_generictime_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_generictime_generic (SerialSink* sink, void* object)
+{
+  return serialize_generictime_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_generictime_generic (const void* object)
+{
+  return serializeio_count_generictime_obj (object);
+}
+
+static void
+serializeio_print_generictime_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_generictime_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_edsiostring_generic (SerialSource* source, void** object)
+{
+  SerialEdsioString* result = NULL;
+  if (! unserialize_edsiostring_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_edsiostring_generic (SerialSink* sink, void* object)
+{
+  return serialize_edsiostring_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_edsiostring_generic (const void* object)
+{
+  return serializeio_count_edsiostring_obj (object);
+}
+
+static void
+serializeio_print_edsiostring_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_edsiostring_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_edsiobytes_generic (SerialSource* source, void** object)
+{
+  SerialEdsioBytes* result = NULL;
+  if (! unserialize_edsiobytes_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_edsiobytes_generic (SerialSink* sink, void* object)
+{
+  return serialize_edsiobytes_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_edsiobytes_generic (const void* object)
+{
+  return serializeio_count_edsiobytes_obj (object);
+}
+
+static void
+serializeio_print_edsiobytes_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_edsiobytes_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_edsiouint_generic (SerialSource* source, void** object)
+{
+  SerialEdsioUint* result = NULL;
+  if (! unserialize_edsiouint_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_edsiouint_generic (SerialSink* sink, void* object)
+{
+  return serialize_edsiouint_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_edsiouint_generic (const void* object)
+{
+  return serializeio_count_edsiouint_obj (object);
+}
+
+static void
+serializeio_print_edsiouint_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_edsiouint_obj (object, indent_spaces);
+}
+
+static void print_spaces (guint n) { guint i; for (i = 0; i < n; i += 1) g_print (" "); }
 
 
 /* initialize this library. */
@@ -77,10 +185,10 @@ edsio_edsio_init (void)
   eventdelivery_initialize_event_def (EC_EdsioUnregisteredTypeValue, EL_Error, EF_None, "UnregisteredType", "Unregistered serial type: library=${0} number=${1}", & Edsio_IntInt_event_field_to_string);
   eventdelivery_initialize_event_def (EC_EdsioTimeFailureValue, EL_Error, EF_None, "TimeFailure", "Time failed: ${0}", & Edsio_Errno_event_field_to_string);
   eventdelivery_initialize_event_def (EC_EdsioGetTimeOfDayFailureValue, EL_Error, EF_None, "GetTimeOfDayFailure", "Gettimeofday failed: ${0}", & Edsio_Errno_event_field_to_string);
-  serializeio_initialize_type ("ST_GenericTime", ST_GenericTime, &unserialize_generictime_internal, &serialize_generictime_obj_internal, &serializeio_count_generictime_obj, &serializeio_print_generictime_obj);
-  serializeio_initialize_type ("ST_EdsioString", ST_EdsioString, &unserialize_edsiostring_internal, &serialize_edsiostring_obj_internal, &serializeio_count_edsiostring_obj, &serializeio_print_edsiostring_obj);
-  serializeio_initialize_type ("ST_EdsioBytes", ST_EdsioBytes, &unserialize_edsiobytes_internal, &serialize_edsiobytes_obj_internal, &serializeio_count_edsiobytes_obj, &serializeio_print_edsiobytes_obj);
-  serializeio_initialize_type ("ST_EdsioUint", ST_EdsioUint, &unserialize_edsiouint_internal, &serialize_edsiouint_obj_internal, &serializeio_count_edsiouint_obj, &serializeio_print_edsiouint_obj);
+  serializeio_initialize_type ("ST_GenericTime", ST_GenericTime, &unserialize_generictime_generic, &serialize_generictime_generic, &serializeio_count_generictime_generic, &serializeio_print_generictime_generic);
+  serializeio_initialize_type ("ST_EdsioString", ST_EdsioString, &unserialize_edsiostring_generic, &serialize_edsiostring_generic, &serializeio_count_edsiostring_generic, &serializeio_print_edsiostring_generic);
+  serializeio_initialize_type ("ST_EdsioBytes", ST_EdsioBytes, &unserialize_edsiobytes_generic, &serialize_edsiobytes_generic, &serializeio_count_edsiobytes_generic, &serializeio_print_edsiobytes_generic);
+  serializeio_initialize_type ("ST_EdsioUint", ST_EdsioUint, &unserialize_edsiouint_generic, &serialize_edsiouint_generic, &serializeio_count_edsiouint_generic, &serializeio_print_edsiouint_generic);
   edsio_initialize_host_type ("PropTest", (PropertyTableFunc) & edsio_proptest_property_table, (PersistSourceFunc) & edsio_persist_proptest_source, (PersistSinkFunc) & edsio_persist_proptest_sink, (PersistIssetFunc) & edsio_persist_proptest_isset, (PersistUnsetFunc) & edsio_persist_proptest_unset);
   edsio_initialize_property_type ("EdsioUint", & edsio_property_vptr_free, (PropGSFunc) & edsio_property_vptr_getter, (PropGSFunc) & edsio_property_vptr_setter, (PropSerialize) serialize_edsiouint_obj, (PropUnserialize) unserialize_edsiouint);
   edsio_initialize_property_type ("string", & edsio_property_string_free, (PropGSFunc) & edsio_property_string_getter, (PropGSFunc) & edsio_property_string_setter, (PropSerialize) serialize_string_obj, (PropUnserialize) unserialize_string);
@@ -89,7 +197,7 @@ edsio_edsio_init (void)
   edsio_library_register (6, "edsio");
   result = TRUE;
   return TRUE;
-};
+}
 
 gboolean edsio_new_proptest_edsiouint_property (const char* name, guint32 flags, EdsioPropTestEdsioUintProperty* prop)
 {
@@ -237,6 +345,7 @@ proptest_isset_uint (PropTest* obj, EdsioPropTestUintProperty prop)
 guint
 serializeio_count_edsiouint (guint32 val) {
   guint size = sizeof (SerialEdsioUint);
+  (void) val;
   ALIGN_8 (size);
   ALIGN_8 (size);
   return size;
@@ -336,6 +445,8 @@ bail:
 guint
 serializeio_count_edsiobytes (guint32 val_len, const guint8* val) {
   guint size = sizeof (SerialEdsioBytes);
+  (void) val_len;
+  (void) val;
   ALIGN_8 (size);
   size += val_len;
   ALIGN_8 (size);
@@ -436,6 +547,7 @@ bail:
 guint
 serializeio_count_edsiostring (const gchar* val) {
   guint size = sizeof (SerialEdsioString);
+  (void) val;
   ALIGN_8 (size);
   size += strlen (val) + 1;
   ALIGN_8 (size);
@@ -536,6 +648,8 @@ bail:
 guint
 serializeio_count_generictime (guint32 seconds, guint32 nanos) {
   guint size = sizeof (SerialGenericTime);
+  (void) seconds;
+  (void) nanos;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);

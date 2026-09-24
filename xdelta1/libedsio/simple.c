@@ -61,6 +61,7 @@ edsio_simple_source (const guint8* data, guint len, guint flags)
 gboolean
 byte_array_source_close (SerialSource* source)
 {
+  (void) source;
   return TRUE;
 }
 

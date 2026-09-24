@@ -188,7 +188,7 @@ struct _XdFileHandle
   gboolean md5_good;
   gboolean reset_length_next_write;
 
-  gint md5_page;
+  guint md5_page;
   gint fd;
 };
 
@@ -252,7 +252,7 @@ static gint         quiet = FALSE;
 #define xd_error g_warning
 
 static void
-usage ()
+usage (void)
 {
   xd_error ("usage: %s COMMAND [OPTIONS] [ARG1 ...]\n", program_name);
   xd_error ("use --help for more help\n");
@@ -260,7 +260,7 @@ usage ()
 }
 
 static void
-help ()
+help (void)
 {
   xd_error ("usage: %s COMMAND [OPTIONS] [ARG1 ...]\n", program_name);
   xd_error ("COMMAND is one of:\n");
@@ -281,7 +281,7 @@ help ()
 }
 
 static void
-version ()
+version (void)
 {
   xd_error ("version %s\n", xdelta_version);
   exit (0);
@@ -295,6 +295,10 @@ xd_error_func (const gchar   *log_domain,
 	       const gchar   *message,
 	       gpointer	user_data)
 {
+  (void) log_domain;
+  (void) log_level;
+  (void) user_data;
+
   if (! xd_error_file)
     xd_error_file = stderr;
 
@@ -924,6 +928,8 @@ on_page (XdFileHandle* fh, guint pgno)
 static gboolean
 xd_handle_close (XdFileHandle *fh, gint ignore)
 {
+  (void) ignore;
+
   /* this is really a reset for writable files */
 
   if (fh->type == WRITE_TYPE)
@@ -963,7 +969,7 @@ xd_handle_checksum_md5 (XdFileHandle *fh)
 
       while (fh->md5_page <= xd_handle_pages (fh))
 	{
-	  gint pgno = fh->md5_page;
+	  guint pgno = fh->md5_page;
 	  gint onpage;
 
 	  if ((onpage = xd_handle_map_page (fh, pgno, &page)) < 0)
@@ -1220,13 +1226,13 @@ print_lru (XdFileHandle* fh)
 static gboolean
 make_lru_room (XdFileHandle* fh)
 {
-  if (fh->lru_count == max_mapped_pages)
+  if (fh->lru_count == (guint) max_mapped_pages)
     {
       if (! really_free_one_page (fh))
 	return FALSE;
     }
 
-  g_assert (fh->lru_count < max_mapped_pages);
+  g_assert (fh->lru_count < (guint) max_mapped_pages);
 
   return TRUE;
 }
@@ -1237,7 +1243,7 @@ static gssize
 xd_handle_map_page (XdFileHandle *fh, guint pgno, const guint8** mem)
 {
   LRU* lru;
-  guint to_map;
+  gint to_map;
 
 #ifdef DEBUG_MAP
   g_print ("map %p:%d\n", fh, pgno);
@@ -1247,7 +1253,7 @@ xd_handle_map_page (XdFileHandle *fh, guint pgno, const guint8** mem)
 
   if (fh->lru_table->len < (pgno + 1))
     {
-      gint olen = fh->lru_table->len;
+      guint olen = fh->lru_table->len;
 
       g_ptr_array_set_size (fh->lru_table, pgno + 1);
 
@@ -1516,7 +1522,7 @@ delta_command (gint argc, gchar** argv)
   XdeltaSource* src;
   XdeltaControl* cont;
   gboolean from_is_compressed = FALSE, to_is_compressed = FALSE;
-  guint32 control_offset, header_offset;
+  gint control_offset, header_offset;
   const char* from_name, *to_name;
   guint32 header_space[HEADER_WORDS];
   int fd;
@@ -1606,7 +1612,7 @@ delta_command (gint argc, gchar** argv)
   serializeio_print_xdeltacontrol_obj (cont, 0);
 #endif
 
-  if (cont->has_data && cont->has_data == cont->source_info_len)
+  if (cont->has_data && cont->source_info_len == 1)
     {
       if (! quiet)
 	xd_error ("warning: no matches found in from file, patch will apply without it\n");
@@ -1797,8 +1803,10 @@ info_command (gint argc, gchar** argv)
 {
   XdeltaPatch* patch;
   char buf[33];
-  int i;
+  guint32 i;
   XdeltaSourceInfo* si;
+
+  (void) argc;
 
   if (! (patch = process_patch (argv[0])))
     return 2;

@@ -14,10 +14,10 @@
 
 typedef struct {
   const char* name;
-  gboolean (*unserialize_func) ();
-  gboolean (*serialize_func) ();
-  guint    (*count_func) ();
-  void     (*print_func) ();
+  SerializeioUnserializeFunc unserialize_func;
+  SerializeioSerializeFunc serialize_func;
+  SerializeioCountFunc count_func;
+  SerializeioPrintFunc print_func;
   guint32    val;
 } SerEntry;
 
@@ -27,10 +27,10 @@ static gboolean  ser_array_sorted;
 void
 serializeio_initialize_type (const char* name,
 			     guint32    val,
-			     gboolean (*unserialize_func) (),
-			     gboolean (*serialize_func) (),
-			     guint    (*count_func) (),
-			     void      (*print_func) ())
+			     SerializeioUnserializeFunc unserialize_func,
+			     SerializeioSerializeFunc serialize_func,
+			     SerializeioCountFunc count_func,
+			     SerializeioPrintFunc print_func)
 {
   SerEntry it;
 
@@ -52,8 +52,8 @@ serializeio_initialize_type (const char* name,
 static int
 ser_entry_compare (const void* va, const void* vb)
 {
-  SerEntry* a = (SerEntry*) va;
-  SerEntry* b = (SerEntry*) vb;
+  const SerEntry* a = va;
+  const SerEntry* b = vb;
 
   return a->val - b->val;
 }
@@ -123,10 +123,7 @@ serializeio_unserialize_generic_internal (SerialSource *source,
   (*object_type) = type;
 
   if (ent)
-    {
-      res = ((gboolean (*) (SerialSource*, void**)) ent->unserialize_func)
-	(source, object);
-    }
+    res = ent->unserialize_func (source, object);
 
   return res;
 }
@@ -162,8 +159,7 @@ serializeio_serialize_generic_internal (SerialSink    *sink,
   ent = serializeio_find_entry (object_type);
 
   if (ent)
-    res = ((gboolean (*) (SerialSink*, void*)) ent->serialize_func)
-      (sink, object);
+    res = ent->serialize_func (sink, object);
 
   return res;
 }
@@ -187,12 +183,12 @@ serializeio_generic_count (SerialType     object_type,
 			   void          *object)
 {
   SerEntry* ent;
-  gboolean res = FALSE;
+  guint res = 0;
 
   ent = serializeio_find_entry (object_type);
 
   if (ent)
-    res = ((guint (*) (void*)) ent->count_func) (object);
+    res = ent->count_func (object);
 
   return res;
 }
@@ -205,10 +201,10 @@ serializeio_generic_print (SerialType type, void* object, guint indent_spaces)
   ent = serializeio_find_entry (type);
 
   if (ent)
-    ((void (*) (void*, guint)) ent->print_func) (object, indent_spaces);
+    ent->print_func (object, indent_spaces);
   else
     {
-      int i = 0;
+      guint i = 0;
 
       for (; i < indent_spaces; i += 1)
 	g_print (" ");
@@ -229,7 +225,7 @@ serializeio_unserialize_generic_acceptable (SerialSource *source,
 
   if (s)
     {
-      if (accept != -1)
+      if (accept != (guint32) -1)
 	{
 	  if ((*object_type & EDSIO_LIBRARY_OFFSET_MASK) != (accept & EDSIO_LIBRARY_OFFSET_MASK))
 	    {

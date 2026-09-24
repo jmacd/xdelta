@@ -32,7 +32,277 @@ static const char* Xd_String_event_field_to_string (GenericEvent* ev, gint field
 static const char* Xd_HandleIntInt_event_field_to_string (GenericEvent* ev, gint field);
 static const char* Xd_HandleStringString_event_field_to_string (GenericEvent* ev, gint field);
 static const char* Xd_Int_event_field_to_string (GenericEvent* ev, gint field);
-static void print_spaces (guint n) { int i; for (i = 0; i < n; i += 1) g_print (" "); }
+static gboolean
+unserialize_version0instruction_generic (SerialSource* source, void** object)
+{
+  SerialVersion0Instruction* result = NULL;
+  if (! unserialize_version0instruction_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_version0instruction_generic (SerialSink* sink, void* object)
+{
+  return serialize_version0instruction_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_version0instruction_generic (const void* object)
+{
+  return serializeio_count_version0instruction_obj (object);
+}
+
+static void
+serializeio_print_version0instruction_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_version0instruction_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_version0control_generic (SerialSource* source, void** object)
+{
+  SerialVersion0Control* result = NULL;
+  if (! unserialize_version0control_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_version0control_generic (SerialSink* sink, void* object)
+{
+  return serialize_version0control_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_version0control_generic (const void* object)
+{
+  return serializeio_count_version0control_obj (object);
+}
+
+static void
+serializeio_print_version0control_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_version0control_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_version0sourceinfo_generic (SerialSource* source, void** object)
+{
+  SerialVersion0SourceInfo* result = NULL;
+  if (! unserialize_version0sourceinfo_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_version0sourceinfo_generic (SerialSink* sink, void* object)
+{
+  return serialize_version0sourceinfo_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_version0sourceinfo_generic (const void* object)
+{
+  return serializeio_count_version0sourceinfo_obj (object);
+}
+
+static void
+serializeio_print_version0sourceinfo_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_version0sourceinfo_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_rsyncindex_generic (SerialSource* source, void** object)
+{
+  SerialRsyncIndex* result = NULL;
+  if (! unserialize_rsyncindex_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_rsyncindex_generic (SerialSink* sink, void* object)
+{
+  return serialize_rsyncindex_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_rsyncindex_generic (const void* object)
+{
+  return serializeio_count_rsyncindex_obj (object);
+}
+
+static void
+serializeio_print_rsyncindex_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_rsyncindex_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_rsyncindexelt_generic (SerialSource* source, void** object)
+{
+  SerialRsyncIndexElt* result = NULL;
+  if (! unserialize_rsyncindexelt_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_rsyncindexelt_generic (SerialSink* sink, void* object)
+{
+  return serialize_rsyncindexelt_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_rsyncindexelt_generic (const void* object)
+{
+  return serializeio_count_rsyncindexelt_obj (object);
+}
+
+static void
+serializeio_print_rsyncindexelt_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_rsyncindexelt_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_xdeltainstruction_generic (SerialSource* source, void** object)
+{
+  SerialXdeltaInstruction* result = NULL;
+  if (! unserialize_xdeltainstruction_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_xdeltainstruction_generic (SerialSink* sink, void* object)
+{
+  return serialize_xdeltainstruction_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_xdeltainstruction_generic (const void* object)
+{
+  return serializeio_count_xdeltainstruction_obj (object);
+}
+
+static void
+serializeio_print_xdeltainstruction_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_xdeltainstruction_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_xdeltacontrol_generic (SerialSource* source, void** object)
+{
+  SerialXdeltaControl* result = NULL;
+  if (! unserialize_xdeltacontrol_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_xdeltacontrol_generic (SerialSink* sink, void* object)
+{
+  return serialize_xdeltacontrol_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_xdeltacontrol_generic (const void* object)
+{
+  return serializeio_count_xdeltacontrol_obj (object);
+}
+
+static void
+serializeio_print_xdeltacontrol_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_xdeltacontrol_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_xdeltasourceinfo_generic (SerialSource* source, void** object)
+{
+  SerialXdeltaSourceInfo* result = NULL;
+  if (! unserialize_xdeltasourceinfo_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_xdeltasourceinfo_generic (SerialSink* sink, void* object)
+{
+  return serialize_xdeltasourceinfo_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_xdeltasourceinfo_generic (const void* object)
+{
+  return serializeio_count_xdeltasourceinfo_obj (object);
+}
+
+static void
+serializeio_print_xdeltasourceinfo_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_xdeltasourceinfo_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_xdeltaindex_generic (SerialSource* source, void** object)
+{
+  SerialXdeltaIndex* result = NULL;
+  if (! unserialize_xdeltaindex_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_xdeltaindex_generic (SerialSink* sink, void* object)
+{
+  return serialize_xdeltaindex_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_xdeltaindex_generic (const void* object)
+{
+  return serializeio_count_xdeltaindex_obj (object);
+}
+
+static void
+serializeio_print_xdeltaindex_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_xdeltaindex_obj (object, indent_spaces);
+}
+
+static gboolean
+unserialize_xdeltachecksum_generic (SerialSource* source, void** object)
+{
+  SerialXdeltaChecksum* result = NULL;
+  if (! unserialize_xdeltachecksum_internal (source, &result)) return FALSE;
+  *object = result;
+  return TRUE;
+}
+
+static gboolean
+serialize_xdeltachecksum_generic (SerialSink* sink, void* object)
+{
+  return serialize_xdeltachecksum_obj_internal (sink, object);
+}
+
+static guint
+serializeio_count_xdeltachecksum_generic (const void* object)
+{
+  return serializeio_count_xdeltachecksum_obj (object);
+}
+
+static void
+serializeio_print_xdeltachecksum_generic (void* object, guint indent_spaces)
+{
+  serializeio_print_xdeltachecksum_obj (object, indent_spaces);
+}
+
+static void print_spaces (guint n) { guint i; for (i = 0; i < n; i += 1) g_print (" "); }
 
 
 /* initialize this library. */
@@ -53,20 +323,20 @@ xd_edsio_init (void)
   eventdelivery_initialize_event_def (EC_XdOutOfRangeSourceIndexValue, EL_Error, EF_None, "OutOfRangeSourceIndex", "Instruction references out-of-range source index: ${0}", & Xd_Int_event_field_to_string);
   eventdelivery_initialize_event_def (EC_XdTooManySourcesValue, EL_Error, EF_None, "TooManySources", "Too many input sources", NULL);
   eventdelivery_initialize_event_def (EC_XdTooFewSourcesValue, EL_Error, EF_None, "TooFewSources", "Too few input sources", NULL);
-  serializeio_initialize_type ("ST_Version0Instruction", ST_Version0Instruction, &unserialize_version0instruction_internal, &serialize_version0instruction_obj_internal, &serializeio_count_version0instruction_obj, &serializeio_print_version0instruction_obj);
-  serializeio_initialize_type ("ST_Version0Control", ST_Version0Control, &unserialize_version0control_internal, &serialize_version0control_obj_internal, &serializeio_count_version0control_obj, &serializeio_print_version0control_obj);
-  serializeio_initialize_type ("ST_Version0SourceInfo", ST_Version0SourceInfo, &unserialize_version0sourceinfo_internal, &serialize_version0sourceinfo_obj_internal, &serializeio_count_version0sourceinfo_obj, &serializeio_print_version0sourceinfo_obj);
-  serializeio_initialize_type ("ST_RsyncIndex", ST_RsyncIndex, &unserialize_rsyncindex_internal, &serialize_rsyncindex_obj_internal, &serializeio_count_rsyncindex_obj, &serializeio_print_rsyncindex_obj);
-  serializeio_initialize_type ("ST_RsyncIndexElt", ST_RsyncIndexElt, &unserialize_rsyncindexelt_internal, &serialize_rsyncindexelt_obj_internal, &serializeio_count_rsyncindexelt_obj, &serializeio_print_rsyncindexelt_obj);
-  serializeio_initialize_type ("ST_XdeltaInstruction", ST_XdeltaInstruction, &unserialize_xdeltainstruction_internal, &serialize_xdeltainstruction_obj_internal, &serializeio_count_xdeltainstruction_obj, &serializeio_print_xdeltainstruction_obj);
-  serializeio_initialize_type ("ST_XdeltaControl", ST_XdeltaControl, &unserialize_xdeltacontrol_internal, &serialize_xdeltacontrol_obj_internal, &serializeio_count_xdeltacontrol_obj, &serializeio_print_xdeltacontrol_obj);
-  serializeio_initialize_type ("ST_XdeltaSourceInfo", ST_XdeltaSourceInfo, &unserialize_xdeltasourceinfo_internal, &serialize_xdeltasourceinfo_obj_internal, &serializeio_count_xdeltasourceinfo_obj, &serializeio_print_xdeltasourceinfo_obj);
-  serializeio_initialize_type ("ST_XdeltaIndex", ST_XdeltaIndex, &unserialize_xdeltaindex_internal, &serialize_xdeltaindex_obj_internal, &serializeio_count_xdeltaindex_obj, &serializeio_print_xdeltaindex_obj);
-  serializeio_initialize_type ("ST_XdeltaChecksum", ST_XdeltaChecksum, &unserialize_xdeltachecksum_internal, &serialize_xdeltachecksum_obj_internal, &serializeio_count_xdeltachecksum_obj, &serializeio_print_xdeltachecksum_obj);
+  serializeio_initialize_type ("ST_Version0Instruction", ST_Version0Instruction, &unserialize_version0instruction_generic, &serialize_version0instruction_generic, &serializeio_count_version0instruction_generic, &serializeio_print_version0instruction_generic);
+  serializeio_initialize_type ("ST_Version0Control", ST_Version0Control, &unserialize_version0control_generic, &serialize_version0control_generic, &serializeio_count_version0control_generic, &serializeio_print_version0control_generic);
+  serializeio_initialize_type ("ST_Version0SourceInfo", ST_Version0SourceInfo, &unserialize_version0sourceinfo_generic, &serialize_version0sourceinfo_generic, &serializeio_count_version0sourceinfo_generic, &serializeio_print_version0sourceinfo_generic);
+  serializeio_initialize_type ("ST_RsyncIndex", ST_RsyncIndex, &unserialize_rsyncindex_generic, &serialize_rsyncindex_generic, &serializeio_count_rsyncindex_generic, &serializeio_print_rsyncindex_generic);
+  serializeio_initialize_type ("ST_RsyncIndexElt", ST_RsyncIndexElt, &unserialize_rsyncindexelt_generic, &serialize_rsyncindexelt_generic, &serializeio_count_rsyncindexelt_generic, &serializeio_print_rsyncindexelt_generic);
+  serializeio_initialize_type ("ST_XdeltaInstruction", ST_XdeltaInstruction, &unserialize_xdeltainstruction_generic, &serialize_xdeltainstruction_generic, &serializeio_count_xdeltainstruction_generic, &serializeio_print_xdeltainstruction_generic);
+  serializeio_initialize_type ("ST_XdeltaControl", ST_XdeltaControl, &unserialize_xdeltacontrol_generic, &serialize_xdeltacontrol_generic, &serializeio_count_xdeltacontrol_generic, &serializeio_print_xdeltacontrol_generic);
+  serializeio_initialize_type ("ST_XdeltaSourceInfo", ST_XdeltaSourceInfo, &unserialize_xdeltasourceinfo_generic, &serialize_xdeltasourceinfo_generic, &serializeio_count_xdeltasourceinfo_generic, &serializeio_print_xdeltasourceinfo_generic);
+  serializeio_initialize_type ("ST_XdeltaIndex", ST_XdeltaIndex, &unserialize_xdeltaindex_generic, &serialize_xdeltaindex_generic, &serializeio_count_xdeltaindex_generic, &serializeio_print_xdeltaindex_generic);
+  serializeio_initialize_type ("ST_XdeltaChecksum", ST_XdeltaChecksum, &unserialize_xdeltachecksum_generic, &serialize_xdeltachecksum_generic, &serializeio_count_xdeltachecksum_generic, &serializeio_print_xdeltachecksum_generic);
   edsio_library_register (3, "xd");
   result = TRUE;
   return TRUE;
-};
+}
 
 /* XdeltaChecksum Count
  */
@@ -74,6 +344,8 @@ xd_edsio_init (void)
 guint
 serializeio_count_xdeltachecksum (guint16 high, guint16 low) {
   guint size = sizeof (SerialXdeltaChecksum);
+  (void) high;
+  (void) low;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
@@ -179,11 +451,15 @@ bail:
 guint
 serializeio_count_xdeltaindex (guint32 file_len, const guint8 file_md5[16], guint32 index_len, SerialXdeltaChecksum const* index) {
   guint size = sizeof (SerialXdeltaIndex);
+  (void) file_len;
+  (void) file_md5;
+  (void) index_len;
+  (void) index;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < index_len; i += 1)
       {
         size += serializeio_count_xdeltachecksum_obj (& (index[i]));
@@ -215,7 +491,7 @@ serializeio_print_xdeltaindex_obj (SerialXdeltaIndex* obj, guint indent_spaces) 
   g_print ("index = ");
   g_print ("{\n");
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < obj->index_len; i += 1)
       {
         print_spaces (indent_spaces);
@@ -238,7 +514,7 @@ serialize_xdeltaindex_internal (SerialSink *sink, guint32 file_len, const guint8
   if (! (* sink->next_uint) (sink, file_len)) goto bail;
   if (! (* sink->next_bytes_known) (sink, file_md5, 16)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* sink->next_uint) (sink, index_len)) goto bail;
     for (i = 0; i < index_len; i += 1)
       {
@@ -282,7 +558,7 @@ unserialize_xdeltaindex_internal_noalloc (SerialSource *source, SerialXdeltaInde
   if (! (* source->next_uint) (source, &result->file_len)) goto bail;
   if (! (* source->next_bytes_known) (source, result->file_md5, 16)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* source->next_uint) (source, &result->index_len)) goto bail;
     if (! (result->index = serializeio_source_alloc (source, sizeof (SerialXdeltaChecksum) * result->index_len))) goto bail;
     for (i = 0; i < result->index_len; i += 1)
@@ -325,6 +601,11 @@ bail:
 guint
 serializeio_count_xdeltasourceinfo (const gchar* name, const guint8 md5[16], guint32 len, gboolean isdata, gboolean sequential) {
   guint size = sizeof (SerialXdeltaSourceInfo);
+  (void) name;
+  (void) md5;
+  (void) len;
+  (void) isdata;
+  (void) sequential;
   ALIGN_8 (size);
   size += strlen (name) + 1;
   ALIGN_8 (size);
@@ -449,12 +730,19 @@ bail:
 guint
 serializeio_count_xdeltacontrol (const guint8 to_md5[16], guint32 to_len, gboolean has_data, guint32 source_info_len, SerialXdeltaSourceInfo* const* source_info, guint32 inst_len, SerialXdeltaInstruction const* inst) {
   guint size = sizeof (SerialXdeltaControl);
+  (void) to_md5;
+  (void) to_len;
+  (void) has_data;
+  (void) source_info_len;
+  (void) source_info;
+  (void) inst_len;
+  (void) inst;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < source_info_len; i += 1)
       {
         size += serializeio_count_xdeltasourceinfo_obj ((source_info[i])) + sizeof (void*);
@@ -462,7 +750,7 @@ serializeio_count_xdeltacontrol (const guint8 to_md5[16], guint32 to_len, gboole
   }
   ALIGN_8 (size);
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < inst_len; i += 1)
       {
         size += serializeio_count_xdeltainstruction_obj (& (inst[i]));
@@ -497,7 +785,7 @@ serializeio_print_xdeltacontrol_obj (SerialXdeltaControl* obj, guint indent_spac
   g_print ("source_info = ");
   g_print ("{\n");
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < obj->source_info_len; i += 1)
       {
         print_spaces (indent_spaces);
@@ -513,7 +801,7 @@ serializeio_print_xdeltacontrol_obj (SerialXdeltaControl* obj, guint indent_spac
   g_print ("inst = ");
   g_print ("{\n");
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < obj->inst_len; i += 1)
       {
         print_spaces (indent_spaces);
@@ -537,7 +825,7 @@ serialize_xdeltacontrol_internal (SerialSink *sink, const guint8 to_md5[16], gui
   if (! (* sink->next_uint) (sink, to_len)) goto bail;
   if (! (* sink->next_bool) (sink, has_data)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* sink->next_uint) (sink, source_info_len)) goto bail;
     for (i = 0; i < source_info_len; i += 1)
       {
@@ -545,7 +833,7 @@ serialize_xdeltacontrol_internal (SerialSink *sink, const guint8 to_md5[16], gui
       }
   }
   {
-    gint i;
+    guint32 i;
     if (! (* sink->next_uint) (sink, inst_len)) goto bail;
     for (i = 0; i < inst_len; i += 1)
       {
@@ -590,7 +878,7 @@ unserialize_xdeltacontrol_internal_noalloc (SerialSource *source, SerialXdeltaCo
   if (! (* source->next_uint) (source, &result->to_len)) goto bail;
   if (! (* source->next_bool) (source, &result->has_data)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* source->next_uint) (source, &result->source_info_len)) goto bail;
     if (! (result->source_info = serializeio_source_alloc (source, sizeof (SerialXdeltaSourceInfo*) * result->source_info_len))) goto bail;
     for (i = 0; i < result->source_info_len; i += 1)
@@ -599,7 +887,7 @@ unserialize_xdeltacontrol_internal_noalloc (SerialSource *source, SerialXdeltaCo
       }
   }
   {
-    gint i;
+    guint32 i;
     if (! (* source->next_uint) (source, &result->inst_len)) goto bail;
     if (! (result->inst = serializeio_source_alloc (source, sizeof (SerialXdeltaInstruction) * result->inst_len))) goto bail;
     for (i = 0; i < result->inst_len; i += 1)
@@ -642,6 +930,9 @@ bail:
 guint
 serializeio_count_xdeltainstruction (guint32 index, guint32 offset, guint32 length) {
   guint size = sizeof (SerialXdeltaInstruction);
+  (void) index;
+  (void) offset;
+  (void) length;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
@@ -753,6 +1044,8 @@ bail:
 guint
 serializeio_count_rsyncindexelt (const guint8 md5[16], SerialXdeltaChecksum const* cksum) {
   guint size = sizeof (SerialRsyncIndexElt);
+  (void) md5;
+  (void) cksum;
   ALIGN_8 (size);
   ALIGN_8 (size);
   size += serializeio_count_xdeltachecksum_obj (cksum) - sizeof (SerialXdeltaChecksum);
@@ -863,12 +1156,17 @@ bail:
 guint
 serializeio_count_rsyncindex (guint32 seg_len, guint32 file_len, const guint8 file_md5[16], guint32 index_len, SerialRsyncIndexElt const* index) {
   guint size = sizeof (SerialRsyncIndex);
+  (void) seg_len;
+  (void) file_len;
+  (void) file_md5;
+  (void) index_len;
+  (void) index;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < index_len; i += 1)
       {
         size += serializeio_count_rsyncindexelt_obj (& (index[i]));
@@ -903,7 +1201,7 @@ serializeio_print_rsyncindex_obj (SerialRsyncIndex* obj, guint indent_spaces) {
   g_print ("index = ");
   g_print ("{\n");
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < obj->index_len; i += 1)
       {
         print_spaces (indent_spaces);
@@ -927,7 +1225,7 @@ serialize_rsyncindex_internal (SerialSink *sink, guint32 seg_len, guint32 file_l
   if (! (* sink->next_uint) (sink, file_len)) goto bail;
   if (! (* sink->next_bytes_known) (sink, file_md5, 16)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* sink->next_uint) (sink, index_len)) goto bail;
     for (i = 0; i < index_len; i += 1)
       {
@@ -972,7 +1270,7 @@ unserialize_rsyncindex_internal_noalloc (SerialSource *source, SerialRsyncIndex*
   if (! (* source->next_uint) (source, &result->file_len)) goto bail;
   if (! (* source->next_bytes_known) (source, result->file_md5, 16)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* source->next_uint) (source, &result->index_len)) goto bail;
     if (! (result->index = serializeio_source_alloc (source, sizeof (SerialRsyncIndexElt) * result->index_len))) goto bail;
     for (i = 0; i < result->index_len; i += 1)
@@ -1015,6 +1313,9 @@ bail:
 guint
 serializeio_count_version0sourceinfo (const guint8 md5[16], const guint8 real_md5[16], guint32 length) {
   guint size = sizeof (SerialVersion0SourceInfo);
+  (void) md5;
+  (void) real_md5;
+  (void) length;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
@@ -1126,13 +1427,20 @@ bail:
 guint
 serializeio_count_version0control (gboolean normalized, guint32 data_len, SerialVersion0SourceInfo const* to_info, guint32 source_info_len, SerialVersion0SourceInfo* const* source_info, guint32 inst_len, SerialVersion0Instruction const* inst) {
   guint size = sizeof (SerialVersion0Control);
+  (void) normalized;
+  (void) data_len;
+  (void) to_info;
+  (void) source_info_len;
+  (void) source_info;
+  (void) inst_len;
+  (void) inst;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
   size += serializeio_count_version0sourceinfo_obj (to_info) - sizeof (SerialVersion0SourceInfo);
   ALIGN_8 (size);
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < source_info_len; i += 1)
       {
         size += serializeio_count_version0sourceinfo_obj ((source_info[i])) + sizeof (void*);
@@ -1140,7 +1448,7 @@ serializeio_count_version0control (gboolean normalized, guint32 data_len, Serial
   }
   ALIGN_8 (size);
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < inst_len; i += 1)
       {
         size += serializeio_count_version0instruction_obj (& (inst[i]));
@@ -1179,7 +1487,7 @@ serializeio_print_version0control_obj (SerialVersion0Control* obj, guint indent_
   g_print ("source_info = ");
   g_print ("{\n");
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < obj->source_info_len; i += 1)
       {
         print_spaces (indent_spaces);
@@ -1195,7 +1503,7 @@ serializeio_print_version0control_obj (SerialVersion0Control* obj, guint indent_
   g_print ("inst = ");
   g_print ("{\n");
   {
-    gint i;
+    guint32 i;
     for (i = 0; i < obj->inst_len; i += 1)
       {
         print_spaces (indent_spaces);
@@ -1219,7 +1527,7 @@ serialize_version0control_internal (SerialSink *sink, gboolean normalized, guint
   if (! (* sink->next_uint) (sink, data_len)) goto bail;
   if (! serialize_version0sourceinfo_internal (sink, to_info->md5, to_info->real_md5, to_info->length)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* sink->next_uint) (sink, source_info_len)) goto bail;
     for (i = 0; i < source_info_len; i += 1)
       {
@@ -1227,7 +1535,7 @@ serialize_version0control_internal (SerialSink *sink, gboolean normalized, guint
       }
   }
   {
-    gint i;
+    guint32 i;
     if (! (* sink->next_uint) (sink, inst_len)) goto bail;
     for (i = 0; i < inst_len; i += 1)
       {
@@ -1272,7 +1580,7 @@ unserialize_version0control_internal_noalloc (SerialSource *source, SerialVersio
   if (! (* source->next_uint) (source, &result->data_len)) goto bail;
   if (! unserialize_version0sourceinfo_internal_noalloc (source, &result->to_info)) goto bail;
   {
-    gint i;
+    guint32 i;
     if (! (* source->next_uint) (source, &result->source_info_len)) goto bail;
     if (! (result->source_info = serializeio_source_alloc (source, sizeof (SerialVersion0SourceInfo*) * result->source_info_len))) goto bail;
     for (i = 0; i < result->source_info_len; i += 1)
@@ -1281,7 +1589,7 @@ unserialize_version0control_internal_noalloc (SerialSource *source, SerialVersio
       }
   }
   {
-    gint i;
+    guint32 i;
     if (! (* source->next_uint) (source, &result->inst_len)) goto bail;
     if (! (result->inst = serializeio_source_alloc (source, sizeof (SerialVersion0Instruction) * result->inst_len))) goto bail;
     for (i = 0; i < result->inst_len; i += 1)
@@ -1324,6 +1632,8 @@ bail:
 guint
 serializeio_count_version0instruction (guint32 offset, guint32 length) {
   guint size = sizeof (SerialVersion0Instruction);
+  (void) offset;
+  (void) length;
   ALIGN_8 (size);
   ALIGN_8 (size);
   ALIGN_8 (size);
@@ -1546,4 +1856,3 @@ Xd_String_event_field_to_string (GenericEvent* ev, gint field)
 }
 
 const XdStringEventCode EC_XdBackwardCompatibilityMode = { EC_XdBackwardCompatibilityModeValue };
-

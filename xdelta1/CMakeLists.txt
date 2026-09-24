@@ -22,10 +22,13 @@ if(XD1_WERROR)
   elseif(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     set(XD1_WERROR_FLAGS
       -Werror
+      -Wall
+      -Wextra
       -Wformat=2
       -Wimplicit-fallthrough
       -Wmissing-prototypes
       -Wpointer-arith
+      -Wpedantic
       -Wshadow
       -Wvla
     )

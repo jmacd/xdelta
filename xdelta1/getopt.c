@@ -474,7 +474,7 @@ _getopt_internal (int argc, char *const *argv, const char *optstring,
       for (p = longopts, option_index = 0; p->name; p++, option_index++)
 	if (!strncmp (p->name, nextchar, nameend - nextchar))
 	  {
-	    if (nameend - nextchar == strlen (p->name))
+	    if ((size_t) (nameend - nextchar) == strlen (p->name))
 	      {
 		/* Exact match found.  */
 		pfound = p;

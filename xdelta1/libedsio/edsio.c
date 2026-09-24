@@ -165,7 +165,7 @@ eventdelivery_event_deliver (GenericEvent* e)
 	    }
 	  else if (in_call == 1)
 	    {
-	      gint i;
+	      guint i;
 
 	      for (i = 0; i < all_event_watchers->len; i += 1)
 		{
@@ -252,12 +252,14 @@ eventdelivery_string_to_string  (const char* x)
 const char*
 eventdelivery_source_to_string  (SerialSource* x)
 {
+  (void) x;
   return g_strdup ("@@@SerialSource");
 }
 
 const char*
 eventdelivery_sink_to_string  (SerialSink* x)
 {
+  (void) x;
   return g_strdup ("@@@SerialSink");
 }
 
@@ -293,7 +295,6 @@ edsio_time_of_day (SerialGenericTime* setme)
 
 #else
 
-  struct timeval tv;
   time_t t = time (NULL);
 
   if (t < 0)
@@ -305,7 +306,7 @@ edsio_time_of_day (SerialGenericTime* setme)
   if (setme)
     {
       setme->nanos = 0;
-      setme->seconds = tv.tv_sec;
+      setme->seconds = t;
     }
 
 #endif
@@ -514,7 +515,7 @@ void
 serializeio_print_bytes (const guint8* bytes, guint len0)
 {
   char buf[100];
-  int i;
+  guint i;
   guint len;
 
   len = MIN (len0, 32);
@@ -974,10 +975,6 @@ edsio_property_unset (const char* ph, const char* t, guint32 code, gpointer obj)
 
   if (table)
     {
-      EdsioPropertyEntry* ent;
-
-      ent = g_hash_table_lookup (table, & code);
-
       g_hash_table_remove (table, & code);
 
       if (g_hash_table_size (table) == 0)
@@ -1196,6 +1193,7 @@ edsio_property_vptr_setter (gpointer obj, EdsioProperty* prop, void* set)
 void
 edsio_property_vptr_free (gpointer obj)
 {
+  (void) obj;
   /* nothing */
 }
 
