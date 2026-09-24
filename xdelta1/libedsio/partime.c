@@ -83,7 +83,7 @@ char const partimeId[] =
 
 struct name_val
   {
-    char name[NAME_LENGTH_MAXIMUM];
+    char name[NAME_LENGTH_MAXIMUM + 1];
     int val;
   };
 
