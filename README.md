@@ -35,7 +35,7 @@ attached to each [GitHub Release](https://github.com/jmacd/xdelta/releases).
 The binaries are self-contained: liblzma (xz) and BLAKE3 are statically
 linked, so they need no system libraries at runtime.  Releases are cut by
 pushing a `vMAJOR.MINOR.PATCH` tag, which drives the
-[release workflow](.github/workflows/release.yml).  See
+[release workflow](.github/workflows/release-v3.yml).  See
 [`RELEASING.md`](RELEASING.md) for the full procedure and the release-branch
 conventions (`releaseMAJOR_MINOR_apl`).
 
@@ -65,6 +65,5 @@ The site sources live in [`site/`](site) (MkDocs + Material) and are built and
 deployed by [`.github/workflows/site.yml`](.github/workflows/site.yml).  These
 pages were migrated and updated from the project's legacy
 [`wiki` branch](https://github.com/jmacd/xdelta/tree/wiki).
-
 
 

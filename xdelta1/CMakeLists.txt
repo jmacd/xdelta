@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(xdelta VERSION 1.2.0 LANGUAGES C)
 
 include(GNUInstallDirs)
+include(CTest)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -51,6 +52,18 @@ target_link_libraries(xdelta_lib PUBLIC edsio)
 
 add_executable(xdelta xdmain.c getopt.c getopt1.c)
 target_link_libraries(xdelta PRIVATE xdelta_lib ZLIB::ZLIB)
+
+if(BUILD_TESTING)
+  add_test(
+    NAME compatibility-1.1.4
+    COMMAND
+      ${CMAKE_COMMAND}
+      -DXDELTA=$<TARGET_FILE:xdelta>
+      -DFIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/test/compat/1.1.4
+      -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/compatibility-1.1.4.out
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/test/compat/verify.cmake
+  )
+endif()
 
 install(TARGETS xdelta xdelta_lib edsio
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

@@ -1,0 +1,19 @@
+Xdelta compatibility fixture
+
+This file is deliberately longer than one matching block.
+The historical encoder should copy most of these lines.
+Compatibility means that a current decoder can read the old patch.
+The reconstructed output must match the expected file exactly.
+
+alpha: the first unchanged record
+bravo: the second unchanged record
+charlie: this record was changed by the historical release
+delta: the fourth unchanged record
+echo: the fifth unchanged record
+foxtrot: the sixth unchanged record
+golf: the seventh unchanged record
+hotel: the eighth unchanged record
+india: the ninth unchanged record
+juliet: the tenth unchanged record
+
+This line was appended before the historical delta was created.

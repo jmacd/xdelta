@@ -421,9 +421,6 @@ xdp_source_free (XdeltaSource* xs)
 {
   if (xs)
     {
-      /* if (xs->ckarray) @@@ this is troublesome now
-	g_free (xs->ckarray);*/
-
       g_free (xs);
     }
 }
@@ -1398,7 +1395,7 @@ xdp_control_write (XdeltaControl   *cont,
   if (! pack_instructions (cont))
     return FALSE;
 
-  /* @@@ think about how the count function overcounts on the instruction
+  /* think about how the count function overcounts on the instruction
    * array by a factor of 2 or more. */
   if (! serialize_xdeltacontrol_obj (sink, cont))
     return FALSE;
