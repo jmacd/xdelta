@@ -114,6 +114,21 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      - name: Prepare release notes
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+          awk -v heading="** Changes in version ${version}" '
+            $0 == heading { found = 1; next }
+            found && index($0, "\f") { exit }
+            found { print }
+            END { if (!found) exit 1 }
+          ' xdelta1/NEWS > release-notes.txt
+          if ! grep -q '[^[:space:]]' release-notes.txt; then
+            echo "::error::No release notes found for Xdelta ${version}"
+            exit 1
+          fi
+
       - uses: actions/download-artifact@v4
         with:
           name: xdelta1-source
@@ -127,7 +142,7 @@ jobs:
           version="${{ needs.verify.outputs.version }}"
           gh release create "${TAG}" \
             --title "Xdelta ${version}" \
-            --notes-from-tag \
+            --notes-file release-notes.txt \
             --latest=false \
             --verify-tag \
             dist/*

@@ -1,7 +1,9 @@
-# Historical Xdelta 1.1.4 source release
+# Historical source provenance
 
-This directory preserves the historical Xdelta 1.1.4 source
-distribution.  It was restored from `xdelta-1.1.4.tar.gz`.
+The actively maintained Xdelta 1.2.x tree in this directory was reconstructed
+from the historical `xdelta-1.1.4.tar.gz` source distribution. The pristine
+restoration is recorded in Git commit `803cbd3`; the current files have since
+been modernized and are not a pristine copy of that release.
 
 The archive's SHA-256 digest is:
 
@@ -9,4 +11,5 @@ The archive's SHA-256 digest is:
 345503b60432812840991ea1d79cb10db5f34bfaba9499bd0e7d5c57ac5d5c6d
 ```
 
-This tree is retained as the baseline for the modern 1.2.x release.
+The restored source serves as the provenance and compatibility baseline for
+the modern 1.2.x release.

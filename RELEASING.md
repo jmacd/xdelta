@@ -21,6 +21,8 @@ For an **Xdelta 1** release, update the version in:
 - `xdelta1/README`
 
 Also add the release notes to `xdelta1/NEWS`.
+The Xdelta 1 workflow copies that version's NEWS section into the GitHub
+Release description.
 
 For an **Xdelta 3** release, update the version in:
 
