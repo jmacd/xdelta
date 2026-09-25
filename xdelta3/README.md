@@ -37,6 +37,8 @@ liblzma (XZ Utils) is used for secondary compression when available:
 
 This produces the `xdelta3` command-line tool (in `build/`) plus the
 `xdelta3decode`, `xdelta3regtest`, and `xdelta3checksum` helpers.
+Windows builds accept Unicode command-line paths and store filenames internally
+as UTF-8.
 
 liblzma is autodetected.  Force it on or off with `-DXD3_LZMA_MODE=on`
 or `-DXD3_LZMA_MODE=off`.  On Homebrew systems, point CMake at the
