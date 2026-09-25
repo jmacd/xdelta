@@ -2879,6 +2879,7 @@ int xd3_encode_input(xd3_stream *stream) {
 
     stream->enc_state = ENC_INPUT;
 
+    XD3_FALLTHROUGH;
   case ENC_INPUT:
 
     /* If there is no input yet, just return.  This checks for
@@ -2947,6 +2948,7 @@ int xd3_encode_input(xd3_stream *stream) {
         }
         XD3_ASSERT(stream->match_fwd == 0);
 
+        XD3_FALLTHROUGH;
       case MATCH_FORWARD:
       case MATCH_BACKWARD:
         if (stream->avail_in != 0) {
@@ -2964,6 +2966,7 @@ int xd3_encode_input(xd3_stream *stream) {
           stream->input_position += stream->match_fwd;
         }
 
+        XD3_FALLTHROUGH;
       case MATCH_SEARCHING:
         /* Continue string matching.  (It's possible that the
          * initial match continued through the entire input, in
@@ -2981,6 +2984,7 @@ int xd3_encode_input(xd3_stream *stream) {
 
     stream->enc_state = ENC_INSTR;
 
+    XD3_FALLTHROUGH;
   case ENC_INSTR:
     /* Note: Jump here to encode VCDIFF deltas w/o using this
      * string-matching code.  Merging code enters here. */
@@ -2994,6 +2998,7 @@ int xd3_encode_input(xd3_stream *stream) {
 
     stream->enc_state = ENC_FLUSH;
 
+    XD3_FALLTHROUGH;
   case ENC_FLUSH:
     /* Note: main_recode_func() bypasses string-matching by setting
      * ENC_FLUSH. */
@@ -3027,6 +3032,7 @@ int xd3_encode_input(xd3_stream *stream) {
       return XD3_OUTPUT;
     }
 
+    XD3_FALLTHROUGH;
   case ENC_POSTOUT:
 
     if (stream->avail_out != 0) {

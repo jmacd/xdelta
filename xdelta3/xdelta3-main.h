@@ -730,7 +730,7 @@ static char *main_format_rate(xoff_t bytes, long millis, shortbuf *buf) {
   static shortbuf lbuf;
 
   main_format_bcnt(r, &lbuf);
-  short_sprintf(*buf, "%s/s", lbuf.buf);
+  short_sprintf(*buf, "%.*s/s", (int)sizeof(buf->buf) - 3, lbuf.buf);
   return buf->buf;
 }
 
@@ -2728,6 +2728,7 @@ static int main_armor_hash_file(const char *filename, const char *type,
   /* RD_FIRST (and *not* RD_NONEXTERNAL) so the same external-decompression
    * detection used by the real read applies here. */
   f.flags = RD_FIRST;
+  f.filename = filename;
 
   if ((ret = main_file_open(&f, filename, XO_READ))) {
     main_file_cleanup(&f);
@@ -3332,16 +3333,15 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
   /* main_input setup. */
   switch ((int)cmd) {
 #if VCDIFF_TOOLS
-    if (1) {
-    case CMD_PRINTHDR:
-      stream_flags |= XD3_JUST_HDR;
-    } else if (1) {
-    case CMD_PRINTHDRS:
-      stream_flags |= XD3_SKIP_WINDOW;
-    } else {
-    case CMD_PRINTDELTA:
-      stream_flags |= XD3_SKIP_EMIT;
-    }
+  case CMD_PRINTHDR:
+    stream_flags |= XD3_JUST_HDR;
+    goto print_setup;
+  case CMD_PRINTHDRS:
+    stream_flags |= XD3_SKIP_WINDOW;
+    goto print_setup;
+  case CMD_PRINTDELTA:
+    stream_flags |= XD3_SKIP_EMIT;
+  print_setup:
     ifile->flags |= RD_NONEXTERNAL;
     input_func = xd3_decode_input;
     output_func = main_print_func;
@@ -4140,6 +4140,7 @@ takearg:
     case 'F':
 #if EXTERNAL_COMPRESSION
       option_force2 = 1;
+      XD3_FALLTHROUGH;
 #else
       XPR(NT "warning: -F option ignored, "
              "external compression support was not compiled\n");

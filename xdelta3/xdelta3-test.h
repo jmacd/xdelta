@@ -2419,10 +2419,10 @@ static int test_no_output(xd3_stream *stream, int ignore) {
 
 /* This tests that the default appheader works */
 static int test_appheader(xd3_stream *stream, int ignore) {
-  int i;
   int ret;
+  size_t i;
   char buf[TESTBUFSIZE];
-  char bogus[TESTBUFSIZE];
+  char bogus[TESTBUFSIZE / 2];
   xoff_t ssize, tsize;
   test_setup();
 
@@ -2469,11 +2469,11 @@ static int test_appheader(xd3_stream *stream, int ignore) {
 
   // Test a malicious string w/ entries > 4 in the appheader by having
   // the encoder write it:
-  for (i = 0; i < TESTBUFSIZE / 4; ++i) {
+  for (i = 0; i < sizeof(bogus) / 2; ++i) {
     bogus[2 * i] = 'G';
     bogus[2 * i + 1] = '/';
   }
-  bogus[TESTBUFSIZE / 2 - 1] = 0;
+  bogus[sizeof(bogus) - 1] = 0;
 
   snprintf_func(buf, TESTBUFSIZE, "%s -q -f -A=%s -e -s %s %s %s", program_name,
                 bogus, TEST_SOURCE_FILE, TEST_TARGET_FILE, TEST_DELTA_FILE);
@@ -2553,13 +2553,13 @@ static int test_armor_blake3_kat(xd3_stream *stream, int ignore) {
 static int test_armor(xd3_stream *stream, int ignore) {
   int ret;
   char buf[TESTBUFSIZE];
-  char d1[TESTFILESIZE];
-  char d2[TESTFILESIZE];
-  char v3[TESTFILESIZE];
-  char merged[TESTFILESIZE];
-  char wrong[TESTFILESIZE];
-  char warnf[TESTFILESIZE];
-  char forged[TESTFILESIZE];
+  char d1[TESTFILESIZE + sizeof(".d1")];
+  char d2[TESTFILESIZE + sizeof(".d2")];
+  char v3[TESTFILESIZE + sizeof(".v3")];
+  char merged[TESTFILESIZE + sizeof(".merged")];
+  char wrong[TESTFILESIZE + sizeof(".wrong")];
+  char warnf[TESTFILESIZE + sizeof(".warn")];
+  char forged[TESTFILESIZE + sizeof(".forged")];
   xoff_t ssize, tsize;
 
   test_setup();
@@ -2647,7 +2647,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
    * the explicit output path override them on decode. */
   {
     char srchash[XD3_BLAKE3_HEXBUF];
-    char header[TESTBUFSIZE];
+    char header[2 * XD3_BLAKE3_HEXLEN + sizeof("x#//x#/")];
     static const char zeros[XD3_BLAKE3_HEXLEN + 1] =
         "0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -2793,8 +2793,8 @@ static int test_armor(xd3_stream *stream, int ignore) {
   /* Armor verifies the logical (decompressed) content, so it works across
    * external compression: encode/decode gzip'd inputs and round-trip. */
   if (main_get_compressor("G") != NULL) {
-    char sgz[TESTFILESIZE];
-    char tgz[TESTFILESIZE];
+    char sgz[TESTFILESIZE + sizeof(".sgz")];
+    char tgz[TESTFILESIZE + sizeof(".tgz")];
     snprintf_func(sgz, sizeof(sgz), "%s.sgz", TEST_DELTA_FILE);
     snprintf_func(tgz, sizeof(tgz), "%s.tgz", TEST_DELTA_FILE);
 
@@ -2868,7 +2868,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
 static int test_srcwin_clamp(xd3_stream *stream, int ignore) {
   int ret;
   char buf[TESTBUFSIZE];
-  char vlog[TESTFILESIZE];
+  char vlog[TESTFILESIZE + sizeof(".vlog")];
   xoff_t ssize, tsize;
 
   test_setup();
@@ -3046,6 +3046,7 @@ static int test_identical_behavior(xd3_stream *stream, int ignore) {
 
   ret = 0;
 fail:
+  stream->src = NULL;
   return ret;
 }
 
@@ -3267,8 +3268,6 @@ static int test_iopt_flush_instructions(xd3_stream *stream, int ignore) {
  */
 #if !XD3_USE_LARGESIZET
 static int test_source_cksum_offset(xd3_stream *stream, int ignore) {
-  xd3_source source;
-
   // Inputs are:
   struct {
     xoff_t cpos; // stream->srcwin_cksum_pos;
@@ -3303,8 +3302,6 @@ static int test_source_cksum_offset(xd3_stream *stream, int ignore) {
           {0, 0, 0, 0, 0},
       },
     *test_ptr;
-
-  stream->src = &source;
 
   for (test_ptr = cksum_test; test_ptr->cpos; test_ptr++) {
     xoff_t r;

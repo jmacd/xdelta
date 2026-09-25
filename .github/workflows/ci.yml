@@ -28,7 +28,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
         lzma: [ "on", "off" ]
     defaults:
       run:
@@ -64,7 +68,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
     defaults:
       run:
         working-directory: xdelta3
@@ -92,13 +100,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        include:
+          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
+          - os: macos-latest
+          - os: macos-15-intel
+          - os: windows-latest
+            cmake_arch: -A x64
+          - os: windows-11-arm
+            cmake_arch: -A ARM64
     steps:
       - uses: actions/checkout@v5
 
       - name: Configure (XD3_LZMA_FETCH=ON)
         working-directory: xdelta3
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DXD3_LZMA_FETCH=ON
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LZMA_FETCH=ON
+          ${{ matrix.cmake_arch }}
 
       - name: Build
         working-directory: xdelta3
@@ -109,12 +129,20 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
 
   windows:
-    name: windows-latest / lzma=${{ matrix.lzma }}
-    runs-on: windows-latest
+    name: ${{ matrix.os }} / lzma=${{ matrix.lzma }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ windows-latest, windows-11-arm ]
         lzma: [ "on", "off" ]
+        include:
+          - os: windows-latest
+            cmake_arch: x64
+            vcpkg_triplet: x64-windows
+          - os: windows-11-arm
+            cmake_arch: ARM64
+            vcpkg_triplet: arm64-windows
     defaults:
       run:
         shell: pwsh
@@ -124,18 +152,23 @@ jobs:
 
       - name: Install liblzma (vcpkg)
         if: matrix.lzma == 'on'
-        run: vcpkg install liblzma:x64-windows
+        run: vcpkg install liblzma:${{ matrix.vcpkg_triplet }}
 
       - name: Configure (no lzma)
         if: matrix.lzma == 'off'
-        run: cmake -B build -A x64 -DXD3_LZMA_MODE=off -DXD3_WERROR=ON
+        run: >
+          cmake -B build -A ${{ matrix.cmake_arch }}
+          -DXD3_LZMA_MODE=off
+          -DXD3_WERROR=ON
 
       - name: Configure (vcpkg lzma)
         if: matrix.lzma == 'on'
         run: >
-          cmake -B build -A x64 -DXD3_LZMA_MODE=on -DXD3_WERROR=ON
+          cmake -B build -A ${{ matrix.cmake_arch }}
+          -DXD3_LZMA_MODE=on
+          -DXD3_WERROR=ON
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
-          -DVCPKG_TARGET_TRIPLET=x64-windows
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
 
       - name: Build
         run: cmake --build build --config Release -j
@@ -149,7 +182,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
     defaults:
       run:
         working-directory: xdelta3
@@ -197,7 +234,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
     defaults:
       run:
         working-directory: xdelta3
@@ -219,7 +260,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
     defaults:
       run:
         working-directory: xdelta1

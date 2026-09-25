@@ -83,10 +83,18 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux-x86_64
+          - os: ubuntu-24.04-arm
+            name: linux-arm64
           - os: macos-latest
             name: macos-arm64
+          - os: macos-15-intel
+            name: macos-x86_64
           - os: windows-latest
             name: windows-x86_64
+            cmake_arch: -A x64
+          - os: windows-11-arm
+            name: windows-arm64
+            cmake_arch: -A ARM64
     defaults:
       run:
         working-directory: xdelta3
@@ -99,7 +107,12 @@ jobs:
       # statically linked via XD3_LZMA_FETCH, and armor (BLAKE3) is statically
       # linked, so the tools need no system libraries at runtime.
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DXD3_LZMA_FETCH=ON -DXD3_BUILD_TESTS=OFF
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LZMA_FETCH=ON
+          -DXD3_BUILD_TESTS=OFF
+          ${{ matrix.cmake_arch }}
 
       - name: Build
         run: cmake --build build --config Release -j
@@ -107,6 +120,10 @@ jobs:
       - name: Smoke test
         if: runner.os != 'Windows'
         run: ./build/xdelta3 test
+
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        run: ./build/Release/xdelta3.exe test
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
