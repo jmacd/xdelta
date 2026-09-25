@@ -17,6 +17,15 @@ See the file `README' for a description of how to report bugs.
   FILE* or a gzFile.  The mismatch was a warning under older compilers
   but is an error under GCC 14 and later.
 
+* Verify backward compatibility by applying a checked-in patch produced
+  by the authentic Xdelta 1.1.4 release.
+
+* Modernize legacy declarations, GLib calls, and generated serialization
+  code, and enforce warning-free builds with GCC and Clang.
+
+* Make the EDSIO serializer generator reproducible with current Emacs and
+  remove its deprecated Emacs Lisp dependencies.
+
 
 ** Changes since version 1.1.3
 
