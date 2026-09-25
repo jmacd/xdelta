@@ -194,15 +194,12 @@ if(WIN32)
 endif()
 
 # Warnings-as-errors flags, applied only to the core targets (the C++ test
-# harness has its own pre-existing warnings).  GCC is intentionally
-# excluded: it emits many additional, largely false-positive diagnostics
-# (implicit-fallthrough, format-truncation, stringop-overflow) that are
-# out of scope here.
+# harness has its own pre-existing warnings).
 set(XD3_WERROR_FLAGS "")
 if(XD3_WERROR)
   if(MSVC)
     set(XD3_WERROR_FLAGS /WX)
-  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+  elseif(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     set(XD3_WERROR_FLAGS -Werror)
   endif()
 endif()

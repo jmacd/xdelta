@@ -595,11 +595,13 @@ static int xd3_decode_sections(xd3_stream *stream) {
              xd3_decode_section(stream, &stream->data_sect, DEC_INST, copy))) {
       return ret;
     }
+    XD3_FALLTHROUGH;
   case DEC_INST:
     if ((ret =
              xd3_decode_section(stream, &stream->inst_sect, DEC_ADDR, copy))) {
       return ret;
     }
+    XD3_FALLTHROUGH;
   case DEC_ADDR:
     if ((ret =
              xd3_decode_section(stream, &stream->addr_sect, DEC_EMIT, copy))) {
@@ -753,6 +755,7 @@ int xd3_decode_input(xd3_stream *stream) {
     }
 
     stream->dec_state = DEC_HDRIND;
+    XD3_FALLTHROUGH;
   }
   case DEC_HDRIND: {
     if ((ret = xd3_decode_byte(stream, &stream->dec_hdr_ind))) {
@@ -765,6 +768,7 @@ int xd3_decode_input(xd3_stream *stream) {
     }
 
     stream->dec_state = DEC_SECONDID;
+    XD3_FALLTHROUGH;
   }
 
   case DEC_SECONDID:
@@ -785,6 +789,7 @@ int xd3_decode_input(xd3_stream *stream) {
       }
     }
 
+    XD3_FALLTHROUGH;
   case DEC_TABLEN:
     /* Length of code table data: only if VCD_CODETABLE is set */
     SIZE_CASE((stream->dec_hdr_ind & VCD_CODETABLE) != 0, stream->dec_codetblsz,
@@ -798,14 +803,17 @@ int xd3_decode_input(xd3_stream *stream) {
       }
       stream->dec_codetblsz -= 2;
     }
+    XD3_FALLTHROUGH;
   case DEC_NEAR:
     /* Near modes: only if VCD_CODETABLE is set */
     BYTE_CASE((stream->dec_hdr_ind & VCD_CODETABLE) != 0, stream->acache.s_near,
               DEC_SAME);
+    XD3_FALLTHROUGH;
   case DEC_SAME:
     /* Same modes: only if VCD_CODETABLE is set */
     BYTE_CASE((stream->dec_hdr_ind & VCD_CODETABLE) != 0, stream->acache.s_same,
               DEC_TABDAT);
+    XD3_FALLTHROUGH;
   case DEC_TABDAT:
     /* Compressed code table data */
 
@@ -825,11 +833,13 @@ int xd3_decode_input(xd3_stream *stream) {
 
     stream->dec_state = DEC_APPLEN;
 
+    XD3_FALLTHROUGH;
   case DEC_APPLEN:
     /* Length of application data */
     SIZE_CASE((stream->dec_hdr_ind & VCD_APPHEADER) != 0, stream->dec_appheadsz,
               DEC_APPDAT);
 
+    XD3_FALLTHROUGH;
   case DEC_APPDAT:
     /* Application data */
     if (stream->dec_hdr_ind & VCD_APPHEADER) {
@@ -859,6 +869,7 @@ int xd3_decode_input(xd3_stream *stream) {
     stream->dec_hdrsize = (usize_t)stream->total_in;
     stream->dec_state = DEC_WININD;
 
+    XD3_FALLTHROUGH;
   case DEC_WININD: {
     /* Start of a window: the window indicator */
     if ((ret = xd3_decode_byte(stream, &stream->dec_win_ind))) {
@@ -887,6 +898,7 @@ int xd3_decode_input(xd3_stream *stream) {
 
     IF_DEBUG2(DP(RINT "--------- TARGET WINDOW %" XD3_Q "u -----------\n",
                  stream->current_window));
+    XD3_FALLTHROUGH;
   }
 
   case DEC_CPYLEN:
@@ -899,6 +911,7 @@ int xd3_decode_input(xd3_stream *stream) {
      * target window. */
     stream->dec_position = stream->dec_cpylen;
 
+    XD3_FALLTHROUGH;
   case DEC_CPYOFF:
     /* Copy window offset: only if VCD_SOURCE or VCD_TARGET is set */
     OFFSET_CASE(SRCORTGT(stream->dec_win_ind), stream->dec_cpyoff, DEC_ENCLEN);
@@ -917,9 +930,11 @@ int xd3_decode_input(xd3_stream *stream) {
       return XD3_INVALID_INPUT;
     }
 
+    XD3_FALLTHROUGH;
   case DEC_ENCLEN:
     /* Length of the delta encoding */
     SIZE_CASE(1, stream->dec_enclen, DEC_TGTLEN);
+    XD3_FALLTHROUGH;
   case DEC_TGTLEN:
     /* Length of target window */
     SIZE_CASE(1, stream->dec_tgtlen, DEC_DELIND);
@@ -940,6 +955,7 @@ int xd3_decode_input(xd3_stream *stream) {
 
     stream->dec_maxpos = stream->dec_cpylen + stream->dec_tgtlen;
 
+    XD3_FALLTHROUGH;
   case DEC_DELIND:
     /* Delta indicator */
     BYTE_CASE(1, stream->dec_del_ind, DEC_DATALEN);
@@ -956,13 +972,17 @@ int xd3_decode_input(xd3_stream *stream) {
     }
 
     /* Section lengths */
+    XD3_FALLTHROUGH;
   case DEC_DATALEN:
     SIZE_CASE(1, stream->data_sect.size, DEC_INSTLEN);
+    XD3_FALLTHROUGH;
   case DEC_INSTLEN:
     SIZE_CASE(1, stream->inst_sect.size, DEC_ADDRLEN);
+    XD3_FALLTHROUGH;
   case DEC_ADDRLEN:
     SIZE_CASE(1, stream->addr_sect.size, DEC_CKSUM);
 
+    XD3_FALLTHROUGH;
   case DEC_CKSUM:
     /* Window checksum. */
     if ((stream->dec_win_ind & VCD_ADLER32) != 0) {
@@ -1013,6 +1033,7 @@ int xd3_decode_input(xd3_stream *stream) {
       return ret;
     }
 
+    XD3_FALLTHROUGH;
   case DEC_EMIT:
 
     /* To speed VCD_SOURCE block-address calculations, the source

@@ -1546,7 +1546,7 @@ static int xd3_decode_huff(xd3_stream *stream, djw_stream *h,
 
     /* Nested scope: code length decoder tables. */
     {
-      uint8_t clen[DJW_MAX_GROUPS][ALPHABET_SIZE];
+      uint8_t clen[DJW_MAX_GROUPS * ALPHABET_SIZE];
       uint8_t cl_inorder[DJW_TOTAL_CODES];
       usize_t cl_base[DJW_MAX_CLCLEN + 2];
       usize_t cl_limit[DJW_MAX_CLCLEN + 2];
@@ -1564,15 +1564,15 @@ static int xd3_decode_huff(xd3_stream *stream, djw_stream *h,
       /* Now decode each group decoder. */
       if ((ret = djw_decode_prefix(stream, &bstate, &input, input_end,
                                    cl_inorder, cl_base, cl_limit, &cl_minlen,
-                                   &cl_maxlen, cl_mtf, groups, clen[0]))) {
+                                   &cl_maxlen, cl_mtf, groups, clen))) {
         goto fail;
       }
 
       /* Prepare the actual decoding tables. */
       for (gp = 0; gp < groups; gp += 1) {
-        djw_build_decoder(stream, ALPHABET_SIZE, DJW_MAX_CODELEN, clen[gp],
-                          inorder[gp], base[gp], limit[gp], &minlen[gp],
-                          &maxlen[gp]);
+        djw_build_decoder(stream, ALPHABET_SIZE, DJW_MAX_CODELEN,
+                          clen + gp * ALPHABET_SIZE, inorder[gp], base[gp],
+                          limit[gp], &minlen[gp], &maxlen[gp]);
       }
     }
 

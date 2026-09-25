@@ -22,9 +22,15 @@
 #ifndef _XDELTA3_H_
 #define _XDELTA3_H_
 
+#ifndef _POSIX_SOURCE
 #define _POSIX_SOURCE 200112L
+#endif
+#ifndef _ISOC99_SOURCE
 #define _ISOC99_SOURCE
+#endif
+#ifndef _C99_SOURCE
 #define _C99_SOURCE
+#endif
 
 #if HAVE_CONFIG_H
 #include "config.h"
@@ -408,6 +414,21 @@ typedef struct {
 #define PRINTF_ATTRIBUTE(x, y) __attribute__((__format__(__printf__, x, y)))
 #else
 #define PRINTF_ATTRIBUTE(x, y)
+#endif
+#endif
+
+#ifndef XD3_FALLTHROUGH
+#if defined(__has_attribute)
+#if __has_attribute(fallthrough)
+#define XD3_FALLTHROUGH __attribute__((fallthrough))
+#endif
+#endif
+#ifndef XD3_FALLTHROUGH
+#if defined(__GNUC__) && __GNUC__ >= 7
+#define XD3_FALLTHROUGH __attribute__((fallthrough))
+#else
+#define XD3_FALLTHROUGH ((void)0)
+#endif
 #endif
 #endif
 
