@@ -326,9 +326,10 @@ if(XD3_BUILD_TESTS)
 
   if(WIN32)
     add_test(NAME xdelta3_unicode_paths
-      COMMAND powershell -NoProfile -ExecutionPolicy Bypass
-        -File ${CMAKE_CURRENT_SOURCE_DIR}/testing/unicode_test.ps1
-        -Xdelta $<TARGET_FILE:xdelta3>)
+      COMMAND ${CMAKE_COMMAND}
+        -DXDELTA=$<TARGET_FILE:xdelta3>
+        -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/unicode-test
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/testing/unicode_test.cmake)
   endif()
 
   # External-compression level detection round-trip.  Only meaningful where the
