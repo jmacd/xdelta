@@ -2647,7 +2647,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
    * the explicit output path override them on decode. */
   {
     char srchash[XD3_BLAKE3_HEXBUF];
-    char header[TESTBUFSIZE];
+    char header[2 * XD3_BLAKE3_HEXLEN + sizeof("x#//x#/")];
     static const char zeros[XD3_BLAKE3_HEXLEN + 1] =
         "0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -2868,7 +2868,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
 static int test_srcwin_clamp(xd3_stream *stream, int ignore) {
   int ret;
   char buf[TESTBUFSIZE];
-  char vlog[TESTFILESIZE];
+  char vlog[TESTFILESIZE + sizeof(".vlog")];
   xoff_t ssize, tsize;
 
   test_setup();
