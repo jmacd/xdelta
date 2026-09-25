@@ -630,6 +630,95 @@ static int get_errno(void) {
 #endif
 }
 
+#ifdef _WIN32
+static wchar_t *main_utf8_to_wide(const char *value) {
+  wchar_t *wide;
+  int length =
+      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value, -1, NULL, 0);
+
+  if (length == 0) {
+    return NULL;
+  }
+  if (XD3_MUL_SIZE_OVERFLOW(sizeof(wchar_t), (size_t)length)) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return NULL;
+  }
+  wide = (wchar_t *)malloc(sizeof(wchar_t) * (size_t)length);
+  if (wide == NULL) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return NULL;
+  }
+  if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value, -1, wide,
+                          length) == 0) {
+    DWORD error = GetLastError();
+    free(wide);
+    SetLastError(error);
+    return NULL;
+  }
+  return wide;
+}
+
+/* The returned pointer table and all its strings share one allocation. */
+static char **main_wide_argv_to_utf8(int argc, wchar_t **wide_argv) {
+  char **argv;
+  char *next;
+  size_t pointer_bytes;
+  size_t text_bytes = 0;
+  size_t total_bytes;
+  int i;
+
+  if (argc < 0) {
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return NULL;
+  }
+  if (XD3_MUL_SIZE_OVERFLOW(sizeof(char *), (size_t)argc + 1)) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return NULL;
+  }
+  pointer_bytes = sizeof(char *) * ((size_t)argc + 1);
+
+  for (i = 0; i < argc; i += 1) {
+    int length =
+        WideCharToMultiByte(CP_UTF8, 0, wide_argv[i], -1, NULL, 0, NULL, NULL);
+    if (length == 0) {
+      return NULL;
+    }
+    if ((size_t)length > SIZE_MAX - text_bytes) {
+      SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+      return NULL;
+    }
+    text_bytes += (size_t)length;
+  }
+  if (text_bytes > SIZE_MAX - pointer_bytes) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return NULL;
+  }
+  total_bytes = pointer_bytes + text_bytes;
+
+  argv = (char **)malloc(total_bytes);
+  if (argv == NULL) {
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return NULL;
+  }
+  next = (char *)argv + pointer_bytes;
+  for (i = 0; i < argc; i += 1) {
+    int length =
+        WideCharToMultiByte(CP_UTF8, 0, wide_argv[i], -1, NULL, 0, NULL, NULL);
+    if (length == 0 || WideCharToMultiByte(CP_UTF8, 0, wide_argv[i], -1, next,
+                                           length, NULL, NULL) == 0) {
+      DWORD error = GetLastError();
+      free(argv);
+      SetLastError(error);
+      return NULL;
+    }
+    argv[i] = next;
+    next += length;
+  }
+  argv[argc] = NULL;
+  return argv;
+}
+#endif
+
 const char *xd3_mainerror(int err_num) {
 #ifndef _WIN32
   const char *x = xd3_strerror(err_num);
@@ -947,6 +1036,42 @@ void main_file_cleanup(main_file *xfile) {
   }
 }
 
+#if defined(_WIN32) && (XD3_STDIO || XD3_WIN32)
+static int main_file_open_windows(main_file *xfile, const char *name,
+                                  int mode) {
+  wchar_t *wide_name = main_utf8_to_wide(name);
+  int ret = 0;
+
+  if (wide_name == NULL) {
+    return get_errno();
+  }
+
+#if XD3_STDIO
+  SetLastError(NO_ERROR);
+  xfile->file = _wfopen(wide_name, mode == XO_READ ? L"rb" : L"wb");
+  if (xfile->file == NULL) {
+    ret = (int)GetLastError();
+    if (ret == NO_ERROR) {
+      ret = ERROR_OPEN_FAILED;
+    }
+  }
+#elif XD3_WIN32
+  xfile->file = CreateFileW(
+      wide_name, (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE,
+      FILE_SHARE_READ, NULL,
+      (mode == XO_READ) ? OPEN_EXISTING
+                        : (option_force ? CREATE_ALWAYS : CREATE_NEW),
+      FILE_ATTRIBUTE_NORMAL, NULL);
+  if (xfile->file == INVALID_HANDLE_VALUE) {
+    ret = get_errno();
+  }
+#endif
+
+  free(wide_name);
+  return ret;
+}
+#endif
+
 int main_file_open(main_file *xfile, const char *name, int mode) {
   int ret = 0;
 
@@ -962,9 +1087,13 @@ int main_file_open(main_file *xfile, const char *name, int mode) {
   IF_DEBUG1(DP(RINT "[main] open source %s\n", name));
 
 #if XD3_STDIO
+#ifdef _WIN32
+  ret = main_file_open_windows(xfile, name, mode);
+#else
   xfile->file = fopen(name, XOPEN_STDIO);
 
   ret = (xfile->file == NULL) ? get_errno() : 0;
+#endif
 
 #elif XD3_POSIX
   /* TODO: Should retry this call if interrupted, similar to read/write */
@@ -976,15 +1105,7 @@ int main_file_open(main_file *xfile, const char *name, int mode) {
   }
 
 #elif XD3_WIN32
-  xfile->file = CreateFile(
-      name, (mode == XO_READ) ? GENERIC_READ : GENERIC_WRITE, FILE_SHARE_READ,
-      NULL,
-      (mode == XO_READ) ? OPEN_EXISTING
-                        : (option_force ? CREATE_ALWAYS : CREATE_NEW),
-      FILE_ATTRIBUTE_NORMAL, NULL);
-  if (xfile->file == INVALID_HANDLE_VALUE) {
-    ret = get_errno();
-  }
+  ret = main_file_open_windows(xfile, name, mode);
 #endif
   if (ret) {
     XF_ERROR("open", name, ret);
@@ -3949,12 +4070,7 @@ static void setup_environment(int argc, char **argv, int *argc_out,
   }
 }
 
-#if PYTHON_MODULE || SWIG_MODULE || XD3_INCLUDE_MAIN
-int xd3_main_cmdline(int argc, char **argv)
-#else
-int main(int argc, char **argv)
-#endif
-{
+int xd3_main_cmdline(int argc, char **argv) {
   static const char *flags =
       "0123456789acdefhnqvDFGJNORVs:m:B:C:E:I:L:O:M:P:W:A::S::";
   xd3_cmd cmd;
@@ -4411,6 +4527,27 @@ takearg:
   fflush(stderr);
   return ret;
 }
+
+#if !(PYTHON_MODULE || SWIG_MODULE || XD3_INCLUDE_MAIN)
+#ifdef _WIN32
+int wmain(int argc, wchar_t **wide_argv) {
+  char **argv = main_wide_argv_to_utf8(argc, wide_argv);
+  int ret;
+
+  if (argv == NULL) {
+    fprintf(stderr, "xdelta3: command-line conversion failed: %s\n",
+            xd3_mainerror(get_errno()));
+    return EXIT_FAILURE;
+  }
+
+  ret = xd3_main_cmdline(argc, argv);
+  free(argv);
+  return ret;
+}
+#else
+int main(int argc, char **argv) { return xd3_main_cmdline(argc, argv); }
+#endif
+#endif
 
 static int main_help(void) {
   main_version();

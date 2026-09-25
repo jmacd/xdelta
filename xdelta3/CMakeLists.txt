@@ -257,6 +257,9 @@ target_compile_definitions(xdelta3 PRIVATE
   ${XD3_PLATFORM_DEFS})
 target_compile_options(xdelta3 PRIVATE ${XD3_WERROR_FLAGS})
 target_link_libraries(xdelta3 PRIVATE ${XD3_LZMA_LIBRARIES})
+if(MINGW)
+  target_link_options(xdelta3 PRIVATE -municode)
+endif()
 if(XD3_ARMOR)
   target_compile_definitions(xdelta3 PRIVATE XD3_ARMOR=1)
   target_link_libraries(xdelta3 PRIVATE ${XD3_ARMOR_LIBRARIES})
@@ -271,6 +274,9 @@ target_compile_definitions(xdelta3decode PRIVATE
   REGRESSION_TEST=0 SECONDARY_DJW=0 SECONDARY_FGK=0 SECONDARY_LZMA=0
   XD3_MAIN=1 XD3_ENCODER=0 XD3_STDIO=1 EXTERNAL_COMPRESSION=0 VCDIFF_TOOLS=0)
 target_compile_options(xdelta3decode PRIVATE ${XD3_WERROR_FLAGS})
+if(MINGW)
+  target_link_options(xdelta3decode PRIVATE -municode)
+endif()
 
 # ---------------------------------------------------------------------------
 # Regression-test executables
@@ -317,6 +323,13 @@ if(XD3_BUILD_TESTS)
   enable_testing()
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
+
+  if(WIN32)
+    add_test(NAME xdelta3_unicode_paths
+      COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+        -File ${CMAKE_CURRENT_SOURCE_DIR}/testing/unicode_test.ps1
+        -Xdelta $<TARGET_FILE:xdelta3>)
+  endif()
 
   # External-compression level detection round-trip.  Only meaningful where the
   # POSIX external-compression path is compiled (i.e. not the Windows
