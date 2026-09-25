@@ -31,8 +31,8 @@ try {
     throw "Unicode decode failed with exit code $LASTEXITCODE"
   }
 
-  $expected = (Get-FileHash -Algorithm SHA256 $target).Hash
-  $actual = (Get-FileHash -Algorithm SHA256 $decoded).Hash
+  $expected = [Convert]::ToBase64String([IO.File]::ReadAllBytes($target))
+  $actual = [Convert]::ToBase64String([IO.File]::ReadAllBytes($decoded))
   if ($actual -ne $expected) {
     throw "Decoded Unicode-path file does not match the target"
   }
