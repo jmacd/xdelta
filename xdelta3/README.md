@@ -10,8 +10,9 @@ This directory contains the Xdelta3 command-line interface (CLI) and source
 distribution for VCDIFF differential compression, a.k.a. delta
 compression. The latest information and downloads are available here:
 
-* http://xdelta.org/
-* http://github.com/jmacd/xdelta/
+* https://jmacd.github.io/xdelta/
+* https://xdelta.blogspot.com/
+* https://github.com/jmacd/xdelta/
 
 Xdelta can be configured to use XZ Utils for secondary compression:
 
@@ -19,7 +20,7 @@ Xdelta can be configured to use XZ Utils for secondary compression:
 
 The command-line syntax is detailed here:
 
-* https://jmacd.github.com/xdelta
+* https://jmacd.github.io/xdelta/
 
 Run 'xdelta3 -h' for brief help.  Run 'xdelta3 test' for built-in tests.
 
