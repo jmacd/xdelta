@@ -8,6 +8,14 @@ As with gzip, `-d` means decompress and the default mode (`-e`) is to compress;
 defaults to stdout instead of choosing a file extension automatically. Without
 `-s SOURCE`, xdelta3 behaves like gzip for stdin/stdout purposes.
 
+Run xdelta3 from a terminal. Invoking it without arguments at an interactive
+terminal displays help. With redirected standard input, no-argument operation
+remains an encoding filter:
+
+```sh
+xdelta3 < TARGET > OUT
+```
+
 ## Compress (encode) examples
 
 ```sh
@@ -30,6 +38,7 @@ The following reflects the built-in help (`xdelta3 -h`) for the current
 release. Some commands and options depend on build-time configuration.
 
 ```
+Run xdelta3 from a command shell.
 usage: xdelta3 [command/options] [input [output]]
 make patch:
 

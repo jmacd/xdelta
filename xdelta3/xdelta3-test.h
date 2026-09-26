@@ -1761,6 +1761,12 @@ fail:
 static int test_command_line_arguments(xd3_stream *stream, int ignore) {
   int i, ret;
 
+  if (!main_should_show_help(1, 1) || main_should_show_help(1, 0) ||
+      main_should_show_help(2, 1)) {
+    stream->msg = "interactive no-argument dispatch failed";
+    return XD3_INTERNAL;
+  }
+
   static const char *cmdpairs[] = {
       /* standard input, output */
       "%s %s -A < %s > %s",
