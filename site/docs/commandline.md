@@ -63,7 +63,7 @@ standard options:
    -F           force the external-compression subprocess
    -h           show help
    -q           be quiet
-   -v           be verbose (max 2)
+   -v           be verbose (repeat for more detail)
    -V           show version
 memory options:
    -B bytes     source window size
