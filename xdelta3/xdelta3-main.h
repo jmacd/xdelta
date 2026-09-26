@@ -3059,20 +3059,47 @@ static void main_armor_merge_link(const uint8_t *apphead, usize_t sz) {
 #endif /* XD3_ARMOR */
 
 #if XD3_ENCODER
-static const char *main_apphead_string(const char *x) {
-  const char *y;
+static int main_apphead_string(const char *x, const char **name) {
+  const char *slash;
+  const char *backslash;
+  const char *separator;
 
   if (x == NULL) {
-    return "";
+    *name = "";
+    return 0;
   }
 
   if (strcmp(x, "/dev/stdin") == 0 || strcmp(x, "/dev/stdout") == 0 ||
       strcmp(x, "/dev/stderr") == 0) {
-    return "-";
+    *name = "-";
+    return 0;
   }
 
-  // TODO: this is not portable
-  return (y = strrchr(x, '/')) == NULL ? x : y + 1;
+  slash = strrchr(x, '/');
+  backslash = strrchr(x, '\\');
+  separator =
+      slash == NULL ? backslash
+                    : (backslash == NULL || slash > backslash ? slash
+                                                              : backslash);
+
+  if (x[0] == 0 || (separator != NULL && separator[1] == 0)) {
+    return XD3_INVALID_INPUT;
+  }
+
+  *name = separator == NULL ? x : separator + 1;
+  return 0;
+}
+
+static int main_apphead_filename(const char *path, const char *type,
+                                 const char **name) {
+  int ret = main_apphead_string(path, name);
+
+  if (ret != 0) {
+    XPR(NT "cannot derive application-header filename from empty %s path or "
+           "path ending in a separator: %s\n",
+        type, path);
+  }
+  return ret;
 }
 
 /* Format the appheader compressor field as "<ident>" or "<ident><level>" (e.g.
@@ -3096,6 +3123,8 @@ static const char *main_apphead_comp(const main_extcomp *comp, int level,
 
 static int main_set_appheader(xd3_stream *stream, main_file *input,
                               main_file *sfile) {
+  int ret;
+
   /* The user may disable the application header.  Once the appheader
    * is set, this disables setting it again. */
   if (appheader_used || !option_use_appheader) {
@@ -3126,13 +3155,17 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
     int armor = !option_no_armor;
 #endif
 
-    iname = main_apphead_string(input->filename);
+    if ((ret = main_apphead_filename(input->filename, "input", &iname))) {
+      return ret;
+    }
     icomp = main_apphead_comp(input->compressor, input->compression_level,
                               icomp_buf, sizeof(icomp_buf));
     len = (usize_t)strlen(iname) + (usize_t)strlen(icomp) + 2;
 
     if (sfile->filename != NULL) {
-      sname = main_apphead_string(sfile->filename);
+      if ((ret = main_apphead_filename(sfile->filename, "source", &sname))) {
+        return ret;
+      }
       scomp = main_apphead_comp(sfile->compressor, sfile->compression_level,
                                 scomp_buf, sizeof(scomp_buf));
       len += (usize_t)strlen(sname) + (usize_t)strlen(scomp) + 2;
@@ -3142,7 +3175,6 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
 
 #if XD3_ARMOR
     if (armor) {
-      int ret;
       /* The target is the encoder input; the source is the -s file.  Both
        * must be seekable regular files so they can be hashed up front. */
       if (input->filename == NULL) {
@@ -3205,7 +3237,7 @@ static void main_get_appheader_params(main_file *file, char **parsed,
   /* Set the filename if it was not specified.  If output, option_stdout (-c)
    * overrides. */
   if (file->filename == NULL && !(output && option_stdout) &&
-      strcmp(parsed[0], "-") != 0) {
+      parsed[0][0] != 0 && strcmp(parsed[0], "-") != 0) {
     file->filename = parsed[0];
 
     if (other->filename != NULL) {
@@ -3593,6 +3625,18 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     XPR(NT "internal error\n");
     return EXIT_FAILURE;
   }
+
+#if XD3_ENCODER
+  if (cmd == CMD_ENCODE && option_use_appheader && option_appheader == NULL) {
+    const char *name;
+
+    if ((ret = main_apphead_filename(ifile->filename, "input", &name)) ||
+        (sfile->filename != NULL &&
+         (ret = main_apphead_filename(sfile->filename, "source", &name)))) {
+      return EXIT_FAILURE;
+    }
+  }
+#endif
 
 #if XD3_ARMOR
   if (cmd == CMD_ENCODE && !option_no_armor) {

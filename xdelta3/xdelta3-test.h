@@ -2447,8 +2447,33 @@ static int test_appheader(xd3_stream *stream, int ignore) {
   size_t i;
   char buf[TESTBUFSIZE];
   char bogus[TESTBUFSIZE / 2];
+  const char *name;
+  char empty_name[] = "";
+  char empty_comp[] = "";
+  char *empty_params[] = {empty_name, empty_comp};
+  main_file apphead_file;
+  main_file other_file;
   xoff_t ssize, tsize;
   test_setup();
+
+  if (main_apphead_string("dir/file", &name) != 0 ||
+      strcmp(name, "file") != 0 ||
+      main_apphead_string("dir\\file", &name) != 0 ||
+      strcmp(name, "file") != 0 ||
+      main_apphead_string("dir/", &name) != XD3_INVALID_INPUT ||
+      main_apphead_string("dir\\", &name) != XD3_INVALID_INPUT) {
+    stream->msg = "application-header basename handling failed";
+    return XD3_INTERNAL;
+  }
+
+  main_file_init(&apphead_file);
+  main_file_init(&other_file);
+  main_get_appheader_params(&apphead_file, empty_params, 1, "output",
+                            &other_file);
+  if (apphead_file.filename != NULL) {
+    stream->msg = "empty application-header filename was not ignored";
+    return XD3_INTERNAL;
+  }
 
   if ((ret = test_make_inputs(stream, &ssize, &tsize))) {
     return ret;
