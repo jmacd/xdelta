@@ -440,6 +440,22 @@ static int main_read_primary_input(main_file *file, uint8_t *buf, size_t size,
 static const char *main_format_bcnt(xoff_t r, shortbuf *buf);
 static int main_help(void);
 
+static int main_stdin_is_console(void) {
+#ifdef _WIN32
+  DWORD mode;
+  HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
+
+  return input != NULL && input != INVALID_HANDLE_VALUE &&
+         GetConsoleMode(input, &mode);
+#else
+  return isatty(STDIN_FILENO);
+#endif
+}
+
+static int main_should_show_help(int argc, int stdin_is_console) {
+  return argc == 1 && stdin_is_console;
+}
+
 #if XD3_ENCODER
 static int xd3_merge_input_output(xd3_stream *stream, xd3_whole_state *source);
 #endif
@@ -4140,6 +4156,13 @@ int xd3_main_cmdline(int argc, char **argv) {
   argc = env_argc;
   program_name = env_argv[0];
 
+  /* With no arguments, preserve filter behavior for redirected input but do
+   * not silently consume commands typed into an interactive terminal. */
+  if (main_should_show_help(argc, main_stdin_is_console())) {
+    ret = main_help();
+    goto exit;
+  }
+
 takearg:
   my_optarg = NULL;
   my_optstr = argv[my_optind];
@@ -4582,6 +4605,9 @@ static int main_help(void) {
   main_version();
 
   /* Note: update wiki when command-line features change */
+  XPR(NTR
+      "Run xdelta3 from a command shell (Command Prompt or PowerShell on "
+      "Windows).\n");
   XPR(NTR "usage: xdelta3 [command/options] [input [output]]\n");
   XPR(NTR "make patch:\n");
   XPR(NTR "\n");
