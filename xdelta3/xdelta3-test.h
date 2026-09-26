@@ -2967,16 +2967,14 @@ static int test_srcwin_minimum(xd3_stream *stream, int ignore) {
     return ret;
   }
 
-  snprintf_func(buf, TESTBUFSIZE,
-                "grep -q 'blksize 512 B.*#bufs 32' %s", vlog);
+  snprintf_func(buf, TESTBUFSIZE, "grep -q 'blksize 512 B.*#bufs 32' %s", vlog);
   if ((ret = do_cmd(stream, buf))) {
     stream->msg = "srcwin: 16 KiB window was not split into 32 blocks";
     return ret;
   }
 
-  snprintf_func(buf, TESTBUFSIZE, "%s -d -f -B 16384 -s %s %s %s",
-                program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE,
-                TEST_RECON_FILE);
+  snprintf_func(buf, TESTBUFSIZE, "%s -d -f -B 16384 -s %s %s %s", program_name,
+                TEST_SOURCE_FILE, TEST_DELTA_FILE, TEST_RECON_FILE);
   if ((ret = do_cmd(stream, buf))) {
     return ret;
   }

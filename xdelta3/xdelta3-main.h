@@ -1700,7 +1700,9 @@ static int main_print_func(xd3_stream *stream, main_file *xfile) {
     VC(UT "\n") VE;
 
     IF_SEC(VC(UT "VCDIFF secondary compressor:  %s\n",
-              stream->sec_type ? stream->sec_type->name : "none") VE);
+              (stream->dec_hdr_ind & VCD_SECONDARY) && stream->sec_type
+                  ? stream->sec_type->name
+                  : "none") VE);
     IF_NSEC(VC(UT "VCDIFF secondary compressor: unsupported\n") VE);
 
     if (stream->dec_hdr_ind & VCD_APPHEADER) {
