@@ -1987,6 +1987,36 @@ static void xd3_iopt_free_nonadd(xd3_stream *stream, xd3_rinst *i) {
   }
 }
 
+static void xd3_source_window_update(xd3_stream *stream, xoff_t addr,
+                                     usize_t size) {
+  xoff_t window = stream->source_window_min;
+  xoff_t end = addr + size;
+
+  if (window == 0) {
+    window = XD3_MINSRCWINSZ;
+  }
+
+  if (addr < stream->source_copy_highwater) {
+    for (;;) {
+      xoff_t block_size = window / MAX_LRU_SIZE;
+      xoff_t block_mask = block_size - 1;
+      xoff_t retained =
+          (stream->source_copy_highwater & ~block_mask) - (addr & ~block_mask) +
+          ((stream->source_copy_highwater & block_mask) != 0 ? block_size : 0);
+
+      if (retained <= window) {
+        break;
+      }
+
+      XD3_ASSERT(window <= XD3_MAXSRCWINSZ / 2);
+      window *= 2;
+    }
+  }
+
+  stream->source_window_min = window;
+  stream->source_copy_highwater = xd3_max(stream->source_copy_highwater, end);
+}
+
 /* When an instruction is ready to flush from the iopt buffer, this
  * function is called to produce an encoding.  It writes the
  * instruction plus size, address, and data to the various encoding
@@ -2025,6 +2055,9 @@ static int xd3_iopt_finish_encoding(xd3_stream *stream, xd3_rinst *inst) {
         if ((ret = xd3_to_usize(inst->addr - src->srcbase, &addr))) {
           stream->msg = "source copy address exceeds window size";
           return ret;
+        }
+        if (stream->flags & XD3_SRCWIN_STATS) {
+          xd3_source_window_update(stream, inst->addr, inst->size);
         }
         stream->n_scpy += 1;
         stream->l_scpy += inst->size;
