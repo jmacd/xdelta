@@ -750,6 +750,24 @@ fail:
   return XD3_INTERNAL;
 }
 
+#if XD3_WIN32
+static int test_win32_error_message(xd3_stream *stream, int unused) {
+  const char *message = xd3_mainerror(ERROR_NOT_ENOUGH_MEMORY);
+
+  /* FormatMessage output is localized, so verify its platform-independent
+   * contract rather than matching English text. */
+  if (message == NULL || message[0] == 0) {
+    stream->msg = "Windows allocation error message is empty";
+    return XD3_INTERNAL;
+  }
+  if (strchr(message, '\r') != NULL || strchr(message, '\n') != NULL) {
+    stream->msg = "Windows allocation error message contains a line ending";
+    return XD3_INTERNAL;
+  }
+  return 0;
+}
+#endif
+
 static int test_forward_match(xd3_stream *stream, int unused) {
   usize_t i;
   uint8_t buf1[256], buf2[256];
@@ -3440,6 +3458,9 @@ int xd3_selftest(void) {
   DO_TEST(usize_t_overflow, 0, 0);
   DO_TEST(usize_narrowing, 0, 0);
   DO_TEST(alloc_overflow, 0, 0);
+#if XD3_WIN32
+  DO_TEST(win32_error_message, 0, 0);
+#endif
   DO_TEST(checksum_step, 0, 0);
   DO_TEST(forward_match, 0, 0);
   DO_TEST(address_cache, 0, 0);
