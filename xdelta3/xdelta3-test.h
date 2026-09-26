@@ -2670,7 +2670,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
   /* A streaming (non-seekable) source cannot be verified: armor warns but the
    * apply still succeeds.  Capture stderr and assert the warning is present. */
   snprintf_func(warnf, sizeof(warnf), "%s.warn", TEST_DELTA_FILE);
-  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -d -s /dev/stdin %s %s 2>%s",
+  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -d -s - %s %s 2>%s",
                 TEST_SOURCE_FILE, program_name, TEST_DELTA_FILE,
                 TEST_RECON_FILE, warnf);
   if ((ret = do_cmd(stream, buf))) {
@@ -2895,7 +2895,7 @@ static int test_armor(xd3_stream *stream, int ignore) {
   if ((ret = do_fail(stream, buf))) {
     return ret;
   }
-  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -e -s /dev/stdin %s %s",
+  snprintf_func(buf, TESTBUFSIZE, "cat %s | %s -f -e -s - %s %s",
                 TEST_SOURCE_FILE, program_name, TEST_TARGET_FILE,
                 TEST_DELTA_FILE);
   if ((ret = do_fail(stream, buf))) {
