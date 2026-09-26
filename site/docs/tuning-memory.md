@@ -22,23 +22,6 @@ data should not shift more than 32 MB — that is, no more than 32 MB should be
 added or removed relative to the source. The minimum is 16 KB. The source file
 is read into the buffer; it is not `mmap`ed (Xdelta 1.x used `mmap()`).
 
-`-B` is a memory and match-distance limit, not a compression-quality setting.
-A larger value exposes a different range of source matches to the encoder's
-bounded hash table and changes when the source horizon advances. Hash collisions
-and the encoder's choice among duplicate matches can therefore change the
-result: increasing `-B` may make a delta smaller or larger. There is no ordering
-constraint between `-B` and `-W`, and neither value can be derived from the file
-sizes alone. The useful `-B` depends on where matching regions occur after
-insertions, deletions, or format changes.
-
-For batch processing, start with the default `-B`. Raise it only when the source
-and target may drift by more than about 32 MB, or when a trial shows a material
-improvement. If minimizing delta size justifies multiple encoding passes, try a
-small set of power-of-two values (for example 64 MB, 128 MB, 256 MB, and the
-rounded source size) and keep the smallest verified delta. Grouping files by
-size does not identify an optimal value; files with similar sizes can have very
-different match layouts.
-
 ## Input window size (`-W`)
 
 The input window size (`-W`) determines how much input is compressed in a single
