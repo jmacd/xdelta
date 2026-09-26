@@ -97,8 +97,12 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   } else {
     /* Either a regular file (possibly compressed) or a FIFO
      * (possibly compressed). */
-    if ((ret = main_file_open(sfile, sfile->filename, XO_READ))) {
-      return ret;
+    if (strcmp(sfile->filename, "-") == 0) {
+      main_file_set_stdin(sfile);
+    } else {
+      if ((ret = main_file_open(sfile, sfile->filename, XO_READ))) {
+        return ret;
+      }
     }
 
     /* If the file is regular we know it's size.  If the file turns

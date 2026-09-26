@@ -433,6 +433,7 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
 
 static int main_getblk_func(xd3_stream *stream, xd3_source *source,
                             xoff_t blkno);
+static void main_file_set_stdin(main_file *xfile);
 static int main_file_seek(main_file *xfile, xoff_t pos);
 static int main_read_primary_input(main_file *file, uint8_t *buf, size_t size,
                                    size_t *nread);
@@ -1009,6 +1010,14 @@ void main_file_init(main_file *xfile) {
 #if XD3_WIN32
   xfile->file = INVALID_HANDLE_VALUE;
 #endif
+}
+
+static void main_file_set_stdin(main_file *xfile) {
+  const char *realname = xfile->filename;
+  xfile->mode = XO_READ;
+  XSTDIN_XF(xfile);
+  xfile->realname = realname;
+  xfile->nread = 0;
 }
 
 int main_file_isopen(main_file *xfile) {
@@ -3078,9 +3087,9 @@ static int main_apphead_string(const char *x, const char **name) {
   slash = strrchr(x, '/');
   backslash = strrchr(x, '\\');
   separator =
-      slash == NULL ? backslash
-                    : (backslash == NULL || slash > backslash ? slash
-                                                              : backslash);
+      slash == NULL
+          ? backslash
+          : (backslash == NULL || slash > backslash ? slash : backslash);
 
   if (x[0] == 0 || (separator != NULL && separator[1] == 0)) {
     return XD3_INVALID_INPUT;
@@ -3773,8 +3782,10 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
                    "use -a to skip armor verification\n");
             return EXIT_FAILURE;
           }
-          if ((ret = main_armor_hash_file(sfile->filename, "source", got,
-                                          &nonseekable))) {
+          if (sfile->realname != NULL && strcmp(sfile->realname, "-") == 0) {
+            nonseekable = 1;
+          } else if ((ret = main_armor_hash_file(sfile->filename, "source", got,
+                                                 &nonseekable))) {
             return EXIT_FAILURE;
           }
           if (nonseekable) {
@@ -4267,7 +4278,10 @@ takearg:
       /* Case 2-5 */
       if (*my_optarg == 0) {
         /* Condition 4-5 */
-        int have_arg = (my_optind < (argc - 1) && *argv[my_optind + 1] != '-');
+        int have_arg =
+            (my_optind < (argc - 1) &&
+             (*argv[my_optind + 1] != '-' ||
+              (ret == 's' && strcmp(argv[my_optind + 1], "-") == 0)));
 
         if (!have_arg) {
           if (!option) {
@@ -4519,6 +4533,12 @@ takearg:
 
   argc -= my_optind;
   argv += my_optind;
+
+  if (argc == 0 && option_source_filename != NULL &&
+      strcmp(option_source_filename, "-") == 0) {
+    XPR(NT "source and input cannot both use standard input\n");
+    goto cleanup;
+  }
 
   /* There may be up to two more arguments. */
   if (argc > 2) {
