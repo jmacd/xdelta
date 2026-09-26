@@ -23,6 +23,9 @@ xdelta3: non-seekable source: copy is too far back (try raising -B): XD3_INTERNA
 Raise `-B` (see [Tuning the memory budget](tuning-memory.md)) so the decoder
 keeps enough of the source in memory.
 
+Run the encoder with `-v` to print the minimum `-B` required by the delta it
+produces.
+
 This non-seekable mode is the default for
 [external compression](external-compression.md): when you pass a compressed
 source file on the command line, xdelta3 forks the decompression command and

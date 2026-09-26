@@ -3019,6 +3019,17 @@ static int test_srcwin_minimum(xd3_stream *stream, int ignore) {
 }
 #endif /* SHELL_TESTS */
 
+static int test_source_window_report(xd3_stream *stream, int ignore) {
+  (void)ignore;
+  xd3_source_window_update(stream, 32768, 1);
+  xd3_source_window_update(stream, 1, 1);
+  if (stream->source_window_min != 65536) {
+    stream->msg = "minimum source window mismatch";
+    return XD3_INTERNAL;
+  }
+  return 0;
+}
+
 /***********************************************************************
  Source identical optimization
  ***********************************************************************/
@@ -3599,6 +3610,8 @@ int xd3_selftest(void) {
   DO_TEST(recode_command, 0, 0);
   IF_LZMA(DO_TEST(secondary_lzma_default, 0, 0));
 #endif
+
+  DO_TEST(source_window_report, 0, 0);
 
   IF_LZMA(DO_TEST(secondary_lzma, 0, 1));
   IF_DJW(DO_TEST(secondary_huff, 0, DJW_MAX_GROUPS));
