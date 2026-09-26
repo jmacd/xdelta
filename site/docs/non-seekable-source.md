@@ -1,13 +1,22 @@
 # Non-seekable source files
 
-How to compress when the **source** is a stream, named pipe, or FIFO rather
-than a regular file.
+How to use a **source** supplied through standard input, a named pipe, or a
+FIFO rather than a regular file.
 
 ## Overview
 
 It is possible to read the source file from a FIFO or named pipe. The encoder is
 designed not to seek backward in the source, but this has implications for the
 decoder's memory budget.
+
+Use `-s -` to select standard input as the source:
+
+```sh
+source-command | xdelta3 -d -s - delta.vcdiff target
+```
+
+The source and the primary input cannot both use standard input. Use `./-` to
+refer to a literal file named `-`.
 
 ## Details
 
