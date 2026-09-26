@@ -408,6 +408,6 @@ uint64_t xd3_large64_cksum_update(xd3_hash_cfg *cfg, const uint64_t cksum,
 #endif /* USE_UINT64 */
 
 #define MAX_LRU_SIZE 32U
-#define XD3_MINSRCWINSZ (XD3_ALLOCSIZE * MAX_LRU_SIZE)
+#define XD3_MINSRCWINSZ XD3_ALLOCSIZE
 
 #endif // XDELTA3_INTERNAL_H__
