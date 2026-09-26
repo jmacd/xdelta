@@ -3572,6 +3572,10 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     input_func = xd3_encode_input;
     output_func = main_write_output;
 
+    if (option_verbose) {
+      stream_flags |= XD3_SRCWIN_STATS;
+    }
+
     if (option_no_compress) {
       stream_flags |= XD3_NOCOMPRESS;
     }
@@ -4028,6 +4032,11 @@ done:
   }
 
 #if XD3_ENCODER
+  if (option_verbose && cmd == CMD_ENCODE && stream.n_scpy != 0) {
+    XPR(NT "Minimum source window (-B): %" XD3_Q "u\n",
+        stream.source_window_min);
+  }
+
   if (option_verbose > 1 && cmd == CMD_ENCODE) {
     XPR(NT "scanner configuration: %s\n", stream.smatcher.name);
     XPR(NT "target hash table size: %" XD3_W "u\n", stream.small_hash.size);

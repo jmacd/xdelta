@@ -1118,6 +1118,9 @@ struct _xd3_stream {
   xoff_t l_add;
   xoff_t l_run;
 
+  xoff_t source_copy_highwater;
+  xoff_t source_window_min;
+
   usize_t i_slots_used;
 
 #if XD3_DEBUG
