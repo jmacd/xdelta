@@ -1511,11 +1511,11 @@ static int main_set_secondary_flags(xd3_config *config) {
 
   if (option_verbose) {
     XPR(NT "secondary compression: %s\n",
-        (config->flags | XD3_SEC_LZMA)
+        (config->flags & XD3_SEC_LZMA)
             ? "lzma"
-            : ((config->flags | XD3_SEC_FGK)
+            : ((config->flags & XD3_SEC_FGK)
                    ? "fgk"
-                   : ((config->flags | XD3_SEC_DJW) ? "djw" : "none")));
+                   : ((config->flags & XD3_SEC_DJW) ? "djw" : "none")));
   }
 
   return 0;

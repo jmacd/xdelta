@@ -324,6 +324,12 @@ if(XD3_BUILD_TESTS)
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
 
+  add_test(NAME xdelta3_secondary_verbose_test
+    COMMAND ${CMAKE_COMMAND}
+      -DXDELTA=$<TARGET_FILE:xdelta3>
+      -DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/secondary-verbose-test
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/testing/secondary_verbose_test.cmake)
+
   if(WIN32)
     add_test(NAME xdelta3_unicode_paths
       COMMAND ${CMAKE_COMMAND}
