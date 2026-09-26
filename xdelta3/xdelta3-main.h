@@ -4620,7 +4620,7 @@ static int main_help(void) {
 #endif
   XPR(NTR "   -h           show help\n");
   XPR(NTR "   -q           be quiet\n");
-  XPR(NTR "   -v           be verbose (max 2)\n");
+  XPR(NTR "   -v           be verbose (repeat for more detail)\n");
   XPR(NTR "   -V           show version\n");
 
   XPR(NTR "memory options:\n");

@@ -2924,6 +2924,70 @@ static int test_srcwin_clamp(xd3_stream *stream, int ignore) {
   test_cleanup();
   return 0;
 }
+
+/* The CLI source cache must accept its documented 16 KiB minimum, split into
+ * MAX_LRU_SIZE 512-byte blocks when the source is larger than the window. */
+static int test_srcwin_minimum(xd3_stream *stream, int ignore) {
+  FILE *sf;
+  int ret;
+  char buf[TESTBUFSIZE];
+  char vlog[TESTFILESIZE + sizeof(".vlog")];
+  xoff_t ssize;
+  usize_t i;
+
+  test_setup();
+  if ((ret = test_make_inputs(stream, &ssize, NULL))) {
+    return ret;
+  }
+
+  /* Ensure the source exceeds -B so main_set_source splits the window into
+   * 32 blocks instead of retaining its initial single-block setup. */
+  if ((sf = fopen(TEST_SOURCE_FILE, "ab")) == NULL) {
+    stream->msg = "srcwin: source append open failed";
+    return get_errno();
+  }
+  for (i = 0; i < XD3_MINSRCWINSZ; i += 1) {
+    if (fputc(0, sf) == EOF) {
+      stream->msg = "srcwin: source append failed";
+      ret = get_errno();
+      fclose(sf);
+      return ret;
+    }
+  }
+  if (fclose(sf) != 0) {
+    stream->msg = "srcwin: source append close failed";
+    return get_errno();
+  }
+
+  snprintf_func(vlog, sizeof(vlog), "%s.vlog", TEST_DELTA_FILE);
+  snprintf_func(buf, TESTBUFSIZE, "%s -e -v -v -f -B 16384 -s %s %s %s 2>%s",
+                program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE,
+                TEST_DELTA_FILE, vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE,
+                "grep -q 'blksize 512 B.*#bufs 32' %s", vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "srcwin: 16 KiB window was not split into 32 blocks";
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE, "%s -d -f -B 16384 -s %s %s %s",
+                program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE,
+                TEST_RECON_FILE);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+  if ((ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  test_unlink(vlog);
+  test_cleanup();
+  return 0;
+}
 #endif /* SHELL_TESTS */
 
 /***********************************************************************
@@ -3493,6 +3557,7 @@ int xd3_selftest(void) {
   DO_TEST(appheader, 0, 0);
   DO_TEST(command_line_arguments, 0, 0);
   DO_TEST(srcwin_clamp, 0, 0);
+  DO_TEST(srcwin_minimum, 0, 0);
 #if XD3_ARMOR
   DO_TEST(armor, 0, 0);
 #endif
