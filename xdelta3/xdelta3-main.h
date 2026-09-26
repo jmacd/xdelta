@@ -572,11 +572,27 @@ static void *main_malloc1(size_t size) {
 }
 
 void *main_bufalloc(size_t size) {
+  void *result;
+
 #if XD3_WIN32
-  return VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  result = VirtualAlloc(NULL, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  if (result == NULL) {
+    DWORD error = GetLastError();
+    if (error == NO_ERROR) {
+      error = ERROR_NOT_ENOUGH_MEMORY;
+    }
+    XPR(NT "buffer allocation of %" XD3_Z "u bytes failed: %s\n", size,
+        xd3_mainerror(error));
+  }
 #else
-  return main_malloc1(size);
+  result = malloc(size);
+  if (result == NULL) {
+    XPR(NT "buffer allocation of %" XD3_Z "u bytes failed: %s\n", size,
+        xd3_mainerror(ENOMEM));
+  }
 #endif
+
+  return result;
 }
 
 void *main_malloc(size_t size) {
@@ -3558,6 +3574,16 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     XPR(NT "internal error\n");
     return EXIT_FAILURE;
   }
+
+#if XD3_ARMOR
+  if (cmd == CMD_ENCODE && !option_no_armor) {
+    xoff_t input_size;
+    if (main_file_stat(ifile, &input_size) != 0) {
+      XPR(NT "armor requires a seekable target: %s\n", ifile->filename);
+      return EXIT_FAILURE;
+    }
+  }
+#endif
 
   main_bsize = winsize = main_get_winsize(ifile);
 
