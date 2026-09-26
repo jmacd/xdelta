@@ -3087,9 +3087,9 @@ static int main_apphead_string(const char *x, const char **name) {
   slash = strrchr(x, '/');
   backslash = strrchr(x, '\\');
   separator =
-      slash == NULL ? backslash
-                    : (backslash == NULL || slash > backslash ? slash
-                                                              : backslash);
+      slash == NULL
+          ? backslash
+          : (backslash == NULL || slash > backslash ? slash : backslash);
 
   if (x[0] == 0 || (separator != NULL && separator[1] == 0)) {
     return XD3_INVALID_INPUT;
