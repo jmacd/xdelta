@@ -4,7 +4,7 @@
 #
 #   cmake -B build -DCMAKE_BUILD_TYPE=Release
 #   cmake --build build
-#   ctest --test-dir build        # runs the built-in regression test
+#   ctest --test-dir build        # runs the C and C++ regression suites
 #
 cmake_minimum_required(VERSION 3.13)
 
@@ -323,6 +323,11 @@ if(XD3_BUILD_TESTS)
   enable_testing()
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
+
+  if(NOT MSVC)
+    add_test(NAME xdelta3_cpp_regression_test COMMAND xdelta3regtest)
+    set_tests_properties(xdelta3_cpp_regression_test PROPERTIES TIMEOUT 1200)
+  endif()
 
   add_test(NAME xdelta3_secondary_verbose_test
     COMMAND ${CMAKE_COMMAND}
