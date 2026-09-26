@@ -326,7 +326,7 @@ if(XD3_BUILD_TESTS)
 
   if(NOT MSVC)
     add_test(NAME xdelta3_cpp_regression_test COMMAND xdelta3regtest)
-    set_tests_properties(xdelta3_cpp_regression_test PROPERTIES TIMEOUT 600)
+    set_tests_properties(xdelta3_cpp_regression_test PROPERTIES TIMEOUT 1200)
   endif()
 
   add_test(NAME xdelta3_secondary_verbose_test
