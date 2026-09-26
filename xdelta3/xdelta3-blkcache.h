@@ -106,6 +106,13 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
     sfile->size_known = (main_file_stat(sfile, &source_size) == 0);
   }
 
+#if XD3_ARMOR
+  if (cmd == CMD_ENCODE && !option_no_armor && !sfile->size_known) {
+    XPR(NT "armor requires a seekable source: %s\n", sfile->filename);
+    return XD3_INVALID_INPUT;
+  }
+#endif
+
   /* Clamp the source window to the known source size.  A large -B on a small
    * source would otherwise reserve the full (rounded-up) window up front --
    * e.g. an 8 GiB buffer for a 100 KB file -- wasting memory and risking
