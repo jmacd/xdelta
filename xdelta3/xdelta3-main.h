@@ -4605,9 +4605,7 @@ static int main_help(void) {
   main_version();
 
   /* Note: update wiki when command-line features change */
-  XPR(NTR
-      "Run xdelta3 from a command shell (Command Prompt or PowerShell on "
-      "Windows).\n");
+  XPR(NTR "Run xdelta3 from a command shell.\n");
   XPR(NTR "usage: xdelta3 [command/options] [input [output]]\n");
   XPR(NTR "make patch:\n");
   XPR(NTR "\n");
