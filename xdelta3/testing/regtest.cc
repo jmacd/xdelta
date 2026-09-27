@@ -26,7 +26,8 @@ public:
     Options()
         : encode_srcwin_maxsz(1 << 20), block_size(Constants::BLOCK_SIZE),
           window_size(Constants::WINDOW_SIZE), size_known(false),
-          iopt_size(XD3_DEFAULT_IOPT_SIZE), smatch_cfg(XD3_SMATCH_DEFAULT) {}
+          iopt_size(XD3_DEFAULT_IOPT_SIZE), smatch_cfg(XD3_SMATCH_DEFAULT),
+          smatch_large_step(0), source_index_start(0) {}
 
     xoff_t encode_srcwin_maxsz;
     size_t block_size;
@@ -34,6 +35,8 @@ public:
     bool size_known;
     usize_t iopt_size;
     xd3_smatch_cfg smatch_cfg;
+    usize_t smatch_large_step;
+    xoff_t source_index_start;
   };
 
 #include "segment.h"
@@ -71,6 +74,16 @@ public:
     encode_config.winsize = options.window_size;
     encode_config.iopt_size = options.iopt_size;
     encode_config.smatch_cfg = options.smatch_cfg;
+    if (options.smatch_large_step != 0) {
+      encode_config.smatch_cfg = XD3_SMATCH_SOFT;
+      encode_config.smatcher_soft.large_look = 9;
+      encode_config.smatcher_soft.large_step = options.smatch_large_step;
+      encode_config.smatcher_soft.small_look = 4;
+      encode_config.smatcher_soft.small_chain = 1;
+      encode_config.smatcher_soft.small_lchain = 1;
+      encode_config.smatcher_soft.max_lazy = 6;
+      encode_config.smatcher_soft.long_enough = 6;
+    }
 
     CHECK_EQ(0, xd3_config_stream(&encode_stream, &encode_config));
     CHECK_EQ(0, xd3_config_stream(&decode_stream, &decode_config));
@@ -90,6 +103,7 @@ public:
       xd3_set_source_and_size(&decode_stream, &decode_source,
                               source_file.Size());
     }
+    encode_stream.srcwin_cksum_pos = options.source_index_start;
 
     BlockIterator source_iterator(source_file, options.block_size);
     BlockIterator target_iterator(target_file, Constants::WINDOW_SIZE);
@@ -1194,6 +1208,44 @@ public:
     InMemoryEncodeDecode(spec1, spec0, &noblock, options);
   }
 
+#if XD3_USE_LARGESIZET
+  void TestLargeSourceOffset() {
+    MTRandom rand;
+    FileSpec source(&rand);
+    FileSpec target(&rand);
+    uint8_t suffix[256];
+    const xoff_t prefix_size = (xoff_t)1 << 31;
+    const size_t copy_size = 9;
+    const size_t copy_offset = sizeof(suffix) - copy_size;
+
+    for (size_t i = 0; i < sizeof(suffix); i++) {
+      suffix[i] = (uint8_t)(i * 29 + 17);
+    }
+
+    source.GenerateLiteralSuffix(prefix_size, suffix, sizeof(suffix));
+    target.GenerateLiteralSuffix(0, suffix + copy_offset, copy_size);
+
+    Options options;
+    options.encode_srcwin_maxsz = (xoff_t)1 << 32;
+    options.block_size = XD3_ALLOCSIZE;
+    options.window_size = XD3_ALLOCSIZE;
+    options.size_known = true;
+
+    // Model the encoder after it has indexed the virtual prefix.  A large
+    // stride keeps the hash table small and indexes the final nine bytes,
+    // isolating the absolute source-address boundary without processing 2 GiB.
+    options.source_index_start = prefix_size;
+    options.smatch_large_step = 1 << 20;
+
+    Block coded;
+    InMemoryEncodeDecode(source, target, &coded, options);
+
+    Delta delta(coded);
+    CHECK_EQ(0, delta.AddedBytes());
+    CHECK(delta.HasCopyAtOrAbove(prefix_size));
+  }
+#endif
+
 }; // class Regtest<Constants>
 
 #define TEST(x)                                                                \
@@ -1228,6 +1280,9 @@ template <class T> void MainTest() {
   TEST(TestNonBlocking);
   TEST(TestHalfBlockCopy);
   TEST(TestLastFrontierBlock);
+#if XD3_USE_LARGESIZET
+  TEST(TestLargeSourceOffset);
+#endif
   TEST(TestMergeCommand1);
   TEST(TestMergeCommand2);
 }

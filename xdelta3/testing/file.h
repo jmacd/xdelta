@@ -132,6 +132,21 @@ public:
     GenerateFixedSize(rand_->ExpRand(mean));
   }
 
+  // Generates a virtual prefix followed by caller-owned literal data.  Tests
+  // can use this to place a small fixture at a large file offset without
+  // allocating or generating the prefix.
+  void GenerateLiteralSuffix(xoff_t prefix_size, uint8_t *data,
+                             size_t data_size) {
+    Reset();
+
+    if (prefix_size != 0) {
+      table_.insert(make_pair(0, Segment(prefix_size, rand_)));
+    }
+    if (data_size != 0) {
+      table_.insert(make_pair(prefix_size, Segment(data_size, data)));
+    }
+  }
+
   // Returns the size of the file
   xoff_t Size() const {
     if (table_.empty()) {
