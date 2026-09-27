@@ -74,6 +74,8 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   int ret = 0;
   usize_t i;
   xoff_t source_size = 0;
+  usize_t source_window_size;
+  size_t source_window_alloc;
   usize_t blksize;
 
   XD3_ASSERT(lru == NULL);
@@ -133,6 +135,11 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * (-B).  The logic here will use a single block if the entire file
    * is known to fit into srcwinsz. */
   option_srcwinsz = xd3_xoff_roundup(option_srcwinsz);
+  if ((ret = xd3_to_usize(option_srcwinsz, &source_window_size)) != 0 ||
+      (ret = xd3_to_size(option_srcwinsz, &source_window_alloc)) != 0) {
+    XPR(NT "source window is too large for this build\n");
+    return ret;
+  }
 
   /* Though called "lru", it is not LRU-specific.  We always allocate
    * a maximum number of source block buffers.  If the entire file
@@ -149,7 +156,7 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   memset(lru, 0, sizeof(lru[0]) * MAX_LRU_SIZE);
 
   /* Allocate the entire buffer. */
-  if ((lru[0].blk = (uint8_t *)main_bufalloc(option_srcwinsz)) == NULL) {
+  if ((lru[0].blk = (uint8_t *)main_bufalloc(source_window_alloc)) == NULL) {
     ret = ENOMEM;
     return ret;
   }
@@ -159,7 +166,7 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * system for a single block. */
   lru_size = 1;
   lru[0].blkno = XD3_INVALID_OFFSET;
-  blksize = option_srcwinsz;
+  blksize = source_window_size;
   main_blklru_list_push_back(&lru_list, &lru[0]);
   XD3_ASSERT(blksize != 0);
 
@@ -182,7 +189,7 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   /* If the file is smaller than a block, size is known. */
   if (!sfile->size_known && source->onblk < blksize) {
     source_size = source->onblk;
-    source->onlastblk = source_size;
+    source->onlastblk = source->onblk;
     sfile->size_known = 1;
   }
 
@@ -191,7 +198,7 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * "lru"). */
   if (!sfile->size_known || source_size > option_srcwinsz) {
     /* Modify block 0, change blocksize. */
-    blksize = option_srcwinsz / MAX_LRU_SIZE;
+    blksize = source_window_size / MAX_LRU_SIZE;
     source->blksize = blksize;
     source->onblk = blksize;
     source->onlastblk = blksize;

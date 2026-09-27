@@ -3476,6 +3476,7 @@ static int test_in_memory(xd3_stream *stream, int ignore) {
  * silently truncating. */
 static int test_usize_narrowing(xd3_stream *stream, int ignore) {
   usize_t out = 0;
+  size_t size_out = 0;
   xd3_stream s;
   xd3_config c;
   xd3_source src;
@@ -3487,6 +3488,19 @@ static int test_usize_narrowing(xd3_stream *stream, int ignore) {
     stream->msg = "xd3_to_usize rejected an in-range value";
     return XD3_INTERNAL;
   }
+
+  if (xd3_to_size(0, &size_out) != 0 || size_out != 0 ||
+      xd3_to_size((xoff_t)SIZE_MAX, &size_out) != 0 || size_out != SIZE_MAX) {
+    stream->msg = "xd3_to_size rejected an in-range value";
+    return XD3_INTERNAL;
+  }
+
+#if SIZEOF_SIZE_T < SIZEOF_XOFF_T
+  if (xd3_to_size((xoff_t)SIZE_MAX + 1, &size_out) != XD3_INVALID_INPUT) {
+    stream->msg = "xd3_to_size failed to reject an overflowing value";
+    return XD3_INTERNAL;
+  }
+#endif
 
 #if SIZEOF_USIZE_T < SIZEOF_XOFF_T
   /* An offset beyond USIZE_T_MAX is rejected, not truncated. */

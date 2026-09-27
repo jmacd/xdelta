@@ -388,6 +388,16 @@ static inline int xd3_to_usize(xoff_t v, usize_t *out) {
   return 0;
 }
 
+static inline int xd3_to_size(xoff_t v, size_t *out) {
+#if SIZEOF_SIZE_T < SIZEOF_XOFF_T
+  if (v > (xoff_t)SIZE_MAX) {
+    return XD3_INVALID_INPUT;
+  }
+#endif
+  *out = (size_t)v;
+  return 0;
+}
+
 int xd3_size_hashtable(xd3_stream *stream, usize_t slots, usize_t look,
                        xd3_hash_cfg *cfg);
 
