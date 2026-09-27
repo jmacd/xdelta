@@ -27,7 +27,7 @@ public:
         : encode_srcwin_maxsz(1 << 20), block_size(Constants::BLOCK_SIZE),
           window_size(Constants::WINDOW_SIZE), size_known(false),
           iopt_size(XD3_DEFAULT_IOPT_SIZE), smatch_cfg(XD3_SMATCH_DEFAULT),
-          smatch_large_step(0), source_index_start(0) {}
+          smatch_large_step(0), source_index_start(0), encode_flags(0) {}
 
     xoff_t encode_srcwin_maxsz;
     size_t block_size;
@@ -37,6 +37,7 @@ public:
     xd3_smatch_cfg smatch_cfg;
     usize_t smatch_large_step;
     xoff_t source_index_start;
+    int encode_flags;
   };
 
 #include "segment.h"
@@ -68,7 +69,7 @@ public:
     memset(&decode_stream, 0, sizeof(decode_stream));
     memset(&decode_source, 0, sizeof(decode_source));
 
-    xd3_init_config(&encode_config, XD3_ADLER32);
+    xd3_init_config(&encode_config, XD3_ADLER32 | options.encode_flags);
     xd3_init_config(&decode_config, XD3_ADLER32);
 
     encode_config.winsize = options.window_size;
@@ -106,7 +107,7 @@ public:
     encode_stream.srcwin_cksum_pos = options.source_index_start;
 
     BlockIterator source_iterator(source_file, options.block_size);
-    BlockIterator target_iterator(target_file, Constants::WINDOW_SIZE);
+    BlockIterator target_iterator(target_file, options.window_size);
     Block encode_source_block, decode_source_block;
     Block decoded_block, target_block;
     bool encoding = true;
@@ -1246,6 +1247,40 @@ public:
   }
 #endif
 
+  void TestStreamingSourceOffsets() {
+    // Exercise the shifted-source streaming behavior at several scales.  The
+    // separate TestLargeSourceOffset covers the actual integer-width boundary.
+    for (int exponent = 13; exponent <= 15; exponent++) {
+      MTRandom rand;
+      FileSpec source(&rand);
+      FileSpec target(&rand);
+      const xoff_t offset = (xoff_t)1 << exponent;
+      const xoff_t length = (xoff_t)3 << exponent;
+
+      source.GenerateFixedSize(length);
+
+      ChangeList changes;
+      changes.push_back(
+          Change(Change::COPYOVER, length - offset, offset, (xoff_t)0));
+      changes.push_back(Change(Change::MODIFY, offset, length - offset));
+      source.ModifyTo(ChangeListMutator(changes), &target);
+
+      Options options;
+      options.encode_srcwin_maxsz = (xoff_t)2 << exponent;
+      options.block_size = 1 << 12;
+      options.window_size = 1 << 14;
+      options.size_known = false;
+      options.encode_flags = XD3_NOCOMPRESS;
+
+      Block coded;
+      InMemoryEncodeDecode(source, target, &coded, options);
+
+      Delta delta(coded);
+      CHECK_GE(delta.AddedBytes(), offset * 95 / 100);
+      CHECK_LE(delta.AddedBytes(), offset * 105 / 100);
+    }
+  }
+
 }; // class Regtest<Constants>
 
 #define TEST(x)                                                                \
@@ -1306,6 +1341,8 @@ int main(int argc, char **argv) {
   MainTest<MixedBlock>();
   MainTest<OversizeBlock>();
   MainTest<LargeBlock>();
+  XPR(NTR "TestStreamingSourceOffsets...\n");
+  Regtest<LargeBlock>().TestStreamingSourceOffsets();
 
   CHECK_EQ(0, xd3_main_cmdline(mcmd.size() - 1, const_cast<char **>(&mcmd[0])));
 
