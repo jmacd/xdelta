@@ -14,12 +14,17 @@
    limitations under the License.
 */
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#endif
+
 extern "C" {
 #include "../xdelta3.h"
 #include "../xdelta3-internal.h"
 }
 
-#include <unistd.h>
 #include <math.h>
 #include <string>
 
@@ -32,8 +37,8 @@ extern "C" {
 
 #define CHECK_OP(x, y, OP)                                                     \
   do {                                                                         \
-    __typeof__(x) _x(x);                                                       \
-    __typeof__(x) _y(y);                                                       \
+    const auto _x(x);                                                          \
+    const auto _y(y);                                                          \
     if (!(_x OP _y)) {                                                         \
       cerr << __FILE__ << ":" << __LINE__                                      \
            << " Check failed: " << #x " " #OP " " #y << endl;                  \

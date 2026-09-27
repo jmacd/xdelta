@@ -282,31 +282,25 @@ endif()
 # Regression-test executables
 # ---------------------------------------------------------------------------
 if(XD3_BUILD_TESTS)
-  # The C++ regression harness in testing/ is POSIX-only: it includes
-  # <unistd.h> and uses the __typeof__ extension, neither of which MSVC
-  # supports.  (The historical Visual Studio build never built it either.)
-  # Skip it under MSVC; the built-in `xdelta3 test` still runs on Windows.
-  if(NOT MSVC)
-    add_executable(xdelta3regtest
-      testing/regtest.cc
-      testing/regtest_c.c)
-    xd3_configure_target(xdelta3regtest)
-    target_compile_definitions(xdelta3regtest PRIVATE
-      REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
-      XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1
-      ${XD3_PLATFORM_DEFS})
-    target_link_libraries(xdelta3regtest PRIVATE ${XD3_LZMA_LIBRARIES})
+  add_executable(xdelta3regtest
+    testing/regtest.cc
+    testing/regtest_c.c)
+  xd3_configure_target(xdelta3regtest)
+  target_compile_definitions(xdelta3regtest PRIVATE
+    REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
+    XD3_MAIN=1 NOT_MAIN=1 XD3_DEBUG=1
+    ${XD3_PLATFORM_DEFS})
+  target_link_libraries(xdelta3regtest PRIVATE ${XD3_LZMA_LIBRARIES})
 
-    add_executable(xdelta3checksum
-      testing/checksum_test.cc
-      testing/checksum_test_c.c)
-    xd3_configure_target(xdelta3checksum)
-    target_compile_definitions(xdelta3checksum PRIVATE
-      REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
-      XD3_MAIN=1 NOT_MAIN=1
-      ${XD3_PLATFORM_DEFS})
-    target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
-  endif()
+  add_executable(xdelta3checksum
+    testing/checksum_test.cc
+    testing/checksum_test_c.c)
+  xd3_configure_target(xdelta3checksum)
+  target_compile_definitions(xdelta3checksum PRIVATE
+    REGRESSION_TEST=1 SECONDARY_DJW=1 SECONDARY_FGK=1
+    XD3_MAIN=1 NOT_MAIN=1
+    ${XD3_PLATFORM_DEFS})
+  target_link_libraries(xdelta3checksum PRIVATE ${XD3_LZMA_LIBRARIES})
 
   # xdelta3link references every public API symbol; building it verifies the
   # library links and catches signature drift in xdelta3.h.  It is a
@@ -324,10 +318,8 @@ if(XD3_BUILD_TESTS)
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
 
-  if(NOT MSVC)
-    add_test(NAME xdelta3_cpp_regression_test COMMAND xdelta3regtest)
-    set_tests_properties(xdelta3_cpp_regression_test PROPERTIES TIMEOUT 1200)
-  endif()
+  add_test(NAME xdelta3_cpp_regression_test COMMAND xdelta3regtest)
+  set_tests_properties(xdelta3_cpp_regression_test PROPERTIES TIMEOUT 1200)
 
   add_test(NAME xdelta3_secondary_verbose_test
     COMMAND ${CMAKE_COMMAND}

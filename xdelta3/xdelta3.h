@@ -151,7 +151,9 @@ typedef ULONGLONG uint64_t;
 #else /* _MSC_VER >= 1600 */
 /* For MSVC10 and above */
 #include <stdint.h>
+#ifndef __cplusplus
 #define inline __inline
+#endif
 #endif /* _MSC_VER < 1600 */
 #else  /* _MSC_VER not defined  */
 /* Mingw32 */
