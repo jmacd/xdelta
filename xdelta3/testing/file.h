@@ -290,15 +290,13 @@ class ExtFile {
 public:
   ExtFile() {
     static int static_counter = 0;
-    pid_t pid = getpid();
     char buf[64];
-    xoff_t xpid = pid;
-    snprintf(buf, 64, "/tmp/regtest.%" XD3_Q "u.%d", xpid, static_counter++);
+    snprintf(buf, sizeof(buf), "regtest.%d", static_counter++);
     filename_.append(buf);
-    unlink(filename_.c_str());
+    remove(filename_.c_str());
   }
 
-  ~ExtFile() { unlink(filename_.c_str()); }
+  ~ExtFile() { remove(filename_.c_str()); }
 
   const char *Name() const { return filename_.c_str(); }
 

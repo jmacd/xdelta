@@ -124,10 +124,10 @@ tool behave as if `-a` were always given.
 Testing
 -------
 
-`xdelta3 test` runs the built-in C test suite.  On non-MSVC builds, `ctest`
-also runs the `xdelta3regtest` C++ framework, including its in-memory codec,
-block-size, mutation, and merge tests.  CI runs these CTest suites on every
-supported Linux and macOS configuration.
+`xdelta3 test` runs the built-in C test suite.  `ctest` also runs the
+`xdelta3regtest` C++ framework, including its in-memory codec, block-size,
+mutation, and merge tests.  CI runs these CTest suites on every supported
+Linux, macOS, and Windows configuration.
 
 An additional regression test harness, written in Go (1.21+), drives the
 command-line tool end to end:
