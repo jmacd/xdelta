@@ -144,7 +144,7 @@ implications. See [Tuning the memory budget](tuning-memory.md).
 | Option | Description |
 | ------ | ----------- |
 | `-s SOURCE` | Select the source file. It may be specified only once. |
-| `-S TYPE` | Select a compiled-in secondary compressor: `lzma`, `djw`, or optional `fgk`. `djw` may have a tuning level (`djw0` … `djw9`). Use `-S=` to disable secondary compression. |
+| `-S TYPE` | Select a compiled-in secondary compressor: `lzma`, `djw`, or optional `fgk`. `djw` may have a tuning level (`djw0` … `djw9`). Use `-S none` or `-S=` to disable secondary compression. |
 | `-N` | Disable small string matching, leaving literal data and source copies. |
 | `-D` | Disable automatic external decompression of recognized inputs. |
 | `-R` | Disable automatic external recompression of decoded output. |
@@ -169,7 +169,9 @@ features in a particular binary.
 stage selected by `-S`. When LZMA support is compiled in, LZMA secondary
 compression is enabled by default. Otherwise secondary compression defaults to
 off. `-S djw`, `-S lzma`, or an FGK-enabled build can make the choice explicit;
-`-S=` disables all secondary compression. See
+`-S none` or `-S=` disables all secondary compression. LZMA-compressed deltas
+require a decoder built with liblzma, so use `-S none` for the broadest
+compatibility with older or reduced-feature builds. See
 [Better compression](better-compression.md).
 
 ### Armor and `-a`

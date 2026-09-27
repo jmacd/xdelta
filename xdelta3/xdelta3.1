@@ -224,8 +224,12 @@ The
 .B djw
 name may be followed by a tuning level from 0 through 9.
 Use
+.B "\-S none"
+or
 .B \-S=
-to disable secondary compression explicitly.
+to disable secondary compression explicitly. This provides the broadest
+compatibility because LZMA-compressed deltas require a decoder built with
+liblzma.
 Run
 .B xdelta3 config
 to see which coders are present.

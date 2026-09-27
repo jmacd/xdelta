@@ -24,10 +24,14 @@ available in a particular binary:
   xdelta3 was built with liblzma; usually the strongest option.
 - **`-S djw`** — the built-in DJW coder (described below).
 - **`-S fgk`** — the built-in adaptive Huffman (FGK) coder.
-- **`-S=`** — disable secondary compression.
+- **`-S none`** or **`-S=`** — disable secondary compression.
 
 FGK is an optional build feature and is disabled in standard builds. The DJW
 name may include a tuning level (`-S djw0` … `-S djw9`).
+
+A delta using LZMA secondary compression requires an xdelta3 decoder built
+with liblzma; use `-S none` when compatibility with older or reduced-feature
+decoders matters more than the additional compression.
 
 ## The DJW coder
 
