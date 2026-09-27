@@ -106,6 +106,8 @@ jobs:
           - os: macos-latest
           - os: macos-15-intel
           - os: windows-latest
+            cmake_arch: -A Win32
+          - os: windows-latest
             cmake_arch: -A x64
           - os: windows-11-arm
             cmake_arch: -A ARM64
@@ -129,20 +131,42 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure
 
   windows:
-    name: ${{ matrix.os }} / lzma=${{ matrix.lzma }}
+    name: ${{ matrix.name }} / lzma=${{ matrix.lzma }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows-latest, windows-11-arm ]
-        lzma: [ "on", "off" ]
         include:
           - os: windows-latest
+            name: windows-x86
+            cmake_arch: Win32
+            vcpkg_triplet: x86-windows
+            lzma: "on"
+          - os: windows-latest
+            name: windows-x86
+            cmake_arch: Win32
+            vcpkg_triplet: x86-windows
+            lzma: "off"
+          - os: windows-latest
+            name: windows-x86_64
             cmake_arch: x64
             vcpkg_triplet: x64-windows
+            lzma: "on"
+          - os: windows-latest
+            name: windows-x86_64
+            cmake_arch: x64
+            vcpkg_triplet: x64-windows
+            lzma: "off"
           - os: windows-11-arm
+            name: windows-arm64
             cmake_arch: ARM64
             vcpkg_triplet: arm64-windows
+            lzma: "on"
+          - os: windows-11-arm
+            name: windows-arm64
+            cmake_arch: ARM64
+            vcpkg_triplet: arm64-windows
+            lzma: "off"
     defaults:
       run:
         shell: pwsh

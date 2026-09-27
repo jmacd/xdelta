@@ -90,6 +90,9 @@ jobs:
           - os: macos-15-intel
             name: macos-x86_64
           - os: windows-latest
+            name: windows-x86
+            cmake_arch: -A Win32
+          - os: windows-latest
             name: windows-x86_64
             cmake_arch: -A x64
           - os: windows-11-arm
