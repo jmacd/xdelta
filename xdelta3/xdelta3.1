@@ -1,225 +1,402 @@
-.TH XDELTA3 "1" "August 2009" "Xdelta3"
+.TH XDELTA3 "1" "September 27, 2026" "Xdelta 3.2.0" "User Commands"
 .SH NAME
-xdelta3 \- VCDIFF (RFC 3284) binary diff tool
+xdelta3 \- VCDIFF (RFC 3284) binary delta tool
 .SH SYNOPSIS
-.B xdelta3 
+.B xdelta3
 .RI [ command ]
-.RI [ options ] 
-.RI [ input 
+.RI [ options ]
+.RI [ input
 .RI [ output ]]
+.PP
+.B xdelta3 \-e \-s
+.I source target delta
+.PP
+.B xdelta3 \-d \-s
+.I source delta target
+.PP
+.B xdelta3 merge
+.BI \-m " delta1"
+.RI [ \-m " delta2 ..." ]
+.I final-delta
+.RI [ output ]
 .SH DESCRIPTION
 .B xdelta3
-is a binary diff tool that uses the VCDIFF (RFC 3284) format and compression.
+encodes and decodes binary differences using the VCDIFF format described by
+RFC 3284.
+Given a source file and a target file, encoding produces a compact delta.
+Decoding applies that delta to the source to reconstruct the target.
+.PP
+The default command is
+.BR encode .
+The
+.B decode
+and
+.B encode
+commands are equivalent to
+.B \-d
+and
+.BR \-e ,
+respectively.
+Unless an output operand is supplied,
+.B xdelta3
+writes to standard output.
+Unless an input operand is supplied, it reads standard input.
+The source is specified separately with
+.BR \-s .
+Standard input cannot be both the source and the input.
+.PP
+With no arguments,
+.B xdelta3
+prints help when standard input is a terminal.
+When standard input is redirected, it remains an encoding filter.
 .SH COMMANDS
 .TP
-.BI config
-prints xdelta3 configuration
+.B encode
+Encode the differences between the source and input (target) as a VCDIFF
+delta. This is the default command.
 .TP
-.BI decode
-decompress the input, also set by -d
+.B decode
+Decode a VCDIFF delta, using the source when the delta contains source-copy
+instructions.
 .TP
-.BI encode
-compress the input, also set by -e (default)
+.B config
+Print compile-time feature flags, default buffer sizes, and type sizes.
 .TP
-.BI test
-run the builtin tests
+.B test
+Run the built-in test suite. This command is present only in builds compiled
+with regression-test support.
 .TP
-.BI printdelta
-print information about the entire delta
+.B printdelta
+Print a human-readable description of the file header and every VCDIFF window
+and instruction.
 .TP
-.BI printhdr
-print information about the first window
+.B printhdr
+Print information from the VCDIFF file header and first window.
 .TP
-.BI printhdrs
-print information about all windows
+.B printhdrs
+Print the file header and summary information for every VCDIFF window.
 .TP
-.BI recode
-encode with new application/secondary settings
-
-.SH OPTIONS
-standard options:
+.B recode
+Read a VCDIFF delta and write an equivalent delta using the selected
+application-header and secondary-compression settings. No source file is
+required.
 .TP
-.BI "\-0 .. \-9"
-compression level
-.TP
-.BI "\-c"
-use stdout
-.TP
-.BI "\-d"
-decompress
-.TP
-.BI \-e
-compress
-.TP
-.BI \-f
-force overwrite
-.TP
-.BI \-h
-show help
-.TP
-.BI \-q
-be quiet
-.TP
-.BI \-v
-be verbose (repeat for more detail)
-.TP
-.BI \-V
-show version
-
-.TP
-memory options:
-.TP
-.BI \-B 
-.RI bytes
-source window size
-.TP
-.BI \-W 
-.RI bytes
-input window size
-.TP
-.BI \-P 
-.RI size
-compression duplicates window
-.TP
-.BI \-I 
-.RI size
-instruction buffer size (0 = unlimited)
-
-.TP
-compression options:
-.TP
-.BI \-s
-.RI source
-source file to copy from (if any)
-.TP
-.BI "\-S " [lzma|djw|fgk|none]
-select secondary compression. LZMA is the default when compiled in;
-.B none
-disables secondary compression and gives the broadest decoder compatibility.
-LZMA-compressed deltas require an xdelta3 decoder built with liblzma.
-.TP
-.BI \-N
-disable small string-matching compression
-.TP
-.BI \-D
-disable external decompression (encode/decode)
-.TP
-.BI \-R
-disable external recompression (decode)
-.TP
-.BI \-G
-omit the detected external-compression level from the application header
-(encode).  By default
-.B xdelta3
-records the level so decode recompresses the output to byte-identical bytes;
-.B \-G
-emits a legacy application header that older
-.B xdelta3
-versions can still recompress.
-.TP
-.BI \-n
-disable checksum (encode/decode)
-.TP
-.BI \-a
-disable armor.
-Armor mode (whole-file BLAKE3 verification) is on by default. When enabled,
-.B xdelta3
-embeds BLAKE3 digests of the source and target into the application header
-using the
-.I name#blake3
-syntax. On encode this requires a seekable source and target; on decode the
-source is verified before applying and the reconstructed target is verified
-afterward. If the source is a stream (not seekable) it cannot be verified, so
-.B xdelta3
-prints a warning and proceeds. If the supplied source already matches the
-delta's target digest -- i.e. the patch is already applied -- decode reports
-"already up to date" and exits with status 2.
-.B \-a
-disables this and restores the legacy application-header format and the
-non-seekable streaming behavior. The
 .B merge
-command verifies an armored chain of deltas when every input is armored.
-Armor verifies the logical (decompressed) content that
-.B xdelta3
-processes, so it composes correctly with external input decompression and
-output recompression.
+Collapse a chain of VCDIFF deltas into one delta. Supply every delta except the
+last with
+.BR \-m ,
+in source-to-target order; the ordinary input operand is the last delta.
+For example, deltas from version 1 to 2, 2 to 3, and 3 to 4 produce a merged
+delta from version 1 to 4:
+.RS
+.PP
+.B xdelta3 merge \-m 1-2.vcdiff \-m 2-3.vcdiff 3-4.vcdiff 1-4.vcdiff
+.RE
+.PP
+The VCDIFF inspection, recode, and merge commands are present only in builds
+compiled with VCDIFF tools.
+.SH OPERANDS AND FILE SELECTION
 .TP
-.BI \-C 
-soft config (encode, undocumented)
+.I input
+The target while encoding, or the VCDIFF delta while decoding, inspecting, or
+recoding. A
+.B \-
+operand means standard input. If omitted, standard input is used.
 .TP
-.BI "\-A " [apphead]
-disable/provide application header (encode)
+.I output
+The VCDIFF delta while encoding or recoding, or the reconstructed target while
+decoding. If omitted, the application header may provide an output filename;
+otherwise standard output is used. The
+.B \-c
+option always selects standard output and overrides this operand.
 .TP
-.BI \-J
-disable output (check/compute only)
+.BI \-s " source"
+The source file used to encode or decode.
+During decode, when
+.B \-s
+is omitted, xdelta3 may use the source filename stored in the application
+header.
+.PP
+By default, xdelta3 refuses to replace an existing output file.
+Use
+.B \-f
+to allow replacement.
+.SH OPTIONS
+.SS Standard options
 .TP
-.BI \-T
-use alternate code table (test)
-
-.SH "EXIT STATUS"
+.BR \-0 " through " \-9
+Select the encoder's string-matching compression level.
+.B \-0
+disables string matching,
+.B \-1
+is fastest, and
+.B \-9
+uses the most thorough matching and the most memory.
+The default is
+.BR \-3 .
+These levels are separate from secondary compression selected by
+.BR \-S .
+.TP
+.B \-c
+Write output to standard output, even if an output filename is also given.
+.TP
+.B \-d
+Decode. Equivalent to the
+.B decode
+command.
+.TP
+.B \-e
+Encode. Equivalent to the
+.B encode
+command and the default in encoder-enabled builds.
+.TP
+.B \-f
+Force replacement of an existing output file. While decoding, also tolerate
+trailing data after a valid VCDIFF stream.
+.TP
+.B \-F
+Pass the force option to an external compression or decompression subprocess.
+This option is available only when external compression support is compiled in.
+.TP
+.B \-h
+Print version and usage information. The command exits unsuccessfully after
+displaying help.
+.TP
+.B \-q
+Suppress non-error informational output. This resets any previous
+.B \-v
+setting.
+.TP
+.B \-v
+Increase verbosity. Repeat for progressively more encoder statistics and
+diagnostics. This clears
+.BR \-q .
+.TP
+.B \-V
+Print version and license information and exit.
+.SS Memory options
+All values are decimal byte or entry counts; suffixes such as
+.B K
+or
+.B M
+are not accepted.
+.TP
+.BI \-B " bytes"
+Set the source window size. The default is 64 MiB and the minimum is 16 KiB.
+Larger values let the encoder find source matches across larger shifts. During
+decode this controls the source block cache.
+.TP
+.BI \-W " bytes"
+Set the input window size. The default is 8 MiB and the minimum is 16 KiB.
+The build's upper limit is reported by
+.BR "xdelta3 config" .
+Larger windows may improve compression but increase encoder and decoder memory.
+.TP
+.BI \-P " entries"
+Set the target duplicate-position table size. The default is 262144 entries.
+This table finds copies in previously seen target data and is normally no
+larger than
+.BR \-W .
+.TP
+.BI \-I " entries"
+Set the encoder instruction buffer size. The default is 32768 entries.
+A value of 0 makes the buffer unlimited.
+.SS Compression and format options
+.TP
+.BI \-s " source"
+Use
+.I source
+as the file from which source-copy instructions are made.
+Specify this option at most once.
+.TP
+.BI \-S " type"
+Select secondary compression.
+.I type
+is
+.BR lzma ,
+.BR djw ,
+or
+.B fgk
+when that coder was compiled in.
+LZMA is selected by default when available; otherwise secondary compression is
+off by default.
+The
+.B djw
+name may be followed by a tuning level from 0 through 9.
+Use
+.B "\-S none"
+or
+.B \-S=
+to disable secondary compression explicitly. This provides the broadest
+compatibility because LZMA-compressed deltas require a decoder built with
+liblzma.
+Run
+.B xdelta3 config
+to see which coders are present.
+.TP
+.B \-N
+Disable small string-matching compression. The encoder then emits literal data
+and source copies without searching for copies in the target.
+.TP
+.B \-D
+Disable automatic external decompression of recognized inputs during encode
+and decode.
+.TP
+.B \-R
+Disable automatic external recompression of decoded output.
+.TP
+.B \-G
+Do not record the detected external-compression level in the application
+header while encoding. This emits a legacy compressor descriptor that older
+xdelta3 versions can use for recompression.
+.TP
+.B \-n
+Do not write target-window Adler-32 checksums while encoding, and do not verify
+them while decoding.
+.TP
+.B \-a
+Disable armor mode. Armor is whole-file BLAKE3 source and target verification
+and is enabled by default in builds that include it.
+See
+.B "ARMOR MODE"
+below.
+.TP
+.BI \-A " appheader"
+Store
+.I appheader
+as application-specific data in the VCDIFF file header.
+With no explicit value, xdelta3 generates an application header containing
+source and target filenames and any external-compression descriptors.
+Use
+.B \-A=
+to disable the application header.
+.TP
+.B \-J
+Check or compute the operation without writing output. Input is still fully
+processed, including checksum and armor verification.
+.TP
+.BI \-m " delta"
+Add
+.I delta
+to the beginning of the
+.B merge
+command's ordered delta chain. Repeat for all but the final input delta.
+.TP
+.BI \-C " values"
+Set the encoder's internal soft string-matcher configuration. This advanced,
+unstable option requires seven nonnegative, comma-separated integer values:
+large look, large step, small look, small chain, small lazy chain, maximum
+lazy match, and long-enough match.
+.SH ARMOR MODE
+When compiled with armor support, xdelta3 enables whole-file verification by
+default. The encoder stores BLAKE3 digests of the logical source and target
+content in the application header. It must therefore be able to seek and read
+both files in full.
+.PP
+The decoder verifies a seekable source before applying the delta and verifies
+the reconstructed target afterward. If the source is not seekable, xdelta3
+warns that it cannot verify it and continues. If the supplied source already
+matches the recorded target digest, xdelta3 reports
+.B "already up to date"
+and exits with status 2 without applying the patch.
+.PP
+Use
+.B \-a
+to disable armor and restore the legacy application-header format and
+non-seekable encoding behavior. The
+.B merge
+command verifies an armored chain when every input delta is armored.
+Digests cover logical content after external decompression, not compressed
+on-disk bytes.
+.SH EXTERNAL COMPRESSION
+On supported systems, xdelta3 recognizes common externally compressed inputs,
+including gzip, bzip2, xz, and compress streams. It invokes the corresponding
+external decompressor before processing and records a descriptor in the
+application header so decode can recompress the output.
+.PP
+Recompression is not guaranteed to reproduce byte-identical compressed data
+because compressor versions and settings differ. Xdelta3 records the bzip2
+level exactly and makes a best-effort gzip or xz level guess. Use
+.B \-D
+to process compressed bytes directly,
+.B \-R
+to leave decoded output uncompressed, or the compressor's environment variable
+(for example,
+.BR GZIP=\-9 )
+to control recompression.
+External compression is unavailable on Windows.
+.SH ENVIRONMENT
+.TP
+.B XDELTA
+Whitespace-separated arguments prepended to the command line. This is useful
+when another program invokes xdelta3 as a filter. For example:
+.RS
+.PP
+.nf
+XDELTA="\-s source-x.y.tar.gz" \e
+tar \-\-use-compress-program=xdelta3 \-cf \e
+    target-x.z.tar.gz.vcdiff target-x.y/
+.fi
+.RE
+.SH EXIT STATUS
 .TP
 .B 0
-success.
-.TP
-.B 2
-the decoded armored delta's source already matches its target digest; the
-patch is already applied and nothing was done.
+The operation completed successfully.
 .TP
 .B 1
-any other error.
-
-.SH NOTES
-When
-.B xdelta3
-automatically decompresses an externally compressed input (bzip2, gzip, xz, or
-compress) it records the detected compression level in the application header
-and passes it to the recompressor on decode, so the recompressed output
-reproduces the original compression level.  The bzip2 block-size level is
-recovered exactly; the gzip and xz levels are best-effort guesses from the
-stream header and may select the format default when the exact level cannot be
-determined.  This makes the application-header compressor field
-.RB ( B ,
-.BR G ,
-.BR Z ,
-.BR Y )
-optionally carry a trailing level digit, e.g.\&
-.IR B9 .
-Use
-.B \-R
-to disable recompression,
-.B \-D
-to disable decompression entirely, or
-.B \-G
-to omit the level from the header for compatibility with older versions.
-.PP
-The
-.B XDELTA
-environment variable may contain extra args:
-
-.RS
-XDELTA="-s source-x.y.tar.gz" \\
-.br
-tar --use-compress-program=xdelta3 -cf \\
-.br
-target-x.z.tar.gz.vcdiff target-x.y/
-
+An error occurred, or help was displayed.
+.TP
+.B 2
+An armored delta was not applied because the supplied source already matches
+the recorded target ("already up to date").
 .SH EXAMPLES
-
-Compress the differences between SOURCE and TARGET, yielding OUT, 
-using "djw" secondary compression:
-
-xdelta3 -S djw -s SOURCE TARGET OUT
-
-Do the same, using standard input and output:
-
-xdelta3 -S djw -s SOURCE < TARGET > OUT
-
-To decompress OUT, using SOURCE, yielding TARGET:
-
-xdelta3 -d -s SOURCE OUT TARGET
-
-.SH AUTHOR
-xdelta3 was written by Josh MacDonald <josh.macdonald@gmail.com>.
+Create a delta:
 .PP
-This manual page was written by Leo 'costela' Antunes <costela@debian.org>
-for the Debian project (but may be used by others).
+.nf
+xdelta3 \-e \-s old-file new-file update.vcdiff
+.fi
+.PP
+Apply it:
+.PP
+.nf
+xdelta3 \-d \-s old-file update.vcdiff reconstructed-file
+.fi
+.PP
+Encode through standard input and output with LZMA secondary compression:
+.PP
+.nf
+xdelta3 \-S lzma \-s old-file < new-file > update.vcdiff
+.fi
+.PP
+Verify that a delta decodes successfully without creating output:
+.PP
+.nf
+xdelta3 \-J \-d \-s old-file update.vcdiff
+.fi
+.PP
+Inspect all windows in a delta:
+.PP
+.nf
+xdelta3 printhdrs update.vcdiff
+.fi
+.SH STANDARDS
+The delta format is VCDIFF as specified by RFC 3284.
+.SH SEE ALSO
+.BR bzip2 (1),
+.BR gzip (1),
+.BR xz (1)
+.PP
+Project documentation:
+.UR https://jmacd.github.io/xdelta/
+Xdelta website
+.UE
+.PP
+Source and issue tracker:
+.UR https://github.com/jmacd/xdelta
+Xdelta source repository
+.UE
+.SH AUTHOR
+xdelta3 was written by Joshua MacDonald.
+.PP
+The original manual page was written by Leo \(aqcostela\(aq Antunes for the
+Debian project and may be used by others.
