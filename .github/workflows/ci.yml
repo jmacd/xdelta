@@ -59,7 +59,7 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j
 
-      - name: Test
+      - name: Test (C and C++ regression suites)
         run: ctest --test-dir build --output-on-failure
 
   cmake-small-usize:
@@ -91,7 +91,7 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j
 
-      - name: Test
+      - name: Test (C and C++ regression suites)
         run: ctest --test-dir build --output-on-failure
 
   cmake-static-lzma:
@@ -124,7 +124,7 @@ jobs:
         working-directory: xdelta3
         run: cmake --build build --config Release -j
 
-      - name: Test
+      - name: Test (registered regression suites)
         working-directory: xdelta3
         run: ctest --test-dir build -C Release --output-on-failure
 

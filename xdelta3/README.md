@@ -33,7 +33,7 @@ liblzma (XZ Utils) is used for secondary compression when available:
 ```
   cmake -B build -DCMAKE_BUILD_TYPE=Release
   cmake --build build
-  ctest --test-dir build          # runs the built-in regression test
+  ctest --test-dir build          # runs the C and C++ regression suites
 ```
 
 This produces the `xdelta3` command-line tool (in `build/`) plus the
@@ -124,9 +124,13 @@ tool behave as if `-a` were always given.
 Testing
 -------
 
-`xdelta3 test` and `ctest` run the built-in C test suite.  An additional
-regression test harness, written in Go (1.21+), drives the command-line
-tool end to end:
+`xdelta3 test` runs the built-in C test suite.  On non-MSVC builds, `ctest`
+also runs the `xdelta3regtest` C++ framework, including its in-memory codec,
+block-size, mutation, and merge tests.  CI runs these CTest suites on every
+supported Linux and macOS configuration.
+
+An additional regression test harness, written in Go (1.21+), drives the
+command-line tool end to end:
 
 ```
   (cd go && go run . -xdelta3 ../build/xdelta3)

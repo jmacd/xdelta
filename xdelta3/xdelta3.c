@@ -1073,13 +1073,13 @@ static usize_t xd3_round_blksize(usize_t sz, usize_t blksz) {
   usize_t mod;
   usize_t add;
 
-  XD3_ASSERT(xd3_check_pow2(blksz, NULL) == 0);
-
   /* A zero blocksize would underflow the mask below; leave sz
    * unchanged rather than corrupt the arithmetic. */
   if (blksz == 0) {
     return sz;
   }
+
+  XD3_ASSERT(xd3_check_pow2(blksz, NULL) == 0);
 
   mod = sz & (blksz - 1);
 
