@@ -92,6 +92,7 @@ jobs:
           - os: windows-latest
             name: windows-x86
             cmake_arch: -A Win32
+            cmake_options: -DXD3_LARGESIZET=OFF
           - os: windows-latest
             name: windows-x86_64
             cmake_arch: -A x64
@@ -116,6 +117,7 @@ jobs:
           -DXD3_LZMA_FETCH=ON
           -DXD3_BUILD_TESTS=OFF
           ${{ matrix.cmake_arch }}
+          ${{ matrix.cmake_options }}
 
       - name: Build
         run: cmake --build build --config Release -j
