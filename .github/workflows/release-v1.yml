@@ -130,7 +130,11 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Install GLib and zlib
-        run: vcpkg install glib:${{ matrix.vcpkg_triplet }} zlib:${{ matrix.vcpkg_triplet }}
+        run: >
+          vcpkg install
+          pkgconf:x64-windows
+          glib:${{ matrix.vcpkg_triplet }}
+          zlib:${{ matrix.vcpkg_triplet }}
 
       - name: Configure
         run: >
@@ -139,6 +143,7 @@ jobs:
           -DXD1_WERROR=ON
           -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
           -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+          -DPKG_CONFIG_EXECUTABLE="$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows/tools/pkgconf/pkgconf.exe"
 
       - name: Build
         run: cmake --build build --config Release --parallel
