@@ -174,14 +174,18 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Create release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="${{ needs.verify.outputs.version }}"
-          gh release create "${TAG}" \
-            --title "Xdelta ${version}" \
-            --generate-notes \
-            --verify-tag \
-            dist/*
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" --clobber dist/*
+          else
+            gh release create "${TAG}" \
+              --title "Xdelta ${version}" \
+              --generate-notes \
+              --verify-tag \
+              dist/*
+          fi
