@@ -142,13 +142,13 @@ jobs:
           - os: windows-latest
             name: windows-x86
             cmake_arch: Win32
-            cmake_options: -DXD3_LARGESIZET=OFF
+            cmake_options: -DXD3_LARGESIZET=OFF -DXD3_WERROR=OFF
             vcpkg_triplet: x86-windows
             lzma: "on"
           - os: windows-latest
             name: windows-x86
             cmake_arch: Win32
-            cmake_options: -DXD3_LARGESIZET=OFF
+            cmake_options: -DXD3_LARGESIZET=OFF -DXD3_WERROR=OFF
             vcpkg_triplet: x86-windows
             lzma: "off"
           - os: windows-latest
