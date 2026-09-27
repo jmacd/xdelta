@@ -48,7 +48,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Using xdelta3:
-      - Command-line syntax: commandline.md
+      - Command-line reference: commandline.md
       - Armor mode: armor.md
       - External compression: external-compression.md
       - Non-seekable source files: non-seekable-source.md

@@ -15,13 +15,19 @@ The `-1` … `-9` flags select alternate compression levels: `-1` is fastest and
 ## Secondary compression
 
 Even better compression can be achieved by applying a *secondary* compressor to
-the VCDIFF byte stream, selected with `-S`:
+the VCDIFF byte stream, selected with `-S`. When xdelta3 is built with LZMA,
+LZMA secondary compression is enabled by default; otherwise secondary
+compression defaults to off. Use `xdelta3 config` to see which coders are
+available in a particular binary:
 
 - **`-S lzma`** — [LZMA](https://tukaani.org/xz/) (XZ Utils). Available when
   xdelta3 was built with liblzma; usually the strongest option.
 - **`-S djw`** — the built-in DJW coder (described below).
 - **`-S fgk`** — the built-in adaptive Huffman (FGK) coder.
-- **`-S none`** — disable secondary compression.
+- **`-S=`** — disable secondary compression.
+
+FGK is an optional build feature and is disabled in standard builds. The DJW
+name may include a tuning level (`-S djw0` … `-S djw9`).
 
 ## The DJW coder
 
