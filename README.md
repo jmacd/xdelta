@@ -19,8 +19,9 @@ cmake --build build
 ctest --test-dir build
 ```
 
-See [`xdelta3/README.md`](xdelta3/README.md) for more detail, including
-liblzma options and the Go regression-test harness.
+See [`xdelta3/README.md`](xdelta3/README.md) for static and shared library
+build/install instructions, liblzma options, and the Go regression-test
+harness.
 
 # Historical Xdelta 1
 
@@ -65,5 +66,4 @@ The site sources live in [`site/`](site) (MkDocs + Material) and are built and
 deployed by [`.github/workflows/site.yml`](.github/workflows/site.yml).  These
 pages were migrated and updated from the project's legacy
 [`wiki` branch](https://github.com/jmacd/xdelta/tree/wiki).
-
 
