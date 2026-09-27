@@ -23,6 +23,11 @@ the VCDIFF byte stream, selected with `-S`:
 - **`-S fgk`** — the built-in adaptive Huffman (FGK) coder.
 - **`-S none`** — disable secondary compression.
 
+When liblzma support is compiled in, LZMA is the default. A delta using LZMA
+secondary compression requires an xdelta3 decoder built with liblzma; use
+`-S none` when compatibility with older or reduced-feature decoders matters
+more than the additional compression.
+
 ## The DJW coder
 
 DJW is named after [David Wheeler](https://en.wikipedia.org/wiki/David_Wheeler_(computer_scientist)).

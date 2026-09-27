@@ -4730,7 +4730,9 @@ static int main_help(void) {
 
   XPR(NTR "compression options:\n");
   XPR(NTR "   -s source    source file to copy from (if any)\n");
-  XPR(NTR "   -S [lzma|djw] enable/disable secondary compression\n");
+  XPR(NTR "   -S [lzma|djw|fgk|none] select secondary compression\n");
+  XPR(NTR
+      "                (default: lzma when built in; none disables it)\n");
   XPR(NTR "   -N           disable small string-matching compression\n");
   XPR(NTR "   -D           disable external decompression (encode/decode)\n");
   XPR(NTR "   -R           disable external recompression (decode)\n");

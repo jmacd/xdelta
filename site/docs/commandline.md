@@ -81,7 +81,8 @@ memory options:
    -I size      instruction buffer size (0 = unlimited)
 compression options:
    -s source    source file to copy from (if any)
-   -S [lzma|djw|fgk] enable/disable secondary compression
+   -S [lzma|djw|fgk|none] select secondary compression
+                (default: lzma when built in; none disables it)
    -N           disable small string-matching compression
    -D           disable external decompression (encode/decode)
    -R           disable external recompression (decode)
@@ -106,7 +107,10 @@ the XDELTA environment variable may contain extra args:
 
 `-S lzma` selects [LZMA](https://tukaani.org/xz/) secondary compression (only
 available when xdelta3 was built with liblzma); `-S djw` and `-S fgk` select the
-built-in coders; `-S none` disables it. See
+built-in coders; `-S none` disables it. When liblzma support is compiled in,
+LZMA is the default. LZMA-compressed deltas require a decoder built with
+liblzma, so use `-S none` for the broadest compatibility with older or
+reduced-feature xdelta3 builds. See
 [Better compression](better-compression.md).
 
 ### `-a` armor

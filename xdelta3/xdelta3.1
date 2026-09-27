@@ -92,8 +92,11 @@ compression options:
 .RI source
 source file to copy from (if any)
 .TP
-.BI "\-S " [djw]
-enable/disable secondary compression
+.BI "\-S " [lzma|djw|fgk|none]
+select secondary compression. LZMA is the default when compiled in;
+.B none
+disables secondary compression and gives the broadest decoder compatibility.
+LZMA-compressed deltas require an xdelta3 decoder built with liblzma.
 .TP
 .BI \-N
 disable small string-matching compression
