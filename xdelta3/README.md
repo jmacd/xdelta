@@ -65,29 +65,102 @@ compression; the command-line tool, block cache, and armor mode are not
 part of the library).  It is built and installed by default; disable it
 with `-DXD3_BUILD_LIB=OFF`.
 
+### Static library
+
+Static libraries are the default.  Configure, build, test, and install one
+with:
+
+```sh
+cmake -S . -B build-static \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=OFF
+cmake --build build-static --config Release
+ctest --test-dir build-static -C Release --output-on-failure
+cmake --install build-static --config Release --prefix /your/prefix
 ```
-  cmake -B build -DCMAKE_BUILD_TYPE=Release
-  cmake --build build
-  cmake --install build --prefix /your/prefix
+
+This installs `libxdelta3.a` on Unix-like systems or `xdelta3.lib` on
+Windows.
+
+### Shared library
+
+Use a separate build directory and enable CMake's standard shared-library
+option:
+
+```sh
+cmake -S . -B build-shared \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=ON
+cmake --build build-shared --config Release
+ctest --test-dir build-shared -C Release --output-on-failure
+cmake --install build-shared --config Release --prefix /your/prefix
 ```
 
-The install provides the static `libxdelta3` archive, `xdelta3.h`, a
-CMake package (`find_package(xdelta3)`), and a pkg-config file
-(`pkg-config xdelta3`).  Downstream CMake projects consume it as:
+This installs `libxdelta3.so` on Linux, `libxdelta3.dylib` on macOS, or
+`xdelta3.dll` plus its import library on Windows.  `CMAKE_BUILD_TYPE` selects
+the configuration for single-config generators such as Unix Makefiles and
+Ninja; `--config Release` selects it for multi-config generators such as
+Visual Studio and Xcode.
 
-  find_package(xdelta3 REQUIRED)
-  target_link_libraries(app PRIVATE xdelta3::xdelta3)
+Choose an absolute installation prefix appropriate for the platform, for
+example `/usr/local`, `$HOME/.local`, or `C:\xdelta3`.  Installing into a
+system-owned prefix may require elevated privileges.  Static and shared builds
+can be installed side by side only when their platform filenames do not
+conflict; separate prefixes avoid ambiguity.
 
-By default the library is dependency-free.  Compile liblzma secondary
-compression into it (and propagate the dependency to consumers) with
-`-DXD3_LIB_LZMA=ON`.  Build a shared library by adding
-`-DBUILD_SHARED_LIBS=ON`.
+### Using an installed library
+
+Both build variants install `xdelta3.h`, CMake package metadata, and a
+pkg-config file alongside the library.  A downstream CMake project can use:
+
+```cmake
+find_package(xdelta3 REQUIRED)
+target_link_libraries(app PRIVATE xdelta3::xdelta3)
+```
+
+Point CMake at a nonstandard installation prefix when configuring the
+consumer:
+
+```sh
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/your/prefix
+cmake --build build
+```
+
+Non-CMake consumers on Unix-like systems can use pkg-config:
+
+```sh
+export PKG_CONFIG_PATH=/your/prefix/lib/pkgconfig  # use lib64 when applicable
+cc app.c -o app $(pkg-config --cflags --libs xdelta3)
+```
+
+At runtime, a shared-library build must be in the platform's normal loader
+search path (or an application-specific rpath).  Installing into a standard
+system prefix normally handles this.
+
+### Library options
+
+The library is dependency-free by default.  Compile liblzma secondary
+compression into it, and propagate that dependency to CMake/pkg-config
+consumers, with `-DXD3_LIB_LZMA=ON`.  Disable the library entirely when only
+the command-line tool is needed with `-DXD3_BUILD_LIB=OFF`.
 
 The public header sizes the `usize_t` window type from the build's
-configuration, so the library's ABI depends on `-DXD3_LARGESIZET`
-(64-bit `usize_t` by default; `OFF` selects the 32-bit variant).  The
-installed CMake/pkg-config files carry the matching definitions, so
-consumers stay ABI-compatible without needing `config.h`.
+configuration, so the library's ABI depends on `-DXD3_LARGESIZET` (64-bit
+`usize_t` by default; `OFF` selects the 32-bit variant).  The installed
+CMake/pkg-config files carry the matching definitions, so consumers stay
+ABI-compatible without needing `config.h`.
+
+For example, a shared library with liblzma support can be built with:
+
+```sh
+cmake -S . -B build-shared-lzma \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_SHARED_LIBS=ON \
+  -DXD3_LIB_LZMA=ON \
+  -DXD3_LZMA_MODE=on
+cmake --build build-shared-lzma --config Release
+cmake --install build-shared-lzma --config Release --prefix /your/prefix
+```
 
 Armor mode (whole-file verification)
 ------------------------------------
