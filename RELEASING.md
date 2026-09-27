@@ -88,8 +88,12 @@ gh workflow run release-v1.yml -f tag=v1.2.0
 gh workflow run release-v3.yml -f tag=v3.2.1
 ```
 
-If a partial GitHub Release was created, delete only the partial release before
-re-running the workflow:
+The Xdelta 3 workflow replaces same-named assets on an existing release while
+preserving its title and notes. This supports rebuilding or adding binary
+platforms for an immutable tag.
+
+The Xdelta 1 workflow does not replace assets. If it created a partial release,
+delete only that partial release before re-running the workflow:
 
 ```sh
 gh release delete v1.2.0 --yes

@@ -2789,9 +2789,14 @@ static int xd3_encode_init(xd3_stream *stream, int full_init) {
      * xd3_string_match_init in the first call to string_match--that way
      * identical or short inputs require no table allocation. */
     if (large_comp) {
-      /* TODO Need to check for overflow here. */
-      usize_t hash_values =
-          stream->src->max_winsize / stream->smatcher.large_step;
+      usize_t max_winsize;
+      usize_t hash_values;
+
+      if ((ret = xd3_to_usize(stream->src->max_winsize, &max_winsize)) != 0) {
+        stream->msg = "source max_winsize does not fit usize_t";
+        return ret;
+      }
+      hash_values = max_winsize / stream->smatcher.large_step;
 
       if ((ret = xd3_size_hashtable(stream, hash_values,
                                     stream->smatcher.large_look,
@@ -3359,7 +3364,9 @@ static xoff_t xd3_source_cksum_offset(xd3_stream *stream, usize_t low) {
  * address.  At this point the decision has to be made. */
 static int xd3_srcwin_setup(xd3_stream *stream) {
   xd3_source *src = stream->src;
-  xoff_t length, x;
+  xoff_t length;
+  usize_t usize_length;
+  int ret;
 
   /* Check the undecided state. */
   XD3_ASSERT(src->srclen == 0 && src->srcbase == 0);
@@ -3381,17 +3388,16 @@ static int xd3_srcwin_setup(xd3_stream *stream) {
    * use smaller windows. */
   length = stream->match_maxaddr - stream->match_minaddr;
 
-  x = USIZE_T_MAX;
-  if (length > x) {
+  if ((ret = xd3_to_usize(length, &usize_length)) != 0) {
     stream->msg = "source window length overflow (not 64bit)";
-    return XD3_INTERNAL;
+    return ret;
   }
 
   /* If ENC_INSTR, then we know the exact source window to use because
    * no more copies can be issued. */
   if (stream->enc_state == ENC_INSTR) {
     src->srcbase = stream->match_minaddr;
-    src->srclen = (usize_t)length;
+    src->srclen = usize_length;
     XD3_ASSERT(src->srclen);
     goto done;
   }
@@ -3402,14 +3408,20 @@ static int xd3_srcwin_setup(xd3_stream *stream) {
    * TODO: This may not working well in practice, more testing needed. */
   src->srcbase = stream->match_minaddr;
   src->srclen =
-      xd3_max((usize_t)length, stream->avail_in + (stream->avail_in >> 2));
+      xd3_max(usize_length, stream->avail_in + (stream->avail_in >> 2));
 
   if (src->eof_known) {
+    xoff_t remaining = xd3_source_eof(src) - src->srcbase;
+
     /* Note: if the source size is known, we must reduce srclen or
      * code that expects to pass a single block w/ getblk == NULL
      * will not function, as the code will return GETSRCBLK asking
      * for the second block. */
-    src->srclen = xd3_min(src->srclen, xd3_source_eof(src) - src->srcbase);
+    if (remaining < src->srclen) {
+      if ((ret = xd3_to_usize(remaining, &src->srclen)) != 0) {
+        return ret;
+      }
+    }
   }
   IF_DEBUG1(DP(RINT "[srcwin_setup_constrained] base %" XD3_Q "u len %" XD3_W
                     "u\n",
@@ -3534,12 +3546,16 @@ static int xd3_source_match_setup(xd3_stream *stream, xoff_t srcpos) {
   } else {
     usize_t srcavail;
 
-    srcavail = (usize_t)(srcpos - src->srcbase);
+    if (xd3_to_usize(srcpos - src->srcbase, &srcavail) != 0) {
+      goto bad;
+    }
     if (srcavail < stream->match_maxback) {
       stream->match_maxback = srcavail;
     }
 
-    srcavail = src->srcbase + src->srclen - srcpos;
+    if (xd3_to_usize(src->srcbase + src->srclen - srcpos, &srcavail) != 0) {
+      goto bad;
+    }
     if (srcavail < stream->match_maxfwd) {
       stream->match_maxfwd = srcavail;
     }
@@ -4024,7 +4040,7 @@ static int xd3_srcwin_move_point(xd3_stream *stream, usize_t *next_move_point) {
      * difference in size. */
     target_cksum_pos = absolute_input_pos + stream->src->max_winsize / 2 +
                        stream->src->blksize * 2;
-    target_cksum_pos &= ~stream->src->maskby;
+    target_cksum_pos &= ~(xoff_t)stream->src->maskby;
   }
 
   /* A long match may have extended past srcwin_cksum_pos.  Don't

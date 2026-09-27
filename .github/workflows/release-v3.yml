@@ -90,6 +90,10 @@ jobs:
           - os: macos-15-intel
             name: macos-x86_64
           - os: windows-latest
+            name: windows-x86
+            cmake_arch: -A Win32
+            cmake_options: -DXD3_LARGESIZET=OFF
+          - os: windows-latest
             name: windows-x86_64
             cmake_arch: -A x64
           - os: windows-11-arm
@@ -113,6 +117,7 @@ jobs:
           -DXD3_LZMA_FETCH=ON
           -DXD3_BUILD_TESTS=OFF
           ${{ matrix.cmake_arch }}
+          ${{ matrix.cmake_options }}
 
       - name: Build
         run: cmake --build build --config Release -j
@@ -169,14 +174,18 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Create release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="${{ needs.verify.outputs.version }}"
-          gh release create "${TAG}" \
-            --title "Xdelta ${version}" \
-            --generate-notes \
-            --verify-tag \
-            dist/*
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" --clobber dist/*
+          else
+            gh release create "${TAG}" \
+              --title "Xdelta ${version}" \
+              --generate-notes \
+              --verify-tag \
+              dist/*
+          fi
