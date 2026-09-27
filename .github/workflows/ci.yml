@@ -366,3 +366,47 @@ jobs:
             echo "obsolete Autotools files are present" >&2
             exit 1
           fi
+
+  xdelta1-windows:
+    name: ${{ matrix.name }} / xdelta1 (v1 line)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86
+            cmake_arch: Win32
+            vcpkg_triplet: x86-windows
+          - name: windows-x86_64
+            cmake_arch: x64
+            vcpkg_triplet: x64-windows
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: xdelta1
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install GLib and zlib
+        run: vcpkg install glib:${{ matrix.vcpkg_triplet }} zlib:${{ matrix.vcpkg_triplet }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -A ${{ matrix.cmake_arch }}
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD1_WERROR=ON
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Check the program and bundled runtime libraries
+        run: |
+          build/Release/xdelta.exe --version
+          if (-not (Test-Path build/Release/glib-2.0-0.dll)) {
+            throw "vcpkg did not deploy the GLib runtime beside xdelta.exe"
+          }

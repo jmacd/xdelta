@@ -1,6 +1,7 @@
 name: Release Xdelta 1
 
-# Publishes a source release when a v1.* tag is pushed. See RELEASING.md.
+# Publishes an Xdelta 1 release when a v1.* tag is pushed. See RELEASING.md.
+# Windows packages include the runtime libraries needed by xdelta.exe.
 on:
   push:
     tags: [ 'v1.*' ]
@@ -105,9 +106,65 @@ jobs:
             xdelta-*.tar.gz
             xdelta-*.tar.gz.sha256
 
+  binaries:
+    name: ${{ matrix.name }} binaries
+    needs: verify
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86
+            cmake_arch: Win32
+            vcpkg_triplet: x86-windows
+          - name: windows-x86_64
+            cmake_arch: x64
+            vcpkg_triplet: x64-windows
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: xdelta1
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Install GLib and zlib
+        run: vcpkg install glib:${{ matrix.vcpkg_triplet }} zlib:${{ matrix.vcpkg_triplet }}
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -A ${{ matrix.cmake_arch }}
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD1_WERROR=ON
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package
+        run: |
+          $version = "${{ needs.verify.outputs.version }}"
+          $dir = "xdelta-$version-${{ matrix.name }}"
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          Copy-Item build/Release/xdelta.exe $dir/
+          Copy-Item build/Release/*.dll $dir/
+          Copy-Item README, COPYING $dir/
+          & "$dir/xdelta.exe" --version
+          Compress-Archive -Path $dir -DestinationPath "$dir.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xdelta1-${{ matrix.name }}
+          path: xdelta1/xdelta-*.zip
+
   release:
     name: Publish GitHub Release
-    needs: [ verify, source ]
+    needs: [ verify, source, binaries ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -131,18 +188,22 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: xdelta1-source
           path: dist
+          merge-multiple: true
 
-      - name: Create release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           version="${{ needs.verify.outputs.version }}"
-          gh release create "${TAG}" \
-            --title "Xdelta ${version}" \
-            --notes-file release-notes.txt \
-            --latest=false \
-            --verify-tag \
-            dist/*
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" --clobber dist/*
+          else
+            gh release create "${TAG}" \
+              --title "Xdelta ${version}" \
+              --notes-file release-notes.txt \
+              --latest=false \
+              --verify-tag \
+              dist/*
+          fi
