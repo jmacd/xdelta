@@ -208,7 +208,7 @@ Formatting
 ----------
 
 C/C++ sources are formatted with clang-format (version 20) using the
-LLVM style in `.clang-format`.  The Objective-C iOS example is excluded.
+LLVM style in `.clang-format`.
 
 ```
   ./format.sh            # reformat sources in place
