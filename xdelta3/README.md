@@ -199,18 +199,9 @@ Testing
 
 `xdelta3 test` runs the built-in C test suite.  `ctest` also runs the
 `xdelta3regtest` C++ framework, including its in-memory codec, block-size,
-mutation, and merge tests.  CI runs these CTest suites on every supported
-Linux, macOS, and Windows configuration.
-
-An additional regression test harness, written in Go (1.21+), drives the
-command-line tool end to end:
-
-```
-  (cd go && go run . -xdelta3 ../build/xdelta3)
-```
-
-See `go run . -h` in the `go/` directory for its flags (including the
-optional `-dataset`/`-compare` comparison test).
+mutation, streaming-source offset, large-source offset, and merge tests.  CI
+runs these CTest suites on every supported Linux, macOS, and Windows
+configuration.
 
 
 Formatting

@@ -56,6 +56,16 @@ public:
 
   xoff_t Windows() const { return stream_.whole_target.wininfolen; }
 
+  bool HasCopyAtOrAbove(xoff_t address) const {
+    for (usize_t i = 0; i < stream_.whole_target.instlen; i++) {
+      const xd3_winst &inst = stream_.whole_target.inst[i];
+      if (inst.type == XD3_CPY && inst.addr >= address) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Note: This does not benefit from -Wformat= checking, due to the
   // enclosing template. Further, it was not used.
   // void Print() const {
