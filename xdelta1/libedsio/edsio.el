@@ -1657,10 +1657,13 @@ replacement is as for replace-regexp."
 			      it
 			      (prop-type-to-get-fps type)))
 	      (insert (format "  EdsioProperty* ep;\n"))
+	      (insert (format "  PropGSFunc getter;\n"))
 	      (insert (format "  g_return_val_if_fail (obj, FALSE);\n"))
-	      (insert (format "  return (* edsio_property_getter (\"%s\", \"%s\", prop.code, & ep)) (obj, ep%s);\n"
+	      (insert (format "  getter = edsio_property_getter (\"%s\", \"%s\", prop.code, & ep);\n"
 			      (prophost-name-get prophost)
 			      type
+			      ))
+	      (insert (format "  return (* getter) (obj, ep%s);\n"
 			      (prop-type-to-args type)
 			      ))
 
@@ -1673,10 +1676,13 @@ replacement is as for replace-regexp."
 			      it
 			      (prop-type-to-set-fps type)))
 	      (insert (format "  EdsioProperty* ep;\n"))
+	      (insert (format "  PropGSFunc setter;\n"))
 	      (insert (format "  g_return_val_if_fail (obj, FALSE);\n"))
-	      (insert (format "  return (* edsio_property_setter (\"%s\", \"%s\", prop.code, & ep)) (obj, ep%s);\n"
+	      (insert (format "  setter = edsio_property_setter (\"%s\", \"%s\", prop.code, & ep);\n"
 			      (prophost-name-get prophost)
 			      type
+			      ))
+	      (insert (format "  return (* setter) (obj, ep%s);\n"
 			      (prop-type-to-args type)
 			      ))
 

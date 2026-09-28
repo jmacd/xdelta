@@ -208,16 +208,20 @@ gboolean
 proptest_get_edsiouint (PropTest* obj, EdsioPropTestEdsioUintProperty prop, SerialEdsioUint** arg)
 {
   EdsioProperty* ep;
+  PropGSFunc getter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_getter ("PropTest", "EdsioUint", prop.code, & ep)) (obj, ep, arg);
+  getter = edsio_property_getter ("PropTest", "EdsioUint", prop.code, & ep);
+  return (* getter) (obj, ep, arg);
 }
 
 gboolean
 proptest_set_edsiouint (PropTest* obj, EdsioPropTestEdsioUintProperty prop, SerialEdsioUint* arg)
 {
   EdsioProperty* ep;
+  PropGSFunc setter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_setter ("PropTest", "EdsioUint", prop.code, & ep)) (obj, ep, arg);
+  setter = edsio_property_setter ("PropTest", "EdsioUint", prop.code, & ep);
+  return (* setter) (obj, ep, arg);
 }
 
 gboolean
@@ -243,16 +247,20 @@ gboolean
 proptest_get_string (PropTest* obj, EdsioPropTestStringProperty prop, const gchar** arg)
 {
   EdsioProperty* ep;
+  PropGSFunc getter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_getter ("PropTest", "string", prop.code, & ep)) (obj, ep, arg);
+  getter = edsio_property_getter ("PropTest", "string", prop.code, & ep);
+  return (* getter) (obj, ep, arg);
 }
 
 gboolean
 proptest_set_string (PropTest* obj, EdsioPropTestStringProperty prop, const gchar* arg)
 {
   EdsioProperty* ep;
+  PropGSFunc setter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_setter ("PropTest", "string", prop.code, & ep)) (obj, ep, arg);
+  setter = edsio_property_setter ("PropTest", "string", prop.code, & ep);
+  return (* setter) (obj, ep, arg);
 }
 
 gboolean
@@ -278,16 +286,20 @@ gboolean
 proptest_get_bytes (PropTest* obj, EdsioPropTestBytesProperty prop, const guint8** arg, guint32* arg_len)
 {
   EdsioProperty* ep;
+  PropGSFunc getter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_getter ("PropTest", "bytes", prop.code, & ep)) (obj, ep, arg, arg_len);
+  getter = edsio_property_getter ("PropTest", "bytes", prop.code, & ep);
+  return (* getter) (obj, ep, arg, arg_len);
 }
 
 gboolean
 proptest_set_bytes (PropTest* obj, EdsioPropTestBytesProperty prop, const guint8* arg, guint32 arg_len)
 {
   EdsioProperty* ep;
+  PropGSFunc setter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_setter ("PropTest", "bytes", prop.code, & ep)) (obj, ep, arg, arg_len);
+  setter = edsio_property_setter ("PropTest", "bytes", prop.code, & ep);
+  return (* setter) (obj, ep, arg, arg_len);
 }
 
 gboolean
@@ -313,16 +325,20 @@ gboolean
 proptest_get_uint (PropTest* obj, EdsioPropTestUintProperty prop, guint32* arg)
 {
   EdsioProperty* ep;
+  PropGSFunc getter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_getter ("PropTest", "uint", prop.code, & ep)) (obj, ep, arg);
+  getter = edsio_property_getter ("PropTest", "uint", prop.code, & ep);
+  return (* getter) (obj, ep, arg);
 }
 
 gboolean
 proptest_set_uint (PropTest* obj, EdsioPropTestUintProperty prop, guint32 arg)
 {
   EdsioProperty* ep;
+  PropGSFunc setter;
   g_return_val_if_fail (obj, FALSE);
-  return (* edsio_property_setter ("PropTest", "uint", prop.code, & ep)) (obj, ep, arg);
+  setter = edsio_property_setter ("PropTest", "uint", prop.code, & ep);
+  return (* setter) (obj, ep, arg);
 }
 
 gboolean

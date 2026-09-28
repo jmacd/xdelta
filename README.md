@@ -30,13 +30,14 @@ its [build and install instructions](xdelta1/README).
 
 # Releases
 
-Prebuilt binaries for Linux, macOS, and Windows (x86, x86-64, and ARM64), plus
-a source tarball, are attached to each
-[GitHub Release](https://github.com/jmacd/xdelta/releases).
-The binaries are self-contained: liblzma (xz) and BLAKE3 are statically
-linked, so they need no system libraries at runtime.  Releases are cut by
-pushing a `vMAJOR.MINOR.PATCH` tag, which drives the
-[release workflow](.github/workflows/release-v3.yml).  See
+Xdelta 3 releases include prebuilt binaries for Linux, macOS, and Windows
+(x86, x86-64, and ARM64). Xdelta 1 releases include Windows x86 and x86-64
+binaries. Source tarballs are also attached to each
+[GitHub Release](https://github.com/jmacd/xdelta/releases). Xdelta 3 binaries
+statically link liblzma (xz) and BLAKE3; Xdelta 1 Windows packages bundle their
+required runtime libraries. Releases are cut by pushing a
+`vMAJOR.MINOR.PATCH` tag, which drives the corresponding workflow in
+[`.github/workflows`](.github/workflows). See
 [`RELEASING.md`](RELEASING.md) for the full procedure and the release-branch
 conventions (`releaseMAJOR_MINOR_apl`).
 
