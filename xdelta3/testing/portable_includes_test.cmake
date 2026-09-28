@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.13)
+
 if(NOT DEFINED HEADER)
   message(FATAL_ERROR "HEADER must name the public header to check")
 endif()

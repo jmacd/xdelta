@@ -206,6 +206,41 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
+  mingw:
+    name: MinGW-w64 cross-build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: xdelta3
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install MinGW-w64
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-x86-64
+
+      - name: Configure
+        run: >
+          cmake -B build
+          -DCMAKE_SYSTEM_NAME=Windows
+          -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc
+          -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++
+          -DCMAKE_BUILD_TYPE=Release
+          -DXD3_LZMA_MODE=off
+          -DXD3_ARMOR=OFF
+          -DXD3_BUILD_TESTS=OFF
+
+      - name: Compile public header with warnings as errors
+        run: >
+          printf '#include "xdelta3.h"\nint main(void) { return 0; }\n' |
+          x86_64-w64-mingw32-gcc
+          -std=c99 -Wall -Wextra -Werror
+          -DHAVE_CONFIG_H=1
+          -Ibuild -I.
+          -x c -c -o build/header-smoke.o -
+
+      - name: Build
+        run: cmake --build build -j
+
   library-consumer:
     name: ${{ matrix.os }} / library install + consumer
     runs-on: ${{ matrix.os }}
