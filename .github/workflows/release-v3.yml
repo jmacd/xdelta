@@ -138,7 +138,7 @@ jobs:
           dir="xdelta3-${version}-${{ matrix.name }}"
           mkdir "$dir"
           cp build/xdelta3 build/xdelta3decode "$dir"/
-          cp xdelta3.1 ../README.md "$dir"/
+          cp xdelta3.1 NEWS ../README.md "$dir"/
           tar -czf "${dir}.tar.gz" "$dir"
 
       - name: Package (Windows)
@@ -149,6 +149,7 @@ jobs:
           $dir = "xdelta3-$version-${{ matrix.name }}"
           New-Item -ItemType Directory -Path $dir | Out-Null
           Copy-Item build/Release/xdelta3.exe, build/Release/xdelta3decode.exe $dir/
+          Copy-Item NEWS $dir/
           Copy-Item ../README.md $dir/
           Compress-Archive -Path $dir -DestinationPath "$dir.zip"
 
@@ -167,6 +168,42 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Prepare release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.verify.outputs.version }}"
+          awk -v heading="** Changes in version ${version}" '
+            $0 == heading { found = 1; next }
+            found && index($0, "\f") { exit }
+            found { print }
+            END { if (!found) exit 1 }
+          ' xdelta3/NEWS > release-notes.txt
+          if ! grep -q '[^[:space:]]' release-notes.txt; then
+            echo "::error::No release notes found for Xdelta ${version}"
+            exit 1
+          fi
+
+          previous_tag="$(
+            git tag --merged "${TAG}" --list 'v3.*' --sort=-version:refname |
+              grep -Fxv "${TAG}" |
+              head -n 1
+          )"
+          if [ -z "${previous_tag}" ]; then
+            echo "::error::No previous Xdelta 3 tag found"
+            exit 1
+          fi
+
+          printf '\n---\n\n' >> release-notes.txt
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+            -f tag_name="${TAG}" \
+            -f previous_tag_name="${previous_tag}" \
+            --jq '.body' >> release-notes.txt
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -185,7 +222,7 @@ jobs:
           else
             gh release create "${TAG}" \
               --title "Xdelta ${version}" \
-              --generate-notes \
+              --notes-file release-notes.txt \
               --verify-tag \
               dist/*
           fi

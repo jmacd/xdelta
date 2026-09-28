@@ -1,0 +1,28 @@
+Xdelta 3 NEWS
+
+Please file bug reports at https://github.com/jmacd/xdelta/issues.
+
+
+** Changes in version 3.2.1
+
+* Support standard input as the source file when encoding or decoding.
+
+* Support Unicode file names on Windows.
+
+* Reject invalid armor streams before decoding and harden application-header
+  file-name handling.
+
+* Correct secondary-compression status and header reporting, and accept the
+  documented smaller source-window sizes.
+
+* Restore the C++ regression suite, port it to Windows, and exercise source
+  copies beyond 2 GiB.
+
+* Install the reusable library and public headers, document CMake consumer
+  workflows, and verify that public headers are independently portable.
+
+* Add dependency-free Windows x86 release binaries alongside the existing
+  x86-64 and ARM64 packages.
+
+* Show command help when invoked without arguments from an interactive
+  terminal.
