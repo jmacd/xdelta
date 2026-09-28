@@ -9,7 +9,7 @@
 cmake_minimum_required(VERSION 3.13)
 
 project(xdelta3
-  VERSION 3.2.0
+  VERSION 3.2.1
   DESCRIPTION "VCDIFF (RFC 3284) delta compression library and tool"
   HOMEPAGE_URL "https://github.com/jmacd/xdelta"
   LANGUAGES C CXX)

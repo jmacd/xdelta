@@ -47,7 +47,7 @@ typedef FileHandle XdeltaOutStream;
  */
 
 /* $Format: "#define XDELTA_VERSION \"$ReleaseVersion$\"" $ */
-#define XDELTA_VERSION "1.2.0"
+#define XDELTA_VERSION "1.2.1"
 
 /* $Format: "#define XDELTA_MAJOR_VERSION $ReleaseMajorVersion$" $ */
 #define XDELTA_MAJOR_VERSION 1

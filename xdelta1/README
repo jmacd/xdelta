@@ -1,4 +1,4 @@
-# Xdelta 1.2.0 -- A binary delta generator
+# Xdelta 1.2.1 -- A binary delta generator
 
 Xdelta is an application program
 designed to compute changes between files.  These changes (deltas) are
@@ -11,7 +11,7 @@ on both binary and text files.
 
 ## Build and install
 
-Xdelta 1.2.0 is built with CMake. You need a C compiler, CMake 3.20 or
+Xdelta 1.2.1 is built with CMake. You need a C compiler, CMake 3.20 or
 newer, pkg-config, GLib 2 development files, and zlib development files.
 
 On macOS with Homebrew these are `brew install cmake pkg-config glib`;
@@ -51,7 +51,7 @@ build/xdelta patch change.xdelta original-file reconstructed-file
 ```
 
 The historical 1.1.4 release was restored as the baseline for this
-modernized 1.2.0 release. See `HISTORICAL.md` for its provenance and
+modernized 1.2.1 release. See `HISTORICAL.md` for its provenance and
 `BUILDING.md` for the concise build reference.
 
 Xdelta was designed and implemented by Joshua MacDonald.  The delta

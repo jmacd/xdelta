@@ -25,7 +25,7 @@ build/install instructions, liblzma options, and regression testing.
 # Historical Xdelta 1
 
 The modernized historical Xdelta 1 release lives in
-[`xdelta1/`](xdelta1). It is currently **1.2.0** and uses CMake; follow
+[`xdelta1/`](xdelta1). It is currently **1.2.1** and uses CMake; follow
 its [build and install instructions](xdelta1/README).
 
 # Releases
