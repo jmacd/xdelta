@@ -36,13 +36,36 @@
 #include "config.h"
 #endif
 
+#ifndef XD3_USE_LARGEFILE64
+#define XD3_USE_LARGEFILE64 1
+#endif
+
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+
+#if !defined(WINVER) && !defined(_WIN32_WINNT)
+#if XD3_USE_LARGEFILE64
+#define WINVER 0x0500
+#define _WIN32_WINNT 0x0500
+#else /* xoff_t is 32bit */
+#define WINVER 0x0400
+#define _WIN32_WINNT 0x0400
+#endif /* XD3_USE_LARGEFILE64 */
+#elif !defined(WINVER)
+#define WINVER _WIN32_WINNT
+#elif !defined(_WIN32_WINNT)
+#define _WIN32_WINNT WINVER
+#endif
+#endif /* _WIN32 */
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 
 /****************************************************************/
 
@@ -99,10 +122,6 @@
 #define XD3_DEFAULT_SECONDARY_LEVEL 6
 #endif
 
-#ifndef XD3_USE_LARGEFILE64
-#define XD3_USE_LARGEFILE64 1
-#endif
-
 /* The source window size is limited to 2GB unless
  * XD3_USE_LARGESIZET is defined to 1. */
 #ifndef XD3_USE_LARGESIZET
@@ -119,30 +138,11 @@
 #ifndef _WIN32
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <stdint.h>
 #else /* WIN32 case */
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
-#ifndef WINVER
-#if XD3_USE_LARGEFILE64
-/* 64 bit file offsets: uses GetFileSizeEx and SetFilePointerEx. */
-#define WINVER 0x0500
-#define _WIN32_WINNT 0x0500
-#else /* xoff_t is 32bit */
-/* 32 bit file offsets: uses GetFileSize and SetFilePointer. */
-#define WINVER 0x0400
-#define _WIN32_WINNT 0x0400
-#endif /* if XD3_USE_LARGEFILE64 */
-#endif /* ifndef WINVER */
-
 #include <windows.h>
 
 /* _MSV_VER is defined by Microsoft tools, not by Mingw32 */
 #ifdef _MSC_VER
-typedef signed int ssize_t;
-typedef int pid_t;
 #if _MSC_VER < 1600
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;

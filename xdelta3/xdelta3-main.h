@@ -1265,7 +1265,7 @@ static int xd3_posix_io(int fd, uint8_t *buf, size_t size, xd3_posix_func *func,
 
   while (nproc < size) {
     size_t tryread = xd3_min(size - nproc, 1U << 30);
-    ssize_t result = (*func)(fd, buf + nproc, tryread);
+    int result = (*func)(fd, buf + nproc, tryread);
 
     if (result < 0) {
       ret = get_errno();

@@ -1,7 +1,7 @@
 /* Consumer smoke test for the installed/embedded xdelta3 library.
    Links against the public xd3_* API only (xdelta3.h) and performs a
    round-trip encode/decode of an in-memory buffer against a source. */
-#include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 

@@ -171,7 +171,7 @@ static fgk_stream *fgk_alloc(xd3_stream *stream /*, int alphabet_size0 */) {
 
 static int fgk_init(xd3_stream *stream, fgk_stream *h, int is_encode) {
   usize_t ui;
-  ssize_t si;
+  ptrdiff_t si;
 
   h->root_node = h->alphabet;
   h->decode_ptr = h->root_node;
@@ -196,7 +196,7 @@ static int fgk_init(xd3_stream *stream, fgk_stream *h, int is_encode) {
   /* Zero frequency nodes are inserted in the first alphabet_size
    * positions, with Value, weight, and a pointer to the next zero
    * frequency node.  */
-  for (si = (ssize_t)h->alphabet_size - 1; si >= 0; si -= 1) {
+  for (si = (ptrdiff_t)h->alphabet_size - 1; si >= 0; si -= 1) {
     fgk_init_node(h->alphabet + si, (usize_t)si, h->alphabet_size);
   }
 

@@ -315,6 +315,11 @@ if(XD3_BUILD_TESTS)
   target_link_libraries(xdelta3link PRIVATE ${XD3_LZMA_LIBRARIES})
 
   enable_testing()
+  add_test(NAME xdelta3_portable_includes_test
+    COMMAND ${CMAKE_COMMAND}
+      -DHEADER=${CMAKE_CURRENT_SOURCE_DIR}/xdelta3.h
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/testing/portable_includes_test.cmake)
+
   add_test(NAME xdelta3_builtin_test COMMAND xdelta3 test)
   set_tests_properties(xdelta3_builtin_test PROPERTIES TIMEOUT 600)
 

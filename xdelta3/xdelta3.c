@@ -4059,12 +4059,11 @@ static int xd3_srcwin_move_point(xd3_stream *stream, usize_t *next_move_point) {
     xoff_t blkno;
     xoff_t blkbaseoffset;
     usize_t blkrem;
-    ssize_t oldpos; /* Using ssize_t because of a  */
-    ssize_t blkpos; /* do { blkpos-- }
-                       while (blkpos >= oldpos); */
+    ptrdiff_t oldpos; /* Signed because the reverse scan steps below zero. */
+    ptrdiff_t blkpos;
     int ret;
     xd3_blksize_div(stream->srcwin_cksum_pos, stream->src, &blkno, &blkrem);
-    oldpos = (ssize_t)blkrem;
+    oldpos = (ptrdiff_t)blkrem;
 
     if ((ret = xd3_getblk(stream, blkno))) {
       /* TOOFARBACK should never occur here, since we read forward. */
@@ -4085,13 +4084,13 @@ static int xd3_srcwin_move_point(xd3_stream *stream, usize_t *next_move_point) {
                  xd3_source_eof(stream->src),
                  stream->src->eof_known ? "known" : "unknown"));
 
-    blkpos = (ssize_t)xd3_bytes_on_srcblk(stream->src, blkno);
+    blkpos = (ptrdiff_t)xd3_bytes_on_srcblk(stream->src, blkno);
 
-    if (blkpos < (ssize_t)stream->smatcher.large_look) {
+    if (blkpos < (ptrdiff_t)stream->smatcher.large_look) {
       stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
-      IF_DEBUG2(DP(RINT "[srcwin_move_point] continue (end-of-block): %" XD3_Z
-                        "d\n",
-                   blkpos));
+      IF_DEBUG2(DP(RINT "[srcwin_move_point] continue (end-of-block): %" XD3_Q
+                        "u\n",
+                   (xoff_t)blkpos));
       continue;
     }
 
@@ -4104,7 +4103,7 @@ static int xd3_srcwin_move_point(xd3_stream *stream, usize_t *next_move_point) {
      * the number of bytes available.  Each iteration inspects
      * large_look bytes then steps back large_step bytes.  The
      * if-stmt above ensures at least one large_look of data. */
-    blkpos -= (ssize_t)stream->smatcher.large_look;
+    blkpos -= (ptrdiff_t)stream->smatcher.large_look;
     blkbaseoffset = stream->src->blksize * blkno;
 
     do {
@@ -4121,7 +4120,7 @@ static int xd3_srcwin_move_point(xd3_stream *stream, usize_t *next_move_point) {
 
       IF_DEBUG(stream->large_ckcnt += 1);
 
-      blkpos -= (ssize_t)stream->smatcher.large_step;
+      blkpos -= (ptrdiff_t)stream->smatcher.large_step;
     } while (blkpos >= oldpos);
 
     stream->srcwin_cksum_pos = (blkno + 1) * stream->src->blksize;
