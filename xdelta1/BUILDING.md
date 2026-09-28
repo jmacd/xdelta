@@ -1,6 +1,6 @@
-# Building Xdelta 1.2.0
+# Building Xdelta 1.2.1
 
-Xdelta 1.2.0 uses CMake and requires a C compiler, CMake 3.20 or later,
+Xdelta 1.2.1 uses CMake and requires a C compiler, CMake 3.20 or later,
 pkg-config, GLib 2, and zlib.
 
 ```

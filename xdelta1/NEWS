@@ -4,6 +4,17 @@ Please file bug reports at https://github.com/jmacd/xdelta/issues.
 See the file `README' for a description of how to report bugs.
 
 
+** Changes in version 1.2.1
+
+* Add x86 and x86-64 Windows release packages with bundled runtime
+  dependencies.
+
+* Install the static libraries and public headers, and document static and
+  shared library builds for CMake consumers.
+
+* Exercise source-copy offsets beyond 2 GiB in the regression suite.
+
+
 ** Changes in version 1.2.0
 
 * Add a CMake build for current C toolchains, GLib 2, and zlib.

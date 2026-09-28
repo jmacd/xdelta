@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(xdelta VERSION 1.2.0 LANGUAGES C)
+project(xdelta VERSION 1.2.1 LANGUAGES C)
 
 include(GNUInstallDirs)
 include(CTest)

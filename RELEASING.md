@@ -29,6 +29,12 @@ For an **Xdelta 3** release, update the version in:
 
 - `xdelta3/CMakeLists.txt`
 - `xdelta3/xdelta3-main.h`
+- `xdelta3/xdelta3.1`
+- `xdelta3/NEWS`
+
+Also add the release notes to `xdelta3/NEWS`. The Xdelta 3 workflow publishes
+that version's NEWS section followed by GitHub's generated change and
+contributor links.
 
 ### 2. Merge the release commit
 
