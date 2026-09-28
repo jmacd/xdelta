@@ -42,7 +42,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 
 /****************************************************************/
 
@@ -119,7 +118,6 @@
 #ifndef _WIN32
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-#include <stdint.h>
 #else /* WIN32 case */
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -141,8 +139,6 @@
 
 /* _MSV_VER is defined by Microsoft tools, not by Mingw32 */
 #ifdef _MSC_VER
-typedef signed int ssize_t;
-typedef int pid_t;
 #if _MSC_VER < 1600
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
