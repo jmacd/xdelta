@@ -1238,10 +1238,12 @@ inline int xd3_emit_bytes(xd3_stream *stream, xd3_output **outputp,
 static int xd3_alloc_cache(xd3_stream *stream) {
   if (stream->acache.near_array != NULL) {
     xd3_free(stream, stream->acache.near_array);
+    stream->acache.near_array = NULL;
   }
 
   if (stream->acache.same_array != NULL) {
     xd3_free(stream, stream->acache.same_array);
+    stream->acache.same_array = NULL;
   }
 
   if (((stream->acache.s_near > 0) &&
