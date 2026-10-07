@@ -2761,8 +2761,14 @@ static int xd3_alloc_iopt(xd3_stream *stream, usize_t elts) {
   xd3_iopt_buflist *last =
       (xd3_iopt_buflist *)xd3_alloc(stream, sizeof(xd3_iopt_buflist), 1);
 
-  if (last == NULL || (last->buffer = (xd3_rinst *)xd3_alloc(
-                           stream, sizeof(xd3_rinst), elts)) == NULL) {
+  if (last == NULL) {
+    return ENOMEM;
+  }
+
+  last->buffer =
+      (xd3_rinst *)xd3_alloc(stream, sizeof(xd3_rinst), elts);
+  if (last->buffer == NULL) {
+    xd3_free(stream, last);
     return ENOMEM;
   }
 
