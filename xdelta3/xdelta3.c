@@ -1238,10 +1238,12 @@ inline int xd3_emit_bytes(xd3_stream *stream, xd3_output **outputp,
 static int xd3_alloc_cache(xd3_stream *stream) {
   if (stream->acache.near_array != NULL) {
     xd3_free(stream, stream->acache.near_array);
+    stream->acache.near_array = NULL;
   }
 
   if (stream->acache.same_array != NULL) {
     xd3_free(stream, stream->acache.same_array);
+    stream->acache.same_array = NULL;
   }
 
   if (((stream->acache.s_near > 0) &&
@@ -2761,8 +2763,13 @@ static int xd3_alloc_iopt(xd3_stream *stream, usize_t elts) {
   xd3_iopt_buflist *last =
       (xd3_iopt_buflist *)xd3_alloc(stream, sizeof(xd3_iopt_buflist), 1);
 
-  if (last == NULL || (last->buffer = (xd3_rinst *)xd3_alloc(
-                           stream, sizeof(xd3_rinst), elts)) == NULL) {
+  if (last == NULL) {
+    return ENOMEM;
+  }
+
+  last->buffer = (xd3_rinst *)xd3_alloc(stream, sizeof(xd3_rinst), elts);
+  if (last->buffer == NULL) {
+    xd3_free(stream, last);
     return ENOMEM;
   }
 

@@ -211,6 +211,7 @@ static int xd3_merge_input_output(xd3_stream *stream, xd3_whole_state *source) {
       (ret = xd3_whole_state_init(&tmp_stream)) ||
       (ret = xd3_merge_inputs(&tmp_stream, source, &stream->whole_target))) {
     XPR(NT XD3_LIB_ERRMSG(&tmp_stream, ret));
+    xd3_free_stream(&tmp_stream);
     return ret;
   }
 

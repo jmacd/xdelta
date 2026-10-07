@@ -88,8 +88,7 @@ static int xd3_get_secondary(xd3_stream *stream, xd3_sec_stream **sec_streamp,
     int ret;
 
     if ((*sec_streamp = stream->sec_type->alloc(stream)) == NULL) {
-      stream->msg = "error initializing secondary stream";
-      return XD3_INVALID;
+      return ENOMEM;
     }
 
     if ((ret = stream->sec_type->init(stream, *sec_streamp, is_encode)) != 0) {
@@ -222,6 +221,9 @@ static int xd3_encode_secondary(xd3_stream *stream, xd3_output **head,
   }
 
   tmp_head = xd3_alloc_output(stream, NULL);
+  if (tmp_head == NULL) {
+    return ENOMEM;
+  }
 
   /* Encode the size, encode the data.  Encoding the size makes it
    * simpler, but is a little gross.  Should not need the entire

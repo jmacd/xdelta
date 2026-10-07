@@ -428,8 +428,8 @@ static main_extcomp extcomp_types[] = {
 
 static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
                       main_file *sfile);
-static void main_get_appheader(xd3_stream *stream, main_file *ifile,
-                               main_file *output, main_file *sfile);
+static int main_get_appheader(xd3_stream *stream, main_file *ifile,
+                              main_file *output, main_file *sfile);
 
 static int main_getblk_func(xd3_stream *stream, xd3_source *source,
                             xoff_t blkno);
@@ -1951,6 +1951,7 @@ static int main_init_recode_stream(void) {
   if ((recode_stream = (xd3_stream *)main_malloc(sizeof(xd3_stream))) == NULL) {
     return ENOMEM;
   }
+  memset(recode_stream, 0, sizeof(*recode_stream));
 
   recode_flags = (stream_flags & XD3_SEC_TYPE);
 
@@ -1965,6 +1966,7 @@ static int main_init_recode_stream(void) {
       (ret = xd3_whole_state_init(recode_stream))) {
     XPR(NT XD3_LIB_ERRMSG(recode_stream, ret));
     xd3_free_stream(recode_stream);
+    main_free(recode_stream);
     recode_stream = NULL;
     return ret;
   }
@@ -1987,6 +1989,7 @@ static int main_merge_arguments(main_merge_list *merges) {
   if ((ret = xd3_config_stream(&merge_input, NULL)) ||
       (ret = xd3_whole_state_init(&merge_input))) {
     XPR(NT XD3_LIB_ERRMSG(&merge_input, ret));
+    xd3_free_stream(&merge_input);
     return ret;
   }
 
@@ -3240,9 +3243,8 @@ static int main_set_appheader(xd3_stream *stream, main_file *input,
 }
 #endif
 
-static void main_get_appheader_params(main_file *file, char **parsed,
-                                      int output, const char *type,
-                                      main_file *other) {
+static int main_get_appheader_params(main_file *file, char **parsed, int output,
+                                     const char *type, main_file *other) {
   /* Set the filename if it was not specified.  If output, option_stdout (-c)
    * overrides. */
   if (file->filename == NULL && !(output && option_stdout) &&
@@ -3265,6 +3267,10 @@ static void main_get_appheader_params(main_file *file, char **parsed,
         XD3_ASSERT(file->filename_copy == NULL);
         file->filename_copy =
             (char *)main_malloc(dlen + 2 + (usize_t)strlen(file->filename));
+        if (file->filename_copy == NULL) {
+          file->filename = NULL;
+          return ENOMEM;
+        }
 
         strncpy(file->filename_copy, other->filename, dlen);
         file->filename_copy[dlen] = '/';
@@ -3301,10 +3307,12 @@ static void main_get_appheader_params(main_file *file, char **parsed,
     file->flags |= RD_DECOMPSET;
     file->compressor = main_get_compressor(ident);
   }
+
+  return 0;
 }
 
-static void main_get_appheader(xd3_stream *stream, main_file *ifile,
-                               main_file *output, main_file *sfile) {
+static int main_get_appheader(xd3_stream *stream, main_file *ifile,
+                              main_file *output, main_file *sfile) {
   uint8_t *apphead;
   usize_t appheadsz;
   int ret;
@@ -3312,14 +3320,14 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
   /* The user may disable the application header.  Once the appheader
    * is set, this disables setting it again. */
   if (!option_use_appheader) {
-    return;
+    return 0;
   }
 
   ret = xd3_get_appheader(stream, &apphead, &appheadsz);
 
   /* Ignore failure, it only means we haven't received a header yet. */
   if (ret != 0) {
-    return;
+    return 0;
   }
 
   if (appheadsz > 0) {
@@ -3368,17 +3376,23 @@ static void main_get_appheader(xd3_stream *stream, main_file *ifile,
 
     /* First take the output parameters. */
     if (place == 2 || place == 4) {
-      main_get_appheader_params(output, parsed, 1, "output", ifile);
+      if ((ret = main_get_appheader_params(output, parsed, 1, "output",
+                                           ifile)) != 0) {
+        return ret;
+      }
     }
 
     /* Then take the source parameters. */
     if (place == 4) {
-      main_get_appheader_params(sfile, parsed + 2, 0, "source", ifile);
+      if ((ret = main_get_appheader_params(sfile, parsed + 2, 0, "source",
+                                           ifile)) != 0) {
+        return ret;
+      }
     }
   }
 
   option_use_appheader = 0;
-  return;
+  return 0;
 }
 
 /*********************************************************************
@@ -3489,6 +3503,7 @@ static usize_t main_get_winsize(main_file *ifile) {
 static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
                       main_file *sfile) {
   int ret;
+  int exit_code = EXIT_FAILURE;
   xd3_stream stream;
   size_t nread = 0;
   usize_t winsize;
@@ -3555,7 +3570,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     input_func = xd3_decode_input;
 
     if ((ret = main_init_recode_stream())) {
-      return EXIT_FAILURE;
+      goto cleanup;
     }
 
     if (cmd == CMD_RECODE) {
@@ -3594,7 +3609,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
             (got < XD3_SOFTCFG_VARCNT - 1 && *e == 0) ||
             (got == XD3_SOFTCFG_VARCNT - 1 && *e != 0)) {
           XPR(NT "invalid string match specifier (-C) %d: %s\n", got, s);
-          return EXIT_FAILURE;
+          goto cleanup;
         }
       }
 
@@ -3636,7 +3651,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     break;
   default:
     XPR(NT "internal error\n");
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 
 #if XD3_ENCODER
@@ -3646,7 +3661,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     if ((ret = main_apphead_filename(ifile->filename, "input", &name)) ||
         (sfile->filename != NULL &&
          (ret = main_apphead_filename(sfile->filename, "source", &name)))) {
-      return EXIT_FAILURE;
+      goto cleanup;
     }
   }
 #endif
@@ -3656,7 +3671,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     xoff_t input_size;
     if (main_file_stat(ifile, &input_size) != 0) {
       XPR(NT "armor requires a seekable target: %s\n", ifile->filename);
-      return EXIT_FAILURE;
+      goto cleanup;
     }
   }
 #endif
@@ -3664,7 +3679,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
   main_bsize = winsize = main_get_winsize(ifile);
 
   if ((main_bdata = (uint8_t *)main_bufalloc(winsize)) == NULL) {
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 
   config.winsize = winsize;
@@ -3674,14 +3689,14 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
   if ((ret = main_set_secondary_flags(&config)) ||
       (ret = xd3_config_stream(&stream, &config))) {
     XPR(NT XD3_LIB_ERRMSG(&stream, ret));
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 
 #if VCDIFF_TOOLS
   if ((cmd == CMD_MERGE || cmd == CMD_MERGE_ARG) &&
       (ret = xd3_whole_state_init(&stream))) {
     XPR(NT XD3_LIB_ERRMSG(&stream, ret));
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 #endif
 
@@ -3690,7 +3705,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
      * step until XD3_GOTHEADER. */
     if (sfile && sfile->filename != NULL) {
       if ((ret = main_set_source(&stream, cmd, sfile, &source))) {
-        return EXIT_FAILURE;
+        goto cleanup;
       }
 
       XD3_ASSERT(stream.src != NULL);
@@ -3702,7 +3717,9 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     if (sfile->filename == NULL) {
       allow_fake_source = 1;
       sfile->filename = "<placeholder>";
-      main_set_source(&stream, cmd, sfile, &source);
+      if ((ret = main_set_source(&stream, cmd, sfile, &source)) != 0) {
+        goto cleanup;
+      }
     }
   }
 
@@ -3722,7 +3739,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
     try_read = (usize_t)xd3_min((xoff_t)config.winsize, input_remain);
 
     if ((ret = main_read_primary_input(ifile, main_bdata, try_read, &nread))) {
-      return EXIT_FAILURE;
+      goto cleanup;
     }
 
     /* If we've reached EOF tell the stream to flush. */
@@ -3736,7 +3753,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
      * header. */
     if (cmd == CMD_ENCODE &&
         (ret = main_set_appheader(&stream, ifile, sfile))) {
-      return EXIT_FAILURE;
+      goto cleanup;
     }
 #endif
     xd3_avail_input(&stream, main_bdata, nread);
@@ -3762,12 +3779,14 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
        * the sources. */
       if (cmd == CMD_DECODE) {
         /* May need to set the sfile->filename if none was given. */
-        main_get_appheader(&stream, ifile, ofile, sfile);
+        if ((ret = main_get_appheader(&stream, ifile, ofile, sfile)) != 0) {
+          goto cleanup;
+        }
 
         /* Now open the source file. */
         if ((sfile->filename != NULL) &&
             (ret = main_set_source(&stream, cmd, sfile, &source))) {
-          return EXIT_FAILURE;
+          goto cleanup;
         }
 
 #if XD3_ARMOR
@@ -3780,13 +3799,13 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
           if (sfile->filename == NULL) {
             XPR(NT "armor: this delta requires a source but none was given; "
                    "use -a to skip armor verification\n");
-            return EXIT_FAILURE;
+            goto cleanup;
           }
           if (sfile->realname != NULL && strcmp(sfile->realname, "-") == 0) {
             nonseekable = 1;
           } else if ((ret = main_armor_hash_file(sfile->filename, "source", got,
                                                  &nonseekable))) {
-            return EXIT_FAILURE;
+            goto cleanup;
           }
           if (nonseekable) {
             /* A streaming (non-seekable) source cannot be read a second time
@@ -3804,14 +3823,15 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
               XPR(NT "the source is already up to date: %s\n", sfile->filename);
               XPR(NT "it already matches the target of this patch; "
                      "nothing to do\n");
-              return EXIT_ARMOR_UP_TO_DATE;
+              exit_code = EXIT_ARMOR_UP_TO_DATE;
+              goto cleanup;
             }
             XPR(NT "source file BLAKE3 mismatch: %s\n", sfile->filename);
             XPR(NT "  expected %s\n", armor_expect_source);
             XPR(NT "  actual   %s\n", got);
             XPR(NT "the supplied source does not match the one used to build "
                    "this patch\n");
-            return EXIT_FAILURE;
+            goto cleanup;
           } else if (option_verbose) {
             XPR(NT "armor: source verified (%s)\n", sfile->filename);
           }
@@ -3836,7 +3856,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
         if (armor_merge_broken) {
           XPR(NT "armor: refusing to merge a broken armored chain; "
                  "use -a to disable armor\n");
-          return EXIT_FAILURE;
+          goto cleanup;
         }
       }
 #endif
@@ -3856,11 +3876,11 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
        * open.) */
       if (ofile != NULL && !main_file_isopen(ofile) &&
           (ret = main_open_output(&stream, ofile)) != 0) {
-        return EXIT_FAILURE;
+        goto cleanup;
       }
 
       if ((ret = output_func(&stream, ofile)) && (ret != PRINTHDR_SPECIAL)) {
-        return EXIT_FAILURE;
+        goto cleanup;
       }
 
       if (ret == PRINTHDR_SPECIAL) {
@@ -3956,7 +3976,7 @@ static int main_input(xd3_cmd cmd, main_file *ifile, main_file *ofile,
         XPR(NT "please verify the source file with sha1sum or "
                "equivalent\n");
       }
-      return EXIT_FAILURE;
+      goto cleanup;
     }
   } while (nread == config.winsize);
 done:
@@ -3968,7 +3988,7 @@ done:
 
 #if VCDIFF_TOOLS
   if (cmd == CMD_MERGE && (ret = main_merge_output(&stream, ofile))) {
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 
   if (cmd == CMD_MERGE_ARG) {
@@ -3984,13 +4004,13 @@ done:
   if (!option_no_output && ofile != NULL) {
     if (!stdout_only && !main_file_isopen(ofile)) {
       XPR(NT "nothing to output: %s\n", ifile->filename);
-      return EXIT_FAILURE;
+      goto cleanup;
     }
 
     /* Have to close the output before calling
      * main_external_compression_finish, or else it hangs. */
     if (main_file_close(ofile) != 0) {
-      return EXIT_FAILURE;
+      goto cleanup;
     }
   }
 
@@ -4011,7 +4031,7 @@ done:
       XPR(NT "target BLAKE3 mismatch after apply: %s\n", oname);
       XPR(NT "  expected %s\n", armor_expect_target);
       XPR(NT "  actual   %s\n", got);
-      return EXIT_FAILURE;
+      goto cleanup;
     }
     if (option_verbose) {
       XPR(NT "armor: target verified\n");
@@ -4022,13 +4042,13 @@ done:
 #if EXTERNAL_COMPRESSION
   if ((ret = main_external_compression_finish())) {
     XPR(NT "external compression commands failed\n");
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 #endif
 
   if ((ret = xd3_close_stream(&stream))) {
     XPR(NT XD3_LIB_ERRMSG(&stream, ret));
-    return EXIT_FAILURE;
+    goto cleanup;
   }
 
 #if XD3_ENCODER
@@ -4057,9 +4077,11 @@ done:
   }
 #endif
 
+  exit_code = EXIT_SUCCESS;
+cleanup:
   xd3_free_stream(&stream);
 
-  if (option_verbose) {
+  if (exit_code == EXIT_SUCCESS && option_verbose) {
     shortbuf tm;
     long end_time = get_millisecs_now();
     xoff_t nwrite = ofile != NULL ? ofile->nwrite : 0;
@@ -4070,7 +4092,7 @@ done:
         100.0 * nwrite / ifile->nread);
   }
 
-  return EXIT_SUCCESS;
+  return exit_code;
 }
 
 /* free memory before exit, reset single-use variables. */
