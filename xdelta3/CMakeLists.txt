@@ -344,6 +344,13 @@ if(XD3_BUILD_TESTS)
   # POSIX external-compression path is compiled (i.e. not the Windows
   # decode-only target); the script itself SKIPs when bzip2 is unavailable.
   if(NOT WIN32)
+    add_test(NAME xdelta3_external_compression_magic_test
+      COMMAND ${CMAKE_COMMAND} -E env
+        sh ${CMAKE_CURRENT_SOURCE_DIR}/testing/external_compression_magic_test.sh
+        $<TARGET_FILE:xdelta3>)
+    set_tests_properties(xdelta3_external_compression_magic_test
+      PROPERTIES TIMEOUT 120)
+
     add_test(NAME xdelta3_recompress_level_test
       COMMAND ${CMAKE_COMMAND} -E env
         sh ${CMAKE_CURRENT_SOURCE_DIR}/testing/recompress_level_test.sh
