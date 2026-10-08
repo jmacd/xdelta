@@ -3,6 +3,15 @@ Xdelta 3 NEWS
 Please file bug reports at https://github.com/jmacd/xdelta/issues.
 
 
+** Changes in version 3.2.2
+
+* Handle allocation failures throughout the encoder, decoder, merge, and
+  application-header paths without leaking memory or dereferencing null
+  pointers.
+
+* Require the complete XZ magic signature before invoking external
+  decompression.
+
 ** Changes in version 3.2.1
 
 * Support standard input as the source file when encoding or decoding.
