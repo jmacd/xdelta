@@ -3498,6 +3498,74 @@ static int test_decode_empty_sections(xd3_stream *stream, int ignore) {
   return 0;
 }
 
+static int test_decode_add_bounds(xd3_stream *stream, int ignore) {
+  static const uint8_t data[] = {'a', 'b'};
+  static const struct {
+    const uint8_t *buf;
+    const uint8_t *end;
+    usize_t take;
+    int expected;
+  } cases[] = {
+      {NULL, NULL, 0, 0},
+      {NULL, NULL, 1, XD3_INVALID_INPUT},
+      {data + 2, data + 2, 0, 0},
+      {data + 2, data + 2, 1, XD3_INVALID_INPUT},
+      {data, data + 2, 3, XD3_INVALID_INPUT},
+      {data, data + 2, USIZE_T_MAX, XD3_INVALID_INPUT},
+      {data, data + 2, 2, 0},
+  };
+  static const uint8_t empty_data[] = {
+      0xd6, 0xc3, 0xc4, 0, 0, 0, 6, 1, 0, 0, 1, 0, 2};
+  static const uint8_t short_data[] = {
+      0xd6, 0xc3, 0xc4, 0, 0, 0, 7, 2, 0, 1, 1, 0, 'a', 3};
+  static const uint8_t poc[] = {
+      0xcd, 0xd3, 0xba, 0xa9, 1, 0x67, 0x2f, 3,
+      0, 0, 0x64, 0xd6, 0xff, 0x25, 0xd1,
+      0xd6, 0xc3, 0xc4, 0, 0, 0, 9, 2, 0, 0, 1, 3, 2, 0xff, 0xfa, 0xf8};
+  uint8_t output[2];
+  usize_t output_size;
+  usize_t i;
+
+  for (i = 0; i < SIZEOF_ARRAY(cases); ++i) {
+    xd3_hinst inst;
+    const uint8_t *expected_buf = cases[i].buf;
+    int ret;
+    memset(&inst, 0, sizeof(inst));
+    memset(output, 0, sizeof(output));
+    inst.type = XD3_ADD;
+    inst.size = cases[i].take;
+    stream->data_sect.buf = cases[i].buf;
+    stream->data_sect.buf_max = cases[i].end;
+    stream->next_out = output;
+    stream->avail_out = 0;
+    stream->space_out = USIZE_T_MAX;
+    stream->msg = NULL;
+    ret = xd3_decode_output_halfinst(stream, &inst);
+    CHECK(ret == cases[i].expected);
+    if (ret != 0) {
+      CHECK(MSG_IS("data underflow"));
+      CHECK(stream->avail_out == 0 && inst.type == XD3_ADD);
+      CHECK(output[0] == 0 && output[1] == 0);
+    } else {
+      CHECK(inst.type == XD3_NOOP);
+      CHECK(stream->avail_out == cases[i].take);
+      if (cases[i].take != 0) {
+        expected_buf += cases[i].take;
+        CHECK(memcmp(output, data, cases[i].take) == 0);
+      }
+    }
+    CHECK(stream->data_sect.buf == expected_buf);
+  }
+
+  CHECK(xd3_decode_memory(empty_data, sizeof(empty_data), NULL, 0, output,
+                          &output_size, sizeof(output), 0) == XD3_INVALID_INPUT);
+  CHECK(xd3_decode_memory(short_data, sizeof(short_data), NULL, 0, output,
+                          &output_size, sizeof(output), 0) == XD3_INVALID_INPUT);
+  CHECK(xd3_decode_memory(poc + 15, sizeof(poc) - 15, poc, 15, output,
+                          &output_size, sizeof(output), 0) == XD3_INVALID_INPUT);
+  return 0;
+}
+
 static int test_in_memory(xd3_stream *stream, int ignore) {
   // test_text is 256 bytes
   uint8_t ibuf[sizeof(test_text)];
@@ -3648,6 +3716,7 @@ int xd3_selftest(void) {
   DO_TEST(choose_instruction, 0, 0);
   DO_TEST(identical_behavior, 0, 0);
   DO_TEST(decode_empty_sections, 0, 0);
+  DO_TEST(decode_add_bounds, 0, 0);
   DO_TEST(in_memory, 0, 0);
 
   DO_TEST(iopt_flush_instructions, 0, 0);

@@ -371,8 +371,14 @@ static int xd3_decode_output_halfinst(xd3_stream *stream, xd3_hinst *inst) {
     break;
   }
   case XD3_ADD: {
-    /* Require at least TAKE data bytes. */
-    if (stream->data_sect.buf + take > stream->data_sect.buf_max) {
+    if (take == 0) {
+      inst->type = XD3_NOOP;
+      break;
+    }
+
+    /* Check the length before pointer arithmetic; empty buffers may be NULL. */
+    if (stream->data_sect.buf == stream->data_sect.buf_max ||
+        take > (usize_t)(stream->data_sect.buf_max - stream->data_sect.buf)) {
       stream->msg = "data underflow";
       return XD3_INVALID_INPUT;
     }
