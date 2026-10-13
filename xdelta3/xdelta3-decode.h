@@ -222,7 +222,9 @@ static int xd3_decode_section(xd3_stream *stream, xd3_desect *section,
   XD3_ASSERT(section->pos == section->size);
 
   stream->dec_state = nstate;
-  section->buf_max = section->buf + section->size;
+  /* Empty sections may have a NULL buffer and size=0, avoid NULL + 0. */
+  section->buf_max =
+      section->size ? section->buf + section->size : section->buf;
   section->pos = 0;
   return 0;
 }

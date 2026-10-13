@@ -3437,6 +3437,67 @@ static int test_source_cksum_offset(xd3_stream *stream, int ignore) {
 }
 #endif /* !XD3_USE_LARGESIZET */
 
+static int test_decode_empty_sections(xd3_stream *stream, int ignore) {
+  xd3_desect *sections[] = {
+      &stream->data_sect, &stream->inst_sect, &stream->addr_sect};
+  xd3_decode_state states[] = {DEC_DATA, DEC_INST, DEC_ADDR, DEC_EMIT};
+  static const uint8_t bytes[] = {'a', 'b'};
+  static const uint8_t add_delta[] = {
+      0xd6, 0xc3, 0xc4, 0, 0, 0, 7, 1, 0, 1, 1, 0, 'a', 2};
+  static const uint8_t copy_delta[] = {
+      0xd6, 0xc3, 0xc4, 0, 0, 1, 1, 0, 8, 1, 0, 0, 2, 1, 19, 1, 0};
+  static const uint8_t multi_delta[] = {
+      0xd6, 0xc3, 0xc4, 0, 0, 0, 7, 1, 0, 1, 1, 0, 'a', 2,
+      1, 1, 0, 8, 1, 0, 0, 2, 1, 19, 1, 0};
+  uint8_t output[2];
+  usize_t output_size;
+  usize_t i;
+  int ret;
+
+  for (i = 0; i < SIZEOF_ARRAY(sections); ++i) {
+    xd3_desect *section = sections[i];
+    stream->dec_state = states[i];
+    CHECK(section->buf == NULL);
+    CHECK(xd3_decode_section(stream, section, states[i + 1], 1) == 0);
+    CHECK(section->buf_max == NULL);
+    CHECK(stream->dec_state == states[i + 1]);
+    CHECK(section->pos == 0);
+
+    /* Fill a section across two calls, then reuse it for an empty section. */
+    section->size = sizeof(bytes);
+    stream->dec_state = states[i];
+    xd3_avail_input(stream, bytes, 1);
+    CHECK(xd3_decode_section(stream, section, states[i + 1], 1) == XD3_INPUT);
+    CHECK(section->pos == 1);
+    xd3_avail_input(stream, bytes + 1, 1);
+    CHECK(xd3_decode_section(stream, section, states[i + 1], 1) == 0);
+    CHECK(section->buf_max == section->buf + sizeof(bytes));
+    CHECK(memcmp(section->buf, bytes, sizeof(bytes)) == 0);
+    section->size = 0;
+    stream->dec_state = states[i];
+    CHECK(xd3_decode_section(stream, section, states[i + 1], 1) == 0);
+    CHECK(section->buf_max == section->buf);
+    CHECK(section->pos == 0);
+  }
+
+  if ((ret = xd3_decode_memory(add_delta, sizeof(add_delta), NULL, 0, output,
+                               &output_size, sizeof(output), 0))) {
+    return ret;
+  }
+  CHECK(output_size == 1 && output[0] == 'a');
+  if ((ret = xd3_decode_memory(copy_delta, sizeof(copy_delta), bytes, 1,
+                               output, &output_size, sizeof(output), 0))) {
+    return ret;
+  }
+  CHECK(output_size == 1 && output[0] == 'a');
+  if ((ret = xd3_decode_memory(multi_delta, sizeof(multi_delta), bytes, 1,
+                               output, &output_size, sizeof(output), 0))) {
+    return ret;
+  }
+  CHECK(output_size == 2 && memcmp(output, "aa", 2) == 0);
+  return 0;
+}
+
 static int test_in_memory(xd3_stream *stream, int ignore) {
   // test_text is 256 bytes
   uint8_t ibuf[sizeof(test_text)];
@@ -3586,6 +3647,7 @@ int xd3_selftest(void) {
   DO_TEST(string_matching, 0, 0);
   DO_TEST(choose_instruction, 0, 0);
   DO_TEST(identical_behavior, 0, 0);
+  DO_TEST(decode_empty_sections, 0, 0);
   DO_TEST(in_memory, 0, 0);
 
   DO_TEST(iopt_flush_instructions, 0, 0);
