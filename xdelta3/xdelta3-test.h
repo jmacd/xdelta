@@ -3438,17 +3438,17 @@ static int test_source_cksum_offset(xd3_stream *stream, int ignore) {
 #endif /* !XD3_USE_LARGESIZET */
 
 static int test_decode_empty_sections(xd3_stream *stream, int ignore) {
-  xd3_desect *sections[] = {
-      &stream->data_sect, &stream->inst_sect, &stream->addr_sect};
+  xd3_desect *sections[] = {&stream->data_sect, &stream->inst_sect,
+                            &stream->addr_sect};
   xd3_decode_state states[] = {DEC_DATA, DEC_INST, DEC_ADDR, DEC_EMIT};
   static const uint8_t bytes[] = {'a', 'b'};
-  static const uint8_t add_delta[] = {
-      0xd6, 0xc3, 0xc4, 0, 0, 0, 7, 1, 0, 1, 1, 0, 'a', 2};
-  static const uint8_t copy_delta[] = {
-      0xd6, 0xc3, 0xc4, 0, 0, 1, 1, 0, 8, 1, 0, 0, 2, 1, 19, 1, 0};
-  static const uint8_t multi_delta[] = {
-      0xd6, 0xc3, 0xc4, 0, 0, 0, 7, 1, 0, 1, 1, 0, 'a', 2,
-      1, 1, 0, 8, 1, 0, 0, 2, 1, 19, 1, 0};
+  static const uint8_t add_delta[] = {0xd6, 0xc3, 0xc4, 0, 0, 0,   7,
+                                      1,    0,    1,    1, 0, 'a', 2};
+  static const uint8_t copy_delta[] = {0xd6, 0xc3, 0xc4, 0, 0, 1,  1, 0, 8,
+                                       1,    0,    0,    2, 1, 19, 1, 0};
+  static const uint8_t multi_delta[] = {0xd6, 0xc3, 0xc4, 0,   0, 0,  7, 1, 0,
+                                        1,    1,    0,    'a', 2, 1,  1, 0, 8,
+                                        1,    0,    0,    2,   1, 19, 1, 0};
   uint8_t output[2];
   usize_t output_size;
   usize_t i;
@@ -3485,8 +3485,8 @@ static int test_decode_empty_sections(xd3_stream *stream, int ignore) {
     return ret;
   }
   CHECK(output_size == 1 && output[0] == 'a');
-  if ((ret = xd3_decode_memory(copy_delta, sizeof(copy_delta), bytes, 1,
-                               output, &output_size, sizeof(output), 0))) {
+  if ((ret = xd3_decode_memory(copy_delta, sizeof(copy_delta), bytes, 1, output,
+                               &output_size, sizeof(output), 0))) {
     return ret;
   }
   CHECK(output_size == 1 && output[0] == 'a');
@@ -3514,14 +3514,14 @@ static int test_decode_add_bounds(xd3_stream *stream, int ignore) {
       {data, data + 2, USIZE_T_MAX, XD3_INVALID_INPUT},
       {data, data + 2, 2, 0},
   };
-  static const uint8_t empty_data[] = {
-      0xd6, 0xc3, 0xc4, 0, 0, 0, 6, 1, 0, 0, 1, 0, 2};
-  static const uint8_t short_data[] = {
-      0xd6, 0xc3, 0xc4, 0, 0, 0, 7, 2, 0, 1, 1, 0, 'a', 3};
-  static const uint8_t poc[] = {
-      0xcd, 0xd3, 0xba, 0xa9, 1, 0x67, 0x2f, 3,
-      0, 0, 0x64, 0xd6, 0xff, 0x25, 0xd1,
-      0xd6, 0xc3, 0xc4, 0, 0, 0, 9, 2, 0, 0, 1, 3, 2, 0xff, 0xfa, 0xf8};
+  static const uint8_t empty_data[] = {0xd6, 0xc3, 0xc4, 0, 0, 0, 6,
+                                       1,    0,    0,    1, 0, 2};
+  static const uint8_t short_data[] = {0xd6, 0xc3, 0xc4, 0, 0, 0,   7,
+                                       2,    0,    1,    1, 0, 'a', 3};
+  static const uint8_t poc[] = {0xcd, 0xd3, 0xba, 0xa9, 1,    0x67, 0x2f, 3,
+                                0,    0,    0x64, 0xd6, 0xff, 0x25, 0xd1, 0xd6,
+                                0xc3, 0xc4, 0,    0,    0,    9,    2,    0,
+                                0,    1,    3,    2,    0xff, 0xfa, 0xf8};
   uint8_t output[2];
   usize_t output_size;
   usize_t i;
@@ -3558,11 +3558,14 @@ static int test_decode_add_bounds(xd3_stream *stream, int ignore) {
   }
 
   CHECK(xd3_decode_memory(empty_data, sizeof(empty_data), NULL, 0, output,
-                          &output_size, sizeof(output), 0) == XD3_INVALID_INPUT);
+                          &output_size, sizeof(output),
+                          0) == XD3_INVALID_INPUT);
   CHECK(xd3_decode_memory(short_data, sizeof(short_data), NULL, 0, output,
-                          &output_size, sizeof(output), 0) == XD3_INVALID_INPUT);
+                          &output_size, sizeof(output),
+                          0) == XD3_INVALID_INPUT);
   CHECK(xd3_decode_memory(poc + 15, sizeof(poc) - 15, poc, 15, output,
-                          &output_size, sizeof(output), 0) == XD3_INVALID_INPUT);
+                          &output_size, sizeof(output),
+                          0) == XD3_INVALID_INPUT);
   return 0;
 }
 
