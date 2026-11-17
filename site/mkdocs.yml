@@ -61,3 +61,4 @@ nav:
   - Project:
       - Licensing: licensing.md
       - Projects using Xdelta3: projects.md
+  - Blog archive: blog/index.md
