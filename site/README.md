@@ -8,6 +8,10 @@ The pages here were migrated from the project's old `wiki` branch and updated
 for the current 3.2.x sources (armor mode, liblzma, `merge`/`recode`, and the
 Apache 2.0 license).
 
+The historical Blogger archive lives in `docs/blog/` and is published as ordinary
+MkDocs pages, with a dated index and no additional blog plugin. Its 2004-2016 posts
+retain their original content and are not current documentation.
+
 ## Build and preview locally
 
 ```sh
