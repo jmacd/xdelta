@@ -418,6 +418,9 @@ uint64_t xd3_large64_cksum_update(xd3_hash_cfg *cfg, const uint64_t cksum,
 #endif /* USE_UINT64 */
 
 #define MAX_LRU_SIZE 32U
+/* Most and smallest blocks the CLI splits a source window into */
+#define MAX_SRC_BUFS 4096U
+#define MIN_SRC_BLKSZ (1U << 16)
 #define XD3_SRCWIN_STATS (1U << 12)
 #define XD3_MINSRCWINSZ XD3_ALLOCSIZE
 
