@@ -75,6 +75,7 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   usize_t i;
   xoff_t source_size = 0;
   usize_t source_window_size;
+  usize_t nblks;
   size_t source_window_alloc;
   usize_t blksize;
 
@@ -147,13 +148,15 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * (lru_size==1) source block.  Otherwise, we know that at least
    * option_srcwinsz bytes are available.  Split the source window
    * into buffers. */
-  if ((lru = (main_blklru *)main_malloc(MAX_SRC_BUFS * sizeof(main_blklru))) ==
-      NULL) {
+  nblks = source_window_size / MIN_SRC_BLKSZ;
+  nblks = xd3_max(MAX_LRU_SIZE, xd3_min(nblks, MAX_SRC_BUFS));
+
+  if ((lru = (main_blklru *)main_malloc(nblks * sizeof(main_blklru))) == NULL) {
     ret = ENOMEM;
     return ret;
   }
 
-  memset(lru, 0, sizeof(lru[0]) * MAX_SRC_BUFS);
+  memset(lru, 0, sizeof(lru[0]) * nblks);
 
   /* Allocate the entire buffer. */
   if ((lru[0].blk = (uint8_t *)main_bufalloc(source_window_alloc)) == NULL) {
@@ -198,18 +201,15 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * "lru").  Small blocks keep a miss from re-reading far more of the
    * source than a copy needs. */
   if (!sfile->size_known || source_size > option_srcwinsz) {
-    usize_t nbufs = source_window_size / MIN_SRC_BLKSZ;
-    nbufs = xd3_max(MAX_LRU_SIZE, xd3_min(nbufs, MAX_SRC_BUFS));
-
     /* Modify block 0, change blocksize. */
-    blksize = source_window_size / nbufs;
+    blksize = source_window_size / nblks;
     source->blksize = blksize;
     source->onblk = blksize;
     source->onlastblk = blksize;
-    source->max_blkno = nbufs - 1;
+    source->max_blkno = nblks - 1;
 
     lru[0].size = blksize;
-    lru_size = nbufs;
+    lru_size = nblks;
 
     /* Setup rest of blocks. */
     for (i = 1; i < lru_size; i += 1) {
