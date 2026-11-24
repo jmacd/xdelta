@@ -7,6 +7,17 @@ on:
   workflow_dispatch:
 
 jobs:
+  dco:
+    name: DCO
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: christophebedard/dco-check@ce494b79603fa6a2d61ce759a6fe051a67219c1c # 0.6.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
   clang-format:
     name: clang-format check
     runs-on: ubuntu-latest
