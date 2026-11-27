@@ -31,6 +31,7 @@ struct _main_blklru {
   xoff_t blkno;
   usize_t size;
   main_blklru_list link;
+  main_blklru *hnext; /* next in its lru_hash bucket */
 };
 
 XD3_MAKELIST(main_blklru_list, main_blklru, link);
@@ -38,6 +39,8 @@ XD3_MAKELIST(main_blklru_list, main_blklru, link);
 static usize_t lru_size = 0;
 static main_blklru *lru = NULL; /* array of lru_size elts */
 static main_blklru_list lru_list;
+static main_blklru **lru_hash = NULL; /* blocks by blkno & lru_hash_mask */
+static usize_t lru_hash_mask = 0;
 static int do_src_fifo = 0; /* set to avoid lru */
 
 static int lru_hits = 0;
@@ -47,6 +50,8 @@ static int lru_filled = 0;
 static void main_lru_reset(void) {
   lru_size = 0;
   lru = NULL;
+  lru_hash = NULL;
+  lru_hash_mask = 0;
   do_src_fifo = 0;
   lru_hits = 0;
   lru_misses = 0;
@@ -60,10 +65,33 @@ static void main_lru_cleanup(void) {
 
   main_free(lru);
   lru = NULL;
+  main_free(lru_hash);
+  lru_hash = NULL;
 
   lru_hits = 0;
   lru_misses = 0;
   lru_filled = 0;
+}
+
+/* Moves a block to the lru_hash bucket of its new blkno */
+static void main_lru_set_blkno(main_blklru *blru, xoff_t blkno) {
+  main_blklru **p;
+
+  if (blru->blkno != XD3_INVALID_OFFSET) {
+    for (p = &lru_hash[blru->blkno & lru_hash_mask]; *p != blru;
+         p = &(*p)->hnext) {
+    }
+    *p = blru->hnext;
+  }
+
+  blru->blkno = blkno;
+  blru->hnext = NULL;
+
+  if (blkno != XD3_INVALID_OFFSET) {
+    p = &lru_hash[blkno & lru_hash_mask];
+    blru->hnext = *p;
+    *p = blru;
+  }
 }
 
 /* This is called at different times for encoding and decoding.  The
@@ -75,6 +103,7 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   usize_t i;
   xoff_t source_size = 0;
   usize_t source_window_size;
+  usize_t nblks;
   size_t source_window_alloc;
   usize_t blksize;
 
@@ -147,13 +176,33 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * (lru_size==1) source block.  Otherwise, we know that at least
    * option_srcwinsz bytes are available.  Split the source window
    * into buffers. */
-  if ((lru = (main_blklru *)main_malloc(MAX_LRU_SIZE * sizeof(main_blklru))) ==
+  /* Only the decoder uses smaller blocks: the encoder's 1/32 blocks give it
+   * more lookahead, and decoders of any version rely on them */
+  nblks = MAX_LRU_SIZE;
+  if (cmd == CMD_DECODE) {
+    nblks = source_window_size / MIN_SRC_BLKSZ;
+    nblks = xd3_max(MAX_LRU_SIZE, xd3_min(nblks, MAX_SRC_BUFS));
+  }
+
+  if ((lru = (main_blklru *)main_malloc(nblks * sizeof(main_blklru))) == NULL) {
+    ret = ENOMEM;
+    return ret;
+  }
+
+  memset(lru, 0, sizeof(lru[0]) * nblks);
+
+  if ((lru_hash = (main_blklru **)main_malloc(nblks * sizeof(main_blklru *))) ==
       NULL) {
     ret = ENOMEM;
     return ret;
   }
 
-  memset(lru, 0, sizeof(lru[0]) * MAX_LRU_SIZE);
+  memset(lru_hash, 0, sizeof(lru_hash[0]) * nblks);
+  lru_hash_mask = nblks - 1;
+
+  for (i = 0; i < nblks; i += 1) {
+    lru[i].blkno = XD3_INVALID_OFFSET;
+  }
 
   /* Allocate the entire buffer. */
   if ((lru[0].blk = (uint8_t *)main_bufalloc(source_window_alloc)) == NULL) {
@@ -165,7 +214,6 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
    * is the point at which external decompression may begin.  Set the
    * system for a single block. */
   lru_size = 1;
-  lru[0].blkno = XD3_INVALID_OFFSET;
   blksize = source_window_size;
   main_blklru_list_push_back(&lru_list, &lru[0]);
   XD3_ASSERT(blksize != 0);
@@ -194,23 +242,24 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
   }
 
   /* If the size is not known or is greater than the buffer size, we
-   * split the buffer across MAX_LRU_SIZE blocks (already allocated in
-   * "lru"). */
+   * split the buffer across lru_size blocks (already allocated in
+   * "lru").  Small blocks keep a miss from re-reading far more of the
+   * source than a copy needs. */
   if (!sfile->size_known || source_size > option_srcwinsz) {
     /* Modify block 0, change blocksize. */
-    blksize = source_window_size / MAX_LRU_SIZE;
+    blksize = source_window_size / nblks;
     source->blksize = blksize;
     source->onblk = blksize;
     source->onlastblk = blksize;
-    source->max_blkno = MAX_LRU_SIZE - 1;
+    source->max_blkno = nblks - 1;
 
     lru[0].size = blksize;
-    lru_size = MAX_LRU_SIZE;
+    lru_size = nblks;
 
     /* Setup rest of blocks. */
     for (i = 1; i < lru_size; i += 1) {
       lru[i].blk = lru[0].blk + (blksize * i);
-      lru[i].blkno = i;
+      main_lru_set_blkno(&lru[i], i);
       lru[i].size = blksize;
       main_blklru_list_push_back(&lru_list, &lru[i]);
     }
@@ -269,7 +318,6 @@ static int main_set_source(xd3_stream *stream, xd3_cmd cmd, main_file *sfile,
 static int main_getblk_lru(xd3_source *source, xoff_t blkno,
                            main_blklru **blrup, int *is_new) {
   main_blklru *blru = NULL;
-  usize_t i;
 
   (*is_new) = 0;
 
@@ -286,9 +334,8 @@ static int main_getblk_lru(xd3_source *source, xoff_t blkno,
       return XD3_TOOFARBACK;
     }
   } else {
-    /* Sequential search through LRU. */
-    for (i = 0; i < lru_size; i += 1) {
-      blru = &lru[i];
+    for (blru = lru_hash[blkno & lru_hash_mask]; blru != NULL;
+         blru = blru->hnext) {
       if (blru->blkno == blkno) {
         main_blklru_list_remove(blru);
         main_blklru_list_push_back(&lru_list, blru);
@@ -316,7 +363,7 @@ static int main_getblk_lru(xd3_source *source, xoff_t blkno,
   lru_filled += 1;
   (*is_new) = 1;
   (*blrup) = blru;
-  blru->blkno = XD3_INVALID_OFFSET;
+  main_lru_set_blkno(blru, XD3_INVALID_OFFSET);
   return 0;
 }
 
@@ -390,7 +437,7 @@ static int main_read_seek_source(xd3_stream *stream, xd3_source *source,
       }
 
       XD3_ASSERT(is_new);
-      blru->blkno = skip_blkno;
+      main_lru_set_blkno(blru, skip_blkno);
 
       if ((ret = main_read_primary_input(sfile, (uint8_t *)blru->blk,
                                          source->blksize, &nread))) {
@@ -499,7 +546,7 @@ static int main_getblk_func(xd3_stream *stream, xd3_source *source,
   source->curblkno = blkno;
   source->onblk = nread;
   blru->size = nread;
-  blru->blkno = blkno;
+  main_lru_set_blkno(blru, blkno);
 
   IF_DEBUG1(DP(RINT "[main_getblk] blkno %" XD3_Q "u onblk %" XD3_Z
                     "u pos %" XD3_Q "u "

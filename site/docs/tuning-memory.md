@@ -57,7 +57,9 @@ times as much memory as `-1`.
 To decode, `-B` and `-W` are used much as for encoding. For the source buffer,
 the decoder uses the smaller of `-B` or the source file size. Setting `-B`
 smaller than the value used to encode causes seeking, served by an LRU cache of
-blocks.
+blocks. When the source doesn't fit in `-B`, the decoder splits `-B` into
+blocks of at least 64 KiB, up to 4096 of them, so each cache miss re-reads
+little more than a copy needs. Below 2 MiB, `-B` is split into 32 blocks.
 
 The input buffer is sized according to `-W`. In addition, the decoder allocates
 three buffers for the data, address, and instruction sections of a VCDIFF

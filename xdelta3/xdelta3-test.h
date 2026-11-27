@@ -3017,6 +3017,97 @@ static int test_srcwin_minimum(xd3_stream *stream, int ignore) {
   test_cleanup();
   return 0;
 }
+/* The decoder splits a 4 MiB window over a larger source into 64 blocks of
+ * 64 KiB, with both seekable and piped sources, while the encoder keeps 32. */
+static int test_srcwin_split(xd3_stream *stream, int ignore) {
+  const usize_t chunk = 1U << 16, nchunks = 128;
+  FILE *sf, *tf;
+  int ret, ok;
+  char buf[TESTBUFSIZE];
+  char vlog[TESTFILESIZE + sizeof(".vlog")];
+  uint8_t *data;
+  usize_t i;
+
+  test_setup();
+  if ((data = (uint8_t *)malloc(chunk * nchunks)) == NULL) {
+    return ENOMEM;
+  }
+  for (i = 0; i < chunk * nchunks; i += 1) {
+    data[i] = (uint8_t)mt_random(&static_mtrand);
+  }
+
+  /* The target has the source's chunks in reverse, so copies go backward */
+  if ((sf = fopen(TEST_SOURCE_FILE, "wb")) == NULL ||
+      (tf = fopen(TEST_TARGET_FILE, "wb")) == NULL) {
+    if (sf != NULL) {
+      fclose(sf);
+    }
+    free(data);
+    stream->msg = "srcwin: open failed";
+    return get_errno();
+  }
+  ok = fwrite(data, 1, chunk * nchunks, sf) == chunk * nchunks;
+  for (i = nchunks; ok && i > 0; i -= 1) {
+    ok = fwrite(data + (i - 1) * chunk, 1, chunk, tf) == chunk;
+  }
+  free(data);
+  ok &= fclose(sf) == 0;
+  ok &= fclose(tf) == 0;
+  if (!ok) {
+    stream->msg = "srcwin: write failed";
+    return get_errno();
+  }
+
+  snprintf_func(vlog, sizeof(vlog), "%s.vlog", TEST_DELTA_FILE);
+  snprintf_func(buf, TESTBUFSIZE, "%s -e -v -v -f -B 4194304 -s %s %s %s 2>%s",
+                program_name, TEST_SOURCE_FILE, TEST_TARGET_FILE,
+                TEST_DELTA_FILE, vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    return ret;
+  }
+
+  /* The encoder keeps its 32 blocks */
+  snprintf_func(buf, TESTBUFSIZE, "grep -q 'blksize 128 KiB.*#bufs 32' %s",
+                vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "srcwin: encoder did not keep 32 blocks";
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE, "%s -d -v -v -f -B 4194304 -s %s %s %s 2>%s",
+                program_name, TEST_SOURCE_FILE, TEST_DELTA_FILE,
+                TEST_RECON_FILE, vlog);
+  if ((ret = do_cmd(stream, buf)) ||
+      (ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE, "grep -q 'blksize 64.0 KiB.*#bufs 64' %s",
+                vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "srcwin: 4 MiB window was not split into 64 blocks";
+    return ret;
+  }
+
+  /* A pipe can't seek, so this decodes through the FIFO cache */
+  snprintf_func(
+      buf, TESTBUFSIZE, "cat %s | %s -d -v -v -f -B 4194304 -s - %s %s 2>%s",
+      TEST_SOURCE_FILE, program_name, TEST_DELTA_FILE, TEST_RECON_FILE, vlog);
+  if ((ret = do_cmd(stream, buf)) ||
+      (ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE, "grep -q '#bufs 64 (FIFO)' %s", vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "srcwin: piped source was not split into 64 FIFO blocks";
+    return ret;
+  }
+
+  test_unlink(vlog);
+  test_cleanup();
+  return 0;
+}
 #endif /* SHELL_TESTS */
 
 static int test_source_window_report(xd3_stream *stream, int ignore) {
@@ -3746,6 +3837,7 @@ int xd3_selftest(void) {
   DO_TEST(command_line_arguments, 0, 0);
   DO_TEST(srcwin_clamp, 0, 0);
   DO_TEST(srcwin_minimum, 0, 0);
+  DO_TEST(srcwin_split, 0, 0);
 #if XD3_ARMOR
   DO_TEST(armor, 0, 0);
 #endif
