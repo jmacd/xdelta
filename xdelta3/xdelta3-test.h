@@ -3022,7 +3022,7 @@ static int test_srcwin_minimum(xd3_stream *stream, int ignore) {
 static int test_srcwin_split(xd3_stream *stream, int ignore) {
   const usize_t chunk = 1U << 16, nchunks = 128;
   FILE *sf, *tf;
-  int ret;
+  int ret, ok;
   char buf[TESTBUFSIZE];
   char vlog[TESTFILESIZE + sizeof(".vlog")];
   uint8_t *data;
@@ -3046,13 +3046,15 @@ static int test_srcwin_split(xd3_stream *stream, int ignore) {
     stream->msg = "srcwin: open failed";
     return get_errno();
   }
-  fwrite(data, 1, chunk * nchunks, sf);
-  for (i = nchunks; i > 0; i -= 1) {
-    fwrite(data + (i - 1) * chunk, 1, chunk, tf);
+  ok = fwrite(data, 1, chunk * nchunks, sf) == chunk * nchunks;
+  for (i = nchunks; ok && i > 0; i -= 1) {
+    ok = fwrite(data + (i - 1) * chunk, 1, chunk, tf) == chunk;
   }
   free(data);
-  if (fclose(sf) != 0 || fclose(tf) != 0) {
-    stream->msg = "srcwin: close failed";
+  ok &= fclose(sf) == 0;
+  ok &= fclose(tf) == 0;
+  if (!ok) {
+    stream->msg = "srcwin: write failed";
     return get_errno();
   }
 
@@ -3087,11 +3089,18 @@ static int test_srcwin_split(xd3_stream *stream, int ignore) {
     return ret;
   }
 
-  snprintf_func(buf, TESTBUFSIZE, "%s -d -f -B 4194304 -s - %s %s < %s",
-                program_name, TEST_DELTA_FILE, TEST_RECON_FILE,
-                TEST_SOURCE_FILE);
+  /* A pipe can't seek, so this decodes through the FIFO cache */
+  snprintf_func(
+      buf, TESTBUFSIZE, "cat %s | %s -d -v -v -f -B 4194304 -s - %s %s 2>%s",
+      TEST_SOURCE_FILE, program_name, TEST_DELTA_FILE, TEST_RECON_FILE, vlog);
   if ((ret = do_cmd(stream, buf)) ||
       (ret = test_compare_files(TEST_TARGET_FILE, TEST_RECON_FILE))) {
+    return ret;
+  }
+
+  snprintf_func(buf, TESTBUFSIZE, "grep -q '#bufs 64 (FIFO)' %s", vlog);
+  if ((ret = do_cmd(stream, buf))) {
+    stream->msg = "srcwin: piped source was not split into 64 FIFO blocks";
     return ret;
   }
 
